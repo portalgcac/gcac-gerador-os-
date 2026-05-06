@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Cliente } from '../../types';
 import { useClientes } from '../../context/ClientesContext';
 import { X, Save, Eye, EyeOff, CheckCircle } from 'lucide-react';
@@ -11,6 +11,7 @@ interface Props {
 export function FormularioCliente({ clienteEditando, onFechar }: Props) {
   const { criarCliente, atualizarCliente, clubesRegistrados } = useClientes();
   const [salvando, setSalvando] = useState(false);
+  const salvandoRef = useRef(false);
   const [mostrarSenha, setMostrarSenha] = useState(false);
   const [focoClube, setFocoClube] = useState(false);
 
@@ -51,10 +52,12 @@ export function FormularioCliente({ clienteEditando, onFechar }: Props) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (salvandoRef.current) return;
     if (!form.nome.trim() || !form.cpf.trim() || !form.contato.trim()) {
       alert('Nome, CPF e Contato são obrigatórios.');
       return;
     }
+    salvandoRef.current = true;
     setSalvando(true);
     try {
       const payload = {
@@ -80,6 +83,7 @@ export function FormularioCliente({ clienteEditando, onFechar }: Props) {
       onFechar();
     } catch (err) {
       alert('Erro ao salvar o cliente');
+      salvandoRef.current = false;
       setSalvando(false);
     }
   };

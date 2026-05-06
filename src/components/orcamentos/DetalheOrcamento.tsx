@@ -106,6 +106,8 @@ export function DetalheOrcamento({ orcamento }: DetalheOrcamentoProps) {
           valor: s.valor,
           categoria: s.categoria || 'Honorário',
           pagoDireto: s.pagoDireto || s.categoria === 'Laudo',
+          taxaPF: s.taxaPF,
+          exigeGRU: s.exigeGRU,
           statusExecucao: 'Não Iniciado',
           pagoGRU: false
         })),

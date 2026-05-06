@@ -223,6 +223,7 @@ export function FormularioOrcamento({ orcamentoExistente }: FormularioOrcamentoP
           detalhes: '', 
           valor: valorAplicado,
           taxaPF: serv.taxaPF,
+          exigeGRU: serv.exigeGRU,
           categoria: serv.categoria || 'Honorário',
           pagoDireto: isLaudo
         }
@@ -319,6 +320,7 @@ export function FormularioOrcamento({ orcamentoExistente }: FormularioOrcamentoP
           categoria: s.categoria || 'Honorário',
           pagoDireto: s.pagoDireto || s.categoria === 'Laudo',
           taxaPF: s.taxaPF,
+          exigeGRU: s.exigeGRU,
           statusExecucao: 'Não Iniciado',
           pagoGRU: false
         })),

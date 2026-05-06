@@ -145,6 +145,7 @@ export function FormularioOrdem({ ordemExistente }: FormularioOrdemProps) {
   const { clientes, criarCliente, atualizarCliente, buscarClientePorNomeExato, clubesRegistrados } = useClientes();
   const { estado: notif, mostrar, fechar } = useNotificacao();
   const [salvando, setSalvando] = useState(false);
+  const salvandoRef = useRef(false);
   const [mostrarSenha, setMostrarSenha] = useState(false);
   const [focoNome, setFocoNome] = useState(false);
   const [focoClube, setFocoClube] = useState(false);
@@ -354,7 +355,10 @@ export function FormularioOrdem({ ordemExistente }: FormularioOrdemProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (salvandoRef.current) return;
     if (!validar()) { mostrar('erro', 'Corrija os campos destacados antes de salvar.'); return; }
+    
+    salvandoRef.current = true;
     setSalvando(true);
     try {
       const dados = {
@@ -411,6 +415,7 @@ export function FormularioOrdem({ ordemExistente }: FormularioOrdemProps) {
     } catch {
       mostrar('erro', 'Erro ao salvar a OS. Tente novamente.');
     } finally {
+      salvandoRef.current = false;
       setSalvando(false);
     }
   };
