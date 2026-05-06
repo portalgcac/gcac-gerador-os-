@@ -395,7 +395,7 @@ export function OrdensProvider({ children }: { children: React.ReactNode }) {
       registrarPagamento,
       removerPagamento,
       sincronizarComPerfil,
-      itensFila: 0,
+      itensFila: ordens.filter(o => o.pendenteSincronizacao).length,
     }}>
       {children}
     </OrdensContext.Provider>
