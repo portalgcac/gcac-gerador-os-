@@ -15,6 +15,7 @@ import {
   CheckCircle2
 } from 'lucide-react';
 import { useOrdens } from '../../context/OrdensContext';
+import { useClientes } from '../../context/ClientesContext';
 import { formatarMoeda, formatarNumeroOS } from '../../utils/formatters';
 
 export function RotinaDiaria() {
@@ -24,26 +25,35 @@ export function RotinaDiaria() {
     atualizarGruServico, 
     atualizarStatusServico
   } = useOrdens();
+  const { clientes } = useClientes();
 
   // 1. Filtro: Conferência na PF (Protocolados)
   const conferenciasPF = useMemo(() => {
     return ordens.filter(o => 
       o.servicos?.some(s => s.statusExecucao === 'Protocolado — Ag. PF')
-    ).map(o => ({
-      ...o,
-      servicosProtocolados: o.servicos.filter(s => s.statusExecucao === 'Protocolado — Ag. PF')
-    }));
-  }, [ordens]);
+    ).map(o => {
+      const clienteLive = clientes.find(c => c.cpf === o.cpf);
+      return {
+        ...o,
+        senhaGov: clienteLive?.senhaGov || o.senhaGov,
+        servicosProtocolados: o.servicos.filter(s => s.statusExecucao === 'Protocolado — Ag. PF')
+      };
+    });
+  }, [ordens, clientes]);
 
   // 2. Filtro: Pendências de GRU
   const pendenciasGRU = useMemo(() => {
     return ordens.filter(o => 
       o.servicos?.some(s => (s.taxaPF || 0) > 0 && !s.pagoGRU)
-    ).map(o => ({
-      ...o,
-      servicosSemGRU: o.servicos.filter(s => (s.taxaPF || 0) > 0 && !s.pagoGRU)
-    }));
-  }, [ordens]);
+    ).map(o => {
+      const clienteLive = clientes.find(c => c.cpf === o.cpf);
+      return {
+        ...o,
+        senhaGov: clienteLive?.senhaGov || o.senhaGov,
+        servicosSemGRU: o.servicos.filter(s => (s.taxaPF || 0) > 0 && !s.pagoGRU)
+      };
+    });
+  }, [ordens, clientes]);
 
 
 
