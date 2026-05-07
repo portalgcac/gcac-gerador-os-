@@ -559,6 +559,7 @@ export function DetalheOrdem({ ordem }: DetalheOrdemProps) {
                   </div>
               )}
             </div>
+            </div>
 
             <div className="bg-brand-dark-3 rounded-xl border border-brand-dark-5 overflow-hidden">
               <table className="w-full text-left text-xs">

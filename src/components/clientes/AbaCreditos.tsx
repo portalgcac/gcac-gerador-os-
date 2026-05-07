@@ -3,7 +3,7 @@ import { Plus, Trash2, TrendingUp, TrendingDown, Wallet } from 'lucide-react';
 import { Cliente, CreditoCliente } from '../../types';
 import { useClientes } from '../../context/ClientesContext';
 import { useAuth } from '../../context/AuthContext';
-import { formatarMoeda, formatarData } from '../../utils/formatters';
+import { formatarMoeda, formatarData, formatarDataHora } from '../../utils/formatters';
 
 export function AbaCreditos({ cliente }: { cliente: Cliente }) {
   const { buscarCreditos, adicionarCredito, deletarCredito } = useClientes();
@@ -162,7 +162,7 @@ export function AbaCreditos({ cliente }: { cliente: Cliente }) {
                   <div>
                     <p className="text-sm font-bold text-white">{c.descricao}</p>
                     <p className="text-[10px] text-gray-500 mt-1">
-                      {formatarData(c.criadoEm, true)} {c.criadoPorNome ? `• Lançado por ${c.criadoPorNome}` : ''}
+                      {formatarDataHora(c.criadoEm)} {c.criadoPorNome ? `• Lançado por ${c.criadoPorNome}` : ''}
                     </p>
                   </div>
                 </div>
