@@ -26,7 +26,7 @@ interface ExportadorRelatorioProps {
   onClose: () => void;
 }
 
-type FonteDados = 'os' | 'orcamentos' | 'recibos' | 'despesas' | 'clientes';
+type FonteDados = 'os' | 'orcamentos' | 'recibos' | 'despesas' | 'clientes' | 'atividades';
 
 interface ColunaConfig {
   key: string;
@@ -113,6 +113,13 @@ export function ExportadorRelatorio({ isOpen, onClose }: ExportadorRelatorioProp
       { key: 'endereco', label: 'Endereço', selected: true },
       { key: 'observacoes', label: 'Observações', selected: false },
       { key: 'criadoEm', label: 'Data Cadastro', selected: true },
+    ],
+    atividades: [
+      { key: 'data', label: 'Data/Hora', selected: true },
+      { key: 'usuario', label: 'Colaborador', selected: true },
+      { key: 'acao', label: 'Ação', selected: true },
+      { key: 'ordemNumero', label: 'Nº OS', selected: true },
+      { key: 'clienteNome', label: 'Cliente', selected: true },
     ]
   };
 
@@ -126,36 +133,91 @@ export function ExportadorRelatorio({ isOpen, onClose }: ExportadorRelatorioProp
 
   const handleExportar = () => {
     let dadosParaFiltrar: any[] = [];
-    if (fonte === 'os') dadosParaFiltrar = ordens;
-    else if (fonte === 'orcamentos') dadosParaFiltrar = orcamentos;
-    else if (fonte === 'recibos') dadosParaFiltrar = recibos;
-    else if (fonte === 'despesas') dadosParaFiltrar = despesas;
-    else if (fonte === 'clientes') dadosParaFiltrar = clientes;
-
-    const filtrados = dadosParaFiltrar.filter(item => {
-      const dataItem = parseISO(item.criadoEm || item.data);
-      const noIntervalo = isWithinInterval(dataItem, {
-        start: startOfDay(parseISO(dataInicio)),
-        end: endOfDay(parseISO(dataFim))
-      });
-
-      if (!noIntervalo) return false;
-
-      // Filtros específicos de OS
-      if (fonte === 'os') {
-        if (statusFiltro.length > 0 && !statusFiltro.includes(item.status)) return false;
-        if (execucaoFiltro.length > 0) {
-          const temStatusExecucao = item.servicos?.some((s: any) => execucaoFiltro.includes(s.statusExecucao));
-          if (!temStatusExecucao) return false;
+    
+    if (fonte === 'atividades') {
+      // Lógica especial para construir a lista de atividades a partir das ordens
+      const atividadesGeradas: any[] = [];
+      ordens.forEach(o => {
+        // Criação de O.S.
+        if (colaboradorFiltro === 'Todos' || o.criadoPorNome === colaboradorFiltro) {
+          const dataCriacao = parseISO(o.criadoEm);
+          if (isWithinInterval(dataCriacao, { start: startOfDay(parseISO(dataInicio)), end: endOfDay(parseISO(dataFim)) })) {
+            atividadesGeradas.push({
+              id: `criacao-${o.id}`,
+              data: o.criadoEm,
+              usuario: o.criadoPorNome || 'Sistema',
+              acao: 'Criou OS',
+              ordemNumero: o.numero,
+              clienteNome: o.nomeCliente
+            });
+          }
         }
-        if (colaboradorFiltro !== 'Todos' && item.criadoPorNome !== colaboradorFiltro) return false;
-      }
 
-      return true;
-    });
+        // Histórico Operacional
+        if (o.historicoStatus) {
+          o.historicoStatus.forEach(evento => {
+            const dataEvento = parseISO(evento.data);
+            if (isWithinInterval(dataEvento, { start: startOfDay(parseISO(dataInicio)), end: endOfDay(parseISO(dataFim)) })) {
+              if (evento.tipo === 'status_execucao') {
+                if (colaboradorFiltro === 'Todos' || evento.usuario === colaboradorFiltro) {
+                  if (evento.valorNovo === 'Protocolado — Ag. PF') {
+                    atividadesGeradas.push({
+                      id: evento.id,
+                      data: evento.data,
+                      usuario: evento.usuario,
+                      acao: 'Protocolou Serviço',
+                      ordemNumero: o.numero,
+                      clienteNome: o.nomeCliente
+                    });
+                  } else if (evento.valorNovo === 'Concluído') {
+                    atividadesGeradas.push({
+                      id: evento.id,
+                      data: evento.data,
+                      usuario: evento.usuario,
+                      acao: 'Concluiu Serviço',
+                      ordemNumero: o.numero,
+                      clienteNome: o.nomeCliente
+                    });
+                  }
+                }
+              }
+            }
+          });
+        }
+      });
+      dadosParaFiltrar = atividadesGeradas.sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime());
+    } else {
+      if (fonte === 'os') dadosParaFiltrar = ordens;
+      else if (fonte === 'orcamentos') dadosParaFiltrar = orcamentos;
+      else if (fonte === 'recibos') dadosParaFiltrar = recibos;
+      else if (fonte === 'despesas') dadosParaFiltrar = despesas;
+      else if (fonte === 'clientes') dadosParaFiltrar = clientes;
+
+      dadosParaFiltrar = dadosParaFiltrar.filter(item => {
+        const dataItem = parseISO(item.criadoEm || item.data);
+        const noIntervalo = isWithinInterval(dataItem, {
+          start: startOfDay(parseISO(dataInicio)),
+          end: endOfDay(parseISO(dataFim))
+        });
+
+        if (!noIntervalo) return false;
+
+        // Filtros específicos de OS
+        if (fonte === 'os') {
+          if (statusFiltro.length > 0 && !statusFiltro.includes(item.status)) return false;
+          if (execucaoFiltro.length > 0) {
+            const temStatusExecucao = item.servicos?.some((s: any) => execucaoFiltro.includes(s.statusExecucao));
+            if (!temStatusExecucao) return false;
+          }
+          if (colaboradorFiltro !== 'Todos' && item.criadoPorNome !== colaboradorFiltro) return false;
+        }
+
+        return true;
+      });
+    }
 
     const colunasSelecionadas = colunas.filter(c => c.selected);
-    const dadosFormatados = filtrados.map(item => {
+    const dadosFormatados = dadosParaFiltrar.map(item => {
       const obj: any = {};
       colunasSelecionadas.forEach(col => {
         let valor = item[col.key];
@@ -165,7 +227,7 @@ export function ExportadorRelatorio({ isOpen, onClose }: ExportadorRelatorioProp
           valor = format(parseISO(valor), 'dd/MM/yyyy HH:mm');
         } else if (col.key === 'servicos' && Array.isArray(valor)) {
           valor = valor.map((s: any) => s.nome).join(', ');
-        } else if (col.key === 'numero') {
+        } else if (col.key === 'numero' || col.key === 'ordemNumero') {
           valor = `#${String(valor).padStart(4, '0')}`;
         }
         
@@ -229,6 +291,7 @@ export function ExportadorRelatorio({ isOpen, onClose }: ExportadorRelatorioProp
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {[
                 { id: 'os', label: 'Ordens de Serviço', icon: <Database size={24} />, desc: 'Relatório detalhado de atendimentos e pagamentos' },
+                { id: 'atividades', label: 'Atividades da Equipe', icon: <CheckSquare size={24} />, desc: 'Métricas e histórico de ações operacionais' },
                 { id: 'recibos', label: 'Recibos', icon: <Download size={24} />, desc: 'Listagem de todos os recibos emitidos' },
                 { id: 'orcamentos', label: 'Orçamentos', icon: <Settings size={24} />, desc: 'Status de orçamentos e conversão' },
                 { id: 'despesas', label: 'Despesas PJ', icon: <Download size={24} />, desc: 'Controle de saídas e categorias' },
@@ -347,6 +410,25 @@ export function ExportadorRelatorio({ isOpen, onClose }: ExportadorRelatorioProp
                     </select>
                   </div>
                 </>
+              )}
+
+              {fonte === 'atividades' && (
+                <div>
+                  <label className="label">Filtrar por Colaborador</label>
+                  <select 
+                    className="select" 
+                    value={colaboradorFiltro}
+                    onChange={e => setColaboradorFiltro(e.target.value)}
+                  >
+                    <option value="Todos">Todos os Colaboradores</option>
+                    {usuarios.map(u => (
+                      <option key={u.id} value={u.nome}>{u.nome}</option>
+                    ))}
+                  </select>
+                  <p className="text-[10px] text-gray-500 mt-2">
+                    A exportação retornará o log de operações (Criação de O.S., Protocolos e Deferimentos) do período.
+                  </p>
+                </div>
               )}
               
               {/* Adicionar mais filtros específicos conforme necessário */}
