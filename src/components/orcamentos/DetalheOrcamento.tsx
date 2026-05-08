@@ -240,6 +240,20 @@ export function DetalheOrcamento({ orcamento }: DetalheOrcamentoProps) {
                     {serv.detalhes && (
                       <p className="text-sm text-gray-400 mt-1 whitespace-pre-wrap">{serv.detalhes}</p>
                     )}
+                    {((serv as any).responsavelNome || (serv as any).valorRepasse) && (
+                      <div className="flex flex-wrap items-center gap-2 mt-2">
+                        {(serv as any).responsavelNome && (
+                          <span className="text-[10px] font-black text-gray-400 bg-brand-dark-5 px-2 py-0.5 rounded border border-brand-dark-5 uppercase tracking-widest flex items-center gap-1.5">
+                            <User size={10} /> {(serv as any).responsavelNome}
+                          </span>
+                        )}
+                        {(serv as any).valorRepasse ? (
+                          <span className="text-[10px] font-black text-brand-green-light bg-brand-green/10 px-2 py-0.5 rounded border border-brand-green/20 uppercase tracking-widest flex items-center gap-1.5">
+                            <DollarSign size={10} /> COMISSÃO: {formatarMoeda((serv as any).valorRepasse)}
+                          </span>
+                        ) : null}
+                      </div>
+                    )}
                   </div>
                   <div className="text-left sm:text-right flex-shrink-0">
                     <p className="text-xs font-bold text-gray-500 uppercase">Valor</p>
