@@ -418,6 +418,21 @@ export function DetalheOrdem({ ordem }: DetalheOrdemProps) {
                     </div>
                   )}
 
+                  {(serv.responsavelNome || serv.valorRepasse) && (
+                    <div className="flex flex-wrap items-center gap-2 mt-1">
+                      {serv.responsavelNome && (
+                        <span className="text-[10px] font-black text-gray-400 bg-brand-dark-5 px-2 py-0.5 rounded border border-brand-dark-5 uppercase tracking-widest flex items-center gap-1.5">
+                          <Users size={10} /> {serv.responsavelNome}
+                        </span>
+                      )}
+                      {serv.valorRepasse ? (
+                        <span className="text-[10px] font-black text-brand-green-light bg-brand-green/10 px-2 py-0.5 rounded border border-brand-green/20 uppercase tracking-widest flex items-center gap-1.5">
+                          <CreditCard size={10} /> COMISSÃO: {formatarMoeda(serv.valorRepasse)}
+                        </span>
+                      ) : null}
+                    </div>
+                  )}
+
                   {serv.detalhes.trim() && (
                     <p className="text-sm text-gray-300 whitespace-pre-wrap">
                       {serv.detalhes}

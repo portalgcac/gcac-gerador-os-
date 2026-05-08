@@ -129,6 +129,8 @@ export interface OrdemDeServico {
     categoria?: 'Honorário' | 'Laudo';
     pagoDireto?: boolean; // Se o pagamento vai direto ao terceiro (instrutor/psicóloga)
     protocolo?: string;
+    responsavelNome?: string;
+    valorRepasse?: number;
   }[];
   valor: number;
   valorPago: number;

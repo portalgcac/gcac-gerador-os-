@@ -16,6 +16,7 @@ import { useServicos } from '../../context/ServicosContext';
 import { Cliente } from '../../types';
 import { Notificacao, useNotificacao } from '../common/Notificacao';
 import { classeStatusExecucao, iconeStatusExecucao, formatarMoeda, removerAcentos } from '../../utils/formatters';
+import { supabase } from '../../db/supabase';
 
 interface FormularioOrdemProps {
   ordemExistente?: OrdemDeServico;
@@ -149,6 +150,15 @@ export function FormularioOrdem({ ordemExistente }: FormularioOrdemProps) {
   const [mostrarSenha, setMostrarSenha] = useState(false);
   const [focoNome, setFocoNome] = useState(false);
   const [focoClube, setFocoClube] = useState(false);
+  const [usuarios, setUsuarios] = useState<{ id: string; nome: string }[]>([]);
+
+  useEffect(() => {
+    const carregarUsuarios = async () => {
+      const { data } = await supabase.from('usuarios_autorizados').select('id, nome').eq('ativo', true).order('nome');
+      if (data) setUsuarios(data);
+    };
+    carregarUsuarios();
+  }, []);
 
   const [form, setForm] = useState({
     nomeCliente:       ordemExistente?.nomeCliente       ?? '',
@@ -325,6 +335,20 @@ export function FormularioOrdem({ ordemExistente }: FormularioOrdemProps) {
     setForm(f => ({
       ...f,
       servicos: (f.servicos as any[]).map((s: any) => s.id === id ? { ...s, protocolo } : s)
+    }));
+  };
+
+  const atualizarResponsavelServico = (id: string, responsavelNome: string) => {
+    setForm(f => ({
+      ...f,
+      servicos: (f.servicos as any[]).map((s: any) => s.id === id ? { ...s, responsavelNome } : s)
+    }));
+  };
+
+  const atualizarRepasseServico = (id: string, valorRepasse: number) => {
+    setForm(f => ({
+      ...f,
+      servicos: (f.servicos as any[]).map((s: any) => s.id === id ? { ...s, valorRepasse } : s)
     }));
   };
 
@@ -730,6 +754,43 @@ export function FormularioOrdem({ ordemExistente }: FormularioOrdemProps) {
                     </div>
                   </>
                 )}
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                  <div>
+                    <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest flex items-center gap-1.5 mb-1.5">
+                      <Users size={11} className="text-gray-400" />
+                      Colaborador Responsável
+                    </label>
+                    <select
+                      className="w-full bg-brand-dark-3 border border-brand-dark-5 focus:border-brand-blue/50 rounded-lg px-3 py-2 text-sm text-gray-200 outline-none transition-colors"
+                      value={serv.responsavelNome || ''}
+                      onChange={e => atualizarResponsavelServico(serv.id, e.target.value)}
+                    >
+                      <option value="">Selecione o responsável</option>
+                      {usuarios.map(u => (
+                        <option key={u.id} value={u.nome}>{u.nome}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest flex items-center gap-1.5 mb-1.5">
+                      <DollarSign size={11} className="text-brand-green" />
+                      Repasse / Comissão (R$)
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm font-medium">R$</span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        className="w-full pl-9 bg-brand-dark-3 border border-brand-dark-5 focus:border-brand-blue/50 rounded-lg px-3 py-2 text-sm text-gray-200 outline-none transition-colors"
+                        placeholder="0,00"
+                        value={serv.valorRepasse ?? ''}
+                        onChange={e => atualizarRepasseServico(serv.id, parseFloat(e.target.value) || 0)}
+                      />
+                    </div>
+                  </div>
+                </div>
 
                 <textarea
                   className="input resize-none bg-brand-dark-3 border-transparent focus:border-brand-blue/30"
