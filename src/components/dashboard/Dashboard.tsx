@@ -35,6 +35,8 @@ export function Dashboard() {
   const despesasMes = despesas.filter(d => isSameMonth(parseISO(d.data), dataAtual));
   const valorDespesas = despesasMes.reduce((s, d) => s + (d.valor || 0), 0);
   
+  const ehAdmin = usuario?.role === 'admin';
+
   const stats = {
     // Contagens Globais (Mês Atual)
     total:       ordensParaStats.length,
@@ -143,72 +145,78 @@ export function Dashboard() {
       <div className="space-y-3">
         <div className="flex items-center gap-2 mb-2">
           <div className="w-1 h-4 bg-brand-blue rounded-full" />
-          <h2 className="text-xs font-bold text-gray-500 uppercase tracking-widest">Detalhamento de Ordens de Serviço</h2>
+          <h2 className="text-xs font-bold text-gray-500 uppercase tracking-widest">Resumo de Ordens de Serviço</h2>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className={`grid grid-cols-1 ${ehAdmin ? 'sm:grid-cols-3' : 'sm:grid-cols-1'} gap-3`}>
           <StatCard
-            titulo="Total de OS"
+            titulo="Total de OS (Mês Atual)"
             valor={stats.total}
             icone={<FileText size={20} className="text-brand-blue-light" />}
             cor="blue"
             onClick={() => navigate('/ordens')}
           />
-          <StatCard
-            titulo="Pagamento Pendente"
-            valor={stats.pendente}
-            icone={<Clock size={20} className="text-yellow-400" />}
-            cor="yellow"
-            onClick={() => navigate('/ordens')}
-          />
-          <StatCard
-            titulo="Pagas"
-            valor={stats.pagas}
-            icone={<CheckCircle size={20} className="text-brand-green" />}
-            cor="green"
-            onClick={() => navigate('/ordens')}
-          />
+          {ehAdmin && (
+            <>
+              <StatCard
+                titulo="Pagamento Pendente"
+                valor={stats.pendente}
+                icone={<Clock size={20} className="text-yellow-400" />}
+                cor="yellow"
+                onClick={() => navigate('/ordens')}
+              />
+              <StatCard
+                titulo="Pagas"
+                valor={stats.pagas}
+                icone={<CheckCircle size={20} className="text-brand-green" />}
+                cor="green"
+                onClick={() => navigate('/ordens')}
+              />
+            </>
+          )}
         </div>
       </div>
 
       {/* ── Banner de Receita e Lucro ── */}
-      <div className="card bg-gradient-to-br from-brand-dark-3 to-brand-dark-2 border border-brand-dark-5 overflow-hidden relative">
-        <div className="absolute top-0 right-0 w-32 h-32 bg-brand-green/5 rounded-full blur-3xl -mr-16 -mt-16" />
-        
-        <div className="flex flex-col md:flex-row items-stretch gap-6 relative z-10">
-          {/* Margem Operacional - Principal */}
-          <div className="flex-1">
-            <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Margem Operacional (Lucro Bruto)</p>
-            <div className="flex items-baseline gap-2">
-              <p className="text-4xl font-black text-white">{formatarMoeda(margemServicos)}</p>
-              <span className="text-xs font-bold text-brand-green bg-brand-green/10 px-2 py-0.5 rounded-full">
-                {stats.receita > 0 ? ((margemServicos / stats.receita) * 100).toFixed(0) : 0}% de margem
-              </span>
-            </div>
-            <p className="text-xs text-gray-500 mt-2 italic">Reflete faturamento menos taxas da PF (Mês atual).</p>
-          </div>
-
-          <div className="hidden md:block w-px bg-brand-dark-5" />
-
-          {/* Lucro Líquido e Breakdown */}
-          <div className="grid grid-cols-2 md:block gap-4 md:space-y-4 min-w-[200px]">
-            <div>
-              <p className="text-[10px] font-bold text-brand-blue uppercase tracking-wider">Lucro Líquido Real</p>
-              <p className="text-lg font-bold text-white">{formatarMoeda(lucroLiquido)}</p>
-              <p className="text-[9px] text-gray-500">Já subtraídas as despesas PJ</p>
-            </div>
-            <div className="flex gap-4">
-              <div>
-                <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Despesas PJ</p>
-                <p className="text-xs font-bold text-red-400">-{formatarMoeda(valorDespesas)}</p>
+      {ehAdmin && (
+        <div className="card bg-gradient-to-br from-brand-dark-3 to-brand-dark-2 border border-brand-dark-5 overflow-hidden relative">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-brand-green/5 rounded-full blur-3xl -mr-16 -mt-16" />
+          
+          <div className="flex flex-col md:flex-row items-stretch gap-6 relative z-10">
+            {/* Margem Operacional - Principal */}
+            <div className="flex-1">
+              <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Margem Operacional (Lucro Bruto)</p>
+              <div className="flex items-baseline gap-2">
+                <p className="text-4xl font-black text-white">{formatarMoeda(margemServicos)}</p>
+                <span className="text-xs font-bold text-brand-green bg-brand-green/10 px-2 py-0.5 rounded-full">
+                  {stats.receita > 0 ? ((margemServicos / stats.receita) * 100).toFixed(0) : 0}% de margem
+                </span>
               </div>
+              <p className="text-xs text-gray-500 mt-2 italic">Reflete faturamento menos taxas da PF (Mês atual).</p>
+            </div>
+
+            <div className="hidden md:block w-px bg-brand-dark-5" />
+
+            {/* Lucro Líquido e Breakdown */}
+            <div className="grid grid-cols-2 md:block gap-4 md:space-y-4 min-w-[200px]">
               <div>
-                <p className="text-[10px] font-bold text-brand-green uppercase tracking-wider">Total Recebido</p>
-                <p className="text-xs font-bold text-brand-green-light">{formatarMoeda(stats.receita)}</p>
+                <p className="text-[10px] font-bold text-brand-blue uppercase tracking-wider">Lucro Líquido Real</p>
+                <p className="text-lg font-bold text-white">{formatarMoeda(lucroLiquido)}</p>
+                <p className="text-[9px] text-gray-500">Já subtraídas as despesas PJ</p>
+              </div>
+              <div className="flex gap-4">
+                <div>
+                  <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Despesas PJ</p>
+                  <p className="text-xs font-bold text-red-400">-{formatarMoeda(valorDespesas)}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-brand-green uppercase tracking-wider">Total Recebido</p>
+                  <p className="text-xs font-bold text-brand-green-light">{formatarMoeda(stats.receita)}</p>
+                </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* ── Resumo Operacional ── */}
       <div>
@@ -251,48 +259,50 @@ export function Dashboard() {
       </div>
 
       {/* ── Resumo de Orçamentos ── */}
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-base font-bold text-white flex items-center gap-2">
-            <Receipt size={18} className="text-yellow-500" />
-            Resumo de Orçamentos
-          </h2>
-          <button onClick={() => navigate('/orcamentos')} className="text-sm text-yellow-500 hover:text-yellow-400 transition-colors">
-            Ver orçamentos →
-          </button>
+      {ehAdmin && (
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-base font-bold text-white flex items-center gap-2">
+              <Receipt size={18} className="text-yellow-500" />
+              Resumo de Orçamentos
+            </h2>
+            <button onClick={() => navigate('/orcamentos')} className="text-sm text-yellow-500 hover:text-yellow-400 transition-colors">
+              Ver orçamentos →
+            </button>
+          </div>
+          
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <StatCard
+              titulo="Total Emitidos"
+              valor={orcStats.total}
+              icone={<Receipt size={20} className="text-brand-blue-light" />}
+              cor="blue"
+              onClick={() => navigate('/orcamentos')}
+            />
+            <StatCard
+              titulo="Aguardando Aprovação"
+              valor={orcStats.pendente}
+              icone={<Clock size={20} className="text-yellow-400" />}
+              cor="yellow"
+              onClick={() => navigate('/orcamentos')}
+            />
+            <StatCard
+              titulo="Aprovados (Convertidos)"
+              valor={orcStats.aprovado}
+              icone={<CheckCircle size={20} className="text-brand-green" />}
+              cor="green"
+              onClick={() => navigate('/orcamentos')}
+            />
+            <StatCard
+              titulo="Recusados"
+              valor={orcStats.recusado}
+              icone={<XCircle size={20} className="text-red-400" />}
+              cor="red"
+              onClick={() => navigate('/orcamentos')}
+            />
+          </div>
         </div>
-        
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <StatCard
-            titulo="Total Emitidos"
-            valor={orcStats.total}
-            icone={<Receipt size={20} className="text-brand-blue-light" />}
-            cor="blue"
-            onClick={() => navigate('/orcamentos')}
-          />
-          <StatCard
-            titulo="Aguardando Aprovação"
-            valor={orcStats.pendente}
-            icone={<Clock size={20} className="text-yellow-400" />}
-            cor="yellow"
-            onClick={() => navigate('/orcamentos')}
-          />
-          <StatCard
-            titulo="Aprovados (Convertidos)"
-            valor={orcStats.aprovado}
-            icone={<CheckCircle size={20} className="text-brand-green" />}
-            cor="green"
-            onClick={() => navigate('/orcamentos')}
-          />
-          <StatCard
-            titulo="Recusados"
-            valor={orcStats.recusado}
-            icone={<XCircle size={20} className="text-red-400" />}
-            cor="red"
-            onClick={() => navigate('/orcamentos')}
-          />
-        </div>
-      </div>
+      )}
 
       {/* ── Ordens Recentes ── */}
       <div>
@@ -333,7 +343,9 @@ export function Dashboard() {
                   <p className="text-xs text-gray-400">{formatarData(ordem.criadoEm)}</p>
                 </div>
                 <div className="flex-shrink-0 flex items-center gap-2">
-                  <span className="text-sm font-bold text-brand-green">{formatarMoeda(ordem.valor)}</span>
+                  {ehAdmin && (
+                    <span className="text-sm font-bold text-brand-green">{formatarMoeda(ordem.valor)}</span>
+                  )}
                   <span className={classeStatus(ordem.status)}>{ordem.status}</span>
                   <ChevronRight size={14} className="text-gray-600" />
                 </div>
