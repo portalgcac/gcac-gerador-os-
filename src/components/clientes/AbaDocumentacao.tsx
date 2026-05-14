@@ -236,38 +236,40 @@ export function AbaDocumentacao({ cliente }: Props) {
         {manejos.length === 0 ? (
           <EmptyState msg="Nenhuma autorização de manejo cadastrada." />
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="space-y-3">
             {manejos.map(m => (
-              <div key={m.id} className="card bg-brand-dark-3/50 border-brand-dark-5 p-4 group">
-                <div className="flex justify-between items-start mb-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-green-500/10 flex items-center justify-center text-green-500">
-                      <FileText size={16} />
+              <div key={m.id} className="card bg-brand-dark-3/50 border-brand-dark-5 p-0 overflow-hidden group">
+                <div className="p-4 flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center text-green-500">
+                      <FileText size={20} />
                     </div>
                     <div>
-                      <p className="text-sm font-bold text-white">{m.nomeFazenda}</p>
-                      <p className="text-[10px] text-gray-500 uppercase font-bold">{m.cidade}</p>
+                      <p className="text-sm font-bold text-white">
+                        {m.nomeFazenda} • {m.cidade}
+                      </p>
+                      <p className="text-[10px] text-gray-500 uppercase font-bold tracking-widest">
+                        CAR: {m.numeroCar} • {m.nomeProprietario}
+                      </p>
                     </div>
                   </div>
-                  <button onClick={() => {
-                    if(confirm('Excluir esta autorização?')) {
-                      deletarManejo(m.id).then(carregarDados);
-                    }
-                  }} className="opacity-0 group-hover:opacity-100 transition-opacity p-1 text-gray-600 hover:text-red-400">
-                    <Trash2 size={16} />
-                  </button>
-                </div>
-                
-                <div className="space-y-2 mb-3">
-                  <div>
-                    <p className="text-[9px] text-gray-500 font-bold uppercase tracking-wider">CAR / Proprietário</p>
-                    <p className="text-[11px] text-white font-medium">{m.numeroCar} • {m.nomeProprietario}</p>
+                  
+                  <div className="flex items-center gap-6">
+                    <div className="text-right">
+                      <p className="text-[10px] text-gray-500 font-bold uppercase mb-1">Validade Manejo</p>
+                      <BadgeVencimento data={m.vencimento} tipo="MANEJO" />
+                    </div>
+                    <button 
+                      onClick={() => {
+                        if(confirm('Excluir esta autorização?')) {
+                          deletarManejo(m.id).then(carregarDados);
+                        }
+                      }} 
+                      className="text-gray-600 hover:text-red-400 p-1 transition-colors"
+                    >
+                      <Trash2 size={18} />
+                    </button>
                   </div>
-                </div>
-
-                <div className="flex items-center justify-between pt-3 border-t border-brand-dark-5">
-                   <span className="text-[10px] text-gray-500 font-bold uppercase">Validade</span>
-                   <BadgeVencimento data={m.vencimento} tipo="MANEJO" />
                 </div>
               </div>
             ))}
