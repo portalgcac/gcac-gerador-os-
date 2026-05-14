@@ -146,6 +146,8 @@ export function FormularioRecibo() {
     try {
       const id = await criarRecibo({
         ...form,
+        clienteNome: form.clienteNome.trim().toUpperCase(),
+        servicos: form.servicos.map((s: any) => ({ ...s, nome: s.nome.trim().toUpperCase() })),
         emitenteNome: EMITENTE.nome,
         emitenteCNPJ: EMITENTE.cnpj
       });
@@ -229,7 +231,7 @@ export function FormularioRecibo() {
                     className={`input uppercase ${erros.clienteNome ? 'input-error' : ''}`}
                     placeholder="Nome completo ou Razão Social"
                     value={form.clienteNome}
-                    onChange={e => atualizar('clienteNome', e.target.value.toUpperCase())}
+                    onChange={e => atualizar('clienteNome', e.target.value)}
                   />
                 </div>
                 <div>
@@ -301,7 +303,7 @@ export function FormularioRecibo() {
                         type="text"
                         className="bg-transparent border-none text-sm font-bold text-white w-full focus:ring-0 uppercase p-0"
                         value={s.nome}
-                        onChange={(e) => atualizarServico(s.id, 'nome', e.target.value.toUpperCase())}
+                        onChange={(e) => atualizarServico(s.id, 'nome', e.target.value)}
                       />
                     </div>
                     <div className="col-span-2 text-right flex items-center justify-end gap-1">

@@ -386,14 +386,18 @@ export function FormularioOrdem({ ordemExistente }: FormularioOrdemProps) {
     setSalvando(true);
     try {
       const dados = {
-        nomeCliente:       form.nomeCliente.trim(),
+        nomeCliente:       form.nomeCliente.trim().toUpperCase(),
         contato:           form.contato.trim(),
         cpf:               form.cpf.trim(),
         senhaGov:          form.senhaGov.trim(),
         filiadoProTiro:    form.filiadoProTiro,
-        clubeFiliado:      form.filiadoProTiro ? '' : form.clubeFiliado.trim(),
-        endereco:          form.endereco.trim(),
-        servicos:          (form.servicos as any[]).map((s: any) => ({ ...s, detalhes: (s.detalhes || '').trim() })),
+        clubeFiliado:      form.filiadoProTiro ? '' : form.clubeFiliado.trim().toUpperCase(),
+        endereco:          form.endereco.trim().toUpperCase(),
+        servicos:          (form.servicos as any[]).map((s: any) => ({ 
+          ...s, 
+          detalhes: (s.detalhes || '').trim(),
+          protocolo: (s.protocolo || '').trim().toUpperCase()
+        })),
         valor:             form.valor,
         taxaPFTotal:       (form.servicos as any[]).reduce((acc: number, s: any) => acc + (s.taxaPF || 0), 0),
         formaPagamento:    form.formaPagamento,
@@ -460,7 +464,7 @@ export function FormularioOrdem({ ordemExistente }: FormularioOrdemProps) {
             <label className="label label-required">Nome Completo</label>
             <input id="campo-nome" type="text" className={`input uppercase ${erros.nomeCliente ? 'input-error' : ''}`}
               placeholder="Nome completo do cliente" value={form.nomeCliente}
-              onChange={e => atualizar('nomeCliente', e.target.value.toUpperCase())}
+              onChange={e => atualizar('nomeCliente', e.target.value)}
               onFocus={() => setFocoNome(true)}
               onBlur={() => setTimeout(() => setFocoNome(false), 200)}
             />
@@ -535,7 +539,7 @@ export function FormularioOrdem({ ordemExistente }: FormularioOrdemProps) {
               className="input uppercase h-20 py-2 resize-none" 
               placeholder="Rua, número, bairro, CEP, cidade-UF..." 
               value={form.endereco}
-              onChange={e => atualizar('endereco', e.target.value.toUpperCase())}
+              onChange={e => atualizar('endereco', e.target.value)}
             />
           </div>
 
@@ -584,7 +588,7 @@ export function FormularioOrdem({ ordemExistente }: FormularioOrdemProps) {
                   className={`input uppercase ${erros.clubeFiliado ? 'input-error' : ''}`}
                   placeholder="Nome do clube de tiro onde é filiado..."
                   value={form.clubeFiliado}
-                  onChange={e => atualizar('clubeFiliado', e.target.value.toUpperCase())}
+                  onChange={e => atualizar('clubeFiliado', e.target.value)}
                   onFocus={() => setFocoClube(true)}
                   onBlur={() => setTimeout(() => setFocoClube(false), 200)}
                 />

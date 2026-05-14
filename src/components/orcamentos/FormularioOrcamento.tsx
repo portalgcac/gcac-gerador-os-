@@ -316,13 +316,13 @@ export function FormularioOrcamento({ orcamentoExistente }: FormularioOrcamentoP
 
       if (!clienteExistente) {
         await criarCliente({
-          nome: nomeClienteFormatado,
+          nome: nomeClienteFormatado.toUpperCase(),
           cpf: dados.cpf,
           contato: dados.contato,
           senhaGov: dados.senhaGov || '',
           filiadoProTiro: dados.filiadoProTiro || false,
-          clubeFiliado: dados.clubeFiliado || 'NÃO RELATADO',
-          endereco: dados.endereco || '',
+          clubeFiliado: (dados.clubeFiliado || 'NÃO RELATADO').toUpperCase(),
+          endereco: (dados.endereco || '').toUpperCase(),
           observacoes: ''
         });
       }
@@ -385,13 +385,13 @@ export function FormularioOrcamento({ orcamentoExistente }: FormularioOrcamentoP
     
     try {
       const dados = {
-        nomeCliente:       form.nomeCliente.trim(),
+        nomeCliente:       form.nomeCliente.trim().toUpperCase(),
         contato:           form.contato.trim(),
         cpf:               form.cpf.trim(),
         senhaGov:          form.senhaGov.trim(),
         filiadoProTiro:    form.filiadoProTiro,
-        clubeFiliado:      form.filiadoProTiro ? '' : form.clubeFiliado.trim(),
-        endereco:          form.endereco.trim(),
+        clubeFiliado:      form.filiadoProTiro ? '' : form.clubeFiliado.trim().toUpperCase(),
+        endereco:          form.endereco.trim().toUpperCase(),
         servicos:          form.servicos.map(s => ({ ...s, detalhes: s.detalhes.trim() })),
         valorTotal:        form.valorTotal,
         taxaPFTotal:       form.servicos.reduce((acc, s) => acc + (s.taxaPF || 0), 0),
@@ -448,7 +448,7 @@ export function FormularioOrcamento({ orcamentoExistente }: FormularioOrcamentoP
             <label className="label label-required">Nome Completo</label>
             <input type="text" className={`input uppercase ${erros.nomeCliente ? 'input-error' : ''}`}
               placeholder="Nome completo do cliente" value={form.nomeCliente}
-              onChange={e => atualizar('nomeCliente', e.target.value.toUpperCase())}
+              onChange={e => atualizar('nomeCliente', e.target.value)}
               onFocus={() => setFocoNome(true)}
               onBlur={() => setTimeout(() => setFocoNome(false), 200)}
             />
@@ -521,7 +521,7 @@ export function FormularioOrcamento({ orcamentoExistente }: FormularioOrcamentoP
               className="input uppercase h-20 py-2 resize-none" 
               placeholder="Rua, número, bairro, CEP, cidade-UF..." 
               value={form.endereco}
-              onChange={e => atualizar('endereco', e.target.value.toUpperCase())}
+              onChange={e => atualizar('endereco', e.target.value)}
             />
           </div>
 
@@ -568,7 +568,7 @@ export function FormularioOrcamento({ orcamentoExistente }: FormularioOrcamentoP
                   className={`input uppercase ${erros.clubeFiliado ? 'input-error' : ''}`}
                   placeholder="Nome do clube de tiro onde é filiado..."
                   value={form.clubeFiliado}
-                  onChange={e => atualizar('clubeFiliado', e.target.value.toUpperCase())}
+                  onChange={e => atualizar('clubeFiliado', e.target.value)}
                   onFocus={() => setFocoClube(true)}
                   onBlur={() => setTimeout(() => setFocoClube(false), 200)}
                 />

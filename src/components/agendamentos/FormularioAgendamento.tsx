@@ -183,14 +183,21 @@ export function FormularioAgendamento({ agendamentoExistente, onSuccess, onCance
     e.preventDefault();
     if (!validar()) return;
     
-    setSalvando(true);
     try {
+      const payload = {
+        ...form,
+        clienteNome: form.clienteNome.trim().toUpperCase(),
+        clienteEndereco: form.clienteEndereco.trim().toUpperCase(),
+        local: form.local.trim().toUpperCase(),
+        despachante: form.despachante.trim().toUpperCase()
+      };
+
       if (agendamentoExistente) {
-        await atualizarAgendamento(agendamentoExistente.id, form);
+        await atualizarAgendamento(agendamentoExistente.id, payload);
         mostrar('sucesso', 'Agendamento atualizado com sucesso!');
         setTimeout(() => onSuccess?.(), 1000);
       } else {
-        await criarAgendamento(form);
+        await criarAgendamento(payload);
         setUltimoTipoSalvo(form.tipo);
         setFoiSalvo(true);
         mostrar('sucesso', 'Agendamento criado com sucesso!');
@@ -306,7 +313,7 @@ export function FormularioAgendamento({ agendamentoExistente, onSuccess, onCance
               className={`input uppercase ${erros.clienteNome ? 'input-error' : ''}`}
               placeholder="NOME DO CLIENTE"
               value={form.clienteNome}
-              onChange={e => atualizar('clienteNome', e.target.value.toUpperCase())}
+              onChange={e => atualizar('clienteNome', e.target.value)}
               onFocus={() => setFocoNome(true)}
               onBlur={() => setTimeout(() => setFocoNome(false), 200)}
             />
@@ -358,7 +365,7 @@ export function FormularioAgendamento({ agendamentoExistente, onSuccess, onCance
               className="input h-20 resize-none uppercase"
               placeholder="RUA, NÚMERO, BAIRRO, CEP, CIDADE-UF"
               value={form.clienteEndereco}
-              onChange={e => atualizar('clienteEndereco', e.target.value.toUpperCase())}
+              onChange={e => atualizar('clienteEndereco', e.target.value)}
             />
           </div>
         </div>
@@ -441,7 +448,7 @@ export function FormularioAgendamento({ agendamentoExistente, onSuccess, onCance
                   list="lista-clubes"
                   placeholder="EX: CLUBE PRO TIRO"
                   value={form.local}
-                  onChange={e => atualizar('local', e.target.value.toUpperCase())}
+                  onChange={e => atualizar('local', e.target.value)}
                 />
                 <datalist id="lista-clubes">
                   <option value="CLUBE DE TIRO E CAÇA PRÓ TIRO (JATAÍ)" />
@@ -473,7 +480,7 @@ export function FormularioAgendamento({ agendamentoExistente, onSuccess, onCance
                   list="lista-despachantes"
                   placeholder="EX: GCAC / GUILHERME"
                   value={form.despachante}
-                  onChange={e => atualizar('despachante', e.target.value.toUpperCase())}
+                  onChange={e => atualizar('despachante', e.target.value)}
                 />
                 <datalist id="lista-despachantes">
                   <option value="GCAC / GUILHERME" />

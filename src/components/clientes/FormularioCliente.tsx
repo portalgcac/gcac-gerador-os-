@@ -61,17 +61,17 @@ export function FormularioCliente({ clienteEditando, onFechar }: Props) {
     setSalvando(true);
     try {
       const payload = {
-        nome: form.nome.trim(),
+        nome: form.nome.trim().toUpperCase(),
         cpf: form.cpf.trim(),
         contato: form.contato.trim(),
         senhaGov: form.senhaGov.trim(),
         filiadoProTiro: form.filiadoProTiro,
-        clubeFiliado: form.filiadoProTiro ? '' : form.clubeFiliado.trim(),
+        clubeFiliado: form.filiadoProTiro ? '' : form.clubeFiliado.trim().toUpperCase(),
         observacoes: form.observacoes.trim(),
-        endereco: form.endereco.trim(),
-        numeroCr: form.numeroCr.trim(),
+        endereco: form.endereco.trim().toUpperCase(),
+        numeroCr: form.numeroCr.trim().toUpperCase(),
         vencimentoCr: form.vencimentoCr,
-        numeroCrIbama: form.numeroCrIbama.trim(),
+        numeroCrIbama: form.numeroCrIbama.trim().toUpperCase(),
         vencimentoCrIbama: form.vencimentoCrIbama,
       };
 
@@ -108,7 +108,7 @@ export function FormularioCliente({ clienteEditando, onFechar }: Props) {
           <div>
             <label className="label label-required">Nome Completo</label>
             <input type="text" className="input uppercase" autoFocus
-              value={form.nome} onChange={e => atualizar('nome', e.target.value.toUpperCase())} />
+              value={form.nome} onChange={e => atualizar('nome', e.target.value)} />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -140,7 +140,7 @@ export function FormularioCliente({ clienteEditando, onFechar }: Props) {
             <div>
               <label className="label">Nº CR (Exército/PF)</label>
               <input type="text" className="input uppercase"
-                value={form.numeroCr} onChange={e => atualizar('numeroCr', e.target.value.toUpperCase())} />
+                value={form.numeroCr} onChange={e => atualizar('numeroCr', e.target.value)} />
             </div>
             <div>
               <label className="label">Vencimento CR</label>
@@ -153,7 +153,7 @@ export function FormularioCliente({ clienteEditando, onFechar }: Props) {
             <div>
               <label className="label">Nº CR IBAMA</label>
               <input type="text" className="input uppercase"
-                value={form.numeroCrIbama} onChange={e => atualizar('numeroCrIbama', e.target.value.toUpperCase())} />
+                value={form.numeroCrIbama} onChange={e => atualizar('numeroCrIbama', e.target.value)} />
             </div>
             <div>
               <label className="label">Vencimento CR IBAMA</label>
@@ -186,7 +186,7 @@ export function FormularioCliente({ clienteEditando, onFechar }: Props) {
                 <label className="label label-required">Qual clube é filiado?</label>
                 <input type="text" className="input uppercase"
                   value={form.clubeFiliado}
-                  onChange={e => atualizar('clubeFiliado', e.target.value.toUpperCase())}
+                  onChange={e => atualizar('clubeFiliado', e.target.value)}
                   onFocus={() => setFocoClube(true)}
                   onBlur={() => setTimeout(() => setFocoClube(false), 200)}
                 />
@@ -218,7 +218,7 @@ export function FormularioCliente({ clienteEditando, onFechar }: Props) {
               className="input h-20 py-3 resize-none uppercase"
               placeholder="Rua, número, bairro, CEP, cidade-UF..."
               value={form.endereco}
-              onChange={e => atualizar('endereco', e.target.value.toUpperCase())}
+              onChange={e => atualizar('endereco', e.target.value)}
             />
           </div>
           

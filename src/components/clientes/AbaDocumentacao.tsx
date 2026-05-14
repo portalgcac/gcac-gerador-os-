@@ -273,7 +273,17 @@ export function AbaDocumentacao({ cliente }: Props) {
           onFechar={() => setModalArma(false)} 
           onSalvar={async (d) => {
             try {
-              await salvarArma({ ...d, clienteId: cliente.id });
+              const armaFormatada = {
+                ...d,
+                tipo: d.tipo?.trim().toUpperCase(),
+                modelo: d.modelo?.trim().toUpperCase(),
+                calibre: d.calibre?.trim().toUpperCase(),
+                fabricante: d.fabricante?.trim().toUpperCase(),
+                numeroSerie: d.numeroSerie?.trim().toUpperCase(),
+                numeroSigma: d.numeroSigma?.trim().toUpperCase(),
+                clienteId: cliente.id
+              };
+              await salvarArma(armaFormatada);
               await carregarDados();
               setModalArma(false);
             } catch (err: any) {
@@ -288,7 +298,11 @@ export function AbaDocumentacao({ cliente }: Props) {
         <ModalGt 
           onFechar={() => setModalGt(null)} 
           onSalvar={(d) => 
-            salvarGt({ ...d, armaId: modalGt })
+            salvarGt({ 
+              ...d, 
+              destino: d.destino?.trim().toUpperCase(),
+              armaId: modalGt 
+            })
               .then(() => { 
                 carregarDados(); 
                 setModalGt(null); 
@@ -304,7 +318,14 @@ export function AbaDocumentacao({ cliente }: Props) {
       {modalManejo && (
         <ModalManejo 
           onFechar={() => setModalManejo(false)} 
-          onSalvar={(d) => salvarManejo({ ...d, clienteId: cliente.id }).then(() => { carregarDados(); setModalManejo(false); })} 
+          onSalvar={(d) => salvarManejo({ 
+            ...d, 
+            numeroCar: d.numeroCar?.trim().toUpperCase(),
+            nomeFazenda: d.nomeFazenda?.trim().toUpperCase(),
+            nomeProprietario: d.nomeProprietario?.trim().toUpperCase(),
+            cidade: d.cidade?.trim().toUpperCase(),
+            clienteId: cliente.id 
+          }).then(() => { carregarDados(); setModalManejo(false); })} 
         />
       )}
     </div>
@@ -393,7 +414,7 @@ function ModalArma({ onFechar, onSalvar }: { onFechar: () => void, onSalvar: (d:
                 type="text" 
                 className="input uppercase" 
                 value={form.modelo} 
-                onChange={e => setForm({...form, modelo: e.target.value.toUpperCase()})} 
+                onChange={e => setForm({...form, modelo: e.target.value})} 
                 placeholder="Ex: G2C"
               />
               <datalist id="modelos-arma">
@@ -406,7 +427,7 @@ function ModalArma({ onFechar, onSalvar }: { onFechar: () => void, onSalvar: (d:
                 list="calibres-arma"
                 className="input uppercase" 
                 value={form.calibre} 
-                onChange={e => setForm({...form, calibre: e.target.value.toUpperCase()})} 
+                onChange={e => setForm({...form, calibre: e.target.value})} 
                 placeholder="Ex: 9mm"
               />
               <datalist id="calibres-arma">
@@ -421,7 +442,7 @@ function ModalArma({ onFechar, onSalvar }: { onFechar: () => void, onSalvar: (d:
                 list="fabricantes-arma"
                 className="input uppercase" 
                 value={form.fabricante} 
-                onChange={e => setForm({...form, fabricante: e.target.value.toUpperCase()})} 
+                onChange={e => setForm({...form, fabricante: e.target.value})} 
                 placeholder="Ex: Taurus"
               />
               <datalist id="fabricantes-arma">
@@ -430,13 +451,13 @@ function ModalArma({ onFechar, onSalvar }: { onFechar: () => void, onSalvar: (d:
             </div>
             <div>
               <label className="label">Nº de Série</label>
-              <input type="text" className="input uppercase" value={form.numeroSerie} onChange={e => setForm({...form, numeroSerie: e.target.value.toUpperCase()})} />
+              <input type="text" className="input uppercase" value={form.numeroSerie} onChange={e => setForm({...form, numeroSerie: e.target.value})} />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="label">Nº SIGMA</label>
-              <input type="text" className="input uppercase" value={form.numeroSigma} onChange={e => setForm({...form, numeroSigma: e.target.value.toUpperCase()})} />
+              <input type="text" className="input uppercase" value={form.numeroSigma} onChange={e => setForm({...form, numeroSigma: e.target.value})} />
             </div>
             <div>
               <label className="label">Acervo</label>
@@ -481,7 +502,7 @@ function ModalGt({ onFechar, onSalvar }: { onFechar: () => void, onSalvar: (d: a
           </div>
           <div>
             <label className="label">Destino</label>
-            <input type="text" className="input uppercase" placeholder="Clube, Cidade, Armeiro..." value={form.destino} onChange={e => setForm({...form, destino: e.target.value.toUpperCase()})} />
+            <input type="text" className="input uppercase" placeholder="Clube, Cidade, Armeiro..." value={form.destino} onChange={e => setForm({...form, destino: e.target.value})} />
           </div>
           <div>
             <label className="label">Data de Vencimento</label>
@@ -507,19 +528,19 @@ function ModalManejo({ onFechar, onSalvar }: { onFechar: () => void, onSalvar: (
         <div className="space-y-4">
           <div>
             <label className="label">Nº do CAR da Fazenda</label>
-            <input type="text" className="input uppercase" value={form.numeroCar} onChange={e => setForm({...form, numeroCar: e.target.value.toUpperCase()})} />
+            <input type="text" className="input uppercase" value={form.numeroCar} onChange={e => setForm({...form, numeroCar: e.target.value})} />
           </div>
           <div>
             <label className="label">Nome da Fazenda</label>
-            <input type="text" className="input uppercase" value={form.nomeFazenda} onChange={e => setForm({...form, nomeFazenda: e.target.value.toUpperCase()})} />
+            <input type="text" className="input uppercase" value={form.nomeFazenda} onChange={e => setForm({...form, nomeFazenda: e.target.value})} />
           </div>
           <div>
             <label className="label">Proprietário</label>
-            <input type="text" className="input uppercase" value={form.nomeProprietario} onChange={e => setForm({...form, nomeProprietario: e.target.value.toUpperCase()})} />
+            <input type="text" className="input uppercase" value={form.nomeProprietario} onChange={e => setForm({...form, nomeProprietario: e.target.value})} />
           </div>
           <div>
             <label className="label">Cidade / Estado</label>
-            <input type="text" className="input uppercase" value={form.cidade} onChange={e => setForm({...form, cidade: e.target.value.toUpperCase()})} />
+            <input type="text" className="input uppercase" value={form.cidade} onChange={e => setForm({...form, cidade: e.target.value})} />
           </div>
           <div>
             <label className="label">Validade da Autorização</label>

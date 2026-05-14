@@ -51,9 +51,9 @@ export function ModalServico({ aberto, fechar, servicoParaEditar }: ModalServico
       const t = parseFloat(taxaPF.replace(',', '.')) || 0;
 
       if (servicoParaEditar) {
-        await atualizarServico(servicoParaEditar.id, { nome, valorPadrao: v, valorFiliado: vf, taxaPF: t, exigeGRU, categoria });
+        await atualizarServico(servicoParaEditar.id, { nome: nome.trim().toUpperCase(), valorPadrao: v, valorFiliado: vf, taxaPF: t, exigeGRU, categoria });
       } else {
-        await criarServico({ nome, valorPadrao: v, valorFiliado: vf, taxaPF: t, exigeGRU, categoria });
+        await criarServico({ nome: nome.trim().toUpperCase(), valorPadrao: v, valorFiliado: vf, taxaPF: t, exigeGRU, categoria });
       }
       fechar();
     } catch (err) {
@@ -84,7 +84,7 @@ export function ModalServico({ aberto, fechar, servicoParaEditar }: ModalServico
               className="input uppercase" 
               placeholder="Ex: GUIA DE TRÁFEGO"
               value={nome}
-              onChange={e => setNome(e.target.value.toUpperCase())}
+              onChange={e => setNome(e.target.value)}
               required
               autoFocus
             />
