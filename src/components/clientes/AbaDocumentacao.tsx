@@ -142,9 +142,14 @@ export function AbaDocumentacao({ cliente }: Props) {
                       <p className="text-sm font-bold text-white">
                         {arma.tipo ? `${arma.tipo} - ` : ''}{arma.modelo} • {arma.calibre}
                       </p>
-                      <p className="text-[10px] text-gray-500 uppercase font-bold tracking-widest">
-                        Série: {arma.numeroSerie} • SIGMA: {arma.numeroSigma}
-                      </p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-[10px] text-gray-500 uppercase font-bold tracking-widest">
+                          Série: {arma.numeroSerie} • SIGMA: {arma.numeroSigma}
+                        </p>
+                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-brand-blue/20 text-brand-blue-light font-black uppercase tracking-tighter">
+                          {arma.acervo}
+                        </span>
+                      </div>
                     </div>
                   </div>
                   
@@ -161,7 +166,10 @@ export function AbaDocumentacao({ cliente }: Props) {
                   <div className="border-t border-brand-dark-5 p-4 bg-brand-dark-4 animate-slide-down">
                     <div className="flex items-center justify-between mb-4">
                        <h4 className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Guias de Tráfego (GTs)</h4>
-                       <button onClick={() => setModalGt(arma.id)} className="text-[10px] font-bold text-brand-blue-light hover:underline flex items-center gap-1">
+                       <button 
+                         onClick={() => setModalGt(arma.id)} 
+                         className="text-[10px] font-bold text-brand-blue-light hover:underline flex items-center gap-1"
+                       >
                          <Plus size={12} /> Nova Guia
                        </button>
                     </div>
@@ -296,6 +304,7 @@ export function AbaDocumentacao({ cliente }: Props) {
 
       {modalGt && (
         <ModalGt 
+          armaAcervo={armas.find(a => a.id === modalGt)?.acervo || 'Tiro Desportivo'}
           onFechar={() => setModalGt(null)} 
           onSalvar={(d) => 
             salvarGt({ 
@@ -482,27 +491,90 @@ function ModalArma({ onFechar, onSalvar }: { onFechar: () => void, onSalvar: (d:
   );
 }
 
-function ModalGt({ onFechar, onSalvar }: { onFechar: () => void, onSalvar: (d: any) => void }) {
-  const [form, setForm] = useState({ tipo: 'Treino', vencimento: '', destino: '' });
+function ModalGt({ armaAcervo, onFechar, onSalvar }: { armaAcervo: string, onFechar: () => void, onSalvar: (d: any) => void }) {
+  const [form, setForm] = useState({ tipo: 'Caça', vencimento: '', destino: '' });
+  const [sugestoes, setSugestoes] = useState<string[]>([]);
+  const { buscarGts } = useClientes();
+
+  // Carregar sugestões do banco de dados baseadas em guias existentes
+  useEffect(() => {
+    const carregarSugestoes = async () => {
+      try {
+        const { supabase } = await import('../../db/supabase');
+        // Buscamos destinos únicos de todas as guias do sistema para popular o autocomplete
+        const { data, error } = await supabase
+          .from('guias_trafego')
+          .select('destino, tipo');
+        
+        if (!error && data) {
+          const uniqueDestinos = new Set<string>();
+          data.forEach(gt => {
+            if (gt.destino) uniqueDestinos.add(gt.destino.toUpperCase());
+          });
+          setSugestoes(Array.from(uniqueDestinos).sort());
+        }
+      } catch (err) {
+        console.error('Erro ao carregar sugestões:', err);
+      }
+    };
+    carregarSugestoes();
+  }, []);
+
+  const getLabelDestino = () => {
+    const acervoUpper = armaAcervo.toUpperCase();
+    if (acervoUpper === 'CAÇA') {
+      return form.tipo === 'Caça' ? 'Município / Estado de Destino' : 'Estande de Tiro (Treino)';
+    }
+    if (acervoUpper === 'TIRO DESPORTIVO') {
+      return 'Clube de Tiro de Destino';
+    }
+    return 'Destino';
+  };
+
+  const getPlaceholderDestino = () => {
+    const acervoUpper = armaAcervo.toUpperCase();
+    if (acervoUpper === 'CAÇA') {
+      return form.tipo === 'Caça' ? 'Ex: JATAÍ-GO' : 'Ex: ESTANDE PRO TIRO';
+    }
+    if (acervoUpper === 'TIRO DESPORTIVO') {
+      return 'Ex: CLUBE DE TIRO JATAÍ';
+    }
+    return 'Ex: Clube, Cidade, Armeiro...';
+  };
 
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
       <div className="card w-full max-w-sm animate-scale-up" onClick={e => e.stopPropagation()}>
-        <h3 className="text-lg font-bold text-white mb-6">Nova Guia de Tráfego</h3>
+        <h3 className="text-lg font-bold text-white mb-2">Nova Guia de Tráfego</h3>
+        <p className="text-[10px] text-brand-blue font-black uppercase mb-6 tracking-widest">
+          Arma em Acervo de: {armaAcervo}
+        </p>
+
         <div className="space-y-4">
           <div>
             <label className="label">Tipo de Guia</label>
             <select className="input" value={form.tipo} onChange={e => setForm({...form, tipo: e.target.value})}>
-              <option value="Treino">Treino</option>
               <option value="Caça">Caça</option>
+              <option value="Caça Treino">Caça Treino</option>
+              <option value="Treino">Treino (Tiro Desportivo)</option>
               <option value="Manutenção">Manutenção</option>
               <option value="Transferência">Transferência</option>
               <option value="Outro">Outro</option>
             </select>
           </div>
           <div>
-            <label className="label">Destino</label>
-            <input type="text" className="input uppercase" placeholder="Clube, Cidade, Armeiro..." value={form.destino} onChange={e => setForm({...form, destino: e.target.value})} />
+            <label className="label">{getLabelDestino()}</label>
+            <input 
+              list="sugestoes-destino"
+              type="text" 
+              className="input uppercase" 
+              placeholder={getPlaceholderDestino()} 
+              value={form.destino} 
+              onChange={e => setForm({...form, destino: e.target.value})} 
+            />
+            <datalist id="sugestoes-destino">
+              {sugestoes.map(s => <option key={s} value={s} />)}
+            </datalist>
           </div>
           <div>
             <label className="label">Data de Vencimento</label>
