@@ -275,7 +275,7 @@ export function DetalheCliente({ cliente }: DetalheClienteProps) {
                 Agendamentos
               </TabButton>
               <TabButton ativo={abaAtiva === 'documentos'} onClick={() => setAbaAtiva('documentos')} count={0}>
-                Documentação
+                Acervo & Documentos
               </TabButton>
               <TabButton ativo={abaAtiva === 'creditos'} onClick={() => setAbaAtiva('creditos')} count={0}>
                 Créditos (Haver)
