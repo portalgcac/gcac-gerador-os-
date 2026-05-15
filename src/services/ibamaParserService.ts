@@ -56,17 +56,18 @@ export async function parseIbamaPdf(file: File): Promise<IbamaData> {
   }
 
   // 5. EXTRAIR CIDADE (Busca elástica para Cidade/UF)
+  const UFS = ['AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO'];
   const cidadeRegex = /([A-ZÀ-ÿ\s]{3,30})\s*\/\s*([A-Z]{2})(?=\s|$|\n)/gi;
   let matchC;
   while ((matchC = cidadeRegex.exec(fullText)) !== null) {
     let nome = matchC[1].trim().toUpperCase();
-    nome = nome.replace(/\d+/g, '').replace('MTS', '').replace('KM', '').trim();
-    // Se sobrar algo como "27 ITIQUIRA", pegar só o texto
-    const apenasTexto = nome.match(/[A-ZÀ-ÿ]{3,}/g);
-    if (apenasTexto) {
-      const nomeLimpo = apenasTexto.join(' ');
-      if (nomeLimpo.length > 2 && !['RUA', 'AV', 'RODOVIA', 'ENDERECO', 'MATRICULA'].includes(nomeLimpo)) {
-        data.cidade = `${nomeLimpo}/${matchC[2].toUpperCase()}`;
+    const uf = matchC[2].toUpperCase();
+    
+    // Validar se o UF é real e se o nome não contém palavras de rodapé
+    if (UFS.includes(uf)) {
+      nome = nome.replace(/\d+/g, '').replace('MTS', '').replace('KM', '').trim();
+      if (!['RUA', 'AV', 'RODOVIA', 'ENDERECO', 'MATRICULA', 'EMENDAS', 'RASURAS', 'VALIDA'].some(excl => nome.includes(excl))) {
+        data.cidade = `${nome}/${uf}`;
       }
     }
   }
@@ -84,14 +85,12 @@ export async function parseIbamaPdf(file: File): Promise<IbamaData> {
   const validNames = allNames.filter(n => {
     let nClean = n.toUpperCase().trim();
     
-    // Remover palavras de título que podem estar grudadas no nome
     blacklist.forEach(b => {
       if (nClean.startsWith(b + ' ')) nClean = nClean.replace(b + ' ', '').trim();
       if (nClean.endsWith(' ' + b)) nClean = nClean.replace(' ' + b, '').trim();
     });
 
     if (solicitanteNome && nClean.includes(solicitanteNome.split(' ')[0])) return false;
-    // Se o bloco ainda contém palavras proibidas no MEIO dele, descartar
     if (blacklist.some(b => nClean.includes(b) && nClean.length < 15)) return false;
     if (data.nomeFazenda && nClean.includes(data.nomeFazenda.replace('FAZENDA ', ''))) return false;
     
@@ -99,15 +98,13 @@ export async function parseIbamaPdf(file: File): Promise<IbamaData> {
   });
 
   if (validNames.length > 0) {
-    // Pegar o primeiro nome que faz sentido após o CAR
     const carIdx = data.numeroCar ? fullText.indexOf(data.numeroCar.split(' ')[0]) : 0;
     let selecionado = validNames.find(n => fullText.indexOf(n) > carIdx) || validNames[0];
     
-    // Limpeza final de títulos residuais
     let final = selecionado.toUpperCase().trim();
-    ['NOME DO', 'PROPRIETARIO', 'CONTROLADOR'].forEach(t => final = final.replace(t, '').trim());
+    ['NOME DO', 'PROPRIETARIO', 'CONTROLADOR', 'RODOVIA', 'ESTRADA', 'MT-'].forEach(t => final = final.replace(t, '').trim());
     
-    data.nomeProprietario = final;
+    data.nomeProprietario = final.split(' RODOVIA')[0].split(' MT')[0].trim();
   }
 
   return data;
