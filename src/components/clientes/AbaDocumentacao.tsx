@@ -620,9 +620,10 @@ function ModalManejo({ onFechar, onSalvar }: { onFechar: () => void, onSalvar: (
         cidade: data.cidade || form.cidade,
         vencimento: data.vencimento || form.vencimento
       });
-    } catch (err) {
+    } catch (err: any) {
       console.error('Erro ao processar PDF:', err);
-      alert('Não foi possível ler os dados deste PDF. Verifique se é uma Autorização de Manejo do IBAMA válida.');
+      const msgErro = err.message || '';
+      alert(`Erro ao ler PDF: ${msgErro}\n\nVerifique se o arquivo é uma Autorização de Manejo válida ou tente novamente.`);
     } finally {
       setImportando(false);
     }

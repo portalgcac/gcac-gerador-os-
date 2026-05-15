@@ -1,7 +1,7 @@
 import * as pdfjs from 'pdfjs-dist';
 
-// Configurar o worker usando um CDN compatível com a versão instalada
-pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
+// Usar uma versão específica e estável do worker via CDN para evitar problemas de versão
+pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
 export interface IbamaData {
   nomeFazenda: string;
@@ -37,30 +37,26 @@ export async function parseIbamaPdf(file: File): Promise<IbamaData> {
 
   // 1. Extrair Vencimento (Período Fim)
   // No documento: "Fim: 13/11/2026"
-  const matchVenc = fullText.match(/Fim:\s*(\d{2}\/\d{2}\/\d{4})/);
+  const matchVenc = fullText.match(/Fim:?\s*(\d{2}\/\d{2}\/\d{4})/i);
   if (matchVenc) {
     const [d, m, y] = matchVenc[1].split('/');
-    data.vencimento = `${y}-${m}-${d}`; // Formato ISO para o input date
+    data.vencimento = `${y}-${m}-${d}`;
   }
 
   // 2. Extrair dados da tabela "Local(is) do manejo"
   // Heurística: Procurar pela palavra "Propriedade" e "CAR" que indicam o início da tabela
-  // E depois procurar pelos dados.
-  
-  // Tentar encontrar o CAR primeiro (padrão mais único)
-  // Ex: MT-5104609-603 D11FCA5C74AF9 A9208FE7C21EF 8D1
-  const carRegex = /[A-Z]{2}-\d{7}-[\w\s-]+/;
+  const carRegex = /([A-Z]{2}-\d{7}-[\w\s-]+)/;
   const carMatch = fullText.match(carRegex);
   if (carMatch) {
-    // O CAR do IBAMA às vezes é quebrado em várias linhas/espaços
-    // Vamos pegar uma sequência que pareça o CAR
-    const carContent = carMatch[0].split('Matrícula')[0].trim();
-    data.numeroCar = carContent.replace(/\s+/g, ' ');
+    // Limpar o CAR de possíveis textos de outras colunas que grudaram
+    let carRaw = carMatch[0].split('Matrícula')[0].trim();
+    // Remover quebras de linha e espaços duplos
+    data.numeroCar = carRaw.replace(/[\n\r]+/g, ' ').replace(/\s+/g, ' ').trim();
   }
 
   // Localizar a cidade (geralmente no final da linha da tabela)
-  // Padrão: "NomeCidade/UF"
-  const cidadeMatch = fullText.match(/([A-Za-zÀ-ÿ\s]+)\/([A-Z]{2})(?=\s|$)/);
+  // Padrão: "NomeCidade/UF" ou "Nome Cidade / UF"
+  const cidadeMatch = fullText.match(/([A-Za-zÀ-ÿ\s]+)\s*\/\s*([A-Z]{2})(?=\s|$|\n)/);
   if (cidadeMatch) {
     data.cidade = `${cidadeMatch[1].trim()}/${cidadeMatch[2]}`;
   }
