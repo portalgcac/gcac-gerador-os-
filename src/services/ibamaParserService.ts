@@ -46,7 +46,7 @@ export async function parseIbamaPdf(file: File): Promise<IbamaData> {
   const solicitanteMatch = fullText.match(/Solicitante:?\s*([A-ZÀ-ÿ\s]{10,60})(?=\s+CTF|Data|$)/i);
   const solicitanteNome = solicitanteMatch ? solicitanteMatch[1].trim().toUpperCase() : '';
 
-  // 3. ISOLAR A ÁREA DA TABELA COM LIMITE DE FIM
+  // 3. ISOLAR A ÁREA DA TABELA
   const cleanText = fullText.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
   const tableKeywords = [/PROPRIEDADE\s+CAR\s+MATRICULA/i, /LOCAL\(IS\)\s+DO\s+MANEJO/i];
   let tableStartIndex = -1;
@@ -60,7 +60,6 @@ export async function parseIbamaPdf(file: File): Promise<IbamaData> {
 
   if (tableStartIndex === -1) tableStartIndex = 0;
   
-  // Achar onde a tabela ACABA (Observações ou avisos legais no rodapé)
   const endKeywords = ['OBSERVACOES', 'ESTA AUTORIZACAO NAO PERMITE', 'EMITIDO EM', 'PAGINA'];
   let tableEndIndex = fullText.length;
   for (const kw of endKeywords) {
@@ -75,9 +74,8 @@ export async function parseIbamaPdf(file: File): Promise<IbamaData> {
   // 4. EXTRAIR CAR
   const carRegex = /([A-Z]{2}-\d{7}-[\w\s-]+)/i;
   const carMatch = tableArea.match(carRegex);
-  let carMainPart = '';
   if (carMatch) {
-    carMainPart = carMatch[0].trim();
+    const carMainPart = carMatch[0].trim();
     const allHashes = tableArea.match(/[A-Z0-9]{15,}/g) || [];
     const filteredHashes = allHashes.filter(h => 
       h.length > 15 && !h.includes('/') && !h.includes(solicitanteNome.split(' ')[0])
@@ -98,19 +96,24 @@ export async function parseIbamaPdf(file: File): Promise<IbamaData> {
     'CIDADE', 'FAZENDA', 'RODOVIA', 'ESTRADA', 'GLEICKSUEL', 'ESTA', 'PERMITE', 'TRANSPORTE'
   ];
 
-  const nameBlocks = tableArea.match(/[A-ZÀ-ÿ]{4,}\s[A-ZÀ-ÿ]{3,}(\s[A-ZÀ-ÿ]{2,})*/g) || [];
+  // Pegar todos os blocos que parecem nomes (Maiúsculas com espaços)
+  const nameBlocks = tableArea.match(/[A-ZÀ-ÿ]{3,}\s[A-ZÀ-ÿ]{2,}(\s[A-ZÀ-ÿ]{2,})*/g) || [];
   const validNames = nameBlocks.filter(n => {
     const nClean = n.toUpperCase().trim();
-    if (solicitanteNome && nClean.includes(solicitanteNome)) return false;
+    if (solicitanteNome && nClean.includes(solicitanteNome.split(' ')[0])) return false;
     if (blacklist.some(b => nClean.includes(b))) return false;
-    if (data.nomeFazenda && nClean.includes(data.nomeFazenda)) return false;
-    return nClean.length > 10;
+    if (data.nomeFazenda && nClean.includes(data.nomeFazenda.replace('FAZENDA ', ''))) return false;
+    if (data.cidade && nClean.includes(data.cidade.split('/')[0])) return false;
+    return nClean.length >= 5;
   });
 
   if (validNames.length > 0) {
-    const afterCarIdx = carMainPart ? tableArea.indexOf(carMainPart) : 0;
-    const bestMatch = validNames.find(n => tableArea.indexOf(n) > afterCarIdx) || validNames[0];
-    data.nomeProprietario = bestMatch.trim().toUpperCase();
+    // Unir nomes próximos para capturar nomes completos quebrados em linhas
+    let finalName = validNames[0];
+    if (validNames[1] && tableArea.indexOf(validNames[1]) < tableArea.indexOf(validNames[0]) + 100) {
+       finalName += ' ' + validNames[1];
+    }
+    data.nomeProprietario = finalName.trim().toUpperCase().replace(/\s+/g, ' ');
   }
 
   // 7. EXTRAIR CIDADE
