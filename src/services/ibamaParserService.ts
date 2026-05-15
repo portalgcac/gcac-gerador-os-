@@ -28,7 +28,7 @@ export async function parseIbamaPdf(file: File): Promise<IbamaData> {
   // Normalizar texto para busca (Remover acentos e colocar em caixa alta)
   const text = rawText.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
   
-  console.log('IBAMA Parser v3.1 - Texto extraído:', text);
+  console.log('IBAMA Parser v3.2 - Texto extraído:', text);
 
   // 1. Extrair Vencimento
   const matchVenc = text.match(/FIM:?\s*(\d{2}\/\d{2}\/\d{4})/);
@@ -37,35 +37,42 @@ export async function parseIbamaPdf(file: File): Promise<IbamaData> {
     data.vencimento = `${y}-${m}-${d}`;
   }
 
-  // 2. IDENTIFICAR O SOLICITANTE / INTERESSADO
+  // 2. IDENTIFICAR O SOLICITANTE / INTERESSADO (Candidato primário a proprietário)
   const solicitanteMatch = text.match(/(SOLICITANTE|INTERESSADO):?\s*([A-Z\s]{10,60})(?=\s+CTF|DATA|$)/);
   const solicitanteNome = solicitanteMatch ? solicitanteMatch[2].trim() : '';
+  if (solicitanteNome && solicitanteNome.length > 5) {
+    data.nomeProprietario = solicitanteNome;
+  }
 
   // 3. EXTRAIR CAR
   const carRegex = /([A-Z]{2}-\d{7}-[\w\s-]+)/;
   const carMatch = text.match(carRegex);
   if (carMatch) {
     const carMain = carMatch[0].trim();
-    const hashes = text.match(/[A-Z0-9]{15,}/g) || [];
-    const filteredHashes = hashes.filter(h => h.length > 15 && !h.includes('/') && !['SOLICITANTE', 'INTERESSADO', 'AUTORIZACAO'].some(k => h.includes(k)));
+    // Tenta encontrar o hash longo do CAR que costuma vir depois
+    const hashes = text.match(/[A-Z0-9]{20,}/g) || [];
+    const filteredHashes = hashes.filter(h => h.length > 20 && !h.includes('/') && !['SOLICITANTE', 'INTERESSADO', 'AUTORIZACAO'].some(k => h.includes(k)));
     data.numeroCar = (carMain + ' ' + filteredHashes.join(' ')).replace(/\s+/g, ' ').trim();
   }
 
-  // 4. EXTRAIR TODOS OS NOMES POSSÍVEIS (Pessoas ou Fazendas)
-  const propertyPrefixesList = ['FAZENDA', 'SITIO', 'STIO', 'CHACARA', 'ESTANCIA', 'GLEBA', 'LOTE', 'PROPRIEDADE'];
+  // 4. EXTRAIR TODOS OS NOMES POSSÍVEIS (Para desempate e identificação de fazenda)
   const allNames = text.match(/[A-Z]{3,}\s[A-Z]{2,}(\s[A-Z]{2,})*/g) || [];
 
   // 5. EXTRAIR NOME DA PROPRIEDADE (FAZENDA, SITIO, etc)
+  const propertyPrefixesList = [
+    'FAZENDA', 'SITIO', 'STIO', 'CHACARA', 'ESTANCIA', 'GLEBA', 'LOTE', 
+    'PROPRIEDADE', 'RANCHO', 'AREA', 'RESERVA', 'CONDOMINIO', 'PROPRIEDADE RURAL'
+  ];
   const propertyPrefixes = propertyPrefixesList.join('|');
   
-  // Tenta encontrar o prefixo vindo antes do número do CAR
-  const carSnippet = data.numeroCar ? data.numeroCar.substring(0, 10) : '';
+  // Tenta encontrar o prefixo vindo antes do número do CAR (usando o carMain como âncora mais estável)
+  const carAnchor = carMatch ? carMatch[0].substring(0, 15) : '';
   let fazendaMatch = null;
   
-  if (carSnippet) {
-    const carIndex = text.indexOf(carSnippet);
+  if (carAnchor) {
+    const carIndex = text.indexOf(carAnchor);
     if (carIndex !== -1) {
-      const beforeCar = text.substring(Math.max(0, carIndex - 250), carIndex);
+      const beforeCar = text.substring(Math.max(0, carIndex - 300), carIndex);
       const matches = Array.from(beforeCar.matchAll(new RegExp(`(${propertyPrefixes})\\s+([A-Z\\s]{3,60})`, 'g')));
       if (matches.length > 0) {
         fazendaMatch = matches[matches.length - 1];
@@ -97,47 +104,51 @@ export async function parseIbamaPdf(file: File): Promise<IbamaData> {
     const uf = matchC[2];
     if (UFS.includes(uf)) {
       nome = nome.replace(/\d+/g, '').replace('MTS', '').replace('KM', '').trim();
-      if (!['RUA', 'AV', 'RODOVIA', 'ENDERECO', 'MATRICULA', 'EMENDAS', 'RASURAS', 'VALIDA'].some(excl => nome.includes(excl))) {
+      if (!['RUA', 'AV', 'RODOVIA', 'ENDERECO', 'MATRICULA', 'EMENDAS', 'RASURAS', 'VALIDA', 'ESTRADA'].some(excl => nome.includes(excl))) {
         data.cidade = `${nome}/${uf}`;
       }
     }
   }
 
-  // 7. EXTRAIR PROPRIETÁRIO
+  // 7. REFINAR PROPRIETÁRIO (Se não foi encontrado via Solicitante ou se precisar de validação)
   const blacklist = [
     'INSTITUTO', 'BRASILEIRO', 'IBAMA', 'MINISTERIO', 'AMBIENTE', 'RECURSOS', 'NATURAIS', 
     'RENOVAVEIS', 'SOLICITANTE', 'INTERESSADO', 'AUTORIZACAO', 'CONTROLADOR', 'MATRICULA', 'ENDERECO', 
     'CIDADE', 'FAZENDA', 'SITIO', 'STIO', 'CHACARA', 'ESTANCIA', 'GLEBA', 'LOTE', 'RODOVIA', 'ESTRADA', 
-    'ESTA', 'PERMITE', 'TRANSPORTE', 'ESPECIES', 'INVASORAS', 'JAVALI', 'ARMADILHA', 'CAES', 'ESPERA', 
-    'SIM', 'NAO', 'PROPRIEDADE', 'NOME', 'PROPRIETARIO'
+    'ESTA', 'PERMITE', 'TRANSPORTE', 'ESPECIES', 'JAVALI', 'ARMADILHA', 'CAES', 'ESPERA', 
+    'SIM', 'NAO', 'PROPRIEDADE', 'NOME', 'PROPRIETARIO', 'VALIDO', 'CHAVE', 'AUTENTICIDADE', 'SISTEMA'
   ];
 
-  const validNames = allNames.filter(n => {
-    const nClean = n.trim();
-    
-    // NUNCA é proprietário se começar com prefixo de propriedade
-    if (propertyPrefixesList.some(p => nClean.startsWith(p))) return false;
-    
-    // Ignorar se for o solicitante já identificado
-    if (solicitanteNome && nClean.includes(solicitanteNome.split(' ')[0])) return false;
-    
-    // Ignorar se contiver palavras da blacklist
-    if (blacklist.some(b => nClean.includes(b))) return false;
-    
-    // Ignorar se for o nome da fazenda (mesmo sem prefixo)
-    if (data.nomeFazenda) {
-      const parts = data.nomeFazenda.split(' ');
-      const mainName = parts.length > 1 ? parts.slice(1).join(' ') : parts[0];
-      if (nClean.includes(mainName)) return false;
-    }
-    
-    return nClean.length >= 8 && nClean.length < 50 && !/\d/.test(nClean);
-  });
+  if (!data.nomeProprietario) {
+    const validNames = allNames.filter(n => {
+      const nClean = n.trim();
+      
+      // NUNCA é proprietário se começar com prefixo de propriedade
+      if (propertyPrefixesList.some(p => nClean.startsWith(p))) return false;
+      
+      // Ignorar se contiver palavras da blacklist
+      if (blacklist.some(b => nClean.includes(b))) return false;
+      
+      // Ignorar se for o nome da fazenda (mesmo sem prefixo)
+      if (data.nomeFazenda) {
+        const parts = data.nomeFazenda.split(' ');
+        const mainName = parts.length > 1 ? parts.slice(1).join(' ') : parts[0];
+        if (nClean.includes(mainName)) return false;
+      }
+      
+      return nClean.length >= 8 && nClean.length < 50 && !/\d/.test(nClean);
+    });
 
-  if (validNames.length > 0) {
-    const carIdx = data.numeroCar ? text.indexOf(data.numeroCar.split('-')[0]) : 0;
-    let selecionado = validNames.find(n => text.indexOf(n) > carIdx) || validNames[0];
-    data.nomeProprietario = selecionado.trim();
+    if (validNames.length > 0) {
+      const carIdx = carMatch ? text.indexOf(carMatch[0]) : 0;
+      let selecionado = validNames.find(n => text.indexOf(n) > carIdx) || validNames[0];
+      data.nomeProprietario = selecionado.trim();
+    }
+  } else {
+    // Se já temos o proprietário via Solicitante, garantimos que ele não é um falso positivo (prefixo de fazenda)
+    if (propertyPrefixesList.some(p => data.nomeProprietario!.startsWith(p))) {
+      data.nomeProprietario = undefined; // Força re-avaliação ou deixa vazio
+    }
   }
 
   return data;
