@@ -1,39 +1,29 @@
-import * as pdfjs from 'pdfjs-dist';
+import * as pdfjsLib from 'pdfjs-dist';
 
-// Usar uma versão específica e estável do worker via CDN para evitar problemas de versão
-pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+// Configurar o worker do PDF.js usando um CDN estável
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
 
 export interface IbamaData {
-  nomeFazenda: string;
-  numeroCar: string;
-  nomeProprietario: string;
-  cidade: string;
-  vencimento: string;
+  numeroCar?: string;
+  nomeFazenda?: string;
+  nomeProprietario?: string;
+  cidade?: string;
+  vencimento?: string;
 }
 
 export async function parseIbamaPdf(file: File): Promise<IbamaData> {
   const arrayBuffer = await file.arrayBuffer();
-  const loadingTask = pdfjs.getDocument({ data: arrayBuffer });
-  const pdf = await loadingTask.promise;
+  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
   
   let fullText = '';
-  let textItems: string[] = [];
-
   for (let i = 1; i <= pdf.numPages; i++) {
     const page = await pdf.getPage(i);
     const textContent = await page.getTextContent();
-    const items = textContent.items.map((item: any) => item.str);
-    textItems = [...textItems, ...items];
-    fullText += items.join(' ') + '\n';
+    const pageText = textContent.items.map((item: any) => item.str).join(' ');
+    fullText += pageText + '\n';
   }
 
-  const data: IbamaData = {
-    nomeFazenda: '',
-    numeroCar: '',
-    nomeProprietario: '',
-    cidade: '',
-    vencimento: ''
-  };
+  const data: IbamaData = {};
 
   // 1. Extrair Vencimento (Período Fim)
   const matchVenc = fullText.match(/Fim:?\s*(\d{2}\/\d{2}\/\d{4})/i);
@@ -42,89 +32,67 @@ export async function parseIbamaPdf(file: File): Promise<IbamaData> {
     data.vencimento = `${y}-${m}-${d}`;
   }
 
-  // 2. IDENTIFICAR E BANIR O SOLICITANTE
+  // 2. IDENTIFICAR O SOLICITANTE (PARA FILTRO)
   const solicitanteMatch = fullText.match(/Solicitante:?\s*([A-ZÀ-ÿ\s]{10,60})(?=\s+CTF|Data|$)/i);
   const solicitanteNome = solicitanteMatch ? solicitanteMatch[1].trim().toUpperCase() : '';
 
-  // 3. ISOLAR A ÁREA DA TABELA
-  const cleanText = fullText.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
-  const tableKeywords = [/PROPRIEDADE\s+CAR\s+MATRICULA/i, /LOCAL\(IS\)\s+DO\s+MANEJO/i];
-  let tableStartIndex = -1;
-  for (const regex of tableKeywords) {
-    const match = cleanText.match(regex);
-    if (match) {
-      tableStartIndex = match.index!;
-      break;
-    }
-  }
-
-  if (tableStartIndex === -1) tableStartIndex = 0;
-  
-  const endKeywords = ['OBSERVACOES', 'ESTA AUTORIZACAO NAO PERMITE', 'EMITIDO EM', 'PAGINA'];
-  let tableEndIndex = fullText.length;
-  for (const kw of endKeywords) {
-    const idx = cleanText.indexOf(kw, tableStartIndex);
-    if (idx !== -1 && idx < tableEndIndex) {
-      tableEndIndex = idx;
-    }
-  }
-
-  const tableArea = fullText.substring(tableStartIndex, tableEndIndex);
-
-  // 4. EXTRAIR CAR
+  // 3. EXTRAIR CAR
   const carRegex = /([A-Z]{2}-\d{7}-[\w\s-]+)/i;
-  const carMatch = tableArea.match(carRegex);
+  const carMatch = fullText.match(carRegex);
   if (carMatch) {
-    const carMainPart = carMatch[0].trim();
-    const allHashes = tableArea.match(/[A-Z0-9]{15,}/g) || [];
-    const filteredHashes = allHashes.filter(h => 
-      h.length > 15 && !h.includes('/') && !h.includes(solicitanteNome.split(' ')[0])
+    const carMain = carMatch[0].trim();
+    const hashes = fullText.match(/[A-Z0-9]{15,}/g) || [];
+    const filteredHashes = hashes.filter(h => 
+      h.length > 15 && 
+      !h.includes('/') && 
+      !['SOLICITANTE', 'AUTORIZACAO', 'CONTROLADOR'].some(ex => h.includes(ex))
     );
-    data.numeroCar = (carMainPart + ' ' + filteredHashes.join(' ')).replace(/\s+/g, ' ').trim();
+    data.numeroCar = (carMain + ' ' + filteredHashes.join(' ')).replace(/\s+/g, ' ').trim();
   }
 
-  // 5. EXTRAIR FAZENDA
-  const fazendaMatch = tableArea.match(/FAZENDA\s+([A-ZÀ-ÿ\s]{3,40})(?=\s+[A-Z]{2}-\d{7})/i);
+  // 4. EXTRAIR FAZENDA
+  const fazendaMatch = fullText.match(/FAZENDA\s+([A-ZÀ-ÿ\s]{3,40})(?=\s+[A-Z]{2}-\d{7})/i);
   if (fazendaMatch) {
     data.nomeFazenda = `FAZENDA ${fazendaMatch[1].trim()}`.toUpperCase();
   }
 
-  // 6. EXTRAIR PROPRIETÁRIO
+  // 5. EXTRAIR CIDADE
+  const cidadeRegex = /([A-ZÀ-ÿ\s]{3,30})\/([A-Z]{2})(?=\s|$|\n)/g;
+  let matches;
+  while ((matches = cidadeRegex.exec(fullText)) !== null) {
+    let nome = matches[1].trim().toUpperCase();
+    nome = nome.replace(/\d+/g, '').replace('MTS', '').replace('KM', '').trim();
+    if (nome.length > 2 && !['RUA', 'AV', 'RODOVIA', 'ENDERECO', 'MATRICULA'].some(excl => nome.includes(excl))) {
+      data.cidade = `${nome}/${matches[2].toUpperCase()}`;
+    }
+  }
+
+  // 6. EXTRAIR PROPRIETÁRIO (ESTRATÉGIA DE ELIMINAÇÃO)
   const blacklist = [
     'INSTITUTO', 'BRASILEIRO', 'IBAMA', 'MINISTERIO', 'AMBIENTE', 'RECURSOS', 'NATURAIS', 
     'RENOVAVEIS', 'SOLICITANTE', 'AUTORIZACAO', 'CONTROLADOR', 'MATRICULA', 'ENDERECO', 
-    'CIDADE', 'FAZENDA', 'RODOVIA', 'ESTRADA', 'GLEICKSUEL', 'ESTA', 'PERMITE', 'TRANSPORTE'
+    'CIDADE', 'FAZENDA', 'RODOVIA', 'ESTRADA', 'ESTA', 'PERMITE', 'TRANSPORTE', 'ESPECIES', 
+    'INVASORAS', 'JAVALI', 'ARMADILHA', 'CAES', 'ESPERA', 'SIM', 'NAO', 'PROPRIEDADE', 'NOME', 'PROPRIETARIO'
   ];
 
-  // Pegar todos os blocos que parecem nomes (Maiúsculas com espaços)
-  const nameBlocks = tableArea.match(/[A-ZÀ-ÿ]{3,}\s[A-ZÀ-ÿ]{2,}(\s[A-ZÀ-ÿ]{2,})*/g) || [];
-  const validNames = nameBlocks.filter(n => {
+  // Pegar todos os blocos de nomes próprios (Ex: ADEMILTON MORAES RESENDE)
+  const allNames = fullText.match(/[A-ZÀ-ÿ]{3,}\s[A-ZÀ-ÿ]{2,}(\s[A-ZÀ-ÿ]{2,})*/g) || [];
+  
+  const validNames = allNames.filter(n => {
     const nClean = n.toUpperCase().trim();
+    // Filtros
     if (solicitanteNome && nClean.includes(solicitanteNome.split(' ')[0])) return false;
     if (blacklist.some(b => nClean.includes(b))) return false;
     if (data.nomeFazenda && nClean.includes(data.nomeFazenda.replace('FAZENDA ', ''))) return false;
     if (data.cidade && nClean.includes(data.cidade.split('/')[0])) return false;
-    return nClean.length >= 5;
+    return nClean.length >= 8;
   });
 
   if (validNames.length > 0) {
-    // Unir nomes próximos para capturar nomes completos quebrados em linhas
-    let finalName = validNames[0];
-    if (validNames[1] && tableArea.indexOf(validNames[1]) < tableArea.indexOf(validNames[0]) + 100) {
-       finalName += ' ' + validNames[1];
-    }
-    data.nomeProprietario = finalName.trim().toUpperCase().replace(/\s+/g, ' ');
-  }
-
-  // 7. EXTRAIR CIDADE
-  const cidadeMatch = tableArea.match(/([A-ZÀ-ÿ\s]{3,25})\/([A-Z]{2})(?=\s|$|\n)/i);
-  if (cidadeMatch) {
-    let nome = cidadeMatch[1].trim().toUpperCase();
-    // Limpeza profunda do nome da cidade
-    nome = nome.replace(/\d+/g, '').replace('MTS', '').replace('KM', '').trim();
-    if (nome.length > 2) {
-      data.cidade = `${nome}/${cidadeMatch[2].toUpperCase()}`;
-    }
+    // O proprietário costuma estar na tabela, perto do CAR
+    const afterCarIdx = data.numeroCar ? fullText.indexOf(data.numeroCar.split(' ')[0]) : 0;
+    const bestMatch = validNames.find(n => fullText.indexOf(n) > afterCarIdx) || validNames[0];
+    data.nomeProprietario = bestMatch.trim().toUpperCase();
   }
 
   return data;
