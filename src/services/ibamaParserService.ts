@@ -42,66 +42,89 @@ export async function parseIbamaPdf(file: File): Promise<IbamaData> {
     data.vencimento = `${y}-${m}-${d}`;
   }
 
-  // Isolar a parte da tabela para evitar pegar cabeçalhos do topo do PDF
-  const idxLocal = fullText.indexOf('Local(is) do manejo');
-  const tableText = idxLocal !== -1 ? fullText.substring(idxLocal) : fullText;
+  // Normalizar texto para busca (remover acentos e excesso de espaços)
+  const cleanText = fullText.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+  
+  // Isolar a parte da tabela (abaixo de "LOCAL(IS) DO MANEJO")
+  const tableKeywords = ['LOCAL(IS) DO MANEJO', 'LOCAL DO MANEJO', 'LOCALIS DO MANEJO'];
+  let tableStartIndex = -1;
+  for (const kw of tableKeywords) {
+    tableStartIndex = cleanText.indexOf(kw);
+    if (tableStartIndex !== -1) break;
+  }
+  
+  const tableArea = tableStartIndex !== -1 ? fullText.substring(tableStartIndex) : fullText;
+  const tableAreaClean = tableStartIndex !== -1 ? cleanText.substring(tableStartIndex) : cleanText;
 
   // 2. Extrair CAR
-  // O CAR do IBAMA: UF-0000000-000 + Hashes
-  const carRegex = /([A-Z]{2}-\d{7}-[\w\s-]+?)(?=\s+Matrícula|\s+Nome do|\s+Endereço|\s+ADEMILTON|\s+RESENDE|$)/i;
-  const carMatch = tableText.match(carRegex);
+  // Padrão: UF-0000000-000 + Hashes alfanuméricos
+  const carRegex = /([A-Z]{2}-\d{7}-[\w\s-]+)/i;
+  const carMatch = tableArea.match(carRegex);
   if (carMatch) {
-    // Pegar hashes de continuação (blocos alfanuméricos longos)
-    const carParts = tableText.match(/[A-Z0-9]{10,}/g) || [];
-    const mainCar = carMatch[0].trim();
-    const filteredParts = carParts.filter(p => 
-      p.length > 10 && 
-      !['SOLICITANTE', 'AUTORIZAÇÃO', 'CONTROLADOR'].includes(p) &&
-      !p.includes('/')
+    let carStr = carMatch[0].trim();
+    // Tentar pegar as linhas de baixo (hashes)
+    const possibleHashes = tableArea.match(/[A-Z0-9]{10,}/g) || [];
+    const filteredHashes = possibleHashes.filter(h => 
+      h.length > 10 && 
+      !['SOLICITANTE', 'AUTORIZACAO', 'CONTROLADOR', 'MATRICULA', 'PROPRIEDADE', 'ENDERECO', 'CIDADE'].includes(h.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase()) &&
+      !h.includes('/')
     );
-    data.numeroCar = (mainCar + ' ' + filteredParts.join(' ')).replace(/\s+/g, ' ').trim();
+    if (filteredHashes.length > 0) {
+      carStr += ' ' + filteredHashes.join(' ');
+    }
+    data.numeroCar = carStr.replace(/\s+/g, ' ').trim();
   }
 
   // 3. Extrair Fazenda
-  const fazendaMatch = tableText.match(/FAZENDA\s+([A-ZÀ-ÿ\s]{3,30})(?=\s+[A-Z]{2}-\d{7})/i);
+  // Sempre começa com FAZENDA e termina antes do CAR
+  const fazendaMatch = tableArea.match(/FAZENDA\s+([A-ZÀ-ÿ\s]{3,40})(?=\s+[A-Z]{2}-\d{7})/i);
   if (fazendaMatch) {
-    data.nomeFazenda = `FAZENDA ${fazendaMatch[1].trim()}`.toUpperCase();
-  } else {
-    const fallback = tableText.match(/FAZENDA\s+([A-ZÀ-ÿ\s]+?)(?=\s+[A-Z]{2}-\d{7})/i);
-    if (fallback) data.nomeFazenda = fallback[0].trim().toUpperCase();
+    data.nomeFazenda = `FAZENDA ${fazendaMatch[1].trim()}`.toUpperCase().replace(/\s+/g, ' ');
   }
 
   // 4. Extrair Cidade/UF
-  // Geralmente no final da tabela
-  const cidadeMatch = tableText.match(/([A-ZÀ-ÿ\s]{3,})\/([A-Z]{2})(?=\s|$|\n)/);
-  if (cidadeMatch) {
-    const cidadeNome = cidadeMatch[1].trim();
-    if (cidadeNome.length > 2 && !['MTS', 'KM', 'RUA', 'AV'].includes(cidadeNome.toUpperCase())) {
-      data.cidade = `${cidadeNome}/${cidadeMatch[2]}`.toUpperCase();
+  // Procurar "NOME/UF" (ex: ITIQUIRA/MT)
+  const cidadeRegex = /([A-ZÀ-ÿ\s]{3,})\/([A-Z]{2})(?=\s|$|\n)/g;
+  let m;
+  while ((m = cidadeRegex.exec(tableArea)) !== null) {
+    const nome = m[1].trim().toUpperCase();
+    if (nome.length > 2 && !['MTS', 'KM', 'RUA', 'AV', 'MATRICULA', 'ENDERECO'].includes(nome)) {
+      data.cidade = `${nome}/${m[2]}`;
     }
   }
 
   // 5. Extrair Proprietário
-  // Excluir palavras que pertencem ao cabeçalho do IBAMA
-  const blacklist = ['INSTITUTO', 'BRASILEIRO', 'RECURSOS', 'NATURAIS', 'IBAMA', 'MINISTÉRIO', 'AMBIENTE', 'CONTROLE', 'ESPÉCIES', 'EXÓTICAS', 'INVASORAS'];
-  
-  const nomesCandidatos = tableText.match(/[A-ZÀ-ÿ]{4,}\s[A-ZÀ-ÿ]{4,}(\s[A-ZÀ-ÿ]{4,})?/g);
-  if (nomesCandidatos) {
-    const filtrados = nomesCandidatos.filter(n => 
-      !blacklist.some(b => n.includes(b)) && 
-      !n.includes('FAZENDA') &&
-      !n.includes('PROPRIEDADE') &&
-      !n.includes('LOCAL')
-    );
-    if (filtrados.length > 0) {
-      // O proprietário costuma vir após o CAR ou no meio da tabela
-      data.nomeProprietario = filtrados[0].trim().toUpperCase();
-      // Se houver um segundo nome (continuação), podemos tentar juntar
-      if (filtrados[1] && tableText.indexOf(filtrados[1]) > tableText.indexOf(filtrados[0])) {
-         // heurística simples de proximidade
-         data.nomeProprietario += ' ' + filtrados[1].trim().toUpperCase();
-      }
-    }
+  // Lista negra pesada de palavras do cabeçalho do IBAMA e do formulário
+  const blacklist = [
+    'INSTITUTO', 'BRASILEIRO', 'MEIO', 'AMBIENTE', 'RECURSOS', 'NATURAIS', 'RENOVAVEIS', 'IBAMA', 
+    'MINISTERIO', 'CONTROLE', 'ESPECIES', 'EXOTICAS', 'INVASORAS', 'SOLICITANTE', 'CTF', 'DATA', 
+    'SOLICITACAO', 'AUTORIZACAO', 'ESPECIE', 'JAVALI', 'TIPO', 'MANEJO', 'ARMADILHA', 'GAIOLA', 
+    'BUSCA', 'CAES', 'ESPERA', 'CEVA', 'CURRAL', 'UNIDADE', 'CONSERVACAO', 'MANEJADOR', 'SIM', 'NAO',
+    'METODOS', 'ABATE', 'FOGO', 'BRANCA', 'PERIODO', 'INICIO', 'FIM', 'PROPRIEDADE', 'CAR', 'MATRICULA', 
+    'NOME', 'PROPRIETARIO', 'CONTROLADOR', 'ENDERECO', 'CIDADE', 'FAZENDA'
+  ];
+
+  const blocks = tableArea.match(/[A-ZÀ-ÿ\s]{8,50}/g) || [];
+  const validBlocks = blocks.filter(b => {
+    const bClean = b.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim();
+    if (bClean.length < 8) return false;
+    // Não pode ter palavras da blacklist
+    const hasBlacklisted = blacklist.some(word => bClean.includes(word));
+    if (hasBlacklisted) return false;
+    // Não pode ser o CAR
+    if (data.numeroCar && data.numeroCar.includes(bClean)) return false;
+    // Não pode ser a fazenda
+    if (data.nomeFazenda && data.nomeFazenda.includes(bClean)) return false;
+    // Não pode ser a cidade
+    if (data.cidade && data.cidade.includes(bClean)) return false;
+    
+    return true;
+  });
+
+  if (validBlocks.length > 0) {
+    // Pegar o bloco que mais se parece com um nome (sem números)
+    const provavel = validBlocks.find(b => !/\d/.test(b));
+    if (provavel) data.nomeProprietario = provavel.trim().toUpperCase().replace(/\s+/g, ' ');
   }
 
   return data;
