@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Target, MapPin, Calendar, Plus, Trash2, ShieldAlert, 
-  ChevronDown, ChevronUp, FileText, Globe, Landmark
+  ChevronDown, ChevronUp, FileText, Globe, Landmark, Upload, Loader2
 } from 'lucide-react';
+import { parseIbamaPdf } from '../../services/ibamaParserService';
 import { useClientes } from '../../context/ClientesContext';
 import { Cliente, Arma, GuiaTrafego, AutorizacaoManejo } from '../../types';
 import { formatarData } from '../../utils/formatters';
@@ -603,11 +604,57 @@ function ModalGt({ armaAcervo, onFechar, onSalvar }: { armaAcervo: string, onFec
 
 function ModalManejo({ onFechar, onSalvar }: { onFechar: () => void, onSalvar: (d: any) => void }) {
   const [form, setForm] = useState({ numeroCar: '', nomeFazenda: '', nomeProprietario: '', cidade: '', vencimento: '' });
+  const [importando, setImportando] = useState(false);
+
+  const handleImportPdf = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setImportando(true);
+    try {
+      const data = await parseIbamaPdf(file);
+      setForm({
+        numeroCar: data.numeroCar || form.numeroCar,
+        nomeFazenda: data.nomeFazenda || form.nomeFazenda,
+        nomeProprietario: data.nomeProprietario || form.nomeProprietario,
+        cidade: data.cidade || form.cidade,
+        vencimento: data.vencimento || form.vencimento
+      });
+    } catch (err) {
+      console.error('Erro ao processar PDF:', err);
+      alert('Não foi possível ler os dados deste PDF. Verifique se é uma Autorização de Manejo do IBAMA válida.');
+    } finally {
+      setImportando(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
       <div className="card w-full max-w-md animate-scale-up" onClick={e => e.stopPropagation()}>
-        <h3 className="text-lg font-bold text-white mb-6">Autorização de Manejo (IBAMA)</h3>
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-lg font-bold text-white">Autorização de Manejo (IBAMA)</h3>
+          <div className="relative">
+            <input 
+              type="file" 
+              accept="application/pdf" 
+              className="hidden" 
+              id="import-ibama-pdf" 
+              onChange={handleImportPdf}
+              disabled={importando}
+            />
+            <label 
+              htmlFor="import-ibama-pdf" 
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all cursor-pointer border ${
+                importando 
+                  ? 'bg-gray-500/10 text-gray-500 border-gray-500/20' 
+                  : 'bg-brand-blue/10 text-brand-blue border-brand-blue/20 hover:bg-brand-blue/20'
+              }`}
+            >
+              {importando ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
+              {importando ? 'Processando...' : 'Importar PDF'}
+            </label>
+          </div>
+        </div>
         <div className="space-y-4">
           <div>
             <label className="label">Nº do CAR da Fazenda</label>
