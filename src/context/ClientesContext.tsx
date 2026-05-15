@@ -19,17 +19,17 @@ interface ClientesContextType {
   
   // Gestão de Armas
   buscarArmas: (clienteId: string) => Promise<Arma[]>;
-  salvarArma: (arma: Omit<Arma, 'id' | 'criadoEm'>) => Promise<void>;
+  salvarArma: (arma: Partial<Arma> & { clienteId: string }) => Promise<void>;
   deletarArma: (id: string) => Promise<void>;
   
   // Gestão de GTs
   buscarGts: (armaId: string) => Promise<GuiaTrafego[]>;
-  salvarGt: (gt: Omit<GuiaTrafego, 'id' | 'criadoEm'>) => Promise<void>;
+  salvarGt: (gt: Partial<GuiaTrafego> & { armaId: string }) => Promise<void>;
   deletarGt: (id: string) => Promise<void>;
   
   // Gestão de Manejo
   buscarManejos: (clienteId: string) => Promise<AutorizacaoManejo[]>;
-  salvarManejo: (manejo: Omit<AutorizacaoManejo, 'id' | 'criadoEm'>) => Promise<void>;
+  salvarManejo: (manejo: Partial<AutorizacaoManejo> & { clienteId: string }) => Promise<void>;
   deletarManejo: (id: string) => Promise<void>;
   
   // Gestão de Créditos
@@ -218,21 +218,32 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
     }));
   }, []);
 
-  const salvarArma = useCallback(async (dados: Omit<Arma, 'id' | 'criadoEm'>) => {
-    const { error } = await supabase
-      .from('armas')
-      .insert([{
-        cliente_id: dados.clienteId,
-        tipo: dados.tipo,
-        modelo: dados.modelo,
-        calibre: dados.calibre,
-        fabricante: dados.fabricante,
-        numero_serie: dados.numeroSerie,
-        numero_sigma: dados.numeroSigma,
-        acervo: dados.acervo,
-        vencimento_craf: dados.vencimentoCraf || null
-      }]);
-    if (error) throw error;
+  const salvarArma = useCallback(async (dados: Partial<Arma> & { clienteId: string }) => {
+    const payload = {
+      cliente_id: dados.clienteId,
+      tipo: dados.tipo,
+      modelo: dados.modelo,
+      calibre: dados.calibre,
+      fabricante: dados.fabricante,
+      numero_serie: dados.numeroSerie,
+      numero_sigma: dados.numeroSigma,
+      acervo: dados.acervo,
+      vencimento_craf: dados.vencimentoCraf || null
+    };
+
+    if (dados.id) {
+      const { error } = await supabase
+        .from('armas')
+        .update(payload)
+        .eq('id', dados.id);
+      if (error) throw error;
+    } else {
+      const { error } = await supabase
+        .from('armas')
+        .insert([payload]);
+      if (error) throw error;
+    }
+    
     await carregarMetadadosArmas();
   }, [carregarMetadadosArmas]);
 
@@ -261,16 +272,26 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
     }));
   }, []);
 
-  const salvarGt = useCallback(async (dados: Omit<GuiaTrafego, 'id' | 'criadoEm'>) => {
-    const { error } = await supabase
-      .from('guias_trafego')
-      .insert([{
-        arma_id: dados.armaId,
-        tipo: dados.tipo,
-        vencimento: dados.vencimento,
-        destino: dados.destino
-      }]);
-    if (error) throw error;
+  const salvarGt = useCallback(async (dados: Partial<GuiaTrafego> & { armaId: string }) => {
+    const payload = {
+      arma_id: dados.armaId,
+      tipo: dados.tipo,
+      vencimento: dados.vencimento,
+      destino: dados.destino
+    };
+
+    if (dados.id) {
+      const { error } = await supabase
+        .from('guias_trafego')
+        .update(payload)
+        .eq('id', dados.id);
+      if (error) throw error;
+    } else {
+      const { error } = await supabase
+        .from('guias_trafego')
+        .insert([payload]);
+      if (error) throw error;
+    }
   }, []);
 
   const deletarGt = useCallback(async (id: string) => {
@@ -299,18 +320,28 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
     }));
   }, []);
 
-  const salvarManejo = useCallback(async (dados: Omit<AutorizacaoManejo, 'id' | 'criadoEm'>) => {
-    const { error } = await supabase
-      .from('autorizacoes_manejo')
-      .insert([{
-        cliente_id: dados.clienteId,
-        numero_car: dados.numeroCar,
-        nome_fazenda: dados.nomeFazenda,
-        nome_proprietario: dados.nomeProprietario,
-        cidade: dados.cidade,
-        vencimento: dados.vencimento
-      }]);
-    if (error) throw error;
+  const salvarManejo = useCallback(async (dados: Partial<AutorizacaoManejo> & { clienteId: string }) => {
+    const payload = {
+      cliente_id: dados.clienteId,
+      numero_car: dados.numeroCar,
+      nome_fazenda: dados.nomeFazenda,
+      nome_proprietario: dados.nomeProprietario,
+      cidade: dados.cidade,
+      vencimento: dados.vencimento
+    };
+
+    if (dados.id) {
+      const { error } = await supabase
+        .from('autorizacoes_manejo')
+        .update(payload)
+        .eq('id', dados.id);
+      if (error) throw error;
+    } else {
+      const { error } = await supabase
+        .from('autorizacoes_manejo')
+        .insert([payload]);
+      if (error) throw error;
+    }
   }, []);
 
   const deletarManejo = useCallback(async (id: string) => {

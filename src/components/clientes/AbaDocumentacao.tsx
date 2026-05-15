@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Target, MapPin, Calendar, Plus, Trash2, ShieldAlert, 
-  ChevronDown, ChevronUp, FileText, Globe, Landmark, Upload, Loader2
+  ChevronDown, ChevronUp, FileText, Globe, Landmark, Upload, Loader2, Pencil
 } from 'lucide-react';
 import { parseIbamaPdf } from '../../services/ibamaParserService';
 import { useClientes } from '../../context/ClientesContext';
@@ -57,8 +57,10 @@ export function AbaDocumentacao({ cliente, armaIdInicial }: Props) {
 
   // Modais
   const [modalArma, setModalArma] = useState(false);
+  const [armaParaEditar, setArmaParaEditar] = useState<Arma | null>(null);
   const [modalGt, setModalGt] = useState<string | null>(null); // armaId
   const [modalManejo, setModalManejo] = useState(false);
+  const [manejoParaEditar, setManejoParaEditar] = useState<AutorizacaoManejo | null>(null);
 
   const carregarDados = async () => {
     setCarregando(true);
@@ -155,14 +157,25 @@ export function AbaDocumentacao({ cliente, armaIdInicial }: Props) {
                     </div>
                   </div>
                   
-                  <div className="flex items-center gap-6">
-                    <div className="text-right">
-                      <p className="text-[10px] text-gray-500 font-bold uppercase mb-1">Validade CRAF</p>
-                      <BadgeVencimento data={arma.vencimentoCraf} tipo="CRAF" />
+                    <div className="flex items-center gap-3">
+                      <div className="text-right">
+                        <p className="text-[10px] text-gray-500 font-bold uppercase mb-1">Validade CRAF</p>
+                        <BadgeVencimento data={arma.vencimentoCraf} tipo="CRAF" />
+                      </div>
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setArmaParaEditar(arma);
+                          setModalArma(true);
+                        }}
+                        className="p-2 rounded-lg bg-brand-dark-2 text-gray-400 hover:text-brand-blue transition-colors"
+                        title="Editar Arma"
+                      >
+                        <Pencil size={16} />
+                      </button>
+                      {expandirArma === arma.id ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
                     </div>
-                    {expandirArma === arma.id ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
                   </div>
-                </div>
 
                 {expandirArma === arma.id && (
                   <div className="border-t border-brand-dark-5 p-4 bg-brand-dark-4 animate-slide-down">
@@ -256,21 +269,34 @@ export function AbaDocumentacao({ cliente, armaIdInicial }: Props) {
                     </div>
                   </div>
                   
-                  <div className="flex items-center gap-6">
+                  <div className="flex items-center gap-4">
                     <div className="text-right">
                       <p className="text-[10px] text-gray-500 font-bold uppercase mb-1">Validade Manejo</p>
                       <BadgeVencimento data={m.vencimento} tipo="MANEJO" />
                     </div>
-                    <button 
-                      onClick={() => {
-                        if(confirm('Excluir esta autorização?')) {
-                          deletarManejo(m.id).then(carregarDados);
-                        }
-                      }} 
-                      className="text-gray-600 hover:text-red-400 p-1 transition-colors"
-                    >
-                      <Trash2 size={18} />
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button 
+                        onClick={() => {
+                          setManejoParaEditar(m);
+                          setModalManejo(true);
+                        }} 
+                        className="p-2 rounded-lg bg-brand-dark-2 text-gray-400 hover:text-brand-blue transition-colors"
+                        title="Editar Manejo"
+                      >
+                        <Pencil size={16} />
+                      </button>
+                      <button 
+                        onClick={() => {
+                          if(confirm('Excluir esta autorização?')) {
+                            deletarManejo(m.id).then(carregarDados);
+                          }
+                        }} 
+                        className="p-2 rounded-lg bg-brand-dark-2 text-gray-400 hover:text-red-400 transition-colors"
+                        title="Excluir Manejo"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -282,7 +308,11 @@ export function AbaDocumentacao({ cliente, armaIdInicial }: Props) {
       {/* --- Modais --- */}
       {modalArma && (
         <ModalArma 
-          onFechar={() => setModalArma(false)} 
+          armaParaEditar={armaParaEditar || undefined}
+          onFechar={() => {
+            setModalArma(false);
+            setArmaParaEditar(null);
+          }} 
           onSalvar={async (d) => {
             try {
               const armaFormatada = {
@@ -330,15 +360,24 @@ export function AbaDocumentacao({ cliente, armaIdInicial }: Props) {
 
       {modalManejo && (
         <ModalManejo 
-          onFechar={() => setModalManejo(false)} 
+          manejoParaEditar={manejoParaEditar || undefined}
+          onFechar={() => {
+            setModalManejo(false);
+            setManejoParaEditar(null);
+          }} 
           onSalvar={(d) => salvarManejo({ 
             ...d, 
             numeroCar: d.numeroCar?.trim().toUpperCase(),
             nomeFazenda: d.nomeFazenda?.trim().toUpperCase(),
             nomeProprietario: d.nomeProprietario?.trim().toUpperCase(),
             cidade: d.cidade?.trim().toUpperCase(),
-            clienteId: cliente.id 
-          }).then(() => { carregarDados(); setModalManejo(false); })} 
+            clienteId: cliente.id,
+            id: manejoParaEditar?.id
+          }).then(() => { 
+            carregarDados(); 
+            setModalManejo(false);
+            setManejoParaEditar(null);
+          })} 
         />
       )}
     </div>
@@ -389,11 +428,18 @@ function EmptyState({ msg }: { msg: string }) {
 
 // --- Formulários Internos (Modais) ---
 
-function ModalArma({ onFechar, onSalvar }: { onFechar: () => void, onSalvar: (d: any) => void }) {
+function ModalArma({ armaParaEditar, onFechar, onSalvar }: { armaParaEditar?: Arma, onFechar: () => void, onSalvar: (d: any) => void }) {
   const { modelosRegistrados, calibresRegistrados, fabricantesRegistrados } = useClientes();
   const [form, setForm] = useState({
-    tipo: '', modelo: '', calibre: '', fabricante: '', numeroSerie: '', 
-    numeroSigma: '', acervo: 'Tiro Desportivo' as any, vencimentoCraf: ''
+    id: armaParaEditar?.id,
+    tipo: armaParaEditar?.tipo || '', 
+    modelo: armaParaEditar?.modelo || '', 
+    calibre: armaParaEditar?.calibre || '', 
+    fabricante: armaParaEditar?.fabricante || '', 
+    numeroSerie: armaParaEditar?.numeroSerie || '', 
+    numeroSigma: armaParaEditar?.numeroSigma || '', 
+    acervo: (armaParaEditar?.acervo || 'Tiro Desportivo') as any, 
+    vencimentoCraf: armaParaEditar?.vencimentoCraf || ''
   });
 
   const modelosCombinados = Array.from(new Set([...MODELOS_BASE, ...modelosRegistrados])).sort();
@@ -403,7 +449,9 @@ function ModalArma({ onFechar, onSalvar }: { onFechar: () => void, onSalvar: (d:
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
       <div className="card w-full max-w-md animate-scale-up" onClick={e => e.stopPropagation()}>
-        <h3 className="text-lg font-bold text-white mb-6">Cadastrar Nova Arma</h3>
+        <h3 className="text-lg font-bold text-white mb-6">
+          {armaParaEditar ? 'Editar Arma' : 'Cadastrar Nova Arma'}
+        </h3>
         <div className="space-y-4">
           <div>
             <label className="label">Tipo de Arma</label>
@@ -487,7 +535,9 @@ function ModalArma({ onFechar, onSalvar }: { onFechar: () => void, onSalvar: (d:
           </div>
           <div className="flex gap-3 pt-4">
             <button onClick={onFechar} className="btn-ghost flex-1">Cancelar</button>
-            <button onClick={() => onSalvar(form)} className="btn-primary flex-1">Salvar Arma</button>
+            <button onClick={() => onSalvar(form)} className="btn-primary flex-1">
+              {armaParaEditar ? 'Salvar Alterações' : 'Salvar Arma'}
+            </button>
           </div>
         </div>
       </div>
@@ -602,8 +652,15 @@ function ModalGt({ armaAcervo, onFechar, onSalvar }: { armaAcervo: string, onFec
   );
 }
 
-function ModalManejo({ onFechar, onSalvar }: { onFechar: () => void, onSalvar: (d: any) => void }) {
-  const [form, setForm] = useState({ numeroCar: '', nomeFazenda: '', nomeProprietario: '', cidade: '', vencimento: '' });
+function ModalManejo({ manejoParaEditar, onFechar, onSalvar }: { manejoParaEditar?: AutorizacaoManejo, onFechar: () => void, onSalvar: (d: any) => void }) {
+  const [form, setForm] = useState({ 
+    id: manejoParaEditar?.id,
+    numeroCar: manejoParaEditar?.numeroCar || '', 
+    nomeFazenda: manejoParaEditar?.nomeFazenda || '', 
+    nomeProprietario: manejoParaEditar?.nomeProprietario || '', 
+    cidade: manejoParaEditar?.cidade || '', 
+    vencimento: manejoParaEditar?.vencimento || '' 
+  });
   const [importando, setImportando] = useState(false);
 
   const handleImportPdf = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -633,7 +690,9 @@ function ModalManejo({ onFechar, onSalvar }: { onFechar: () => void, onSalvar: (
     <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
       <div className="card w-full max-w-md animate-scale-up" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-6">
-          <h3 className="text-lg font-bold text-white">Autorização de Manejo (IBAMA)</h3>
+          <h3 className="text-lg font-bold text-white">
+            {manejoParaEditar ? 'Editar Autorização de Manejo' : 'Autorização de Manejo (IBAMA)'}
+          </h3>
           <div className="relative">
             <input 
               type="file" 
@@ -679,7 +738,9 @@ function ModalManejo({ onFechar, onSalvar }: { onFechar: () => void, onSalvar: (
           </div>
           <div className="flex gap-3 pt-4">
             <button onClick={onFechar} className="btn-ghost flex-1">Cancelar</button>
-            <button onClick={() => onSalvar(form)} className="btn-primary flex-1">Salvar Manejo</button>
+            <button onClick={() => onSalvar(form)} className="btn-primary flex-1">
+              {manejoParaEditar ? 'Salvar Alterações' : 'Salvar Manejo'}
+            </button>
           </div>
         </div>
       </div>
