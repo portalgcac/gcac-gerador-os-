@@ -15,56 +15,80 @@ export async function parseIbamaPdf(file: File): Promise<IbamaData> {
   const arrayBuffer = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
   
-  let fullText = '';
+  let rawText = '';
   for (let i = 1; i <= pdf.numPages; i++) {
     const page = await pdf.getPage(i);
     const textContent = await page.getTextContent();
     const pageText = textContent.items.map((item: any) => item.str).join(' ');
-    fullText += pageText + '\n';
+    rawText += pageText + '\n';
   }
 
   const data: IbamaData = {};
 
-  // Normalizar texto para busca
-  const cleanText = fullText.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+  // Normalizar texto para busca (Remover acentos e colocar em caixa alta)
+  const text = rawText.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+  
+  console.log('Texto extraído e normalizado:', text);
 
   // 1. Extrair Vencimento
-  const matchVenc = fullText.match(/Fim:?\s*(\d{2}\/\d{2}\/\d{4})/i);
+  const matchVenc = text.match(/FIM:?\s*(\d{2}\/\d{2}\/\d{4})/);
   if (matchVenc) {
     const [d, m, y] = matchVenc[1].split('/');
     data.vencimento = `${y}-${m}-${d}`;
   }
 
-  // 2. IDENTIFICAR O SOLICITANTE
-  const solicitanteMatch = fullText.match(/(Solicitante|Interessado):?\s*([A-ZÀ-ÿ\s]{10,60})(?=\s+CTF|Data|$)/i);
-  const solicitanteNome = solicitanteMatch ? solicitanteMatch[solicitanteMatch.length - 1].trim().toUpperCase() : '';
+  // 2. IDENTIFICAR O SOLICITANTE / INTERESSADO
+  const solicitanteMatch = text.match(/(SOLICITANTE|INTERESSADO):?\s*([A-Z\s]{10,60})(?=\s+CTF|DATA|$)/);
+  const solicitanteNome = solicitanteMatch ? solicitanteMatch[2].trim() : '';
 
   // 3. EXTRAIR CAR
-  const carRegex = /([A-Z]{2}-\d{7}-[\w\s-]+)/i;
-  const carMatch = fullText.match(carRegex);
+  const carRegex = /([A-Z]{2}-\d{7}-[\w\s-]+)/;
+  const carMatch = text.match(carRegex);
   if (carMatch) {
     const carMain = carMatch[0].trim();
-    const hashes = fullText.match(/[A-Z0-9]{15,}/g) || [];
-    const filteredHashes = hashes.filter(h => h.length > 15 && !h.includes('/') && !h.includes('SOLICITANTE'));
+    const hashes = text.match(/[A-Z0-9]{15,}/g) || [];
+    const filteredHashes = hashes.filter(h => h.length > 15 && !h.includes('/') && !['SOLICITANTE', 'INTERESSADO', 'AUTORIZACAO'].some(k => h.includes(k)));
     data.numeroCar = (carMain + ' ' + filteredHashes.join(' ')).replace(/\s+/g, ' ').trim();
   }
 
-  // 4. EXTRAIR FAZENDA
-  const propertyPrefixes = 'FAZENDA|SITIO|SÍTIO|STIO|CHACARA|CHÁCARA|ESTANCIA|ESTÂNCIA|GLEBA|LOTE|PROPRIEDADE';
-  const fazendaMatch = fullText.match(new RegExp(`(${propertyPrefixes})\\s+([A-ZÀ-ÿ\\s]{3,40})(?=\\s+[A-Z]{2}-\\d{7})`, 'i'));
-  if (fazendaMatch) {
-    data.nomeFazenda = `${fazendaMatch[1]} ${fazendaMatch[2]}`.toUpperCase().trim();
+  // 4. EXTRAIR NOME DA PROPRIEDADE (FAZENDA, SITIO, etc)
+  const propertyPrefixesList = ['FAZENDA', 'SITIO', 'STIO', 'CHACARA', 'ESTANCIA', 'GLEBA', 'LOTE', 'PROPRIEDADE'];
+  const propertyPrefixes = propertyPrefixesList.join('|');
+  
+  // Tenta encontrar o prefixo vindo antes do número do CAR
+  const carSnippet = data.numeroCar ? data.numeroCar.substring(0, 10) : '';
+  let fazendaMatch = null;
+  
+  if (carSnippet) {
+    const carIndex = text.indexOf(carSnippet);
+    if (carIndex !== -1) {
+      // Busca nos 200 caracteres anteriores ao CAR
+      const beforeCar = text.substring(Math.max(0, carIndex - 200), carIndex);
+      const matches = Array.from(beforeCar.matchAll(new RegExp(`(${propertyPrefixes})\\s+([A-Z\\s]{3,60})`, 'g')));
+      if (matches.length > 0) {
+        const lastMatch = matches[matches.length - 1];
+        fazendaMatch = lastMatch;
+      }
+    }
   }
 
-  // 5. EXTRAIR CIDADE (Busca elástica para Cidade/UF)
+  // Fallback se não encontrou perto do CAR
+  if (!fazendaMatch) {
+    fazendaMatch = text.match(new RegExp(`(${propertyPrefixes})\\s+([A-Z\\s]{3,60})(?=\\s+[A-Z]{2}-\\d{7})`));
+  }
+
+  if (fazendaMatch) {
+    data.nomeFazenda = `${fazendaMatch[1]} ${fazendaMatch[2].trim()}`.toUpperCase();
+  }
+
+  // 5. EXTRAIR CIDADE
   const UFS = ['AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO'];
-  const cidadeRegex = /([A-ZÀ-ÿ\s]{3,30})\s*\/\s*([A-Z]{2})(?=\s|$|\n)/gi;
+  const cidadeRegex = /([A-Z\s]{3,30})\s*\/\s*([A-Z]{2})(?=\s|$|\n)/g;
   let matchC;
-  while ((matchC = cidadeRegex.exec(fullText)) !== null) {
-    let nome = matchC[1].trim().toUpperCase();
-    const uf = matchC[2].toUpperCase();
+  while ((matchC = cidadeRegex.exec(text)) !== null) {
+    let nome = matchC[1].trim();
+    const uf = matchC[2];
     
-    // Validar se o UF é real e se o nome não contém palavras de rodapé
     if (UFS.includes(uf)) {
       nome = nome.replace(/\d+/g, '').replace('MTS', '').replace('KM', '').trim();
       if (!['RUA', 'AV', 'RODOVIA', 'ENDERECO', 'MATRICULA', 'EMENDAS', 'RASURAS', 'VALIDA'].some(excl => nome.includes(excl))) {
@@ -73,48 +97,41 @@ export async function parseIbamaPdf(file: File): Promise<IbamaData> {
     }
   }
 
-  // 6. EXTRAIR PROPRIETÁRIO (Estratégia de limpeza de cabeçalhos)
+  // 6. EXTRAIR PROPRIETÁRIO
   const blacklist = [
     'INSTITUTO', 'BRASILEIRO', 'IBAMA', 'MINISTERIO', 'AMBIENTE', 'RECURSOS', 'NATURAIS', 
-    'RENOVAVEIS', 'SOLICITANTE', 'AUTORIZACAO', 'CONTROLADOR', 'MATRICULA', 'ENDERECO', 
-    'CIDADE', 'FAZENDA', 'RODOVIA', 'ESTRADA', 'ESTA', 'PERMITE', 'TRANSPORTE', 'ESPECIES', 
-    'INVASORAS', 'JAVALI', 'ARMADILHA', 'CAES', 'ESPERA', 'SIM', 'NAO', 'PROPRIEDADE', 'NOME', 'PROPRIETARIO',
-    'SITIO', 'STIO', 'SÍTIO', 'CHACARA', 'CHÁCARA', 'ESTANCIA', 'ESTÂNCIA', 'GLEBA', 'LOTE'
+    'RENOVAVEIS', 'SOLICITANTE', 'INTERESSADO', 'AUTORIZACAO', 'CONTROLADOR', 'MATRICULA', 'ENDERECO', 
+    'CIDADE', 'FAZENDA', 'SITIO', 'STIO', 'CHACARA', 'ESTANCIA', 'GLEBA', 'LOTE', 'RODOVIA', 'ESTRADA', 
+    'ESTA', 'PERMITE', 'TRANSPORTE', 'ESPECIES', 'INVASORAS', 'JAVALI', 'ARMADILHA', 'CAES', 'ESPERA', 
+    'SIM', 'NAO', 'PROPRIEDADE', 'NOME', 'PROPRIETARIO'
   ];
 
-  const allNames = fullText.match(/[A-ZÀ-ÿ]{3,}\s[A-ZÀ-ÿ]{2,}(\s[A-ZÀ-ÿ]{2,})*/g) || [];
+  const allNames = text.match(/[A-Z]{3,}\s[A-Z]{2,}(\s[A-Z]{2,})*/g) || [];
   
   const validNames = allNames.filter(n => {
-    let nClean = n.toUpperCase().trim();
+    const nClean = n.trim();
     
-    blacklist.forEach(b => {
-      if (nClean.startsWith(b + ' ')) nClean = nClean.replace(b + ' ', '').trim();
-      if (nClean.endsWith(' ' + b)) nClean = nClean.replace(' ' + b, '').trim();
-    });
-
+    // Ignorar se for o solicitante já identificado
     if (solicitanteNome && nClean.includes(solicitanteNome.split(' ')[0])) return false;
-    if (blacklist.some(b => nClean.includes(b) && nClean.length < 15)) return false;
     
-    // Se o nome contém algum prefixo de propriedade e é curto, provavelmente é o nome da fazenda
-    const prefixes = ['FAZENDA', 'SITIO', 'STIO', 'SÍTIO', 'CHACARA', 'CHÁCARA'];
-    if (prefixes.some(p => nClean.startsWith(p)) && nClean.length < 30) return false;
-
+    // Ignorar se contiver palavras da blacklist
+    if (blacklist.some(b => nClean.includes(b))) return false;
+    
+    // Ignorar se for o nome da fazenda
     if (data.nomeFazenda) {
       const fazendaSemPrefixo = data.nomeFazenda.split(' ').slice(1).join(' ');
       if (nClean.includes(fazendaSemPrefixo)) return false;
     }
     
-    return nClean.length >= 5;
+    // Nomes de pessoas geralmente não têm números e têm tamanho razoável
+    return nClean.length >= 8 && nClean.length < 50 && !/\d/.test(nClean);
   });
 
   if (validNames.length > 0) {
-    const carIdx = data.numeroCar ? fullText.indexOf(data.numeroCar.split(' ')[0]) : 0;
-    let selecionado = validNames.find(n => fullText.indexOf(n) > carIdx) || validNames[0];
-    
-    let final = selecionado.toUpperCase().trim();
-    ['NOME DO', 'PROPRIETARIO', 'CONTROLADOR', 'RODOVIA', 'ESTRADA', 'MT-'].forEach(t => final = final.replace(t, '').trim());
-    
-    data.nomeProprietario = final.split(' RODOVIA')[0].split(' MT')[0].trim();
+    // Prioriza nomes que aparecem após o CAR no texto
+    const carIdx = data.numeroCar ? text.indexOf(data.numeroCar.split('-')[0]) : 0;
+    let selecionado = validNames.find(n => text.indexOf(n) > carIdx) || validNames[0];
+    data.nomeProprietario = selecionado.trim();
   }
 
   return data;
