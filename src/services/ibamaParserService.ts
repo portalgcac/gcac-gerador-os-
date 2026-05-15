@@ -42,61 +42,65 @@ export async function parseIbamaPdf(file: File): Promise<IbamaData> {
     data.vencimento = `${y}-${m}-${d}`;
   }
 
-  // 2. Extrair CAR (Pode estar em múltiplas linhas)
-  // O CAR sempre começa com UF- e tem uma sequência de números e letras
-  const carMatch = fullText.match(/[A-Z]{2}-\d{7}-[\w\s-]+?(?=\s+Matrícula|\s+Nome do|\s+Endereço|$)/i);
+  // Isolar a parte da tabela para evitar pegar cabeçalhos do topo do PDF
+  const idxLocal = fullText.indexOf('Local(is) do manejo');
+  const tableText = idxLocal !== -1 ? fullText.substring(idxLocal) : fullText;
+
+  // 2. Extrair CAR
+  // O CAR do IBAMA: UF-0000000-000 + Hashes
+  const carRegex = /([A-Z]{2}-\d{7}-[\w\s-]+?)(?=\s+Matrícula|\s+Nome do|\s+Endereço|\s+ADEMILTON|\s+RESENDE|$)/i;
+  const carMatch = tableText.match(carRegex);
   if (carMatch) {
-    // Pegamos o bloco do CAR e também procuramos por continuações (hashes) que o IBAMA coloca abaixo
-    const carLines = fullText.match(/[A-Z0-9]{10,}/g) || [];
-    const mainCar = carMatch[0].split(/\s{2,}/)[0].trim();
-    
-    // Filtramos apenas o que parece ser parte do CAR (letras e números longos)
-    const carParts = carLines.filter(l => l.length > 10 && !l.includes('/') && l !== data.vencimento.replace(/-/g, ''));
-    if (carParts.length > 0) {
-      data.numeroCar = (mainCar + ' ' + carParts.join(' ')).replace(/\s+/g, ' ').trim();
-    } else {
-      data.numeroCar = mainCar;
-    }
+    // Pegar hashes de continuação (blocos alfanuméricos longos)
+    const carParts = tableText.match(/[A-Z0-9]{10,}/g) || [];
+    const mainCar = carMatch[0].trim();
+    const filteredParts = carParts.filter(p => 
+      p.length > 10 && 
+      !['SOLICITANTE', 'AUTORIZAÇÃO', 'CONTROLADOR'].includes(p) &&
+      !p.includes('/')
+    );
+    data.numeroCar = (mainCar + ' ' + filteredParts.join(' ')).replace(/\s+/g, ' ').trim();
   }
 
   // 3. Extrair Fazenda
-  // Procurar por "FAZENDA" seguido de um nome, evitando os cabeçalhos
-  const fazendaRegex = /FAZENDA\s+([A-ZÀ-ÿ\s]{3,30})(?=\s+[A-Z]{2}-\d{7})/i;
-  const fazendaMatch = fullText.match(fazendaRegex);
+  const fazendaMatch = tableText.match(/FAZENDA\s+([A-ZÀ-ÿ\s]{3,30})(?=\s+[A-Z]{2}-\d{7})/i);
   if (fazendaMatch) {
     data.nomeFazenda = `FAZENDA ${fazendaMatch[1].trim()}`.toUpperCase();
   } else {
-    // Fallback: procurar no texto geral por FAZENDA + Próxima palavra em maiúsculo
-    const fallbackFazenda = fullText.match(/FAZENDA\s+([A-ZÀ-ÿ]+(\s+[A-ZÀ-ÿ]+)?)/);
-    if (fallbackFazenda && !fallbackFazenda[0].includes('PROPRIEDADE')) {
-      data.nomeFazenda = fallbackFazenda[0].toUpperCase();
-    }
+    const fallback = tableText.match(/FAZENDA\s+([A-ZÀ-ÿ\s]+?)(?=\s+[A-Z]{2}-\d{7})/i);
+    if (fallback) data.nomeFazenda = fallback[0].trim().toUpperCase();
   }
 
   // 4. Extrair Cidade/UF
-  // Procurar padrão Cidade/UF no final de blocos de texto
-  const cidadeRegex = /([A-ZÀ-ÿ\s]{3,})\/([A-Z]{2})(?=\s|$|\n)/g;
-  let matches;
-  while ((matches = cidadeRegex.exec(fullText)) !== null) {
-    const cidadeNome = matches[1].trim();
-    // Evitar pegar "MTS" ou partes do endereço
+  // Geralmente no final da tabela
+  const cidadeMatch = tableText.match(/([A-ZÀ-ÿ\s]{3,})\/([A-Z]{2})(?=\s|$|\n)/);
+  if (cidadeMatch) {
+    const cidadeNome = cidadeMatch[1].trim();
     if (cidadeNome.length > 2 && !['MTS', 'KM', 'RUA', 'AV'].includes(cidadeNome.toUpperCase())) {
-      data.cidade = `${cidadeNome}/${matches[2]}`.toUpperCase();
+      data.cidade = `${cidadeNome}/${cidadeMatch[2]}`.toUpperCase();
     }
   }
 
   // 5. Extrair Proprietário
-  // Geralmente é um nome em maiúsculas após o CAR ou perto de "controlador"
-  const proprietarioRegex = /(?:controlador|Matrícula)\s+([A-Z\s]{10,40})(?=\s+RODOVIA|\s+Endereço|\s+ESTRADA)/i;
-  const propMatch = fullText.match(proprietarioRegex);
-  if (propMatch) {
-    data.nomeProprietario = propMatch[1].trim().toUpperCase();
-  } else {
-    // Se não achou, procurar por nomes próprios longos em maiúsculas que não sejam a fazenda
-    const nomes = fullText.match(/[A-Z]{3,}\s[A-Z]{3,}\s[A-Z]{3,}/g);
-    if (nomes) {
-      const provavel = nomes.find(n => !n.includes('FAZENDA') && !n.includes('MINISTÉRIO') && !n.includes('INSTITUTO'));
-      if (provavel) data.nomeProprietario = provavel.trim().toUpperCase();
+  // Excluir palavras que pertencem ao cabeçalho do IBAMA
+  const blacklist = ['INSTITUTO', 'BRASILEIRO', 'RECURSOS', 'NATURAIS', 'IBAMA', 'MINISTÉRIO', 'AMBIENTE', 'CONTROLE', 'ESPÉCIES', 'EXÓTICAS', 'INVASORAS'];
+  
+  const nomesCandidatos = tableText.match(/[A-ZÀ-ÿ]{4,}\s[A-ZÀ-ÿ]{4,}(\s[A-ZÀ-ÿ]{4,})?/g);
+  if (nomesCandidatos) {
+    const filtrados = nomesCandidatos.filter(n => 
+      !blacklist.some(b => n.includes(b)) && 
+      !n.includes('FAZENDA') &&
+      !n.includes('PROPRIEDADE') &&
+      !n.includes('LOCAL')
+    );
+    if (filtrados.length > 0) {
+      // O proprietário costuma vir após o CAR ou no meio da tabela
+      data.nomeProprietario = filtrados[0].trim().toUpperCase();
+      // Se houver um segundo nome (continuação), podemos tentar juntar
+      if (filtrados[1] && tableText.indexOf(filtrados[1]) > tableText.indexOf(filtrados[0])) {
+         // heurística simples de proximidade
+         data.nomeProprietario += ' ' + filtrados[1].trim().toUpperCase();
+      }
     }
   }
 
