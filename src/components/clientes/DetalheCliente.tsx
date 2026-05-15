@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   User, Mail, Phone, MapPin, Shield, Copy, Check, 
   FileText, Receipt, Clock, Calendar, Plus, 
@@ -30,7 +30,10 @@ export function DetalheCliente({ cliente }: DetalheClienteProps) {
   const { agendamentos } = useAgendamentos();
   const { deletarCliente } = useClientes();
   
-  const [abaAtiva, setAbaAtiva] = useState<'ordens' | 'orcamentos' | 'recibos' | 'agendamentos' | 'documentos' | 'creditos'>('ordens');
+  const location = useLocation();
+  const [abaAtiva, setAbaAtiva] = useState<'ordens' | 'orcamentos' | 'recibos' | 'agendamentos' | 'documentos' | 'creditos'>(
+    (location.state as any)?.aba || 'ordens'
+  );
   const [copiou, setCopiou] = useState(false);
   const [editando, setEditando] = useState(false);
   const [confirmandoDelete, setConfirmandoDelete] = useState(false);
@@ -349,7 +352,10 @@ export function DetalheCliente({ cliente }: DetalheClienteProps) {
                 />
               )}
               {abaAtiva === 'documentos' && (
-                <AbaDocumentacao cliente={cliente} />
+                <AbaDocumentacao 
+                  cliente={cliente} 
+                  armaIdInicial={(location.state as any)?.armaId}
+                />
               )}
               {abaAtiva === 'creditos' && (
                 <div className="pt-2">

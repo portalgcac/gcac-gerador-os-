@@ -21,7 +21,8 @@ export async function buscarAlertasGlobais(): Promise<AlertaDocumento[]> {
             dataVencimento: c.vencimento_cr,
             nivel: result.nivel,
             diasRestantes: result.dias,
-            clienteNome: c.nome
+            clienteNome: c.nome,
+            clienteId: c.id
           });
         }
       }
@@ -35,7 +36,8 @@ export async function buscarAlertasGlobais(): Promise<AlertaDocumento[]> {
             dataVencimento: c.vencimento_cr_ibama,
             nivel: result.nivel,
             diasRestantes: result.dias,
-            clienteNome: c.nome
+            clienteNome: c.nome,
+            clienteId: c.id
           });
         }
       }
@@ -49,6 +51,7 @@ export async function buscarAlertasGlobais(): Promise<AlertaDocumento[]> {
       id, 
       modelo, 
       vencimento_craf, 
+      cliente_id,
       clientes:cliente_id (nome)
     `);
 
@@ -66,7 +69,9 @@ export async function buscarAlertasGlobais(): Promise<AlertaDocumento[]> {
             nivel: result.nivel,
             diasRestantes: result.dias,
             clienteNome: cliente?.nome,
-            armaModelo: a.modelo
+            clienteId: a.cliente_id,
+            armaModelo: a.modelo,
+            armaId: a.id
           });
         }
       }
@@ -82,6 +87,7 @@ export async function buscarAlertasGlobais(): Promise<AlertaDocumento[]> {
       vencimento, 
       armas:arma_id (
         modelo, 
+        cliente_id,
         clientes:cliente_id (nome)
       )
     `);
@@ -101,7 +107,9 @@ export async function buscarAlertasGlobais(): Promise<AlertaDocumento[]> {
             nivel: result.nivel,
             diasRestantes: result.dias,
             clienteNome: cliente?.nome,
-            armaModelo: arma?.modelo
+            clienteId: arma?.cliente_id,
+            armaModelo: arma?.modelo,
+            armaId: arma?.id
           });
         }
       }
@@ -115,6 +123,7 @@ export async function buscarAlertasGlobais(): Promise<AlertaDocumento[]> {
       id, 
       nome_fazenda, 
       vencimento, 
+      cliente_id,
       clientes:cliente_id (nome)
     `);
 
@@ -131,7 +140,8 @@ export async function buscarAlertasGlobais(): Promise<AlertaDocumento[]> {
             dataVencimento: m.vencimento,
             nivel: result.nivel,
             diasRestantes: result.dias,
-            clienteNome: cliente?.nome
+            clienteNome: cliente?.nome,
+            clienteId: m.cliente_id
           });
         }
       }

@@ -73,13 +73,19 @@ export function WidgetVencimentos() {
             </div>
 
             <button 
-              onClick={() => {
-                // Navegar para o detalhe do cliente. Se tivermos o ID no alerta.id, podemos extrair.
-                // Mas salvei o alerta.id como string composta. Melhor seria ter clienteId separado.
-                // Por enquanto vou navegar para a lista de clientes ou usar um link genérico se necessário.
-                // Note: alerta.id format: `${c.id}-cr` etc.
-                const clienteId = alerta.id.split('-')[0];
-                navigate(`/clientes?id=${clienteId}`); // Idealmente abriria o modal de detalhe
+            onClick={() => {
+                if (alerta.clienteId) {
+                  navigate(`/clientes/${alerta.clienteId}`, { 
+                    state: { 
+                      aba: 'documentos',
+                      armaId: alerta.armaId 
+                    } 
+                  });
+                } else {
+                  // Fallback
+                  const clienteId = alerta.id.split('-')[0];
+                  navigate(`/clientes/${clienteId}`, { state: { aba: 'documentos' } });
+                }
               }}
               className="p-1.5 hover:bg-black/10 rounded-lg transition-colors flex-shrink-0"
               title="Ver Cliente"

@@ -15,7 +15,9 @@ export interface AlertaDocumento {
   nivel: NivelAlerta;
   diasRestantes: number;
   clienteNome?: string;
+  clienteId?: string;
   armaModelo?: string;
+  armaId?: string;
 }
 
 /**

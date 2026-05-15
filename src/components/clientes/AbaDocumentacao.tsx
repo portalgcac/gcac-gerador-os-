@@ -38,9 +38,10 @@ const MODELOS_BASE = [
 
 interface Props {
   cliente: Cliente;
+  armaIdInicial?: string;
 }
 
-export function AbaDocumentacao({ cliente }: Props) {
+export function AbaDocumentacao({ cliente, armaIdInicial }: Props) {
   const { 
     buscarArmas, salvarArma, deletarArma,
     buscarGts, salvarGt, deletarGt,
@@ -51,7 +52,7 @@ export function AbaDocumentacao({ cliente }: Props) {
   const [manejos, setManejos] = useState<AutorizacaoManejo[]>([]);
   const [gtsPorArma, setGtsPorArma] = useState<Record<string, GuiaTrafego[]>>({});
   const [carregando, setCarregando] = useState(true);
-  const [expandirArma, setExpandirArma] = useState<string | null>(null);
+  const [expandirArma, setExpandirArma] = useState<string | null>(armaIdInicial || null);
 
   // Modais
   const [modalArma, setModalArma] = useState(false);
