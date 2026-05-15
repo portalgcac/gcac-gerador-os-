@@ -43,13 +43,12 @@ export async function parseIbamaPdf(file: File): Promise<IbamaData> {
   }
 
   // 2. IDENTIFICAR E BANIR O SOLICITANTE
-  // O solicitante aparece no início: "Solicitante: NOME COMPLETO"
   const solicitanteMatch = fullText.match(/Solicitante:?\s*([A-ZÀ-ÿ\s]{10,60})(?=\s+CTF|Data|$)/i);
   const solicitanteNome = solicitanteMatch ? solicitanteMatch[1].trim().toUpperCase() : '';
 
-  // 3. ISOLAR A ÁREA DA TABELA (Abaixo de Propriedade/CAR)
+  // 3. ISOLAR A ÁREA DA TABELA COM LIMITE DE FIM
   const cleanText = fullText.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
-  const tableKeywords = [/PROPRIEDADE\s+CAR\s+MATRICULA/i, /LOCAL\(IS\)\s+DO\s+MANEJO/i, /LOCAL\s+DO\s+MANEJO/i];
+  const tableKeywords = [/PROPRIEDADE\s+CAR\s+MATRICULA/i, /LOCAL\(IS\)\s+DO\s+MANEJO/i];
   let tableStartIndex = -1;
   for (const regex of tableKeywords) {
     const match = cleanText.match(regex);
@@ -59,7 +58,19 @@ export async function parseIbamaPdf(file: File): Promise<IbamaData> {
     }
   }
 
-  const tableArea = tableStartIndex !== -1 ? fullText.substring(tableStartIndex) : fullText;
+  if (tableStartIndex === -1) tableStartIndex = 0;
+  
+  // Achar onde a tabela ACABA (Observações ou avisos legais no rodapé)
+  const endKeywords = ['OBSERVACOES', 'ESTA AUTORIZACAO NAO PERMITE', 'EMITIDO EM', 'PAGINA'];
+  let tableEndIndex = fullText.length;
+  for (const kw of endKeywords) {
+    const idx = cleanText.indexOf(kw, tableStartIndex);
+    if (idx !== -1 && idx < tableEndIndex) {
+      tableEndIndex = idx;
+    }
+  }
+
+  const tableArea = fullText.substring(tableStartIndex, tableEndIndex);
 
   // 4. EXTRAIR CAR
   const carRegex = /([A-Z]{2}-\d{7}-[\w\s-]+)/i;
@@ -67,7 +78,6 @@ export async function parseIbamaPdf(file: File): Promise<IbamaData> {
   let carMainPart = '';
   if (carMatch) {
     carMainPart = carMatch[0].trim();
-    // Pegar hashes extras
     const allHashes = tableArea.match(/[A-Z0-9]{15,}/g) || [];
     const filteredHashes = allHashes.filter(h => 
       h.length > 15 && !h.includes('/') && !h.includes(solicitanteNome.split(' ')[0])
@@ -81,28 +91,23 @@ export async function parseIbamaPdf(file: File): Promise<IbamaData> {
     data.nomeFazenda = `FAZENDA ${fazendaMatch[1].trim()}`.toUpperCase();
   }
 
-  // 6. EXTRAIR PROPRIETÁRIO (Focar no nome que NÃO é o solicitante)
+  // 6. EXTRAIR PROPRIETÁRIO
   const blacklist = [
     'INSTITUTO', 'BRASILEIRO', 'IBAMA', 'MINISTERIO', 'AMBIENTE', 'RECURSOS', 'NATURAIS', 
     'RENOVAVEIS', 'SOLICITANTE', 'AUTORIZACAO', 'CONTROLADOR', 'MATRICULA', 'ENDERECO', 
-    'CIDADE', 'FAZENDA', 'RODOVIA', 'ESTRADA', 'GLEICKSUEL', 'FERRERA'
+    'CIDADE', 'FAZENDA', 'RODOVIA', 'ESTRADA', 'GLEICKSUEL', 'ESTA', 'PERMITE', 'TRANSPORTE'
   ];
 
-  // Procurar por nomes próprios (2 ou mais palavras em maiúsculo) na área da tabela
   const nameBlocks = tableArea.match(/[A-ZÀ-ÿ]{4,}\s[A-ZÀ-ÿ]{3,}(\s[A-ZÀ-ÿ]{2,})*/g) || [];
   const validNames = nameBlocks.filter(n => {
     const nClean = n.toUpperCase().trim();
-    // Não pode ser o solicitante
     if (solicitanteNome && nClean.includes(solicitanteNome)) return false;
-    // Não pode ter palavras da blacklist
     if (blacklist.some(b => nClean.includes(b))) return false;
-    // Não pode ser a fazenda
     if (data.nomeFazenda && nClean.includes(data.nomeFazenda)) return false;
     return nClean.length > 10;
   });
 
   if (validNames.length > 0) {
-    // Pegar o primeiro nome válido que aparece após o CAR (heurística de posição)
     const afterCarIdx = carMainPart ? tableArea.indexOf(carMainPart) : 0;
     const bestMatch = validNames.find(n => tableArea.indexOf(n) > afterCarIdx) || validNames[0];
     data.nomeProprietario = bestMatch.trim().toUpperCase();
@@ -111,8 +116,10 @@ export async function parseIbamaPdf(file: File): Promise<IbamaData> {
   // 7. EXTRAIR CIDADE
   const cidadeMatch = tableArea.match(/([A-ZÀ-ÿ\s]{3,25})\/([A-Z]{2})(?=\s|$|\n)/i);
   if (cidadeMatch) {
-    const nome = cidadeMatch[1].trim().toUpperCase();
-    if (!['MTS', 'KM', 'RUA', 'AV', 'MATRICULA'].includes(nome)) {
+    let nome = cidadeMatch[1].trim().toUpperCase();
+    // Limpeza profunda do nome da cidade
+    nome = nome.replace(/\d+/g, '').replace('MTS', '').replace('KM', '').trim();
+    if (nome.length > 2) {
       data.cidade = `${nome}/${cidadeMatch[2].toUpperCase()}`;
     }
   }
