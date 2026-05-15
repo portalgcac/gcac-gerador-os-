@@ -42,77 +42,78 @@ export async function parseIbamaPdf(file: File): Promise<IbamaData> {
     data.vencimento = `${y}-${m}-${d}`;
   }
 
-  // Normalizar texto para busca
-  const cleanText = fullText.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
-  
-  // Isolar a área da tabela de forma mais agressiva
-  // Procurar pelo cabeçalho da tabela: Propriedade CAR Matrícula...
-  const tableHeaderMatch = cleanText.match(/PROPRIEDADE\s+CAR\s+MATRICULA/i);
-  const tableStartIndex = tableHeaderMatch ? tableHeaderMatch.index : cleanText.indexOf('LOCAL(IS) DO MANEJO');
-  
-  const tableArea = tableStartIndex !== -1 ? fullText.substring(tableStartIndex!) : fullText;
-  const tableAreaClean = tableStartIndex !== -1 ? cleanText.substring(tableStartIndex!) : cleanText;
+  // 2. IDENTIFICAR E BANIR O SOLICITANTE
+  // O solicitante aparece no início: "Solicitante: NOME COMPLETO"
+  const solicitanteMatch = fullText.match(/Solicitante:?\s*([A-ZÀ-ÿ\s]{10,60})(?=\s+CTF|Data|$)/i);
+  const solicitanteNome = solicitanteMatch ? solicitanteMatch[1].trim().toUpperCase() : '';
 
-  // 2. Extrair CAR (Fundamental para localizar o proprietário)
+  // 3. ISOLAR A ÁREA DA TABELA (Abaixo de Propriedade/CAR)
+  const cleanText = fullText.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+  const tableKeywords = [/PROPRIEDADE\s+CAR\s+MATRICULA/i, /LOCAL\(IS\)\s+DO\s+MANEJO/i, /LOCAL\s+DO\s+MANEJO/i];
+  let tableStartIndex = -1;
+  for (const regex of tableKeywords) {
+    const match = cleanText.match(regex);
+    if (match) {
+      tableStartIndex = match.index!;
+      break;
+    }
+  }
+
+  const tableArea = tableStartIndex !== -1 ? fullText.substring(tableStartIndex) : fullText;
+
+  // 4. EXTRAIR CAR
   const carRegex = /([A-Z]{2}-\d{7}-[\w\s-]+)/i;
   const carMatch = tableArea.match(carRegex);
   let carMainPart = '';
   if (carMatch) {
     carMainPart = carMatch[0].trim();
-    const possibleHashes = tableArea.match(/[A-Z0-9]{10,}/g) || [];
-    const filteredHashes = possibleHashes.filter(h => 
-      h.length > 10 && 
-      !['SOLICITANTE', 'AUTORIZACAO', 'CONTROLADOR', 'MATRICULA', 'PROPRIEDADE', 'ENDERECO', 'CIDADE', 'JAVALI', 'GLEICKSUEL'].some(excl => h.includes(excl)) &&
-      !h.includes('/')
+    // Pegar hashes extras
+    const allHashes = tableArea.match(/[A-Z0-9]{15,}/g) || [];
+    const filteredHashes = allHashes.filter(h => 
+      h.length > 15 && !h.includes('/') && !h.includes(solicitanteNome.split(' ')[0])
     );
     data.numeroCar = (carMainPart + ' ' + filteredHashes.join(' ')).replace(/\s+/g, ' ').trim();
   }
 
-  // 3. Extrair Fazenda
+  // 5. EXTRAIR FAZENDA
   const fazendaMatch = tableArea.match(/FAZENDA\s+([A-ZÀ-ÿ\s]{3,40})(?=\s+[A-Z]{2}-\d{7})/i);
   if (fazendaMatch) {
-    data.nomeFazenda = `FAZENDA ${fazendaMatch[1].trim()}`.toUpperCase().replace(/\s+/g, ' ');
+    data.nomeFazenda = `FAZENDA ${fazendaMatch[1].trim()}`.toUpperCase();
   }
 
-  // 4. Extrair Proprietário (O nome que vem LOGO APÓS o CAR na tabela)
-  // Estratégia: Pegar o texto após o CAR e buscar o primeiro bloco de nome maiúsculo
-  if (carMainPart) {
-    const afterCarText = tableArea.substring(tableArea.indexOf(carMainPart) + carMainPart.length);
-    const nameBlocks = afterCarText.match(/[A-ZÀ-ÿ]{4,}\s[A-ZÀ-ÿ]{4,}(\s[A-ZÀ-ÿ]{2,})*/g) || [];
-    const blacklist = ['RODOVIA', 'ESTRADA', 'AVENIDA', 'RUA', 'CIDADE', 'MATRICULA', 'ENDERECO', 'PROPRIETARIO', 'CONTROLADOR'];
-    
-    const ownerName = nameBlocks.find(n => {
-       const nClean = n.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
-       return !blacklist.some(b => nClean.includes(b)) && nClean.length > 8;
-    });
-    
-    if (ownerName) {
-      data.nomeProprietario = ownerName.trim().toUpperCase();
-      // Se houver um bloco de nome logo em seguida (sobrenome em outra linha), podemos tentar anexar
-      const nextIdx = nameBlocks.indexOf(ownerName) + 1;
-      if (nameBlocks[nextIdx] && afterCarText.indexOf(nameBlocks[nextIdx]) < afterCarText.indexOf(ownerName) + 50) {
-        // data.nomeProprietario += ' ' + nameBlocks[nextIdx].trim().toUpperCase();
-      }
-    }
+  // 6. EXTRAIR PROPRIETÁRIO (Focar no nome que NÃO é o solicitante)
+  const blacklist = [
+    'INSTITUTO', 'BRASILEIRO', 'IBAMA', 'MINISTERIO', 'AMBIENTE', 'RECURSOS', 'NATURAIS', 
+    'RENOVAVEIS', 'SOLICITANTE', 'AUTORIZACAO', 'CONTROLADOR', 'MATRICULA', 'ENDERECO', 
+    'CIDADE', 'FAZENDA', 'RODOVIA', 'ESTRADA', 'GLEICKSUEL', 'FERRERA'
+  ];
+
+  // Procurar por nomes próprios (2 ou mais palavras em maiúsculo) na área da tabela
+  const nameBlocks = tableArea.match(/[A-ZÀ-ÿ]{4,}\s[A-ZÀ-ÿ]{3,}(\s[A-ZÀ-ÿ]{2,})*/g) || [];
+  const validNames = nameBlocks.filter(n => {
+    const nClean = n.toUpperCase().trim();
+    // Não pode ser o solicitante
+    if (solicitanteNome && nClean.includes(solicitanteNome)) return false;
+    // Não pode ter palavras da blacklist
+    if (blacklist.some(b => nClean.includes(b))) return false;
+    // Não pode ser a fazenda
+    if (data.nomeFazenda && nClean.includes(data.nomeFazenda)) return false;
+    return nClean.length > 10;
+  });
+
+  if (validNames.length > 0) {
+    // Pegar o primeiro nome válido que aparece após o CAR (heurística de posição)
+    const afterCarIdx = carMainPart ? tableArea.indexOf(carMainPart) : 0;
+    const bestMatch = validNames.find(n => tableArea.indexOf(n) > afterCarIdx) || validNames[0];
+    data.nomeProprietario = bestMatch.trim().toUpperCase();
   }
 
-  // Fallback para Proprietário se a lógica do CAR falhar
-  if (!data.nomeProprietario) {
-    const fallbackNomes = tableArea.match(/[A-ZÀ-ÿ]{5,}\s[A-ZÀ-ÿ]{5,}(\s[A-ZÀ-ÿ]{2,})*/g) || [];
-    const filtrados = fallbackNomes.filter(n => 
-      !['GLEICKSUEL', 'FERRERA', 'INSTITUTO', 'BRASILEIRO', 'FAZENDA'].some(excl => n.includes(excl))
-    );
-    if (filtrados.length > 0) data.nomeProprietario = filtrados[0].toUpperCase();
-  }
-
-  // 5. Extrair Cidade/UF
-  // Buscar no final da área da tabela
-  const cidadeRegex = /([A-ZÀ-ÿ\s]{3,30})\/([A-Z]{2})(?=\s|$|\n)/g;
-  let matches;
-  while ((matches = cidadeRegex.exec(tableArea)) !== null) {
-    const nome = matches[1].trim().toUpperCase();
-    if (!['MTS', 'KM', 'RUA', 'AV', 'RODOVIA', 'ENDERECO'].some(excl => nome.includes(excl))) {
-      data.cidade = `${nome}/${matches[2].toUpperCase()}`;
+  // 7. EXTRAIR CIDADE
+  const cidadeMatch = tableArea.match(/([A-ZÀ-ÿ\s]{3,25})\/([A-Z]{2})(?=\s|$|\n)/i);
+  if (cidadeMatch) {
+    const nome = cidadeMatch[1].trim().toUpperCase();
+    if (!['MTS', 'KM', 'RUA', 'AV', 'MATRICULA'].includes(nome)) {
+      data.cidade = `${nome}/${cidadeMatch[2].toUpperCase()}`;
     }
   }
 
