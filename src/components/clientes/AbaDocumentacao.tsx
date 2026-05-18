@@ -55,10 +55,9 @@ export function AbaDocumentacao({ cliente, armaIdInicial }: Props) {
   const [carregando, setCarregando] = useState(true);
   const [expandirArma, setExpandirArma] = useState<string | null>(armaIdInicial || null);
 
-  // Modais
   const [modalArma, setModalArma] = useState(false);
   const [armaParaEditar, setArmaParaEditar] = useState<Arma | null>(null);
-  const [modalGt, setModalGt] = useState<string | null>(null); // armaId
+  const [modalGt, setModalGt] = useState<{armaId: string, gt?: GuiaTrafego} | null>(null);
   const [modalManejo, setModalManejo] = useState(false);
   const [manejoParaEditar, setManejoParaEditar] = useState<AutorizacaoManejo | null>(null);
 
@@ -182,7 +181,7 @@ export function AbaDocumentacao({ cliente, armaIdInicial }: Props) {
                     <div className="flex items-center justify-between mb-4">
                        <h4 className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Guias de Tráfego (GTs)</h4>
                        <button 
-                         onClick={() => setModalGt(arma.id)} 
+                         onClick={() => setModalGt({armaId: arma.id})} 
                          className="text-[10px] font-bold text-brand-blue-light hover:underline flex items-center gap-1"
                        >
                          <Plus size={12} /> Nova Guia
@@ -206,11 +205,14 @@ export function AbaDocumentacao({ cliente, armaIdInicial }: Props) {
                             </div>
                             <div className="flex items-center gap-3">
                               <BadgeVencimento data={gt.vencimento} tipo="GT" />
+                              <button onClick={() => setModalGt({armaId: arma.id, gt})} className="text-gray-600 hover:text-brand-blue p-1" title="Editar Guia">
+                                <Pencil size={14} />
+                              </button>
                               <button onClick={() => {
                                 if(confirm('Excluir esta guia?')) {
                                   deletarGt(gt.id).then(carregarDados);
                                 }
-                              }} className="text-gray-600 hover:text-red-400 p-1">
+                              }} className="text-gray-600 hover:text-red-400 p-1" title="Excluir Guia">
                                 <Trash2 size={14} />
                               </button>
                             </div>
@@ -338,13 +340,14 @@ export function AbaDocumentacao({ cliente, armaIdInicial }: Props) {
 
       {modalGt && (
         <ModalGt 
-          armaAcervo={armas.find(a => a.id === modalGt)?.acervo || 'Tiro Desportivo'}
+          armaAcervo={armas.find(a => a.id === modalGt.armaId)?.acervo || 'Tiro Desportivo'}
+          gtParaEditar={modalGt.gt}
           onFechar={() => setModalGt(null)} 
           onSalvar={(d) => 
             salvarGt({ 
               ...d, 
               destino: d.destino?.trim().toUpperCase(),
-              armaId: modalGt 
+              armaId: modalGt.armaId 
             })
               .then(() => { 
                 carregarDados(); 
@@ -545,8 +548,13 @@ function ModalArma({ armaParaEditar, onFechar, onSalvar }: { armaParaEditar?: Ar
   );
 }
 
-function ModalGt({ armaAcervo, onFechar, onSalvar }: { armaAcervo: string, onFechar: () => void, onSalvar: (d: any) => void }) {
-  const [form, setForm] = useState({ tipo: 'Caça', vencimento: '', destino: '' });
+function ModalGt({ armaAcervo, gtParaEditar, onFechar, onSalvar }: { armaAcervo: string, gtParaEditar?: GuiaTrafego, onFechar: () => void, onSalvar: (d: any) => void }) {
+  const [form, setForm] = useState({ 
+    id: gtParaEditar?.id,
+    tipo: gtParaEditar?.tipo || 'Caça', 
+    vencimento: gtParaEditar?.vencimento || '', 
+    destino: gtParaEditar?.destino || '' 
+  });
   const [sugestoes, setSugestoes] = useState<string[]>([]);
   const { buscarGts } = useClientes();
 
@@ -607,7 +615,9 @@ function ModalGt({ armaAcervo, onFechar, onSalvar }: { armaAcervo: string, onFec
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
       <div className="card w-full max-w-sm animate-scale-up" onClick={e => e.stopPropagation()}>
-        <h3 className="text-lg font-bold text-white mb-2">Nova Guia de Tráfego</h3>
+        <h3 className="text-lg font-bold text-white mb-2">
+          {gtParaEditar ? 'Editar Guia de Tráfego' : 'Nova Guia de Tráfego'}
+        </h3>
         <p className="text-[10px] text-brand-blue font-black uppercase mb-6 tracking-widest">
           Arma em Acervo de: {armaAcervo}
         </p>
@@ -615,7 +625,7 @@ function ModalGt({ armaAcervo, onFechar, onSalvar }: { armaAcervo: string, onFec
         <div className="space-y-4">
           <div>
             <label className="label">Tipo de Guia</label>
-            <select className="input" value={form.tipo} onChange={e => setForm({...form, tipo: e.target.value})}>
+            <select className="input" value={form.tipo} onChange={e => setForm({...form, tipo: e.target.value as any})}>
               <option value="Caça">Caça</option>
               <option value="Caça Treino">Caça Treino</option>
               <option value="Treino">Treino (Tiro Desportivo)</option>
@@ -644,7 +654,9 @@ function ModalGt({ armaAcervo, onFechar, onSalvar }: { armaAcervo: string, onFec
           </div>
           <div className="flex gap-3 pt-4">
             <button onClick={onFechar} className="btn-ghost flex-1">Cancelar</button>
-            <button onClick={() => onSalvar(form)} className="btn-primary flex-1">Salvar Guia</button>
+            <button onClick={() => onSalvar(form)} className="btn-primary flex-1">
+              {gtParaEditar ? 'Salvar Alterações' : 'Salvar Guia'}
+            </button>
           </div>
         </div>
       </div>
@@ -670,13 +682,14 @@ function ModalManejo({ manejoParaEditar, onFechar, onSalvar }: { manejoParaEdita
     setImportando(true);
     try {
       const data = await parseIbamaPdf(file);
-      setForm({
-        numeroCar: data.numeroCar || form.numeroCar,
-        nomeFazenda: data.nomeFazenda || form.nomeFazenda,
-        nomeProprietario: data.nomeProprietario || form.nomeProprietario,
-        cidade: data.cidade || form.cidade,
-        vencimento: data.vencimento || form.vencimento
-      });
+      setForm(prev => ({
+        ...prev,
+        numeroCar: data.numeroCar || prev.numeroCar,
+        nomeFazenda: data.nomeFazenda || prev.nomeFazenda,
+        nomeProprietario: data.nomeProprietario || prev.nomeProprietario,
+        cidade: data.cidade || prev.cidade,
+        vencimento: data.vencimento || prev.vencimento
+      }));
     } catch (err: any) {
       console.error('Erro ao processar PDF:', err);
       const msgErro = err.message || '';
