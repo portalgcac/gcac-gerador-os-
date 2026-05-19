@@ -120,7 +120,12 @@ export function AbaDocumentacao({ cliente, armaIdInicial }: Props) {
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <Target size={20} className="text-brand-blue" />
-            <h3 className="text-sm font-black text-white uppercase tracking-wider">Armas & CRAFs</h3>
+            <h3 className="text-sm font-black text-white uppercase tracking-wider flex items-center gap-2">
+              Armas & CRAFs
+              <span className="bg-brand-blue/20 text-brand-blue px-2 py-0.5 rounded-full text-[10px]">
+                {armas.length}
+              </span>
+            </h3>
           </div>
           <button onClick={() => setModalArma(true)} className="btn-primary py-1.5 px-3 text-xs">
             <Plus size={14} /> Adicionar Arma
@@ -179,7 +184,12 @@ export function AbaDocumentacao({ cliente, armaIdInicial }: Props) {
                 {expandirArma === arma.id && (
                   <div className="border-t border-brand-dark-5 p-4 bg-brand-dark-4 animate-slide-down">
                     <div className="flex items-center justify-between mb-4">
-                       <h4 className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Guias de Tráfego (GTs)</h4>
+                       <h4 className="text-[10px] font-black text-gray-500 uppercase tracking-widest flex items-center gap-2">
+                         Guias de Tráfego (GTs)
+                         <span className="bg-brand-dark-3 text-gray-400 px-1.5 py-0.5 rounded-full text-[9px]">
+                           {gtsPorArma[arma.id]?.length || 0}
+                         </span>
+                       </h4>
                        <button 
                          onClick={() => setModalGt({armaId: arma.id})} 
                          className="text-[10px] font-bold text-brand-blue-light hover:underline flex items-center gap-1"
@@ -243,7 +253,12 @@ export function AbaDocumentacao({ cliente, armaIdInicial }: Props) {
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <Landmark size={20} className="text-brand-blue" />
-            <h3 className="text-sm font-black text-white uppercase tracking-wider">IBAMA: Autorizações de Manejo</h3>
+            <h3 className="text-sm font-black text-white uppercase tracking-wider flex items-center gap-2">
+              IBAMA: Autorizações de Manejo
+              <span className="bg-green-500/20 text-green-500 px-2 py-0.5 rounded-full text-[10px]">
+                {manejos.length}
+              </span>
+            </h3>
           </div>
           <button onClick={() => setModalManejo(true)} className="btn-primary py-1.5 px-3 text-xs">
             <Plus size={14} /> Novo Manejo
