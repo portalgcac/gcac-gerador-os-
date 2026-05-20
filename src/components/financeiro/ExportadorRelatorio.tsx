@@ -20,6 +20,7 @@ import { STATUS_OS, FORMAS_PAGAMENTO, STATUS_ORCAMENTO } from '../../types';
 import { format, parseISO, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
 import * as XLSX from 'xlsx';
 import { supabase } from '../../db/supabase';
+import { useAuth } from '../../context/AuthContext';
 
 interface ExportadorRelatorioProps {
   isOpen: boolean;
@@ -52,16 +53,23 @@ export function ExportadorRelatorio({ isOpen, onClose }: ExportadorRelatorioProp
   const [colaboradorFiltro, setColaboradorFiltro] = useState<string>('Todos');
   const [usuarios, setUsuarios] = useState<{id: string, nome: string}[]>([]);
 
+  const { usuario } = useAuth();
+
   // Colunas
   const [colunas, setColunas] = useState<ColunaConfig[]>([]);
 
   useEffect(() => {
     const carregarUsuarios = async () => {
-      const { data } = await supabase.from('usuarios_autorizados').select('id, nome').eq('ativo', true);
+      if (!usuario?.empresaId) return;
+      const { data } = await supabase
+        .from('usuarios_autorizados')
+        .select('id, nome')
+        .eq('ativo', true)
+        .eq('empresa_id', usuario.empresaId);
       if (data) setUsuarios(data);
     };
     carregarUsuarios();
-  }, []);
+  }, [usuario?.empresaId]);
 
   const configColunas: Record<FonteDados, ColunaConfig[]> = {
     os: [

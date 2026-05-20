@@ -1,13 +1,15 @@
 import { supabase } from '../db/supabase';
 import { calcularAlerta, AlertaDocumento } from '../utils/vencimentos';
 
-export async function buscarAlertasGlobais(): Promise<AlertaDocumento[]> {
+export async function buscarAlertasGlobais(empresaId?: string): Promise<AlertaDocumento[]> {
+  if (!empresaId) return [];
   const alertas: AlertaDocumento[] = [];
 
   // 1. Buscar Clientes (CR e IBAMA CR)
   const { data: clientes } = await supabase
     .from('clientes')
-    .select('id, nome, numero_cr, vencimento_cr, vencimento_cr_ibama');
+    .select('id, nome, numero_cr, vencimento_cr, vencimento_cr_ibama')
+    .eq('empresa_id', empresaId);
 
   if (clientes) {
     clientes.forEach(c => {
@@ -53,7 +55,8 @@ export async function buscarAlertasGlobais(): Promise<AlertaDocumento[]> {
       vencimento_craf, 
       cliente_id,
       clientes:cliente_id (nome)
-    `);
+    `)
+    .eq('empresa_id', empresaId);
 
   if (armas) {
     (armas as any[]).forEach((a) => {
@@ -90,7 +93,8 @@ export async function buscarAlertasGlobais(): Promise<AlertaDocumento[]> {
         cliente_id,
         clientes:cliente_id (nome)
       )
-    `);
+    `)
+    .eq('empresa_id', empresaId);
 
   if (gts) {
     (gts as any[]).forEach((g) => {
@@ -125,7 +129,8 @@ export async function buscarAlertasGlobais(): Promise<AlertaDocumento[]> {
       vencimento, 
       cliente_id,
       clientes:cliente_id (nome)
-    `);
+    `)
+    .eq('empresa_id', empresaId);
 
   if (manejos) {
     (manejos as any[]).forEach((m) => {

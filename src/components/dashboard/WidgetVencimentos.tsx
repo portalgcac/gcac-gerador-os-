@@ -4,16 +4,19 @@ import { ShieldAlert, ChevronRight, Calendar, User, Target, MapPin, ExternalLink
 import { buscarAlertasGlobais } from '../../services/vencimentosService';
 import { AlertaDocumento, obterClasseAlerta } from '../../utils/vencimentos';
 import { formatarData } from '../../utils/formatters';
+import { useAuth } from '../../context/AuthContext';
 
 export function WidgetVencimentos() {
   const navigate = useNavigate();
+  const { usuario } = useAuth();
   const [alertas, setAlertas] = useState<AlertaDocumento[]>([]);
   const [carregando, setCarregando] = useState(true);
 
   useEffect(() => {
     async function carregar() {
+      if (!usuario?.empresaId) return;
       try {
-        const data = await buscarAlertasGlobais();
+        const data = await buscarAlertasGlobais(usuario.empresaId);
         setAlertas(data);
       } catch (err) {
         console.error('Erro ao carregar alertas de vencimento:', err);
@@ -22,7 +25,7 @@ export function WidgetVencimentos() {
       }
     }
     carregar();
-  }, []);
+  }, [usuario?.empresaId]);
 
   if (carregando) return null;
   if (alertas.length === 0) return null;

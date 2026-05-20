@@ -13,6 +13,7 @@ import { Cliente } from '../../types';
 import { Notificacao, useNotificacao } from '../common/Notificacao';
 import { formatarMoeda, removerAcentos } from '../../utils/formatters';
 import { supabase } from '../../db/supabase';
+import { useAuth } from '../../context/AuthContext';
 
 interface FormularioOrcamentoProps {
   orcamentoExistente?: Orcamento;
@@ -125,6 +126,7 @@ export function FormularioOrcamento({ orcamentoExistente }: FormularioOrcamentoP
   const { clientes, criarCliente, clubesRegistrados } = useClientes();
   const { criarOrdem } = useOrdens();
   const { estado: notif, mostrar, fechar } = useNotificacao();
+  const { usuario } = useAuth();
   const [salvando, setSalvando] = useState(false);
   const [focoNome, setFocoNome] = useState(false);
   const [focoClube, setFocoClube] = useState(false);
@@ -133,11 +135,17 @@ export function FormularioOrcamento({ orcamentoExistente }: FormularioOrcamentoP
 
   useEffect(() => {
     const carregarUsuarios = async () => {
-      const { data } = await supabase.from('usuarios_autorizados').select('id, nome').eq('ativo', true).order('nome');
+      if (!usuario?.empresaId) return;
+      const { data } = await supabase
+        .from('usuarios_autorizados')
+        .select('id, nome')
+        .eq('ativo', true)
+        .eq('empresa_id', usuario.empresaId)
+        .order('nome');
       if (data) setUsuarios(data);
     };
     carregarUsuarios();
-  }, []);
+  }, [usuario?.empresaId]);
 
   const [form, setForm] = useState({
     nomeCliente:       orcamentoExistente?.nomeCliente       ?? '',

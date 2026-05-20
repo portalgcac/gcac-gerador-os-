@@ -17,6 +17,7 @@ import { Cliente } from '../../types';
 import { Notificacao, useNotificacao } from '../common/Notificacao';
 import { classeStatusExecucao, iconeStatusExecucao, formatarMoeda, removerAcentos } from '../../utils/formatters';
 import { supabase } from '../../db/supabase';
+import { useAuth } from '../../context/AuthContext';
 
 interface FormularioOrdemProps {
   ordemExistente?: OrdemDeServico;
@@ -145,6 +146,7 @@ export function FormularioOrdem({ ordemExistente }: FormularioOrdemProps) {
   const { criarOrdem, atualizarOrdem } = useOrdens();
   const { clientes, criarCliente, atualizarCliente, buscarClientePorNomeExato, clubesRegistrados } = useClientes();
   const { estado: notif, mostrar, fechar } = useNotificacao();
+  const { usuario } = useAuth();
   const [salvando, setSalvando] = useState(false);
   const salvandoRef = useRef(false);
   const [mostrarSenha, setMostrarSenha] = useState(false);
@@ -154,11 +156,17 @@ export function FormularioOrdem({ ordemExistente }: FormularioOrdemProps) {
 
   useEffect(() => {
     const carregarUsuarios = async () => {
-      const { data } = await supabase.from('usuarios_autorizados').select('id, nome').eq('ativo', true).order('nome');
+      if (!usuario?.empresaId) return;
+      const { data } = await supabase
+        .from('usuarios_autorizados')
+        .select('id, nome')
+        .eq('ativo', true)
+        .eq('empresa_id', usuario.empresaId)
+        .order('nome');
       if (data) setUsuarios(data);
     };
     carregarUsuarios();
-  }, []);
+  }, [usuario?.empresaId]);
 
   const [form, setForm] = useState({
     nomeCliente:       ordemExistente?.nomeCliente       ?? '',
