@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useCallback, useState, useEffect } from 'react';
 import { supabase } from '../db/supabase';
+import { useAuth } from './AuthContext';
 
 export interface Despesa {
   id: string;
@@ -30,15 +31,21 @@ export const CATEGORIAS_DESPESA = [
 ] as const;
 
 export function FinanceiroProvider({ children }: { children: React.ReactNode }) {
+  const { usuario } = useAuth();
   const [despesas, setDespesas] = useState<Despesa[]>([]);
   const [carregando, setCarregando] = useState(true);
 
   const carregarDespesas = useCallback(async () => {
+    if (!usuario?.empresaId) {
+      setCarregando(false);
+      return;
+    }
     setCarregando(true);
     try {
       const { data, error } = await supabase
         .from('despesas')
         .select('*')
+        .eq('empresa_id', usuario.empresaId)
         .order('data', { ascending: false });
 
       if (error) throw error;
@@ -57,9 +64,10 @@ export function FinanceiroProvider({ children }: { children: React.ReactNode }) 
     } finally {
       setCarregando(false);
     }
-  }, []);
+  }, [usuario]);
 
   const criarDespesa = useCallback(async (dados: Omit<Despesa, 'id' | 'criadoEm'>) => {
+    if (!usuario?.empresaId) throw new Error('Usuário não autenticado');
     try {
       const { error } = await supabase
         .from('despesas')
@@ -67,7 +75,8 @@ export function FinanceiroProvider({ children }: { children: React.ReactNode }) 
           descricao: dados.descricao,
           valor: dados.valor,
           categoria: dados.categoria,
-          data: dados.data
+          data: dados.data,
+          empresa_id: usuario.empresaId
         }]);
 
       if (error) throw error;
@@ -76,7 +85,7 @@ export function FinanceiroProvider({ children }: { children: React.ReactNode }) 
       console.error('Erro ao criar despesa:', error);
       throw error;
     }
-  }, [carregarDespesas]);
+  }, [carregarDespesas, usuario]);
 
   const deletarDespesa = useCallback(async (id: string) => {
     try {

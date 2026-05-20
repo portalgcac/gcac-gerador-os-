@@ -260,6 +260,13 @@ export interface UsuarioGoogle {
   accessToken: string;
   role: 'admin' | 'colaborador';
   permissoes?: string[];
+  empresaId?: string;
+}
+
+export interface Empresa {
+  id: string;
+  nome: string;
+  criadoEm: string;
 }
 
 // ─── Constantes ───────────────────────────────────────────────────────────

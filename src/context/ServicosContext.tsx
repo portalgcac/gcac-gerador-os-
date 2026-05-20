@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useCallback, useState, useEffect } from 'react';
 import { ServicoConfig } from '../types';
 import { supabase } from '../db/supabase';
+import { useAuth } from './AuthContext';
 
 interface ServicosContextType {
   servicos: ServicoConfig[];
@@ -13,14 +14,20 @@ interface ServicosContextType {
 const ServicosContext = createContext<ServicosContextType | null>(null);
 
 export function ServicosProvider({ children }: { children: React.ReactNode }) {
+  const { usuario } = useAuth();
   const [servicos, setServicos] = useState<ServicoConfig[]>([]);
   const [carregando, setCarregando] = useState(true);
 
   const carregarServicos = useCallback(async () => {
+    if (!usuario?.empresaId) {
+      setCarregando(false);
+      return;
+    }
     try {
       const { data, error } = await supabase
         .from('servicos_config')
         .select('*')
+        .eq('empresa_id', usuario.empresaId)
         .order('nome', { ascending: true });
 
       if (error) throw error;
@@ -41,13 +48,14 @@ export function ServicosProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setCarregando(false);
     }
-  }, []);
+  }, [usuario]);
 
   useEffect(() => {
     carregarServicos();
   }, [carregarServicos]);
 
   const criarServico = async (dados: Omit<ServicoConfig, 'id' | 'criadoEm'>) => {
+    if (!usuario?.empresaId) throw new Error('Usuário não autenticado');
     const { error } = await supabase
       .from('servicos_config')
       .insert([{
@@ -56,7 +64,8 @@ export function ServicosProvider({ children }: { children: React.ReactNode }) {
         valor_filiado: dados.valorFiliado,
         taxa_pf: dados.taxaPF,
         exige_gru: dados.exigeGRU,
-        categoria: dados.categoria
+        categoria: dados.categoria,
+        empresa_id: usuario.empresaId
       }]);
 
     if (error) throw error;

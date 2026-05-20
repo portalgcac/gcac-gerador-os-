@@ -30,7 +30,7 @@ export function NotificacoesSistemaProvider({ children }: { children: React.Reac
   const [estaCarregando, setEstaCarregando] = useState(true);
 
   const carregarNotificacoes = useCallback(async () => {
-    if (!estaAutenticado || usuario?.role !== 'admin') {
+    if (!estaAutenticado || usuario?.role !== 'admin' || !usuario?.empresaId) {
       setNotificacoes([]);
       setEstaCarregando(false);
       return;
@@ -39,6 +39,7 @@ export function NotificacoesSistemaProvider({ children }: { children: React.Reac
     const { data, error } = await supabase
       .from('notificacoes_sistema')
       .select('*')
+      .eq('empresa_id', usuario.empresaId)
       .order('criado_em', { ascending: false })
       .limit(50);
 
@@ -46,7 +47,7 @@ export function NotificacoesSistemaProvider({ children }: { children: React.Reac
       setNotificacoes(data.map(mapFromDB));
     }
     setEstaCarregando(false);
-  }, [estaAutenticado, usuario?.role]);
+  }, [estaAutenticado, usuario]);
 
   useEffect(() => {
     carregarNotificacoes();
@@ -71,17 +72,19 @@ export function NotificacoesSistemaProvider({ children }: { children: React.Reac
   }, [carregarNotificacoes, estaAutenticado, usuario?.role]);
 
   const enviarNotificacao = useCallback(async (dados: { titulo: string, mensagem: string, tipo?: 'info' | 'sucesso' | 'alerta', link?: string }) => {
+    if (!usuario?.empresaId) return;
     const { error } = await supabase
       .from('notificacoes_sistema')
       .insert([{
         titulo: dados.titulo,
         mensagem: dados.mensagem,
         tipo: dados.tipo || 'info',
-        link: dados.link
+        link: dados.link,
+        empresa_id: usuario.empresaId
       }]);
 
     if (error) console.error('Erro ao enviar notificação interna:', error);
-  }, []);
+  }, [usuario]);
 
   const marcarComoLida = useCallback(async (id: string) => {
     const { error } = await supabase
@@ -94,14 +97,16 @@ export function NotificacoesSistemaProvider({ children }: { children: React.Reac
   }, [carregarNotificacoes]);
 
   const marcarTodasComoLidas = useCallback(async () => {
+    if (!usuario?.empresaId) return;
     const { error } = await supabase
       .from('notificacoes_sistema')
       .update({ lida: true })
-      .eq('lida', false);
+      .eq('lida', false)
+      .eq('empresa_id', usuario.empresaId);
 
     if (error) console.error('Erro ao marcar todas como lidas:', error);
     else await carregarNotificacoes();
-  }, [carregarNotificacoes]);
+  }, [carregarNotificacoes, usuario]);
 
   const naoLidas = notificacoes.filter(n => !n.lida).length;
 

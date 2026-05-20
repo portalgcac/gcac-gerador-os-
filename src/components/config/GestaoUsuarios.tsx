@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { UserPlus, Shield, Mail, User, Trash2, Edit2, CheckCircle, XCircle, ChevronDown, ChevronUp, Lock } from 'lucide-react';
+import { UserPlus, Shield, Mail, User, Trash2, Edit2, CheckCircle, XCircle, ChevronDown, ChevronUp, Lock, Building } from 'lucide-react';
 import { supabase } from '../../db/supabase';
 import { Notificacao, useNotificacao } from '../common/Notificacao';
+import { useAuth } from '../../context/AuthContext';
 
 interface UsuarioAutorizado {
   id: string;
@@ -12,6 +13,7 @@ interface UsuarioAutorizado {
   role: 'admin' | 'colaborador';
   ativo: boolean;
   permissoes: string[];
+  empresa_id?: string;
 }
 
 const MODULOS = [
@@ -28,9 +30,18 @@ const MODULOS = [
 ];
 
 export function GestaoUsuarios() {
+  const { usuario } = useAuth();
+  const isMasterAdmin = usuario?.email === 'gui.gomesassis@gmail.com';
+
   const [usuarios, setUsuarios] = useState<UsuarioAutorizado[]>([]);
   const [carregando, setCarregando] = useState(true);
   const { estado: notif, mostrar, fechar } = useNotificacao();
+
+  // Empresas State (only for master admin)
+  const [empresas, setEmpresas] = useState<{ id: string; nome: string }[]>([]);
+  const [novaEmpresaNome, setNovaEmpresaNome] = useState('');
+  const [carregandoEmpresas, setCarregandoEmpresas] = useState(false);
+  const [mostrarGerenciarEmpresas, setMostrarGerenciarEmpresas] = useState(false);
   
   // Modal State
   const [modalAberto, setModalAberto] = useState(false);
@@ -41,15 +52,36 @@ export function GestaoUsuarios() {
     cpf: '',
     contato: '',
     role: 'colaborador' as 'admin' | 'colaborador',
-    permissoes: ['ordens'] as string[]
+    permissoes: ['ordens'] as string[],
+    empresa_id: '00000000-0000-0000-0000-000000000001'
   });
 
-  const carregarUsuarios = async () => {
-    setCarregando(true);
+  const carregarEmpresas = async () => {
+    if (!isMasterAdmin) return;
+    setCarregandoEmpresas(true);
     const { data, error } = await supabase
+      .from('empresas')
+      .select('*')
+      .order('nome');
+    if (!error && data) {
+      setEmpresas(data);
+    }
+    setCarregandoEmpresas(false);
+  };
+
+  const carregarUsuarios = async () => {
+    if (!usuario) return;
+    setCarregando(true);
+    let query = supabase
       .from('usuarios_autorizados')
       .select('*')
       .order('nome');
+
+    if (!isMasterAdmin) {
+      query = query.eq('empresa_id', usuario.empresaId);
+    }
+
+    const { data, error } = await query;
     
     if (error) {
       mostrar('erro', 'Erro ao carregar usuários.');
@@ -60,8 +92,13 @@ export function GestaoUsuarios() {
   };
 
   useEffect(() => {
-    carregarUsuarios();
-  }, []);
+    if (usuario) {
+      carregarUsuarios();
+      if (isMasterAdmin) {
+        carregarEmpresas();
+      }
+    }
+  }, [usuario]);
 
   const handleAbrirModal = (user?: UsuarioAutorizado) => {
     if (user) {
@@ -72,7 +109,8 @@ export function GestaoUsuarios() {
         cpf: user.cpf || '',
         contato: user.contato || '',
         role: user.role,
-        permissoes: user.permissoes
+        permissoes: user.permissoes,
+        empresa_id: user.empresa_id || '00000000-0000-0000-0000-000000000001'
       });
     } else {
       setEditando(null);
@@ -82,7 +120,8 @@ export function GestaoUsuarios() {
         cpf: '',
         contato: '',
         role: 'colaborador',
-        permissoes: ['ordens']
+        permissoes: ['ordens'],
+        empresa_id: '00000000-0000-0000-0000-000000000001'
       });
     }
     setModalAberto(true);
@@ -91,33 +130,34 @@ export function GestaoUsuarios() {
   const handleSalvar = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      const payload: any = {
+        nome: formData.nome,
+        email: formData.email.trim().toLowerCase(),
+        cpf: formData.cpf || null,
+        contato: formData.contato || null,
+        role: formData.role,
+        permissoes: formData.permissoes
+      };
+
+      if (isMasterAdmin) {
+        payload.empresa_id = formData.empresa_id;
+      } else if (usuario?.empresaId) {
+        payload.empresa_id = usuario.empresaId;
+      }
+
       if (editando) {
         const { error } = await supabase
           .from('usuarios_autorizados')
-          .update({
-            nome: formData.nome,
-            email: formData.email.trim().toLowerCase(),
-            cpf: formData.cpf,
-            contato: formData.contato,
-            role: formData.role,
-            permissoes: formData.permissoes
-          })
+          .update(payload)
           .eq('id', editando.id);
         
         if (error) throw error;
         mostrar('sucesso', 'Usuário atualizado com sucesso.');
       } else {
+        payload.ativo = true;
         const { error } = await supabase
           .from('usuarios_autorizados')
-          .insert([{
-            nome: formData.nome,
-            email: formData.email.trim().toLowerCase(),
-            cpf: formData.cpf,
-            contato: formData.contato,
-            role: formData.role,
-            permissoes: formData.permissoes,
-            ativo: true
-          }]);
+          .insert([payload]);
         
         if (error) throw error;
         mostrar('sucesso', 'Usuário cadastrado com sucesso.');
@@ -126,6 +166,24 @@ export function GestaoUsuarios() {
       carregarUsuarios();
     } catch (err: any) {
       mostrar('erro', err.message || 'Erro ao realizar operação.');
+    }
+  };
+
+  const handleCriarEmpresa = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!novaEmpresaNome.trim()) return;
+    try {
+      const { error } = await supabase
+        .from('empresas')
+        .insert([{ nome: novaEmpresaNome.trim() }]);
+      
+      if (error) throw error;
+      
+      mostrar('sucesso', 'Empresa cadastrada com sucesso.');
+      setNovaEmpresaNome('');
+      carregarEmpresas();
+    } catch (err: any) {
+      mostrar('erro', err.message || 'Erro ao cadastrar empresa.');
     }
   };
 
@@ -162,6 +220,59 @@ export function GestaoUsuarios() {
     <div className="space-y-4">
       <Notificacao {...notif} onFechar={fechar} />
 
+      {isMasterAdmin && (
+        <div className="card space-y-4">
+          <button 
+            type="button"
+            onClick={() => setMostrarGerenciarEmpresas(!mostrarGerenciarEmpresas)}
+            className="w-full flex items-center justify-between text-sm font-bold text-gray-400 uppercase tracking-wider hover:text-white transition-colors"
+          >
+            <span className="flex items-center gap-2">
+              <Building size={16} className="text-brand-blue" />
+              Gerenciamento de Empresas (Tenants)
+            </span>
+            {mostrarGerenciarEmpresas ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+          </button>
+
+          {mostrarGerenciarEmpresas && (
+            <div className="space-y-4 pt-2 border-t border-brand-dark-5">
+              <form onSubmit={handleCriarEmpresa} className="flex gap-2 max-w-md">
+                <input
+                  type="text"
+                  required
+                  placeholder="Nome da Nova Empresa/Cliente"
+                  value={novaEmpresaNome}
+                  onChange={e => setNovaEmpresaNome(e.target.value)}
+                  className="input flex-1"
+                />
+                <button type="submit" className="btn-primary px-4 shrink-0">
+                  Criar Empresa
+                </button>
+              </form>
+
+              {carregandoEmpresas ? (
+                <div className="text-center py-4">
+                  <div className="w-5 h-5 border-2 border-brand-blue border-t-transparent rounded-full animate-spin mx-auto" />
+                </div>
+              ) : empresas.length === 0 ? (
+                <p className="text-sm text-gray-500">Nenhuma empresa cadastrada.</p>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                  {empresas.map(e => (
+                    <div key={e.id} className="p-3 bg-brand-dark-4 border border-brand-dark-5 rounded-xl flex items-center justify-between">
+                      <div>
+                        <p className="font-bold text-white text-sm">{e.nome}</p>
+                        <p className="text-[10px] text-gray-500 font-mono select-all">{e.id}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="card space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2">
@@ -188,6 +299,7 @@ export function GestaoUsuarios() {
                 <tr>
                   <th className="px-3 py-2 font-bold">Usuário / E-mail</th>
                   <th className="px-3 py-2 font-bold">Nível</th>
+                  {isMasterAdmin && <th className="px-3 py-2 font-bold">Empresa</th>}
                   <th className="px-3 py-2 font-bold">Status</th>
                   <th className="px-3 py-2 font-bold text-right">Ações</th>
                 </tr>
@@ -207,6 +319,11 @@ export function GestaoUsuarios() {
                         {u.role === 'admin' ? 'Administrador' : 'Colaborador'}
                       </span>
                     </td>
+                    {isMasterAdmin && (
+                      <td className="px-3 py-3 text-sm text-gray-300 font-medium">
+                        {empresas.find(e => e.id === u.empresa_id)?.nome || 'GCAC Principal'}
+                      </td>
+                    )}
                     <td className="px-3 py-3">
                       <button 
                         onClick={() => toggleStatus(u)}
@@ -288,6 +405,23 @@ export function GestaoUsuarios() {
                   />
                 </div>
               </div>
+
+              {isMasterAdmin && (
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-gray-500 uppercase">Empresa (Tenant)</label>
+                  <select
+                    value={formData.empresa_id}
+                    onChange={e => setFormData({ ...formData, empresa_id: e.target.value })}
+                    className="input w-full"
+                  >
+                    {empresas.map(emp => (
+                      <option key={emp.id} value={emp.id} className="bg-brand-dark-2 text-white">
+                        {emp.nome}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <div className="space-y-2">
                 <label className="text-xs font-bold text-gray-500 uppercase">Nível de Acesso</label>

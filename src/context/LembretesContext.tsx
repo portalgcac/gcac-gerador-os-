@@ -50,12 +50,13 @@ export function LembretesProvider({ children }: { children: React.ReactNode }) {
   const [estaCarregando, setEstaCarregando] = useState(true);
 
   const carregarLembretes = useCallback(async () => {
-    if (!estaAutenticado) return;
+    if (!estaAutenticado || !usuario?.empresaId) return;
     
     setEstaCarregando(true);
     const { data, error } = await supabase
       .from('lembretes')
       .select('*')
+      .eq('empresa_id', usuario.empresaId)
       .order('data', { ascending: true })
       .order('horario', { ascending: true });
     
@@ -63,7 +64,7 @@ export function LembretesProvider({ children }: { children: React.ReactNode }) {
       setLembretes(data.map(mapFromDB));
     }
     setEstaCarregando(false);
-  }, [estaAutenticado]);
+  }, [estaAutenticado, usuario]);
 
   useEffect(() => {
     carregarLembretes();
@@ -120,17 +121,19 @@ export function LembretesProvider({ children }: { children: React.ReactNode }) {
   }, [estaAutenticado, lembretes, enviarNotificacao]);
 
   const criarLembrete = useCallback(async (dados: Omit<Lembrete, 'id' | 'concluido' | 'criadoEm' | 'usuarioId'>) => {
+    if (!usuario?.empresaId) throw new Error('Usuário não autenticado');
     const { error } = await supabase
       .from('lembretes')
       .insert([{
         ...mapToDB(dados),
         usuario_id: usuario?.id,
-        concluido: false
+        concluido: false,
+        empresa_id: usuario.empresaId
       }]);
 
     if (error) throw error;
     await carregarLembretes();
-  }, [carregarLembretes, usuario?.id]);
+  }, [carregarLembretes, usuario]);
 
   const atualizarLembrete = useCallback(async (id: string, dados: Partial<Lembrete>) => {
     const { error } = await supabase

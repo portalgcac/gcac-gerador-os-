@@ -119,15 +119,17 @@ export function OrdensProvider({ children }: { children: React.ReactNode }) {
   }, [usuario]);
 
   const carregarOrdens = useCallback(async () => {
+    if (!usuario?.empresaId) return;
     const { data, error } = await supabase
       .from('ordens')
       .select('*')
+      .eq('empresa_id', usuario.empresaId)
       .order('numero', { ascending: false });
     
     if (!error && data) {
       setOrdens(data.map(mapFromDB));
     }
-  }, []);
+  }, [usuario]);
 
   useEffect(() => {
     carregarOrdens();
@@ -138,13 +140,14 @@ export function OrdensProvider({ children }: { children: React.ReactNode }) {
   const criarOrdem = useCallback(async (
     dados: Omit<OrdemDeServico, 'id' | 'numero' | 'criadoEm' | 'atualizadoEm' | 'driveArquivoJsonId' | 'drivePdfId' | 'ultimaSincronizacao' | 'pendenteSincronizacao'>
   ): Promise<string> => {
-    
+    if (!usuario?.empresaId) throw new Error('Usuário não autenticado');
     const payloadNovo = {
       ...mapToDB(dados),
       pendente_sincronizacao: true,
       criado_por_nome: usuario?.nome || 'Sistema',
       usuario_id: usuario?.id,
-      historico_status: adicionarEvento([], 'criacao', 'Ordem de serviço aberta')
+      historico_status: adicionarEvento([], 'criacao', 'Ordem de serviço aberta'),
+      empresa_id: usuario.empresaId
     };
 
     const { data, error } = await supabase
@@ -271,15 +274,17 @@ export function OrdensProvider({ children }: { children: React.ReactNode }) {
     await carregarOrdens();
   }, [carregarOrdens]);
   const buscarOrdem = useCallback(async (id: string) => {
+    if (!usuario?.empresaId) return undefined;
     const { data, error } = await supabase
       .from('ordens')
       .select('*')
       .eq('id', id)
+      .eq('empresa_id', usuario.empresaId)
       .single();
 
     if (error || !data) return undefined;
     return mapFromDB(data);
-  }, []);
+  }, [usuario]);
 
   const registrarPagamento = useCallback(async (ordemId: string, valor: number, metodo: FormaPagamento) => {
     const ordem = ordens.find(o => o.id === ordemId);
@@ -349,12 +354,14 @@ export function OrdensProvider({ children }: { children: React.ReactNode }) {
     try {
       const ordem = ordens.find(o => o.id === ordemId);
       if (!ordem) return false;
+      if (!usuario?.empresaId) return false;
 
       // Buscar cliente pelo CPF (que é único e confiável)
       const { data: cliente, error } = await supabase
         .from('clientes')
         .select('*')
         .eq('cpf', ordem.cpf)
+        .eq('empresa_id', usuario.empresaId)
         .maybeSingle();
 
       if (error || !cliente) return false;

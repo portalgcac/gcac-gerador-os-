@@ -36,7 +36,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
             const { data, error } = await supabase
               .from('usuarios_autorizados')
-              .select('role, permissoes, ativo')
+              .select('role, permissoes, ativo, empresa_id')
               .eq('email', emailLower)
               .single();
 
@@ -49,15 +49,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }
 
             const rawRole = data?.role;
+            const rawEmpresaId = data?.empresa_id || (ehMasterAdmin ? '00000000-0000-0000-0000-000000000001' : null);
             const role = ((ehMasterAdmin || rawRole === 'admin') ? 'admin' : 'colaborador') as 'admin' | 'colaborador';
             const permissoes = (ehMasterAdmin 
               ? ["painel", "rotina", "agenda", "financeiro", "orcamentos", "ordens", "recibos", "agendamentos", "clientes", "config"]
               : (data?.permissoes || ["ordens"])) as string[];
 
-            const usuarioAtualizado = { ...u, role, permissoes };
+            const usuarioAtualizado = { ...u, role, permissoes, empresaId: rawEmpresaId || undefined };
             
             // Só atualiza se houver mudança real para evitar loops/re-renders desnecessários
-            if (JSON.stringify(u.permissoes) !== JSON.stringify(permissoes) || u.role !== role) {
+            if (
+              JSON.stringify(u.permissoes) !== JSON.stringify(permissoes) || 
+              u.role !== role ||
+              u.empresaId !== (rawEmpresaId || undefined)
+            ) {
               setUsuario(usuarioAtualizado);
               localStorage.setItem('gcac_usuario', JSON.stringify(usuarioAtualizado));
             }
@@ -98,6 +103,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       const rawRole = whitelistData?.role;
+      const rawEmpresaId = whitelistData?.empresa_id || (ehMasterAdmin ? '00000000-0000-0000-0000-000000000001' : null);
       const role = ((ehMasterAdmin || rawRole === 'admin') ? 'admin' : 'colaborador') as 'admin' | 'colaborador';
       const permissoes = (ehMasterAdmin 
         ? ["painel", "rotina", "agenda", "financeiro", "orcamentos", "ordens", "recibos", "agendamentos", "clientes", "config"]
@@ -110,7 +116,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         fotoPerfil: info.picture,
         accessToken: tokenResponse.access_token,
         role,
-        permissoes
+        permissoes,
+        empresaId: rawEmpresaId || undefined
       };
 
       setUsuario(novoUsuario);

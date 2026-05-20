@@ -50,15 +50,17 @@ export function RecibosProvider({ children }: { children: React.ReactNode }) {
   const [recibos, setRecibos] = useState<Recibo[]>([]);
 
   const carregarRecibos = useCallback(async () => {
+    if (!usuario?.empresaId) return;
     const { data, error } = await supabase
       .from('recibos')
       .select('*')
+      .eq('empresa_id', usuario.empresaId)
       .order('numero', { ascending: false });
     
     if (!error && data) {
       setRecibos(data.map(mapFromDB));
     }
-  }, []);
+  }, [usuario]);
 
   useEffect(() => {
     carregarRecibos();
@@ -67,10 +69,12 @@ export function RecibosProvider({ children }: { children: React.ReactNode }) {
   const criarRecibo = useCallback(async (
     dados: Omit<Recibo, 'id' | 'numero' | 'criadoEm'>
   ): Promise<string> => {
+    if (!usuario?.empresaId) throw new Error('Usuário não autenticado');
     const payloadNovo = {
       ...mapToDB(dados),
       criado_por_nome: usuario?.nome || 'Sistema',
-      usuario_id: usuario?.id
+      usuario_id: usuario?.id,
+      empresa_id: usuario.empresaId
     };
 
     const { data, error } = await supabase
@@ -83,7 +87,7 @@ export function RecibosProvider({ children }: { children: React.ReactNode }) {
     
     await carregarRecibos();
     return data.id;
-  }, [carregarRecibos]);
+  }, [carregarRecibos, usuario]);
 
   const deletarRecibo = useCallback(async (id: string) => {
     const { error } = await supabase
@@ -96,15 +100,17 @@ export function RecibosProvider({ children }: { children: React.ReactNode }) {
   }, [carregarRecibos]);
 
   const buscarRecibo = useCallback(async (id: string) => {
+    if (!usuario?.empresaId) return undefined;
     const { data, error } = await supabase
       .from('recibos')
       .select('*')
       .eq('id', id)
+      .eq('empresa_id', usuario.empresaId)
       .single();
 
     if (error || !data) return undefined;
     return mapFromDB(data);
-  }, []);
+  }, [usuario]);
 
   return (
     <RecibosContext.Provider value={{

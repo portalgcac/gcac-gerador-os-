@@ -71,12 +71,13 @@ export function AgendamentosProvider({ children }: { children: React.ReactNode }
   const [estaCarregando, setEstaCarregando] = useState(true);
 
   const carregarAgendamentos = useCallback(async () => {
-    if (!estaAutenticado) return;
+    if (!estaAutenticado || !usuario?.empresaId) return;
     
     setEstaCarregando(true);
     let query = supabase
       .from('agendamentos')
       .select('*')
+      .eq('empresa_id', usuario.empresaId)
       .order('data', { ascending: false });
     
     // Se for colaborador, filtra apenas os seus próprios dados (Multi-Tenant)
@@ -91,7 +92,7 @@ export function AgendamentosProvider({ children }: { children: React.ReactNode }
       setAgendamentos(data.map(mapFromDB));
     }
     setEstaCarregando(false);
-  }, [estaAutenticado]);
+  }, [estaAutenticado, usuario]);
 
   useEffect(() => {
     carregarAgendamentos();
@@ -100,11 +101,13 @@ export function AgendamentosProvider({ children }: { children: React.ReactNode }
   const criarAgendamento = useCallback(async (
     dados: Omit<Agendamento, 'id' | 'confirmado' | 'criadoEm'>
   ): Promise<string> => {
+    if (!usuario?.empresaId) throw new Error('Usuário não autenticado');
     const payload = {
       ...mapToDB(dados),
       usuario_id: usuario?.id,
       status: 'pendente',
-      confirmado: false
+      confirmado: false,
+      empresa_id: usuario.empresaId
     };
 
     const { data, error } = await supabase

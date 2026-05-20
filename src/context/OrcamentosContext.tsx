@@ -61,10 +61,11 @@ export function OrcamentosProvider({ children }: { children: React.ReactNode }) 
   const [orcamentos, setOrcamentos] = useState<Orcamento[]>([]);
 
   const carregarOrcamentos = useCallback(async () => {
-    if (!usuario) return;
+    if (!usuario?.empresaId) return;
     const { data, error } = await supabase
       .from('orcamentos')
       .select('*')
+      .eq('empresa_id', usuario.empresaId)
       .order('numero', { ascending: false });
     
     if (!error && data) {
@@ -79,10 +80,12 @@ export function OrcamentosProvider({ children }: { children: React.ReactNode }) 
   const criarOrcamento = useCallback(async (
     dados: Omit<Orcamento, 'id' | 'numero' | 'criadoEm' | 'atualizadoEm'>
   ): Promise<string> => {
+    if (!usuario?.empresaId) throw new Error('Usuário não autenticado');
     const payloadNovo = {
       ...mapToDB(dados),
       criado_por_nome: usuario?.nome || 'Sistema',
-      usuario_id: usuario?.id
+      usuario_id: usuario?.id,
+      empresa_id: usuario.empresaId
     };
 
     const { data, error } = await supabase
@@ -123,15 +126,17 @@ export function OrcamentosProvider({ children }: { children: React.ReactNode }) 
   }, [carregarOrcamentos]);
 
   const buscarOrcamento = useCallback(async (id: string) => {
+    if (!usuario?.empresaId) return undefined;
     const { data, error } = await supabase
       .from('orcamentos')
       .select('*')
       .eq('id', id)
+      .eq('empresa_id', usuario.empresaId)
       .single();
 
     if (error || !data) return undefined;
     return mapFromDB(data);
-  }, []);
+  }, [usuario]);
 
   return (
     <OrcamentosContext.Provider value={{

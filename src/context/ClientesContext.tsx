@@ -3,6 +3,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { Cliente, Arma, GuiaTrafego, AutorizacaoManejo, CreditoCliente } from '../types';
 import { supabase } from '../db/supabase';
 
+import { useAuth } from './AuthContext';
+
 interface ClientesContextType {
   clientes: Cliente[];
   criarCliente: (dados: Omit<Cliente, 'id' | 'criadoEm' | 'atualizadoEm'>) => Promise<string>;
@@ -76,12 +78,15 @@ const mapToDB = (dados: any) => {
 };
 
 export function ClientesProvider({ children }: { children: React.ReactNode }) {
+  const { usuario } = useAuth();
   const [clientes, setClientes] = useState<Cliente[]>([]);
 
   const carregarClientes = useCallback(async () => {
+    if (!usuario?.empresaId) return;
     const { data, error } = await supabase
       .from('clientes')
       .select('*')
+      .eq('empresa_id', usuario.empresaId)
       .order('nome', { ascending: true });
     
     if (error) {
@@ -89,18 +94,19 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
       return;
     }
     
-    
     setClientes(data.map(mapFromDB));
-  }, []);
+  }, [usuario]);
 
   const [modelosRegistrados, setModelosRegistrados] = useState<string[]>([]);
   const [calibresRegistrados, setCalibresRegistrados] = useState<string[]>([]);
   const [fabricantesRegistrados, setFabricantesRegistrados] = useState<string[]>([]);
 
   const carregarMetadadosArmas = useCallback(async () => {
+    if (!usuario?.empresaId) return;
     const { data, error } = await supabase
       .from('armas')
-      .select('modelo, calibre, fabricante');
+      .select('modelo, calibre, fabricante')
+      .eq('empresa_id', usuario.empresaId);
 
     if (error) {
       console.error('Erro ao buscar metadados de armas:', error);
@@ -122,7 +128,7 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
       setCalibresRegistrados(Array.from(calibres).sort());
       setFabricantesRegistrados(Array.from(fabricantes).sort());
     }
-  }, []);
+  }, [usuario]);
 
   useEffect(() => {
     carregarClientes();
@@ -132,16 +138,17 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
   const criarCliente = useCallback(async (
     dados: Omit<Cliente, 'id' | 'criadoEm' | 'atualizadoEm'>
   ): Promise<string> => {
+    if (!usuario?.empresaId) throw new Error('Usuário não autenticado');
     const { data, error } = await supabase
       .from('clientes')
-      .insert([mapToDB(dados)])
+      .insert([{ ...mapToDB(dados), empresa_id: usuario.empresaId }])
       .select()
       .single();
 
     if (error) throw error;
     await carregarClientes();
     return data.id;
-  }, [carregarClientes]);
+  }, [carregarClientes, usuario]);
 
   const atualizarCliente = useCallback(async (id: string, dados: Partial<Cliente>) => {
     const { error } = await supabase
@@ -164,27 +171,31 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
   }, [carregarClientes]);
 
   const buscarCliente = useCallback(async (id: string) => {
+    if (!usuario?.empresaId) return undefined;
     const { data, error } = await supabase
       .from('clientes')
       .select('*')
       .eq('id', id)
+      .eq('empresa_id', usuario.empresaId)
       .single();
 
     if (error || !data) return undefined;
     return mapFromDB(data);
-  }, []);
+  }, [usuario]);
 
   const buscarClientePorNomeExato = useCallback(async (nome: string) => {
+    if (!usuario?.empresaId) return undefined;
     const { data, error } = await supabase
       .from('clientes')
       .select('*')
       .ilike('nome', nome)
+      .eq('empresa_id', usuario.empresaId)
       .limit(1)
       .single();
 
     if (error || !data) return undefined;
     return mapFromDB(data);
-  }, []);
+  }, [usuario]);
 
   const clubesRegistrados = React.useMemo(() => {
     const todosClubes = clientes
@@ -196,10 +207,12 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
 
   // --- Gestão de Armas ---
   const buscarArmas = useCallback(async (clienteId: string) => {
+    if (!usuario?.empresaId) return [];
     const { data, error } = await supabase
       .from('armas')
       .select('*')
       .eq('cliente_id', clienteId)
+      .eq('empresa_id', usuario.empresaId)
       .order('modelo', { ascending: true });
     
     if (error) throw error;
@@ -216,9 +229,10 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
       vencimentoCraf: row.vencimento_craf,
       criadoEm: row.criado_em
     }));
-  }, []);
+  }, [usuario]);
 
   const salvarArma = useCallback(async (dados: Partial<Arma> & { clienteId: string }) => {
+    if (!usuario?.empresaId) throw new Error('Usuário não autenticado');
     const payload = {
       cliente_id: dados.clienteId,
       tipo: dados.tipo,
@@ -228,7 +242,8 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
       numero_serie: dados.numeroSerie,
       numero_sigma: dados.numeroSigma,
       acervo: dados.acervo,
-      vencimento_craf: dados.vencimentoCraf || null
+      vencimento_craf: dados.vencimentoCraf || null,
+      empresa_id: usuario.empresaId
     };
 
     if (dados.id) {
@@ -245,7 +260,7 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
     }
     
     await carregarMetadadosArmas();
-  }, [carregarMetadadosArmas]);
+  }, [carregarMetadadosArmas, usuario]);
 
   const deletarArma = useCallback(async (id: string) => {
     const { error } = await supabase.from('armas').delete().eq('id', id);
@@ -255,10 +270,12 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
 
   // --- Gestão de GTs ---
   const buscarGts = useCallback(async (armaId: string) => {
+    if (!usuario?.empresaId) return [];
     const { data, error } = await supabase
       .from('guias_trafego')
       .select('*')
       .eq('arma_id', armaId)
+      .eq('empresa_id', usuario.empresaId)
       .order('vencimento', { ascending: true });
     
     if (error) throw error;
@@ -270,14 +287,16 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
       destino: row.destino,
       criadoEm: row.criado_em
     }));
-  }, []);
+  }, [usuario]);
 
   const salvarGt = useCallback(async (dados: Partial<GuiaTrafego> & { armaId: string }) => {
+    if (!usuario?.empresaId) throw new Error('Usuário não autenticado');
     const payload = {
       arma_id: dados.armaId,
       tipo: dados.tipo,
       vencimento: dados.vencimento,
-      destino: dados.destino
+      destino: dados.destino,
+      empresa_id: usuario.empresaId
     };
 
     if (dados.id) {
@@ -292,7 +311,7 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
         .insert([payload]);
       if (error) throw error;
     }
-  }, []);
+  }, [usuario]);
 
   const deletarGt = useCallback(async (id: string) => {
     const { error } = await supabase.from('guias_trafego').delete().eq('id', id);
@@ -301,10 +320,12 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
 
   // --- Gestão de Manejo ---
   const buscarManejos = useCallback(async (clienteId: string) => {
+    if (!usuario?.empresaId) return [];
     const { data, error } = await supabase
       .from('autorizacoes_manejo')
       .select('*')
       .eq('cliente_id', clienteId)
+      .eq('empresa_id', usuario.empresaId)
       .order('vencimento', { ascending: true });
     
     if (error) throw error;
@@ -318,16 +339,18 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
       vencimento: row.vencimento,
       criadoEm: row.criado_em
     }));
-  }, []);
+  }, [usuario]);
 
   const salvarManejo = useCallback(async (dados: Partial<AutorizacaoManejo> & { clienteId: string }) => {
+    if (!usuario?.empresaId) throw new Error('Usuário não autenticado');
     const payload = {
       cliente_id: dados.clienteId,
       numero_car: dados.numeroCar,
       nome_fazenda: dados.nomeFazenda,
       nome_proprietario: dados.nomeProprietario,
       cidade: dados.cidade,
-      vencimento: dados.vencimento
+      vencimento: dados.vencimento,
+      empresa_id: usuario.empresaId
     };
 
     if (dados.id) {
@@ -342,7 +365,7 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
         .insert([payload]);
       if (error) throw error;
     }
-  }, []);
+  }, [usuario]);
 
   const deletarManejo = useCallback(async (id: string) => {
     const { error } = await supabase.from('autorizacoes_manejo').delete().eq('id', id);
@@ -351,10 +374,12 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
 
   // --- Gestão de Créditos ---
   const buscarCreditos = useCallback(async (clienteId: string) => {
+    if (!usuario?.empresaId) return [];
     const { data, error } = await supabase
       .from('creditos_cliente')
       .select('*')
       .eq('cliente_id', clienteId)
+      .eq('empresa_id', usuario.empresaId)
       .order('criado_em', { ascending: false });
     
     if (error) throw error;
@@ -368,9 +393,10 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
       criadoPorNome: row.criado_por_nome,
       criadoEm: row.criado_em
     }));
-  }, []);
+  }, [usuario]);
 
   const adicionarCredito = useCallback(async (dados: Omit<CreditoCliente, 'id' | 'criadoEm'>) => {
+    if (!usuario?.empresaId) throw new Error('Usuário não autenticado');
     const { error } = await supabase
       .from('creditos_cliente')
       .insert([{
@@ -379,10 +405,11 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
         valor: dados.valor,
         descricao: dados.descricao,
         origem_id: dados.origemId || null,
-        criado_por_nome: dados.criadoPorNome || null
+        criado_por_nome: dados.criadoPorNome || null,
+        empresa_id: usuario.empresaId
       }]);
     if (error) throw error;
-  }, []);
+  }, [usuario]);
 
   const deletarCredito = useCallback(async (id: string) => {
     const { error } = await supabase.from('creditos_cliente').delete().eq('id', id);
