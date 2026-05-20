@@ -17,6 +17,7 @@ import { useRecibos } from '../../context/RecibosContext';
 import { useAgendamentos } from '../../context/AgendamentosContext';
 import { useClientes } from '../../context/ClientesContext';
 import { DialogConfirmacao } from '../common/DialogConfirmacao';
+import { useAuth } from '../../context/AuthContext';
 
 interface DetalheClienteProps {
   cliente: Cliente;
@@ -24,16 +25,18 @@ interface DetalheClienteProps {
 
 export function DetalheCliente({ cliente }: DetalheClienteProps) {
   const navigate = useNavigate();
+  const { usuario } = useAuth();
   const { ordens } = useOrdens();
   const { orcamentos } = useOrcamentos();
   const { recibos } = useRecibos();
   const { agendamentos } = useAgendamentos();
   const { deletarCliente } = useClientes();
+
+  const temPermissao = (slug: string) => {
+    return usuario?.role === 'admin' || usuario?.permissoes?.includes(slug);
+  };
   
   const location = useLocation();
-  const [abaAtiva, setAbaAtiva] = useState<'ordens' | 'orcamentos' | 'recibos' | 'agendamentos' | 'documentos' | 'creditos'>(
-    (location.state as any)?.aba || 'ordens'
-  );
   const [copiou, setCopiou] = useState(false);
   const [editando, setEditando] = useState(false);
   const [confirmandoDelete, setConfirmandoDelete] = useState(false);
@@ -49,6 +52,23 @@ export function DetalheCliente({ cliente }: DetalheClienteProps) {
   const recibosCliente = recibos.filter(r => r.clienteCPF === cliente.cpf);
   const agendamentosCliente = agendamentos.filter(a => a.clienteCPF === cliente.cpf && a.status === 'pendente');
 
+  const tabsDisponiveis = [
+    { id: 'ordens', label: 'O.S.', slug: 'ordens', count: todasOrdensCliente.length },
+    { id: 'orcamentos', label: 'Orçamentos', slug: 'orcamentos', count: orcamentosCliente.length },
+    { id: 'recibos', label: 'Recibos', slug: 'recibos', count: recibosCliente.length },
+    { id: 'agendamentos', label: 'Agendamentos', slug: 'agendamentos', count: agendamentosCliente.length },
+    { id: 'documentos', label: 'Acervo & Documentos', slug: null, count: 0 },
+    { id: 'creditos', label: 'Créditos (Haver)', slug: 'financeiro', count: 0 },
+  ].filter(tab => !tab.slug || temPermissao(tab.slug));
+
+  const [abaAtiva, setAbaAtiva] = useState<'ordens' | 'orcamentos' | 'recibos' | 'agendamentos' | 'documentos' | 'creditos'>(() => {
+    const defaultAba = (location.state as any)?.aba;
+    if (defaultAba && tabsDisponiveis.some(t => t.id === defaultAba)) {
+      return defaultAba;
+    }
+    return (tabsDisponiveis[0]?.id || 'documentos') as any;
+  });
+
   const handleCopiarSenha = (senha: string) => {
     navigator.clipboard.writeText(senha);
     setCopiou(true);
@@ -60,33 +80,38 @@ export function DetalheCliente({ cliente }: DetalheClienteProps) {
       label: 'Gerar O.S.', 
       icon: <FileText size={20} />, 
       color: 'bg-brand-blue/10 text-brand-blue border-brand-blue/20',
-      path: '/ordens/nova'
+      path: '/ordens/nova',
+      slug: 'ordens'
     },
     { 
       label: 'Gerar Orçamento', 
       icon: <Receipt size={20} />, 
       color: 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20',
-      path: '/orcamentos/novo'
+      path: '/orcamentos/novo',
+      slug: 'orcamentos'
     },
     { 
       label: 'Gerar Recibo', 
       icon: <FileText size={20} />, 
       color: 'bg-brand-green/10 text-brand-green border-brand-green/20',
-      path: '/recibos/novo'
+      path: '/recibos/novo',
+      slug: 'recibos'
     },
     { 
       label: 'Agendar Laudo', 
       icon: <Calendar size={20} />, 
       color: 'bg-purple-500/10 text-purple-500 border-purple-500/20',
-      path: '/agendamentos'
+      path: '/agendamentos',
+      slug: 'agendamentos'
     },
     { 
       label: 'Iniciar Conversa', 
       icon: <MessageCircle size={20} />, 
       color: 'bg-[#25D366]/10 text-[#25D366] border-[#25D366]/20 hover:bg-[#25D366]/20',
-      onClick: () => setModalWhatsAppAberto(true)
+      onClick: () => setModalWhatsAppAberto(true),
+      slug: null
     },
-  ];
+  ].filter(acao => !acao.slug || temPermissao(acao.slug));
 
   const handleAcao = (acao: any) => {
     if (acao.onClick) {
@@ -261,28 +286,16 @@ export function DetalheCliente({ cliente }: DetalheClienteProps) {
           {/* Histórico com Tabs */}
           <div className="card p-0 overflow-hidden border-brand-dark-5">
             <div className="flex bg-brand-dark-3 border-b border-brand-dark-5 overflow-x-auto">
-              <TabButton 
-                ativo={abaAtiva === 'ordens'} 
-                onClick={() => setAbaAtiva('ordens')} 
-                count={mostrarTodasOrdens ? todasOrdensCliente.length : ordensClienteAbertas.length}
-              >
-                O.S.
-              </TabButton>
-              <TabButton ativo={abaAtiva === 'orcamentos'} onClick={() => setAbaAtiva('orcamentos')} count={orcamentosCliente.length}>
-                Orçamentos
-              </TabButton>
-              <TabButton ativo={abaAtiva === 'recibos'} onClick={() => setAbaAtiva('recibos')} count={recibosCliente.length}>
-                Recibos
-              </TabButton>
-              <TabButton ativo={abaAtiva === 'agendamentos'} onClick={() => setAbaAtiva('agendamentos')} count={agendamentosCliente.length}>
-                Agendamentos
-              </TabButton>
-              <TabButton ativo={abaAtiva === 'documentos'} onClick={() => setAbaAtiva('documentos')} count={0}>
-                Acervo & Documentos
-              </TabButton>
-              <TabButton ativo={abaAtiva === 'creditos'} onClick={() => setAbaAtiva('creditos')} count={0}>
-                Créditos (Haver)
-              </TabButton>
+              {tabsDisponiveis.map(tab => (
+                <TabButton 
+                  key={tab.id}
+                  ativo={abaAtiva === tab.id} 
+                  onClick={() => setAbaAtiva(tab.id as any)} 
+                  count={tab.id === 'ordens' && !mostrarTodasOrdens ? ordensClienteAbertas.length : tab.count}
+                >
+                  {tab.label}
+                </TabButton>
+              ))}
             </div>
 
             <div className="p-4">
