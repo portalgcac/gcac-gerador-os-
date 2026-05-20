@@ -261,6 +261,7 @@ export interface UsuarioGoogle {
   role: 'admin' | 'colaborador';
   permissoes?: string[];
   empresaId?: string;
+  empresaNome?: string;
 }
 
 export interface Empresa {

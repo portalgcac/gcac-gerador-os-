@@ -67,7 +67,9 @@ export function Sidebar() {
           <img src="/Logo oficial.png" alt="GCAC" className="w-10 h-10 object-contain"
             onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
           <div>
-            <p className="font-black text-white text-base leading-tight">GCAC</p>
+            <p className="font-black text-white text-base leading-tight truncate max-w-[140px]" title={usuario?.empresaNome || 'GCAC'}>
+              {usuario?.empresaNome || 'GCAC'}
+            </p>
             <p className="text-brand-green text-xs font-bold tracking-wider">Gerador de O.S.</p>
           </div>
         </div>

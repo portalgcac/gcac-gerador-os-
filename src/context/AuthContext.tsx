@@ -55,13 +55,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               ? ["painel", "rotina", "agenda", "financeiro", "orcamentos", "ordens", "recibos", "agendamentos", "clientes", "config"]
               : (data?.permissoes || ["ordens"])) as string[];
 
-            const usuarioAtualizado = { ...u, role, permissoes, empresaId: rawEmpresaId || undefined };
+            let rawEmpresaNome = u.empresaNome || 'GCAC Principal';
+            if (rawEmpresaId) {
+              const { data: empData } = await supabase
+                .from('empresas')
+                .select('nome')
+                .eq('id', rawEmpresaId)
+                .single();
+              if (empData) {
+                rawEmpresaNome = empData.nome;
+              }
+            }
+
+            const usuarioAtualizado = { 
+              ...u, 
+              role, 
+              permissoes, 
+              empresaId: rawEmpresaId || undefined,
+              empresaNome: rawEmpresaNome
+            };
             
             // Só atualiza se houver mudança real para evitar loops/re-renders desnecessários
             if (
               JSON.stringify(u.permissoes) !== JSON.stringify(permissoes) || 
               u.role !== role ||
-              u.empresaId !== (rawEmpresaId || undefined)
+              u.empresaId !== (rawEmpresaId || undefined) ||
+              u.empresaNome !== rawEmpresaNome
             ) {
               setUsuario(usuarioAtualizado);
               localStorage.setItem('gcac_usuario', JSON.stringify(usuarioAtualizado));
@@ -109,6 +128,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         ? ["painel", "rotina", "agenda", "financeiro", "orcamentos", "ordens", "recibos", "agendamentos", "clientes", "config"]
         : (whitelistData?.permissoes || ["ordens"])) as string[];
 
+      let rawEmpresaNome = 'GCAC Principal';
+      if (rawEmpresaId) {
+        const { data: empData } = await supabase
+          .from('empresas')
+          .select('nome')
+          .eq('id', rawEmpresaId)
+          .single();
+        if (empData) {
+          rawEmpresaNome = empData.nome;
+        }
+      }
+
       const novoUsuario: UsuarioGoogle = {
         id: info.sub,
         nome: info.name,
@@ -117,7 +148,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         accessToken: tokenResponse.access_token,
         role,
         permissoes,
-        empresaId: rawEmpresaId || undefined
+        empresaId: rawEmpresaId || undefined,
+        empresaNome: rawEmpresaNome
       };
 
       setUsuario(novoUsuario);
