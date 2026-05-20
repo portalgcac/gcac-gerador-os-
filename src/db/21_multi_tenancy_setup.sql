@@ -65,21 +65,6 @@ UPDATE public.creditos_cliente SET empresa_id = '00000000-0000-0000-0000-0000000
 UPDATE public.servicos_config SET empresa_id = '00000000-0000-0000-0000-000000000001' WHERE empresa_id IS NULL;
 UPDATE public.notificacoes_sistema SET empresa_id = '00000000-0000-0000-0000-000000000001' WHERE empresa_id IS NULL;
 
--- 6. Garantir que as tabelas tenham RLS ativo e habilitado
-ALTER TABLE public.empresas ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.usuarios_autorizados ENABLE ROW LEVEL SECURITY;
-
--- 7. Criar política de leitura pública de empresas para usuários autenticados
-DROP POLICY IF EXISTS "Leitura de empresas para autenticados" ON public.empresas;
-CREATE POLICY "Leitura de empresas para autenticados" 
-ON public.empresas FOR SELECT 
-TO authenticated 
-USING (true);
-
--- Criar política de leitura/escrita geral de empresas para o master admin
-DROP POLICY IF EXISTS "Acesso total empresas para master admin" ON public.empresas;
-CREATE POLICY "Acesso total empresas para master admin" 
-ON public.empresas FOR ALL 
-TO authenticated 
-USING (LOWER(auth.jwt() ->> 'email') = 'gui.gomesassis@gmail.com')
-WITH CHECK (LOWER(auth.jwt() ->> 'email') = 'gui.gomesassis@gmail.com');
+-- 6. Garantir que as tabelas tenham RLS desativado (já que a autenticação é feita diretamente no frontend e o Supabase recebe requisições anônimas)
+ALTER TABLE public.empresas DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.usuarios_autorizados DISABLE ROW LEVEL SECURITY;
