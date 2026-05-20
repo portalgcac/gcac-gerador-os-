@@ -128,12 +128,16 @@ export async function buscarAlertasGlobais(empresaId?: string): Promise<AlertaDo
       nome_fazenda, 
       vencimento, 
       cliente_id,
+      status,
       clientes:cliente_id (nome)
     `)
     .eq('empresa_id', empresaId);
 
   if (manejos) {
     (manejos as any[]).forEach((m) => {
+      // Pular alertas para autorizações inertes
+      if (m.status === 'Inerte') return;
+
       if (m.vencimento) {
         const result = calcularAlerta('MANEJO', m.vencimento);
         if (result.nivel !== 'OK') {

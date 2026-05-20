@@ -101,6 +101,7 @@ export interface AutorizacaoManejo {
   cidade: string;
   vencimento: string;
   criadoEm: string;
+  status: 'Ativo' | 'Inerte';
 }
 
 export interface OrdemDeServico {

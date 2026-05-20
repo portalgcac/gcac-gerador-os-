@@ -337,7 +337,8 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
       nomeProprietario: row.nome_proprietario,
       cidade: row.cidade,
       vencimento: row.vencimento,
-      criadoEm: row.criado_em
+      criadoEm: row.criado_em,
+      status: row.status || 'Ativo'
     }));
   }, [usuario]);
 
@@ -350,6 +351,7 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
       nome_proprietario: dados.nomeProprietario,
       cidade: dados.cidade,
       vencimento: dados.vencimento,
+      status: dados.status || 'Ativo',
       empresa_id: usuario.empresaId
     };
 

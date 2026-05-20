@@ -277,9 +277,16 @@ export function AbaDocumentacao({ cliente, armaIdInicial }: Props) {
                       <FileText size={20} />
                     </div>
                     <div>
-                      <p className="text-sm font-bold text-white">
-                        {m.nomeFazenda} • {m.cidade}
-                      </p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-bold text-white">
+                          {m.nomeFazenda} • {m.cidade}
+                        </p>
+                        {m.status === 'Inerte' && (
+                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-gray-500/10 text-gray-400 font-black uppercase tracking-tighter">
+                            Inerte
+                          </span>
+                        )}
+                      </div>
                       <p className="text-[10px] text-gray-500 uppercase font-bold tracking-widest">
                         CAR: {m.numeroCar} • {m.nomeProprietario}
                       </p>
@@ -289,7 +296,7 @@ export function AbaDocumentacao({ cliente, armaIdInicial }: Props) {
                   <div className="flex items-center gap-4">
                     <div className="text-right">
                       <p className="text-[10px] text-gray-500 font-bold uppercase mb-1">Validade Manejo</p>
-                      <BadgeVencimento data={m.vencimento} tipo="MANEJO" />
+                      <BadgeVencimento data={m.vencimento} tipo="MANEJO" status={m.status} />
                     </div>
                     <div className="flex items-center gap-2">
                       <button 
@@ -424,8 +431,15 @@ function CardVencimento({ label, numero, data, tipo, icon }: { label: string, nu
   );
 }
 
-function BadgeVencimento({ data, tipo }: { data?: string, tipo: string }) {
+function BadgeVencimento({ data, tipo, status }: { data?: string, tipo: string, status?: string }) {
   if (!data) return <span className="text-[10px] text-gray-600 italic">Não informado</span>;
+  if (status === 'Inerte') {
+    return (
+      <span className="px-2 py-1 rounded-lg text-[10px] font-black uppercase border border-brand-dark-5 bg-brand-dark-3 text-gray-500">
+        {formatarData(data)}
+      </span>
+    );
+  }
   const alerta = calcularAlerta(tipo, data);
   const classes = obterClasseAlerta(alerta.nivel);
   
@@ -686,7 +700,8 @@ function ModalManejo({ manejoParaEditar, onFechar, onSalvar }: { manejoParaEdita
     nomeFazenda: manejoParaEditar?.nomeFazenda || '', 
     nomeProprietario: manejoParaEditar?.nomeProprietario || '', 
     cidade: manejoParaEditar?.cidade || '', 
-    vencimento: manejoParaEditar?.vencimento || '' 
+    vencimento: manejoParaEditar?.vencimento || '',
+    status: manejoParaEditar?.status || 'Ativo'
   });
   const [importando, setImportando] = useState(false);
 
@@ -760,9 +775,18 @@ function ModalManejo({ manejoParaEditar, onFechar, onSalvar }: { manejoParaEdita
             <label className="label">Cidade / Estado</label>
             <input type="text" className="input uppercase" value={form.cidade} onChange={e => setForm({...form, cidade: e.target.value})} />
           </div>
-          <div>
-            <label className="label">Validade da Autorização</label>
-            <input type="date" className="input" value={form.vencimento} onChange={e => setForm({...form, vencimento: e.target.value})} />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="label">Validade da Autorização</label>
+              <input type="date" className="input" value={form.vencimento} onChange={e => setForm({...form, vencimento: e.target.value})} />
+            </div>
+            <div>
+              <label className="label">Status da Autorização</label>
+              <select className="input" value={form.status} onChange={e => setForm({...form, status: e.target.value as any})}>
+                <option value="Ativo">Ativo</option>
+                <option value="Inerte">Inerte</option>
+              </select>
+            </div>
           </div>
           <div className="flex gap-3 pt-4">
             <button onClick={onFechar} className="btn-ghost flex-1">Cancelar</button>
