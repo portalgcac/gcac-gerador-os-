@@ -82,6 +82,7 @@ const mapToDB = (dados: any) => {
 export function ClientesProvider({ children }: { children: React.ReactNode }) {
   const { usuario } = useAuth();
   const [clientes, setClientes] = useState<Cliente[]>([]);
+  const [carregado, setCarregado] = useState(false);
 
   const carregarClientes = useCallback(async () => {
     if (!usuario?.empresaId) return;
@@ -97,6 +98,7 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
     }
     
     setClientes(data.map(mapFromDB));
+    setCarregado(true);
   }, [usuario]);
 
   const [modelosRegistrados, setModelosRegistrados] = useState<string[]>([]);
@@ -421,7 +423,7 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (usuario?.tipoConta === 'cac_individual' && usuario?.empresaId) {
+    if (usuario?.tipoConta === 'cac_individual' && usuario?.empresaId && carregado) {
       if (clientes.length === 0) {
         const autoCreate = async () => {
           try {
@@ -446,7 +448,7 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
         autoCreate();
       }
     }
-  }, [clientes, usuario, criarCliente]);
+  }, [clientes, usuario, criarCliente, carregado]);
 
   return (
     <ClientesContext.Provider value={{
