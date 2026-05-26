@@ -81,7 +81,7 @@ export function Sidebar() {
           <img 
             src="/logo 2.png" 
             alt="GCAC" 
-            className="w-12 h-12 object-contain"
+            className="w-16 h-16 object-contain"
             style={{ mixBlendMode: 'screen' }}
             onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} 
           />
