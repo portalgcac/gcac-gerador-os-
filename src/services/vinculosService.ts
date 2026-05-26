@@ -196,7 +196,7 @@ export async function solicitarVinculo(params: {
       })
       .eq('id', existente.id);
 
-    if (error) return { sucesso: false, erro: 'Erro ao reenviar solicitação.' };
+    if (error) return { sucesso: false, erro: 'Erro ao reenviar solicitação: ' + error.message };
 
     // Insere notificação no portal do CAC
     await inserirNotificacaoCac(params.cac_empresa_id, params.despachante_nome, existente.id);
@@ -219,7 +219,9 @@ export async function solicitarVinculo(params: {
     .select()
     .single();
 
-  if (error || !data) return { sucesso: false, erro: 'Erro ao criar solicitação.' };
+  if (error || !data) {
+    return { sucesso: false, erro: 'Erro ao criar solicitação: ' + (error?.message || 'registro não retornado') };
+  }
 
   // 4. Insere notificação no portal do CAC
   await inserirNotificacaoCac(params.cac_empresa_id, params.despachante_nome, data.id);
