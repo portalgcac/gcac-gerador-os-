@@ -79,10 +79,9 @@ export function Sidebar() {
       <div className="p-5 border-b border-brand-dark-5 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <img 
-            src="/Logo oficial.png" 
+            src="/logo 2.png" 
             alt="GCAC" 
-            className="w-10 h-10 object-contain animate-pulse-subtle"
-            style={{ mixBlendMode: 'darken' }}
+            className="w-10 h-10 object-contain"
             onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} 
           />
           <div>
