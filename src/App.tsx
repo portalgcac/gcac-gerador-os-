@@ -41,6 +41,7 @@ import { RotinaDiaria } from './components/operacional/RotinaDiaria';
 import { LembretesProvider } from './context/LembretesContext';
 import { ListaLembretes } from './components/lembretes/ListaLembretes';
 import { PainelAtiradores } from './components/admin/PainelAtiradores';
+import { PainelClientesCAC } from './components/vinculos/PainelClientesCAC';
 
 const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
@@ -250,6 +251,7 @@ export default function App() {
                               <Route path="ordens/:id" element={<RotaProtegida modulo="ordens"><PaginaDetalheOrdem /></RotaProtegida>} />
                               <Route path="ordens/:id/editar" element={<RotaProtegida modulo="ordens"><PaginaEditarOrdem /></RotaProtegida>} />
                               <Route path="clientes" element={<RotaProtegida modulo="clientes"><ListaClientes /></RotaProtegida>} />
+                              <Route path="clientes-cac" element={<RotaProtegida modulo="clientes"><PainelClientesCAC /></RotaProtegida>} />
                               <Route path="clientes/:id" element={<RotaProtegida modulo="clientes"><PaginaDetalheCliente /></RotaProtegida>} />
                               <Route path="agendamentos" element={<RotaProtegida modulo="agendamentos"><ListaAgendamentos /></RotaProtegida>} />
                               <Route path="financeiro" element={<RotaProtegida modulo="financeiro"><Financeiro /></RotaProtegida>} />

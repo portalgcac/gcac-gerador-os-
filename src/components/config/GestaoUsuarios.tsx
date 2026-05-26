@@ -39,12 +39,12 @@ export function GestaoUsuarios() {
   const { estado: notif, mostrar, fechar } = useNotificacao();
 
   // Empresas State (only for master admin)
-  const [empresas, setEmpresas] = useState<{ id: string; nome: string; tipo_conta?: string }[]>([]);
+  const [empresas, setEmpresas] = useState<{ id: string; nome: string; tipo_conta?: string; limite_cac_vinculados?: number }[]>([]);
   const [novaEmpresaNome, setNovaEmpresaNome] = useState('');
   const [novaEmpresaTipo, setNovaEmpresaTipo] = useState<'empresa' | 'cac_individual'>('empresa');
   const [carregandoEmpresas, setCarregandoEmpresas] = useState(false);
   const [mostrarGerenciarEmpresas, setMostrarGerenciarEmpresas] = useState(false);
-  const [empresaEditando, setEmpresaEditando] = useState<{ id: string; nome: string; tipo_conta: 'empresa' | 'cac_individual' } | null>(null);
+  const [empresaEditando, setEmpresaEditando] = useState<{ id: string; nome: string; tipo_conta: 'empresa' | 'cac_individual'; limite_cac_vinculados?: number } | null>(null);
   const [confirmandoDeleteEmpresa, setConfirmandoDeleteEmpresa] = useState<{ id: string; nome: string } | null>(null);
   
   // Modal State
@@ -65,7 +65,7 @@ export function GestaoUsuarios() {
     setCarregandoEmpresas(true);
     const { data, error } = await supabase
       .from('empresas')
-      .select('*')
+      .select('id, nome, tipo_conta, limite_cac_vinculados')
       .order('nome');
     if (!error && data) {
       setEmpresas(data);
@@ -203,7 +203,8 @@ export function GestaoUsuarios() {
         .from('empresas')
         .update({
           nome: empresaEditando.nome.trim(),
-          tipo_conta: empresaEditando.tipo_conta
+          tipo_conta: empresaEditando.tipo_conta,
+          limite_cac_vinculados: empresaEditando.tipo_conta === 'empresa' ? (empresaEditando.limite_cac_vinculados || 10) : null
         })
         .eq('id', empresaEditando.id);
 
@@ -341,12 +342,22 @@ export function GestaoUsuarios() {
                             {e.tipo_conta === 'cac_individual' ? 'CAC' : 'B2B'}
                           </span>
                         </div>
-                        <p className="text-[10px] text-gray-500 font-mono select-all mt-1">{e.id}</p>
+                        <p className="text-[10px] text-gray-500 font-mono select-all mt-0.5">{e.id}</p>
+                        {e.tipo_conta !== 'cac_individual' && (
+                          <p className="text-[10px] text-brand-blue-light/80 font-semibold mt-0.5">
+                            Limite: {e.limite_cac_vinculados ?? 10} CACs
+                          </p>
+                        )}
                       </div>
                       
                       <div className="flex items-center gap-1">
                         <button 
-                          onClick={() => setEmpresaEditando({ id: e.id, nome: e.nome, tipo_conta: (e.tipo_conta || 'empresa') as any })}
+                          onClick={() => setEmpresaEditando({
+                            id: e.id,
+                            nome: e.nome,
+                            tipo_conta: (e.tipo_conta || 'empresa') as any,
+                            limite_cac_vinculados: e.limite_cac_vinculados ?? 10
+                          })}
                           className="p-1.5 text-gray-400 hover:text-brand-blue-light rounded-lg hover:bg-brand-dark-3 transition-colors"
                           title="Editar Empresa"
                         >
@@ -631,6 +642,21 @@ export function GestaoUsuarios() {
                   <option value="cac_individual" className="bg-brand-dark-2 text-white">CAC Individual</option>
                 </select>
               </div>
+
+              {empresaEditando.tipo_conta === 'empresa' && (
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-gray-500 uppercase">Limite de CACs Vinculados</label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={1000}
+                    required
+                    value={empresaEditando.limite_cac_vinculados ?? 10}
+                    onChange={e => setEmpresaEditando({ ...empresaEditando, limite_cac_vinculados: parseInt(e.target.value) || 10 })}
+                    className="input w-full"
+                  />
+                </div>
+              )}
 
               <div className="pt-4 flex gap-3">
                 <button

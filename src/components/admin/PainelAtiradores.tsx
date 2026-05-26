@@ -4,7 +4,7 @@ import {
   Search, Filter, CheckCircle, XCircle, ChevronDown, ChevronUp,
   Eye, MessageSquare, Download, Wifi, WifiOff, Shield,
   TrendingUp, BarChart2, Calendar, Award, User, X, ExternalLink,
-  Crosshair, FileText, Zap, Info
+  Crosshair, FileText, Zap, Info, Link2
 } from 'lucide-react';
 import {
   buscarTodosAtiradores,
@@ -209,6 +209,24 @@ function ModalDetalheAtirador({ perfil, onClose }: { perfil: PerfilAtirador; onC
                 />
               </div>
             </div>
+
+            {/* Despachantes Vinculados */}
+            <div className="col-span-2 bg-brand-dark-3 rounded-xl p-4 border border-brand-dark-5">
+              <h4 className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-3 flex items-center gap-2">
+                <Link2 size={12} className="text-brand-blue-light" /> Despachantes Vinculados
+              </h4>
+              {perfil.despachantesVinculados?.length === 0 ? (
+                <p className="text-xs text-gray-600 italic">Este atirador não está vinculado a nenhuma empresa despachante no momento.</p>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {perfil.despachantesVinculados?.map(v => (
+                    <span key={v.id} className="text-xs font-bold px-3 py-1 rounded-lg bg-brand-blue/10 border border-brand-blue/20 text-brand-blue-light">
+                      {v.nome}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Nota de suporte */}
@@ -360,6 +378,13 @@ function LinhaAtirador({ perfil, onClick }: { perfil: PerfilAtirador; onClick: (
           ? <CheckCircle size={14} className="text-green-500" />
           : <Clock size={14} className="text-yellow-500 opacity-60" />
         }
+      </td>
+
+      {/* Vínculos */}
+      <td className="px-4 py-3">
+        <span className={`text-xs font-bold ${perfil.despachantesVinculados?.length > 0 ? 'text-brand-blue-light' : 'text-gray-600'}`}>
+          {perfil.despachantesVinculados?.length || 0}
+        </span>
       </td>
 
       {/* Cadastro */}
@@ -670,6 +695,7 @@ export function PainelAtiradores() {
                     { label: 'Alertas', col: 'alertas' as OrdemSort },
                     { label: 'Exports', col: null },
                     { label: 'Tutorial', col: null },
+                    { label: 'Vínculos', col: null },
                     { label: 'Cadastro', col: 'cadastro' as OrdemSort },
                     { label: '', col: null },
                   ].map((h, i) => (

@@ -30,7 +30,7 @@ export function NotificacoesSistemaProvider({ children }: { children: React.Reac
   const [estaCarregando, setEstaCarregando] = useState(true);
 
   const carregarNotificacoes = useCallback(async () => {
-    if (!estaAutenticado || usuario?.role !== 'admin' || !usuario?.empresaId) {
+    if (!estaAutenticado || !usuario?.empresaId) {
       setNotificacoes([]);
       setEstaCarregando(false);
       return;
@@ -52,8 +52,8 @@ export function NotificacoesSistemaProvider({ children }: { children: React.Reac
   useEffect(() => {
     carregarNotificacoes();
 
-    // Inscrição Realtime (Apenas para Admins)
-    if (estaAutenticado && usuario?.role === 'admin') {
+    // Inscrição Realtime para todos autenticados
+    if (estaAutenticado) {
       const channel = supabase
         .channel('schema-db-changes')
         .on(
@@ -69,7 +69,7 @@ export function NotificacoesSistemaProvider({ children }: { children: React.Reac
         supabase.removeChannel(channel);
       };
     }
-  }, [carregarNotificacoes, estaAutenticado, usuario?.role]);
+  }, [carregarNotificacoes, estaAutenticado]);
 
   const enviarNotificacao = useCallback(async (dados: { titulo: string, mensagem: string, tipo?: 'info' | 'sucesso' | 'alerta', link?: string }) => {
     if (!usuario?.empresaId) return;

@@ -53,6 +53,7 @@ export interface PerfilAtirador {
   totalGts: number;
   totalManejos: number;
   alertasCriticos: number; // docs vencidos ou a vencer em ≤30 dias
+  despachantesVinculados: Array<{ id: string; nome: string }>;
 }
 
 // ── Funções ──────────────────────────────────────────────────────────────────
@@ -110,6 +111,13 @@ export async function buscarTodosAtiradores(): Promise<PerfilAtirador[]> {
     .select('empresa_id, vencimento')
     .in('empresa_id', empresaIds);
 
+  // 7. Busca todos os vínculos de despachantes ativos desses atiradores
+  const { data: todosVinculos } = await supabase
+    .from('vinculos_despachante_cac')
+    .select('id, cac_empresa_id, despachante_nome, status')
+    .in('cac_empresa_id', empresaIds)
+    .eq('status', 'ativo');
+
   // ── Monta os perfis ──────────────────────────────────────────────────────
 
   const hoje = new Date();
@@ -128,6 +136,9 @@ export async function buscarTodosAtiradores(): Promise<PerfilAtirador[]> {
     const armaIdsDoUser = armasDoUser.map(a => a.id);
     const gtsDoUser = gtsPorArma.filter(g => armaIdsDoUser.includes(g.arma_id));
     const manejosDoUser = (manejos || []).filter(m => m.empresa_id === u.empresa_id);
+    const vinculosDoUser = (todosVinculos || [])
+      .filter(v => v.cac_empresa_id === u.empresa_id)
+      .map(v => ({ id: v.id, nome: v.despachante_nome }));
 
     // Conta alertas: CRAF vencido, GTs vencidos, CR vencido, Manejos vencidos
     let alertasCriticos = 0;
@@ -164,6 +175,7 @@ export async function buscarTodosAtiradores(): Promise<PerfilAtirador[]> {
       totalGts: gtsDoUser.length,
       totalManejos: manejosDoUser.length,
       alertasCriticos,
+      despachantesVinculados: vinculosDoUser,
     };
   });
 

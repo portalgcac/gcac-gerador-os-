@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useStatusConexao } from '../../hooks/useStatusConexao';
@@ -10,7 +10,8 @@ import {
   LogOut, Cloud, RefreshCw, User, Wifi, WifiOff, ShieldCheck, 
   Plus, Settings2, Edit2, Trash2, BadgeDollarSign, ChevronDown,
   HelpCircle, FileText, CheckSquare, Square, DownloadCloud,
-  ShieldAlert, Shield, Target, MapPin, Calendar, Download
+  ShieldAlert, Shield, Target, MapPin, Calendar, Download,
+  Link2, Unlink
 } from 'lucide-react';
 import { Notificacao, useNotificacao } from '../common/Notificacao';
 import { ModalServico } from './ModalServico';
@@ -21,6 +22,7 @@ import { CONTEUDO_MANUAL } from '../../services/manualService';
 import { baixarManualPdf } from '../../services/geradorPdfManual';
 import { exportarAcervoPdf, exportarAcervoExcel } from '../../services/geradorExportacaoAcervo';
 import { incrementarExportacao } from '../../services/adminCacService';
+import { buscarVinculosCAC, revogarVinculo } from '../../services/vinculosService';
 
 export function Configuracoes() {
   const { usuario, logout } = useAuth();
@@ -54,6 +56,35 @@ export function Configuracoes() {
   const [alertaManejo, setAlertaManejo] = useState(() => localStorage.getItem('config_alerta_manejo') || '7');
   const [ocultarIbama, setOcultarIbama] = useState(() => localStorage.getItem('config_ocultar_ibama') === 'true');
   const [exportando, setExportando] = useState(false);
+
+  // Vínculos do CAC
+  const [vinculosCac, setVinculosCac] = useState<any[]>([]);
+  const [carregandoVinculos, setCarregandoVinculos] = useState(false);
+
+  const carregarVinculosCac = useCallback(async () => {
+    if (!usuario?.empresaId || !isCac) return;
+    setCarregandoVinculos(true);
+    const dados = await buscarVinculosCAC(usuario.empresaId);
+    setVinculosCac(dados.filter(d => d.status === 'ativo'));
+    setCarregandoVinculos(false);
+  }, [usuario, isCac]);
+
+  useEffect(() => {
+    if (isCac) {
+      carregarVinculosCac();
+    }
+  }, [isCac, carregarVinculosCac]);
+
+  const handleRevogarVinculoCac = async (vinculoId: string, despachanteNome: string) => {
+    if (!usuario?.empresaId || !confirm(`Deseja revogar o acesso do despachante "${despachanteNome}" ao seu acervo?`)) return;
+    const res = await revogarVinculo(vinculoId, 'cac', usuario.empresaId);
+    if (res.sucesso) {
+      mostrar('sucesso', 'Acesso revogado com sucesso!');
+      carregarVinculosCac();
+    } else {
+      mostrar('erro', res.erro || 'Falha ao revogar acesso.');
+    }
+  };
 
   const salvarConfiguracoesCac = (chave: string, valor: string) => {
     localStorage.setItem(chave, valor);
@@ -429,6 +460,47 @@ export function Configuracoes() {
               Backup Digital (JSON)
             </button>
           </div>
+        </div>
+
+        {/* ── Despachantes Autorizados (Apenas CAC) ── */}
+        <div className="card space-y-4">
+          <div className="flex items-center gap-2 pb-3 border-b border-brand-dark-5">
+            <Link2 className="text-brand-blue-light" size={18} />
+            <h2 className="text-sm font-bold text-white uppercase tracking-wider">Despachantes Autorizados</h2>
+          </div>
+          <p className="text-xs text-gray-400 leading-relaxed">
+            Profissionais autorizados por você a visualizar os dados do seu acervo para gestão de documentos e controle de vencimentos.
+          </p>
+
+          {carregandoVinculos ? (
+            <div className="flex justify-center py-4">
+              <div className="w-5 h-5 border-2 border-brand-blue border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : vinculosCac.length === 0 ? (
+            <div className="bg-brand-dark-4 border border-brand-dark-5 rounded-xl p-4 text-center">
+              <p className="text-xs text-gray-500">Nenhum despachante autorizado no momento.</p>
+              <p className="text-[10px] text-gray-600 mt-1">
+                Quando um despachante solicitar acesso usando seu CPF, um aviso aparecerá na parte superior da sua tela para você autorizar.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {vinculosCac.map(v => (
+                <div key={v.id} className="flex items-center justify-between bg-brand-dark-4 border border-brand-dark-5 rounded-xl p-3">
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold text-white truncate">{v.despachante_nome}</p>
+                    <p className="text-[10px] text-gray-500">Autorizado em {formatarData(v.respondido_em || v.solicitado_em)}</p>
+                  </div>
+                  <button
+                    onClick={() => handleRevogarVinculoCac(v.id, v.despachante_nome)}
+                    className="btn-ghost py-1 px-2.5 text-[10px] border border-red-500/20 hover:border-red-500/40 text-red-400 font-bold hover:bg-red-500/10 flex items-center gap-1"
+                  >
+                    <Unlink size={10} /> Revogar
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* ── Perfil da Conta ── */}

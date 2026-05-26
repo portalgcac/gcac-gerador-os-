@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
-  LayoutDashboard, FileText, Plus, Settings, LogOut, Cloud, CloudOff, Loader, X, Users, Receipt, Calendar, BarChart3, ListTodo, Bell, Shield
+  LayoutDashboard, FileText, Plus, Settings, LogOut, Cloud, CloudOff, Loader, X, Users, Receipt, Calendar, BarChart3, ListTodo, Bell, Shield, Link2
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useOrdens } from '../../context/OrdensContext';
@@ -21,13 +21,14 @@ const links = [
   { to: '/recibos',    label: 'Recibos',           icon: Receipt,      slug: 'recibos' },
   { to: '/agendamentos', label: 'Agendamentos',   icon: Calendar,      slug: 'agendamentos' },
   { to: '/clientes',   label: 'Meus Clientes',     icon: Users,         slug: 'clientes' },
+  { to: '/clientes-cac', label: 'Clientes CAC',   icon: Link2,         slug: 'clientes' },
   { to: '/configuracoes', label: 'Configurações', icon: Settings,      slug: 'config' },
 ].sort((a, b) => a.label.localeCompare(b.label));
 
 const filtrarLinks = (usuario: any) => {
   return links.filter(link => {
     if (usuario?.tipoConta === 'cac_individual') {
-      return link.slug === 'clientes' || link.slug === 'agenda' || link.slug === 'config';
+      return (link.slug === 'clientes' && link.to === '/clientes') || link.slug === 'agenda' || link.slug === 'config';
     }
     return usuario?.permissoes?.includes(link.slug) || usuario?.role === 'admin';
   });
@@ -266,6 +267,7 @@ export function NavegacaoInferior() {
     if (label === 'Agenda / Lembretes') return 'Lembretes';
     if (label === 'Ordens de Serviço') return 'Ordens';
     if (label === 'Meus Clientes') return 'Clientes';
+    if (label === 'Clientes CAC') return 'Vínculos';
     if (label === 'Configurações') return 'Config';
     if (label === 'Agendamentos') return 'Agenda';
     return label;
