@@ -17,7 +17,8 @@ export function ListaClientes() {
 
   if (usuario?.tipoConta === 'cac_individual') {
     if (clientes.length > 0) {
-      return <DetalheCliente cliente={clientes[0]} />;
+      const clienteReal = clientes.find(c => c.cpf && c.cpf.trim() !== '') || clientes[0];
+      return <DetalheCliente cliente={clienteReal} />;
     }
     return (
       <div className="text-center py-20">

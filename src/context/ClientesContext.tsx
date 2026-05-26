@@ -427,20 +427,34 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
       if (clientes.length === 0) {
         const autoCreate = async () => {
           try {
-            await criarCliente({
-              nome: usuario.nome.toUpperCase(),
-              cpf: usuario.cpf || '',
-              contato: usuario.contato || '',
-              senhaGov: '',
-              filiadoProTiro: false,
-              clubeFiliado: '',
-              observacoes: 'CLIENTE AUTOMÁTICO (PERFIL INDIVIDUAL CAC)',
-              endereco: '',
-              numeroCr: '',
-              vencimentoCr: '',
-              numeroCrIbama: '',
-              vencimentoCrIbama: '',
-            });
+            // Consulta direta no banco de dados para evitar qualquer race condition local
+            const { data, error } = await supabase
+              .from('clientes')
+              .select('id')
+              .eq('empresa_id', usuario.empresaId)
+              .limit(1);
+
+            if (error) throw error;
+
+            if (!data || data.length === 0) {
+              await criarCliente({
+                nome: usuario.nome.toUpperCase(),
+                cpf: usuario.cpf || '',
+                contato: usuario.contato || '',
+                senhaGov: '',
+                filiadoProTiro: false,
+                clubeFiliado: '',
+                observacoes: 'CLIENTE AUTOMÁTICO (PERFIL INDIVIDUAL CAC)',
+                endereco: '',
+                numeroCr: '',
+                vencimentoCr: '',
+                numeroCrIbama: '',
+                vencimentoCrIbama: '',
+              });
+            } else {
+              // Se já existe no banco mas não na lista local por delay, recarrega
+              await carregarClientes();
+            }
           } catch (e) {
             console.error('Erro ao criar cliente individual automático:', e);
           }
@@ -448,7 +462,7 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
         autoCreate();
       }
     }
-  }, [clientes, usuario, criarCliente, carregado]);
+  }, [clientes, usuario, criarCliente, carregado, carregarClientes]);
 
   return (
     <ClientesContext.Provider value={{

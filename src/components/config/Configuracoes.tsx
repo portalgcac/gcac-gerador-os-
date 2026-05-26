@@ -19,6 +19,7 @@ import { formatarMoeda, formatarData } from '../../utils/formatters';
 import { ServicoConfig } from '../../types';
 import { CONTEUDO_MANUAL } from '../../services/manualService';
 import { baixarManualPdf } from '../../services/geradorPdfManual';
+import { exportarAcervoPdf, exportarAcervoExcel } from '../../services/geradorExportacaoAcervo';
 
 export function Configuracoes() {
   const { usuario, logout } = useAuth();
@@ -64,8 +65,80 @@ export function Configuracoes() {
     mostrar('sucesso', checked ? 'Monitoramento IBAMA/SIMAF desativado.' : 'Monitoramento IBAMA/SIMAF ativado.');
   };
 
+  const handleExportarPdf = async () => {
+    const cliente = clientes.find(c => c.cpf && c.cpf.trim() !== '') || clientes[0];
+    if (!cliente) {
+      mostrar('erro', 'Perfil de acervo não encontrado.');
+      return;
+    }
+    setExportando(true);
+    try {
+      const armas = await buscarArmas(cliente.id);
+      const armasComGts = await Promise.all(armas.map(async (arma) => {
+        const gts = await buscarGts(arma.id);
+        return { ...arma, gts };
+      }));
+      const manejos = await buscarManejos(cliente.id);
+
+      const perfil = {
+        nome: cliente.nome,
+        cpf: cliente.cpf,
+        contato: cliente.contato,
+        cr: cliente.numeroCr,
+        vencimentoCr: cliente.vencimentoCr,
+        crIbama: cliente.numeroCrIbama,
+        vencimentoCrIbama: cliente.vencimentoCrIbama,
+        endereco: cliente.endereco
+      };
+
+      await exportarAcervoPdf(perfil, armasComGts, manejos);
+      mostrar('sucesso', 'PDF do acervo gerado com sucesso!');
+    } catch (e) {
+      console.error(e);
+      mostrar('erro', 'Falha ao exportar PDF.');
+    } finally {
+      setExportando(false);
+    }
+  };
+
+  const handleExportarExcel = async () => {
+    const cliente = clientes.find(c => c.cpf && c.cpf.trim() !== '') || clientes[0];
+    if (!cliente) {
+      mostrar('erro', 'Perfil de acervo não encontrado.');
+      return;
+    }
+    setExportando(true);
+    try {
+      const armas = await buscarArmas(cliente.id);
+      const armasComGts = await Promise.all(armas.map(async (arma) => {
+        const gts = await buscarGts(arma.id);
+        return { ...arma, gts };
+      }));
+      const manejos = await buscarManejos(cliente.id);
+
+      const perfil = {
+        nome: cliente.nome,
+        cpf: cliente.cpf,
+        contato: cliente.contato,
+        cr: cliente.numeroCr,
+        vencimentoCr: cliente.vencimentoCr,
+        crIbama: cliente.numeroCrIbama,
+        vencimentoCrIbama: cliente.vencimentoCrIbama,
+        endereco: cliente.endereco
+      };
+
+      await exportarAcervoExcel(perfil, armasComGts, manejos);
+      mostrar('sucesso', 'Planilha Excel gerada com sucesso!');
+    } catch (e) {
+      console.error(e);
+      mostrar('erro', 'Falha ao exportar Excel.');
+    } finally {
+      setExportando(false);
+    }
+  };
+
   const handleExportarAcervo = async () => {
-    const cliente = clientes[0];
+    const cliente = clientes.find(c => c.cpf && c.cpf.trim() !== '') || clientes[0];
     if (!cliente) {
       mostrar('erro', 'Perfil de acervo não encontrado.');
       return;
@@ -316,23 +389,39 @@ export function Configuracoes() {
           </div>
         </div>
 
-        {/* ── Backup do Acervo ── */}
+        {/* ── Exportar & Backup do Acervo ── */}
         <div className="card space-y-4">
           <div className="flex items-center gap-2 pb-3 border-b border-brand-dark-5">
             <Download className="text-brand-green" size={18} />
             <h2 className="text-sm font-bold text-white uppercase tracking-wider">Exportar & Backup do Acervo</h2>
           </div>
           <p className="text-xs text-gray-400 leading-relaxed">
-            Faça o download imediato de um backup digital completo contendo seus dados de CR, a lista completa de armas cadastradas com seus respectivos CRAFs e histórico de Guias de Tráfego (GT) vinculadas em formato JSON legível.
+            Faça o download imediato das informações do seu acervo para arquivamento, controle ou impressão.
           </p>
           
-          <button 
-            onClick={handleExportarAcervo}
-            disabled={exportando}
-            className="btn-primary w-full justify-center py-3"
-          >
-            {exportando ? 'Exportando acervo...' : 'Exportar Acervo Completo'}
-          </button>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <button 
+              onClick={handleExportarPdf}
+              disabled={exportando}
+              className="btn-primary justify-center py-3 text-xs"
+            >
+              Exportar em PDF (Imprimir)
+            </button>
+            <button 
+              onClick={handleExportarExcel}
+              disabled={exportando}
+              className="btn-primary justify-center py-3 text-xs bg-brand-green/20 hover:bg-brand-green/30 border-brand-green/30 text-brand-green"
+            >
+              Exportar em Excel
+            </button>
+            <button 
+              onClick={handleExportarAcervo}
+              disabled={exportando}
+              className="btn-ghost justify-center py-3 text-xs border-brand-dark-5 text-gray-400 hover:text-white"
+            >
+              Backup Digital (JSON)
+            </button>
+          </div>
         </div>
 
         {/* ── Perfil da Conta ── */}
