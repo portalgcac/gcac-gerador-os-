@@ -91,12 +91,13 @@ export async function buscarCacPorCpf(cpf: string): Promise<{
 } > {
   // Normaliza CPF (remove pontuação)
   const cpfLimpo = cpf.replace(/\D/g, '');
+  const cpfFormatado = cpfLimpo.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
 
   // 1. Busca o CAC pelo CPF na tabela de clientes (perfil do portal)
   const { data: clienteData } = await supabase
     .from('clientes')
     .select('empresa_id, nome, cpf')
-    .eq('cpf', cpfLimpo)
+    .or(`cpf.eq.${cpfLimpo},cpf.eq.${cpfFormatado}`)
     .limit(1)
     .maybeSingle();
 
