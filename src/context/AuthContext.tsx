@@ -36,7 +36,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
             const { data, error } = await supabase
               .from('usuarios_autorizados')
-              .select('role, permissoes, ativo, empresa_id')
+              .select('role, permissoes, ativo, empresa_id, cpf, contato')
               .eq('email', emailLower)
               .single();
 
@@ -56,14 +56,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               : (data?.permissoes || ["ordens"])) as string[];
 
             let rawEmpresaNome = u.empresaNome || 'GCAC Principal';
+            let tipoConta: 'empresa' | 'cac_individual' = u.tipoConta || 'empresa';
+            let modulosAtivos: string[] = u.modulosAtivos || [];
             if (rawEmpresaId) {
               const { data: empData } = await supabase
                 .from('empresas')
-                .select('nome')
+                .select('nome, tipo_conta, modulos_ativos')
                 .eq('id', rawEmpresaId)
                 .single();
               if (empData) {
                 rawEmpresaNome = empData.nome;
+                tipoConta = (empData.tipo_conta || 'empresa') as 'empresa' | 'cac_individual';
+                modulosAtivos = empData.modulos_ativos || [];
               }
             }
 
@@ -72,7 +76,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               role, 
               permissoes, 
               empresaId: rawEmpresaId || undefined,
-              empresaNome: rawEmpresaNome
+              empresaNome: rawEmpresaNome,
+              tipoConta,
+              modulosAtivos,
+              cpf: data?.cpf || undefined,
+              contato: data?.contato || undefined
             };
             
             // Só atualiza se houver mudança real para evitar loops/re-renders desnecessários
@@ -80,7 +88,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               JSON.stringify(u.permissoes) !== JSON.stringify(permissoes) || 
               u.role !== role ||
               u.empresaId !== (rawEmpresaId || undefined) ||
-              u.empresaNome !== rawEmpresaNome
+              u.empresaNome !== rawEmpresaNome ||
+              u.tipoConta !== tipoConta ||
+              JSON.stringify(u.modulosAtivos) !== JSON.stringify(modulosAtivos)
             ) {
               setUsuario(usuarioAtualizado);
               localStorage.setItem('gcac_usuario', JSON.stringify(usuarioAtualizado));
@@ -129,14 +139,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         : (whitelistData?.permissoes || ["ordens"])) as string[];
 
       let rawEmpresaNome = 'GCAC Principal';
+      let tipoConta: 'empresa' | 'cac_individual' = 'empresa';
+      let modulosAtivos: string[] = [];
       if (rawEmpresaId) {
         const { data: empData } = await supabase
           .from('empresas')
-          .select('nome')
+          .select('nome, tipo_conta, modulos_ativos')
           .eq('id', rawEmpresaId)
           .single();
         if (empData) {
           rawEmpresaNome = empData.nome;
+          tipoConta = (empData.tipo_conta || 'empresa') as 'empresa' | 'cac_individual';
+          modulosAtivos = empData.modulos_ativos || [];
         }
       }
 
@@ -149,7 +163,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         role,
         permissoes,
         empresaId: rawEmpresaId || undefined,
-        empresaNome: rawEmpresaNome
+        empresaNome: rawEmpresaNome,
+        tipoConta,
+        modulosAtivos,
+        cpf: whitelistData?.cpf || undefined,
+        contato: whitelistData?.contato || undefined
       };
 
       setUsuario(novoUsuario);

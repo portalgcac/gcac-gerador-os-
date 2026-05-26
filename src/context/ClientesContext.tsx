@@ -418,6 +418,34 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
     if (error) throw error;
   }, []);
 
+  useEffect(() => {
+    if (usuario?.tipoConta === 'cac_individual' && usuario?.empresaId) {
+      if (clientes.length === 0) {
+        const autoCreate = async () => {
+          try {
+            await criarCliente({
+              nome: usuario.nome.toUpperCase(),
+              cpf: usuario.cpf || '',
+              contato: usuario.contato || '',
+              senhaGov: '',
+              filiadoProTiro: false,
+              clubeFiliado: '',
+              observacoes: 'CLIENTE AUTOMÁTICO (PERFIL INDIVIDUAL CAC)',
+              endereco: '',
+              numeroCr: '',
+              vencimentoCr: '',
+              numeroCrIbama: '',
+              vencimentoCrIbama: '',
+            });
+          } catch (e) {
+            console.error('Erro ao criar cliente individual automático:', e);
+          }
+        };
+        autoCreate();
+      }
+    }
+  }, [clientes, usuario, criarCliente]);
+
   return (
     <ClientesContext.Provider value={{
       clientes,

@@ -24,6 +24,23 @@ const links = [
   { to: '/configuracoes', label: 'Configurações', icon: Settings,      slug: 'config' },
 ].sort((a, b) => a.label.localeCompare(b.label));
 
+const filtrarLinks = (usuario: any) => {
+  return links.filter(link => {
+    if (usuario?.tipoConta === 'cac_individual') {
+      return link.slug === 'clientes' || link.slug === 'agenda' || link.slug === 'config';
+    }
+    return usuario?.permissoes?.includes(link.slug) || usuario?.role === 'admin';
+  });
+};
+
+const getLinkLabel = (link: typeof links[0], usuario: any) => {
+  if (usuario?.tipoConta === 'cac_individual') {
+    if (link.slug === 'clientes') return 'Meu Acervo & CR';
+    if (link.slug === 'agenda') return 'Meus Lembretes';
+  }
+  return link.label;
+};
+
 export function Sidebar() {
   const { usuario, logout } = useAuth();
   const { ordens, itensFila } = useOrdens();
@@ -52,9 +69,7 @@ export function Sidebar() {
     setSincronizando(false);
   };
 
-  const linksFiltrados = links.filter(link => 
-    usuario?.permissoes?.includes(link.slug) || usuario?.role === 'admin'
-  );
+  const linksFiltrados = filtrarLinks(usuario);
 
   const isAdmin = usuario?.role === 'admin';
 
@@ -98,28 +113,31 @@ export function Sidebar() {
 
       {/* Nav */}
       <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
-        {linksFiltrados.map(({ to, label, icon: Icon }) => (
-          <NavLink
-            key={to}
-            to={to}
-            className={({ isActive }) => isActive ? 'nav-link-active' : 'nav-link'}
-          >
-            <Icon size={18} />
-            <span className="flex-1">{label}</span>
-            {to === '/rotina' && totalRotina > 0 && (
-              <span className="bg-orange-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-md animate-pulse">
-                {totalRotina}
-              </span>
-            )}
-            {to === '/agenda' && tarefasPendentesHoje > 0 && (
-              <span className="bg-brand-blue text-white text-[10px] font-black px-1.5 py-0.5 rounded-md animate-pulse">
-                {tarefasPendentesHoje}
-              </span>
-            )}
-          </NavLink>
-        ))}
+        {linksFiltrados.map((link) => {
+          const Icon = link.icon;
+          return (
+            <NavLink
+              key={link.to}
+              to={link.to}
+              className={({ isActive }) => isActive ? 'nav-link-active' : 'nav-link'}
+            >
+              <Icon size={18} />
+              <span className="flex-1">{getLinkLabel(link, usuario)}</span>
+              {link.to === '/rotina' && totalRotina > 0 && (
+                <span className="bg-orange-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-md animate-pulse">
+                  {totalRotina}
+                </span>
+              )}
+              {link.to === '/agenda' && tarefasPendentesHoje > 0 && (
+                <span className="bg-brand-blue text-white text-[10px] font-black px-1.5 py-0.5 rounded-md animate-pulse">
+                  {tarefasPendentesHoje}
+                </span>
+              )}
+            </NavLink>
+          );
+        })}
 
-        {isAdmin && (
+        {isAdmin && usuario?.tipoConta !== 'cac_individual' && (
           <div className="pt-2">
             <button
               onClick={() => navigate('/ordens/nova')}
@@ -196,9 +214,7 @@ export function NavegacaoInferior() {
   const { itensFila } = useOrdens();
 
   const { usuario } = useAuth();
-  const linksFiltrados = links.filter(link => 
-    usuario?.permissoes?.includes(link.slug) || usuario?.role === 'admin'
-  );
+  const linksFiltrados = filtrarLinks(usuario);
 
   const getShortLabel = (label: string) => {
     if (label === 'Rotina Diária') return 'Rotina';
@@ -212,32 +228,35 @@ export function NavegacaoInferior() {
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-40 bg-brand-dark-2 border-t border-brand-dark-5 flex sm:hidden overflow-x-auto no-scrollbar scroll-smooth px-2">
-      {linksFiltrados.map(({ to, label, icon: Icon }) => (
-        <NavLink
-          key={to}
-          to={to}
-          className={({ isActive }) =>
-            `flex-shrink-0 min-w-[75px] flex flex-col items-center gap-1 py-3 text-[10px] font-medium transition-colors ${
-              isActive ? 'text-brand-blue-light' : 'text-gray-500 hover:text-gray-300'
-            }`
-          }
-        >
-          {({ isActive }) => (
-            <>
-              <div className="relative">
-                <Icon size={20} className={isActive ? 'scale-110 transition-transform' : ''} />
-                {to === '/ordens' && itensFila > 0 && (
-                  <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-brand-blue" />
+      {linksFiltrados.map((link) => {
+        const Icon = link.icon;
+        return (
+          <NavLink
+            key={link.to}
+            to={link.to}
+            className={({ isActive }) =>
+              `flex-shrink-0 min-w-[75px] flex flex-col items-center gap-1 py-3 text-[10px] font-medium transition-colors ${
+                isActive ? 'text-brand-blue-light' : 'text-gray-500 hover:text-gray-300'
+              }`
+            }
+          >
+            {({ isActive }) => (
+              <>
+                <div className="relative">
+                  <Icon size={20} className={isActive ? 'scale-110 transition-transform' : ''} />
+                  {link.to === '/ordens' && itensFila > 0 && (
+                    <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-brand-blue" />
+                  )}
+                </div>
+                <span className="leading-none whitespace-nowrap">{getShortLabel(getLinkLabel(link, usuario))}</span>
+                {isActive && (
+                  <div className="absolute bottom-1 w-1 h-1 rounded-full bg-brand-blue-light" />
                 )}
-              </div>
-              <span className="leading-none whitespace-nowrap">{getShortLabel(label)}</span>
-              {isActive && (
-                <div className="absolute bottom-1 w-1 h-1 rounded-full bg-brand-blue-light" />
-              )}
-            </>
-          )}
-        </NavLink>
-      ))}
+              </>
+            )}
+          </NavLink>
+        );
+      })}
     </nav>
   );
 }

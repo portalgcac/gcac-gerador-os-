@@ -263,6 +263,10 @@ export interface UsuarioGoogle {
   permissoes?: string[];
   empresaId?: string;
   empresaNome?: string;
+  tipoConta?: 'empresa' | 'cac_individual';
+  modulosAtivos?: string[];
+  cpf?: string;
+  contato?: string;
 }
 
 export interface Empresa {

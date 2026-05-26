@@ -38,8 +38,9 @@ export function GestaoUsuarios() {
   const { estado: notif, mostrar, fechar } = useNotificacao();
 
   // Empresas State (only for master admin)
-  const [empresas, setEmpresas] = useState<{ id: string; nome: string }[]>([]);
+  const [empresas, setEmpresas] = useState<{ id: string; nome: string; tipo_conta?: string }[]>([]);
   const [novaEmpresaNome, setNovaEmpresaNome] = useState('');
+  const [novaEmpresaTipo, setNovaEmpresaTipo] = useState<'empresa' | 'cac_individual'>('empresa');
   const [carregandoEmpresas, setCarregandoEmpresas] = useState(false);
   const [mostrarGerenciarEmpresas, setMostrarGerenciarEmpresas] = useState(false);
   
@@ -175,12 +176,16 @@ export function GestaoUsuarios() {
     try {
       const { error } = await supabase
         .from('empresas')
-        .insert([{ nome: novaEmpresaNome.trim() }]);
+        .insert([{ 
+          nome: novaEmpresaNome.trim(),
+          tipo_conta: novaEmpresaTipo
+        }]);
       
       if (error) throw error;
       
       mostrar('sucesso', 'Empresa cadastrada com sucesso.');
       setNovaEmpresaNome('');
+      setNovaEmpresaTipo('empresa');
       carregarEmpresas();
     } catch (err: any) {
       mostrar('erro', err.message || 'Erro ao cadastrar empresa.');
@@ -236,7 +241,7 @@ export function GestaoUsuarios() {
 
           {mostrarGerenciarEmpresas && (
             <div className="space-y-4 pt-2 border-t border-brand-dark-5">
-              <form onSubmit={handleCriarEmpresa} className="flex gap-2 max-w-md">
+              <form onSubmit={handleCriarEmpresa} className="flex flex-col sm:flex-row gap-2 max-w-xl">
                 <input
                   type="text"
                   required
@@ -245,6 +250,14 @@ export function GestaoUsuarios() {
                   onChange={e => setNovaEmpresaNome(e.target.value)}
                   className="input flex-1"
                 />
+                <select
+                  value={novaEmpresaTipo}
+                  onChange={e => setNovaEmpresaTipo(e.target.value as any)}
+                  className="input sm:w-48"
+                >
+                  <option value="empresa" className="bg-brand-dark-2 text-white">Empresa/Despachante</option>
+                  <option value="cac_individual" className="bg-brand-dark-2 text-white">CAC Individual</option>
+                </select>
                 <button type="submit" className="btn-primary px-4 shrink-0">
                   Criar Empresa
                 </button>
@@ -261,8 +274,17 @@ export function GestaoUsuarios() {
                   {empresas.map(e => (
                     <div key={e.id} className="p-3 bg-brand-dark-4 border border-brand-dark-5 rounded-xl flex items-center justify-between">
                       <div>
-                        <p className="font-bold text-white text-sm">{e.nome}</p>
-                        <p className="text-[10px] text-gray-500 font-mono select-all">{e.id}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="font-bold text-white text-sm">{e.nome}</p>
+                          <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded-full ${
+                            e.tipo_conta === 'cac_individual' 
+                              ? 'bg-brand-blue/10 text-brand-blue-light border border-brand-blue/20' 
+                              : 'bg-purple-500/10 text-purple-400 border border-purple-500/20'
+                          }`}>
+                            {e.tipo_conta === 'cac_individual' ? 'CAC' : 'B2B'}
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-gray-500 font-mono select-all mt-1">{e.id}</p>
                       </div>
                     </div>
                   ))}

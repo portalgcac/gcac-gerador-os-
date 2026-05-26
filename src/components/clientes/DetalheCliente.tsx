@@ -59,7 +59,12 @@ export function DetalheCliente({ cliente }: DetalheClienteProps) {
     { id: 'agendamentos', label: 'Agendamentos', slug: 'agendamentos', count: agendamentosCliente.length },
     { id: 'documentos', label: 'Acervo & Documentos', slug: null, count: 0 },
     { id: 'creditos', label: 'Créditos (Haver)', slug: 'financeiro', count: 0 },
-  ].filter(tab => !tab.slug || temPermissao(tab.slug));
+  ].filter(tab => {
+    if (usuario?.tipoConta === 'cac_individual') {
+      return tab.id === 'documentos';
+    }
+    return !tab.slug || temPermissao(tab.slug);
+  });
 
   const [abaAtiva, setAbaAtiva] = useState<'ordens' | 'orcamentos' | 'recibos' | 'agendamentos' | 'documentos' | 'creditos'>(() => {
     const defaultAba = (location.state as any)?.aba;
@@ -111,7 +116,12 @@ export function DetalheCliente({ cliente }: DetalheClienteProps) {
       onClick: () => setModalWhatsAppAberto(true),
       slug: null
     },
-  ].filter(acao => !acao.slug || temPermissao(acao.slug));
+  ].filter(acao => {
+    if (usuario?.tipoConta === 'cac_individual') {
+      return false;
+    }
+    return !acao.slug || temPermissao(acao.slug);
+  });
 
   const handleAcao = (acao: any) => {
     if (acao.onClick) {
@@ -136,17 +146,21 @@ export function DetalheCliente({ cliente }: DetalheClienteProps) {
       {/* ── Header ── */}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-center gap-4">
-          <button 
-            onClick={() => navigate('/clientes')}
-            className="p-2 bg-brand-dark-3 border border-brand-dark-5 rounded-xl text-gray-400 hover:text-white transition-colors"
-          >
-            <ArrowLeft size={20} />
-          </button>
+          {usuario?.tipoConta !== 'cac_individual' && (
+            <button 
+              onClick={() => navigate('/clientes')}
+              className="p-2 bg-brand-dark-3 border border-brand-dark-5 rounded-xl text-gray-400 hover:text-white transition-colors"
+            >
+              <ArrowLeft size={20} />
+            </button>
+          )}
           <div>
             <h1 className="text-2xl font-bold text-white flex items-center gap-2">
               {cliente.nome}
             </h1>
-            <p className="text-gray-400 text-sm">Perfil do Cliente</p>
+            <p className="text-gray-400 text-sm">
+              {usuario?.tipoConta === 'cac_individual' ? 'Meu Acervo & Documentação' : 'Perfil do Cliente'}
+            </p>
           </div>
         </div>
 
@@ -159,13 +173,15 @@ export function DetalheCliente({ cliente }: DetalheClienteProps) {
             Editar Cadastro
           </button>
           
-          <button 
-            onClick={() => setConfirmandoDelete(true)}
-            className="btn-danger-soft px-3 py-1.5 text-sm font-black uppercase tracking-wider"
-          >
-            <Trash2 size={16} />
-            Excluir Cliente
-          </button>
+          {usuario?.tipoConta !== 'cac_individual' && (
+            <button 
+              onClick={() => setConfirmandoDelete(true)}
+              className="btn-danger-soft px-3 py-1.5 text-sm font-black uppercase tracking-wider"
+            >
+              <Trash2 size={16} />
+              Excluir Cliente
+            </button>
+          )}
         </div>
       </div>
 
@@ -270,18 +286,20 @@ export function DetalheCliente({ cliente }: DetalheClienteProps) {
         {/* ── Coluna Direita: Ações e Histórico ── */}
         <div className="lg:col-span-2 space-y-6">
           {/* Ações Rápidas */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {acoesRapidas.map((acao) => (
-              <button
-                key={acao.label}
-                onClick={() => handleAcao(acao)}
-                className={`flex flex-col items-center justify-center p-4 rounded-2xl border transition-all hover:-translate-y-1 hover:shadow-lg ${acao.color}`}
-              >
-                <div className="mb-2">{acao.icon}</div>
-                <span className="text-[10px] font-black uppercase text-center leading-tight">{acao.label}</span>
-              </button>
-            ))}
-          </div>
+          {acoesRapidas.length > 0 && (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {acoesRapidas.map((acao) => (
+                <button
+                  key={acao.label}
+                  onClick={() => handleAcao(acao)}
+                  className={`flex flex-col items-center justify-center p-4 rounded-2xl border transition-all hover:-translate-y-1 hover:shadow-lg ${acao.color}`}
+                >
+                  <div className="mb-2">{acao.icon}</div>
+                  <span className="text-[10px] font-black uppercase text-center leading-tight">{acao.label}</span>
+                </button>
+              ))}
+            </div>
+          )}
 
           {/* Histórico com Tabs */}
           <div className="card p-0 overflow-hidden border-brand-dark-5">

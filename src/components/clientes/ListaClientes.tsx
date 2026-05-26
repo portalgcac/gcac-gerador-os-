@@ -7,10 +7,25 @@ import { formatarCPF, formatarTelefone, removerAcentos } from '../../utils/forma
 import { FormularioCliente } from './FormularioCliente';
 import { DialogConfirmacao } from '../common/DialogConfirmacao';
 import { Notificacao, useNotificacao } from '../common/Notificacao';
+import { DetalheCliente } from './DetalheCliente';
+import { useAuth } from '../../context/AuthContext';
 
 export function ListaClientes() {
   const navigate = useNavigate();
+  const { usuario } = useAuth();
   const { clientes, deletarCliente } = useClientes();
+
+  if (usuario?.tipoConta === 'cac_individual') {
+    if (clientes.length > 0) {
+      return <DetalheCliente cliente={clientes[0]} />;
+    }
+    return (
+      <div className="text-center py-20">
+        <div className="w-12 h-12 border-2 border-brand-blue border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+        <p className="text-gray-400 text-sm">Carregando acervo pessoal...</p>
+      </div>
+    );
+  }
   const { estado: notif, mostrar, fechar } = useNotificacao();
   const [busca, setBusca] = useState('');
   const [clienteEditando, setClienteEditando] = useState<Cliente | null>(null);
