@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   ClipboardCheck, 
@@ -42,6 +42,27 @@ export function RotinaDiaria() {
       removerAcentos(o.nomeCliente.toLowerCase()).includes(removerAcentos(busca.toLowerCase()))
     );
   }, [conferenciasPF, busca]);
+
+  // Auto-scroll e realce de O.S. ao voltar para a listagem
+  useEffect(() => {
+    const lastOsId = sessionStorage.getItem('last_os_id');
+    if (lastOsId && conferenciasFiltradas.length > 0) {
+      const timer = setTimeout(() => {
+        const element = document.getElementById(`os-card-${lastOsId}`);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          element.classList.add('border-brand-blue');
+          element.classList.remove('border-brand-dark-5');
+          setTimeout(() => {
+            element.classList.remove('border-brand-blue');
+            element.classList.add('border-brand-dark-5');
+          }, 2500);
+        }
+        sessionStorage.removeItem('last_os_id');
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [conferenciasFiltradas]);
 
   const copiarParaTransferencia = (texto: string, tipo: string) => {
     navigator.clipboard.writeText(texto);
@@ -93,14 +114,18 @@ export function RotinaDiaria() {
               {busca ? 'Nenhum processo correspondente encontrado.' : 'Nenhum processo aguardando resposta da PF no momento.'}
             </div>
           ) : (
-            conferenciasFiltradas.map(o => (
+            conferenciasFiltradas.map((o, index) => (
               <div 
-                key={o.id} 
+                key={o.id}
+                id={`os-card-${o.id}`}
                 className="card bg-brand-dark-3/50 border-brand-dark-5 hover:border-brand-blue/30 transition-all p-3 flex flex-col lg:flex-row lg:items-center justify-between gap-4 group animate-scale-up"
               >
                 {/* 1. O.S. Info & Cliente */}
                 <div className="flex-1 min-w-[200px]">
                   <div className="flex items-center gap-2 flex-wrap mb-1">
+                    <span className="text-[10px] font-black text-brand-blue-light bg-brand-blue/10 px-1.5 py-0.5 rounded border border-brand-blue/20 font-mono">
+                      {String(index + 1).padStart(2, '0')}
+                    </span>
                     <p className="text-[10px] font-bold text-gray-500 uppercase tracking-tighter">
                       #{formatarNumeroOS(o.numero)}
                     </p>
@@ -114,7 +139,10 @@ export function RotinaDiaria() {
                     )}
                   </div>
                   <h3 
-                    onClick={() => navigate(`/ordens/${o.id}`)}
+                    onClick={() => {
+                      sessionStorage.setItem('last_os_id', o.id);
+                      navigate(`/ordens/${o.id}`);
+                    }}
                     className="text-sm font-bold text-white hover:text-brand-blue-light cursor-pointer transition-colors"
                   >
                     {o.nomeCliente}
@@ -152,10 +180,15 @@ export function RotinaDiaria() {
                 <div className="flex-[1.5] min-w-[250px] flex flex-col gap-1.5">
                   {o.servicosProtocolados.map(s => (
                     <div key={s.id} className="flex items-center justify-between gap-3 bg-black/20 p-2 rounded-lg border border-white/5 hover:border-white/10 transition-colors">
-                      <div className="flex flex-col overflow-hidden pr-2">
-                        <span className="text-[10px] font-bold text-white truncate leading-tight">{s.nome}</span>
+                      <div className="flex flex-col overflow-hidden pr-2 flex-1">
+                        <span className="text-[10px] font-bold text-white leading-tight">{s.nome}</span>
                         {s.protocolo && (
-                          <span className="text-[9px] text-brand-blue-light font-mono mt-0.5">{s.protocolo}</span>
+                          <span className="text-[9px] text-brand-blue-light font-mono mt-0.5">Prot: {s.protocolo}</span>
+                        )}
+                        {s.detalhes && s.detalhes.trim() && (
+                          <span className="text-[9px] text-gray-400 font-sans leading-tight mt-0.5 break-words">
+                            Obs: {s.detalhes}
+                          </span>
                         )}
                       </div>
                       <button 
@@ -172,7 +205,10 @@ export function RotinaDiaria() {
                 {/* 4. Link Externo */}
                 <div className="flex items-center self-end lg:self-auto">
                   <button 
-                    onClick={() => navigate(`/ordens/${o.id}`)}
+                    onClick={() => {
+                      sessionStorage.setItem('last_os_id', o.id);
+                      navigate(`/ordens/${o.id}`);
+                    }}
                     className="p-1.5 text-gray-500 hover:text-white transition-colors bg-brand-dark-4 rounded-lg hover:bg-brand-dark-5 border border-white/5"
                     title="Ver OS Completa"
                   >
