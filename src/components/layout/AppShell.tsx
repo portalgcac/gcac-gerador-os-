@@ -5,6 +5,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useStatusConexao } from '../../hooks/useStatusConexao';
 import { useOrdens } from '../../context/OrdensContext';
 import { sincronizarPendentes } from '../../services/driveSync';
+import { OnboardingCAC } from '../common/OnboardingCAC';
 
 export function AppShell() {
   const { estaAutenticado } = useAuth();
@@ -54,6 +55,9 @@ export function AppShell() {
 
       {/* Navegação inferior — apenas mobile */}
       <NavegacaoInferior />
+
+      {/* Tutorial de Boas-vindas para CAC Individual */}
+      <OnboardingCAC />
     </div>
   );
 }
