@@ -57,6 +57,7 @@ export function PaginaLogin() {
               src="/logo 2.png"
               alt="GCAC Logo"
               className="w-32 h-32 object-contain drop-shadow-2xl"
+              style={{ mixBlendMode: 'screen' }}
               onError={(e) => {
                 (e.target as HTMLImageElement).style.display = 'none';
               }}
