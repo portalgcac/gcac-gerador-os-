@@ -41,27 +41,40 @@ export function calcularAlerta(tipo: string, dataVenc: string): { nivel: NivelAl
     return { nivel: 'OK', dias };
   }
 
-  // Regra CR (PF/EB) e CRAF: 2 meses ANTES
+  // Regra CR (PF/EB) e CRAF: 2 meses ANTES por padrão ou customizado
   if (tipo === 'CR' || tipo === 'CRAF') {
+    const configChave = `config_alerta_${tipo.toLowerCase()}`;
+    const diasConfig = typeof window !== 'undefined' ? localStorage.getItem(configChave) : null;
+    const limiteAviso = diasConfig ? parseInt(diasConfig, 10) : 60;
+    const limiteCritico = Math.max(15, Math.floor(limiteAviso / 2));
+
     if (dias < 0) return { nivel: 'VENCIDO', dias };
-    if (dias <= 30) return { nivel: 'CRITICO', dias };
-    if (dias <= 60) return { nivel: 'AVISO', dias };
+    if (dias <= limiteCritico) return { nivel: 'CRITICO', dias };
+    if (dias <= limiteAviso) return { nivel: 'AVISO', dias };
     return { nivel: 'OK', dias };
   }
 
-  // Regra GT: 20 dias ANTES
+  // Regra GT: 20 dias ANTES por padrão ou customizado
   if (tipo === 'GT') {
+    const diasConfig = typeof window !== 'undefined' ? localStorage.getItem('config_alerta_gt') : null;
+    const limiteAviso = diasConfig ? parseInt(diasConfig, 10) : 20;
+    const limiteCritico = Math.max(5, Math.floor(limiteAviso / 3));
+
     if (dias < 0) return { nivel: 'VENCIDO', dias };
-    if (dias <= 7) return { nivel: 'CRITICO', dias };
-    if (dias <= 20) return { nivel: 'AVISO', dias };
+    if (dias <= limiteCritico) return { nivel: 'CRITICO', dias };
+    if (dias <= limiteAviso) return { nivel: 'AVISO', dias };
     return { nivel: 'OK', dias };
   }
 
-  // Regra Manejo: 7 dias ANTES
+  // Regra Manejo: 7 dias ANTES por padrão ou customizado
   if (tipo === 'MANEJO') {
+    const diasConfig = typeof window !== 'undefined' ? localStorage.getItem('config_alerta_manejo') : null;
+    const limiteAviso = diasConfig ? parseInt(diasConfig, 10) : 7;
+    const limiteCritico = Math.max(2, Math.floor(limiteAviso / 3));
+
     if (dias < 0) return { nivel: 'VENCIDO', dias };
-    if (dias <= 2) return { nivel: 'CRITICO', dias };
-    if (dias <= 7) return { nivel: 'AVISO', dias };
+    if (dias <= limiteCritico) return { nivel: 'CRITICO', dias };
+    if (dias <= limiteAviso) return { nivel: 'AVISO', dias };
     return { nivel: 'OK', dias };
   }
 

@@ -4,21 +4,28 @@ import { useAuth } from '../../context/AuthContext';
 import { useStatusConexao } from '../../hooks/useStatusConexao';
 import { useOrdens } from '../../context/OrdensContext';
 import { useServicos } from '../../context/ServicosContext';
+import { useClientes } from '../../context/ClientesContext';
 import { sincronizarPendentes } from '../../services/driveSync';
-import { LogOut, Cloud, RefreshCw, User, Wifi, WifiOff, ShieldCheck, Plus, Settings2, Edit2, Trash2, BadgeDollarSign, ChevronDown } from 'lucide-react';
+import { 
+  LogOut, Cloud, RefreshCw, User, Wifi, WifiOff, ShieldCheck, 
+  Plus, Settings2, Edit2, Trash2, BadgeDollarSign, ChevronDown,
+  HelpCircle, FileText, CheckSquare, Square, DownloadCloud,
+  ShieldAlert, Shield, Target, MapPin, Calendar, Download
+} from 'lucide-react';
 import { Notificacao, useNotificacao } from '../common/Notificacao';
 import { ModalServico } from './ModalServico';
 import { GestaoUsuarios } from './GestaoUsuarios';
-import { formatarMoeda } from '../../utils/formatters';
+import { formatarMoeda, formatarData } from '../../utils/formatters';
 import { ServicoConfig } from '../../types';
 import { CONTEUDO_MANUAL } from '../../services/manualService';
 import { baixarManualPdf } from '../../services/geradorPdfManual';
-import { HelpCircle, FileText, CheckSquare, Square, DownloadCloud } from 'lucide-react';
 
 export function Configuracoes() {
   const { usuario, logout } = useAuth();
+  const isCac = usuario?.tipoConta === 'cac_individual';
   const { ordens } = useOrdens();
   const { servicos, deletarServico } = useServicos();
+  const { clientes, buscarArmas, buscarGts, buscarManejos } = useClientes();
   const itensFila = ordens.filter(o => o.pendenteSincronizacao).length;
   
   const online = useStatusConexao();
@@ -37,6 +44,96 @@ export function Configuracoes() {
   // Controle de Seleção do Manual
   const [secoesSelecionadas, setSecoesSelecionadas] = useState<string[]>(CONTEUDO_MANUAL.map(s => s.id));
   const [gerandoManual, setGerandoManual] = useState(false);
+
+  // Configurações do CAC Individual
+  const [alertaCr, setAlertaCr] = useState(() => localStorage.getItem('config_alerta_cr') || '60');
+  const [alertaCraf, setAlertaCraf] = useState(() => localStorage.getItem('config_alerta_craf') || '60');
+  const [alertaGt, setAlertaGt] = useState(() => localStorage.getItem('config_alerta_gt') || '20');
+  const [alertaManejo, setAlertaManejo] = useState(() => localStorage.getItem('config_alerta_manejo') || '7');
+  const [ocultarIbama, setOcultarIbama] = useState(() => localStorage.getItem('config_ocultar_ibama') === 'true');
+  const [exportando, setExportando] = useState(false);
+
+  const salvarConfiguracoesCac = (chave: string, valor: string) => {
+    localStorage.setItem(chave, valor);
+    mostrar('sucesso', 'Configuração de prazo atualizada!');
+  };
+
+  const handleToggleIbama = (checked: boolean) => {
+    setOcultarIbama(checked);
+    localStorage.setItem('config_ocultar_ibama', String(checked));
+    mostrar('sucesso', checked ? 'Monitoramento IBAMA/SIMAF desativado.' : 'Monitoramento IBAMA/SIMAF ativado.');
+  };
+
+  const handleExportarAcervo = async () => {
+    const cliente = clientes[0];
+    if (!cliente) {
+      mostrar('erro', 'Perfil de acervo não encontrado.');
+      return;
+    }
+    setExportando(true);
+    try {
+      const armas = await buscarArmas(cliente.id);
+      const armasComGts = await Promise.all(armas.map(async (arma) => {
+        const gts = await buscarGts(arma.id);
+        return { ...arma, gts };
+      }));
+      const manejos = await buscarManejos(cliente.id);
+
+      const backup = {
+        exportadoEm: new Date().toISOString(),
+        perfil: {
+          nome: cliente.nome,
+          cpf: cliente.cpf,
+          contato: cliente.contato,
+          cr: cliente.numeroCr,
+          vencimentoCr: cliente.vencimentoCr,
+          crIbama: cliente.numeroCrIbama,
+          vencimentoCrIbama: cliente.vencimentoCrIbama,
+          endereco: cliente.endereco
+        },
+        armas: armasComGts.map(a => ({
+          tipo: a.tipo,
+          modelo: a.modelo,
+          calibre: a.calibre,
+          fabricante: a.fabricante,
+          numeroSerie: a.numeroSerie,
+          numeroSigma: a.numeroSigma,
+          acervo: a.acervo,
+          vencimentoCraf: a.vencimentoCraf,
+          gts: a.gts.map(g => ({
+            tipo: g.tipo,
+            vencimento: g.vencimento,
+            destino: g.destino
+          }))
+        })),
+        manejos: manejos.map(m => ({
+          fazenda: m.nomeFazenda,
+          proprietario: m.nomeProprietario,
+          car: m.numeroCar,
+          cidade: m.cidade,
+          vencimento: m.vencimento,
+          status: m.status
+        }))
+      };
+
+      const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `backup_acervo_gcac_${cliente.nome.toLowerCase().replace(/\s+/g, '_')}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      mostrar('sucesso', 'Backup baixado com sucesso!');
+    } catch (e) {
+      console.error(e);
+      mostrar('erro', 'Falha ao exportar acervo.');
+    } finally {
+      setExportando(false);
+    }
+  };
 
   const toggleSecao = (id: string) => {
     setSecoesSelecionadas(prev => 
@@ -102,6 +199,174 @@ export function Configuracoes() {
     setModalAberto(true);
   };
 
+  if (isCac) {
+    return (
+      <div className="max-w-2xl mx-auto space-y-6 animate-fade-in pb-20">
+        <h1 className="text-2xl font-bold text-white flex items-center gap-2">
+          <Settings2 className="text-brand-blue" />
+          Configurações do Atirador
+        </h1>
+        <p className="text-gray-400 text-sm">Personalize os alertas de prazos, monitoramento de documentos e faça backup do seu acervo.</p>
+
+        {/* ── Painel de Alertas ── */}
+        <div className="card space-y-5">
+          <div className="flex items-center gap-2 pb-3 border-b border-brand-dark-5">
+            <ShieldAlert className="text-brand-blue-light" size={18} />
+            <h2 className="text-sm font-bold text-white uppercase tracking-wider">Prazos de Alerta e Antecedência</h2>
+          </div>
+          
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Alerta CR */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-gray-400 uppercase">CR (Exército/PF)</label>
+              <select 
+                className="select" 
+                value={alertaCr}
+                onChange={e => {
+                  setAlertaCr(e.target.value);
+                  salvarConfiguracoesCac('config_alerta_cr', e.target.value);
+                }}
+              >
+                <option value="30">Alertar com 30 dias de antecedência</option>
+                <option value="60">Alertar com 60 dias de antecedência</option>
+                <option value="90">Alertar com 90 dias de antecedência</option>
+                <option value="120">Alertar com 120 dias de antecedência</option>
+              </select>
+            </div>
+
+            {/* Alerta CRAF */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-gray-400 uppercase">CRAF (Armas)</label>
+              <select 
+                className="select" 
+                value={alertaCraf}
+                onChange={e => {
+                  setAlertaCraf(e.target.value);
+                  salvarConfiguracoesCac('config_alerta_craf', e.target.value);
+                }}
+              >
+                <option value="30">Alertar com 30 dias de antecedência</option>
+                <option value="60">Alertar com 60 dias de antecedência</option>
+                <option value="90">Alertar com 90 dias de antecedência</option>
+                <option value="120">Alertar com 120 dias de antecedência</option>
+              </select>
+            </div>
+
+            {/* Alerta GT */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-gray-400 uppercase">Guia de Tráfego (GT)</label>
+              <select 
+                className="select" 
+                value={alertaGt}
+                onChange={e => {
+                  setAlertaGt(e.target.value);
+                  salvarConfiguracoesCac('config_alerta_gt', e.target.value);
+                }}
+              >
+                <option value="10">Alertar com 10 dias de antecedência</option>
+                <option value="20">Alertar com 20 dias de antecedência</option>
+                <option value="30">Alertar com 30 dias de antecedência</option>
+                <option value="45">Alertar com 45 dias de antecedência</option>
+              </select>
+            </div>
+
+            {/* Alerta Manejo */}
+            {!ocultarIbama && (
+              <div className="space-y-1.5 animate-fade-in">
+                <label className="text-xs font-bold text-gray-400 uppercase">SIMAF / Manejo</label>
+                <select 
+                  className="select" 
+                  value={alertaManejo}
+                  onChange={e => {
+                    setAlertaManejo(e.target.value);
+                    salvarConfiguracoesCac('config_alerta_manejo', e.target.value);
+                  }}
+                >
+                  <option value="5">Alertar com 5 dias de antecedência</option>
+                  <option value="7">Alertar com 7 dias de antecedência</option>
+                  <option value="15">Alertar com 15 dias de antecedência</option>
+                  <option value="30">Alertar com 30 dias de antecedência</option>
+                </select>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ── Monitoramento IBAMA / SIMAF ── */}
+        <div className="card space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Shield className="text-brand-blue-light" size={18} />
+              <div>
+                <h2 className="text-sm font-bold text-white tracking-wider">Monitoramento IBAMA / SIMAF</h2>
+                <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mt-0.5">
+                  Desative caso você não utilize autorizações de caça/manejo
+                </p>
+              </div>
+            </div>
+            
+            <button 
+              onClick={() => handleToggleIbama(!ocultarIbama)}
+              className={`w-12 h-6 rounded-full flex items-center transition-all p-1 ${
+                ocultarIbama ? 'bg-brand-dark-5 justify-start' : 'bg-brand-green justify-end'
+              }`}
+            >
+              <div className="w-4 h-4 rounded-full bg-white shadow-md" />
+            </button>
+          </div>
+        </div>
+
+        {/* ── Backup do Acervo ── */}
+        <div className="card space-y-4">
+          <div className="flex items-center gap-2 pb-3 border-b border-brand-dark-5">
+            <Download className="text-brand-green" size={18} />
+            <h2 className="text-sm font-bold text-white uppercase tracking-wider">Exportar & Backup do Acervo</h2>
+          </div>
+          <p className="text-xs text-gray-400 leading-relaxed">
+            Faça o download imediato de um backup digital completo contendo seus dados de CR, a lista completa de armas cadastradas com seus respectivos CRAFs e histórico de Guias de Tráfego (GT) vinculadas em formato JSON legível.
+          </p>
+          
+          <button 
+            onClick={handleExportarAcervo}
+            disabled={exportando}
+            className="btn-primary w-full justify-center py-3"
+          >
+            {exportando ? 'Exportando acervo...' : 'Exportar Acervo Completo'}
+          </button>
+        </div>
+
+        {/* ── Perfil da Conta ── */}
+        <div className="card space-y-4">
+          <div className="flex items-center gap-2 pb-3 border-b border-brand-dark-5">
+            <User className="text-gray-400" size={18} />
+            <h2 className="text-sm font-bold text-white uppercase tracking-wider">Perfil da Conta</h2>
+          </div>
+          {usuario && (
+            <div className="flex items-center gap-3">
+              <img src={usuario.fotoPerfil} alt={usuario.nome} className="w-12 h-12 rounded-full border border-brand-blue/30" />
+              <div className="flex-1 overflow-hidden">
+                <p className="font-semibold text-white truncate">{usuario.nome}</p>
+                <p className="text-xs text-gray-400 truncate">{usuario.email}</p>
+                <span className="text-[10px] text-brand-blue-light bg-brand-blue/10 px-2 py-0.5 rounded border border-brand-blue/20 font-bold uppercase tracking-wider inline-block mt-1">
+                  Perfil Individual CAC
+                </span>
+              </div>
+              
+              <button onClick={logout} className="btn-danger btn-sm">
+                Sair da Conta
+              </button>
+            </div>
+          )}
+        </div>
+
+        <div className="text-center text-[10px] text-gray-600 uppercase tracking-widest pt-4">
+          Portal GCAC Atirador v3.0
+        </div>
+        <Notificacao {...notif} onFechar={fechar} />
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-2xl mx-auto space-y-6 animate-fade-in">
       <h1 className="text-2xl font-bold text-white">Configurações e Serviços</h1>
@@ -118,7 +383,7 @@ export function Configuracoes() {
             </div>
             <div>
               <h2 className="text-sm font-bold text-white tracking-wider">
-                Manual de Instruções Atualizado
+                Manual de Instruções Update
               </h2>
               {!manualExpandido && (
                 <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">

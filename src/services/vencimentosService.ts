@@ -4,6 +4,7 @@ import { calcularAlerta, AlertaDocumento } from '../utils/vencimentos';
 export async function buscarAlertasGlobais(empresaId?: string): Promise<AlertaDocumento[]> {
   if (!empresaId) return [];
   const alertas: AlertaDocumento[] = [];
+  const ocultarIbama = typeof window !== 'undefined' && localStorage.getItem('config_ocultar_ibama') === 'true';
 
   // 1. Buscar Clientes (CR e IBAMA CR)
   const { data: clientes } = await supabase
@@ -28,7 +29,7 @@ export async function buscarAlertasGlobais(empresaId?: string): Promise<AlertaDo
           });
         }
       }
-      if (c.vencimento_cr_ibama) {
+      if (!ocultarIbama && c.vencimento_cr_ibama) {
         const result = calcularAlerta('IBAMA_CR', c.vencimento_cr_ibama);
         if (result.nivel !== 'OK') {
           alertas.push({
@@ -121,40 +122,42 @@ export async function buscarAlertasGlobais(empresaId?: string): Promise<AlertaDo
   }
 
   // 4. Buscar Manejos
-  const { data: manejos } = await supabase
-    .from('autorizacoes_manejo')
-    .select(`
-      id, 
-      nome_fazenda, 
-      vencimento, 
-      cliente_id,
-      status,
-      clientes:cliente_id (nome)
-    `)
-    .eq('empresa_id', empresaId);
+  if (!ocultarIbama) {
+    const { data: manejos } = await supabase
+      .from('autorizacoes_manejo')
+      .select(`
+        id, 
+        nome_fazenda, 
+        vencimento, 
+        cliente_id,
+        status,
+        clientes:cliente_id (nome)
+      `)
+      .eq('empresa_id', empresaId);
 
-  if (manejos) {
-    (manejos as any[]).forEach((m) => {
-      // Pular alertas para autorizações inertes
-      if (m.status === 'Inerte') return;
+    if (manejos) {
+      (manejos as any[]).forEach((m) => {
+        // Pular alertas para autorizações inertes
+        if (m.status === 'Inerte') return;
 
-      if (m.vencimento) {
-        const result = calcularAlerta('MANEJO', m.vencimento);
-        if (result.nivel !== 'OK') {
-          const cliente = Array.isArray(m.clientes) ? m.clientes[0] : m.clientes;
-          alertas.push({
-            id: `${m.id}-manejo`,
-            tipo: 'MANEJO',
-            label: `Manejo: ${m.nome_fazenda}`,
-            dataVencimento: m.vencimento,
-            nivel: result.nivel,
-            diasRestantes: result.dias,
-            clienteNome: cliente?.nome,
-            clienteId: m.cliente_id
-          });
+        if (m.vencimento) {
+          const result = calcularAlerta('MANEJO', m.vencimento);
+          if (result.nivel !== 'OK') {
+            const cliente = Array.isArray(m.clientes) ? m.clientes[0] : m.clientes;
+            alertas.push({
+              id: `${m.id}-manejo`,
+              tipo: 'MANEJO',
+              label: `Manejo: ${m.nome_fazenda}`,
+              dataVencimento: m.vencimento,
+              nivel: result.nivel,
+              diasRestantes: result.dias,
+              clienteNome: cliente?.nome,
+              clienteId: m.cliente_id
+            });
+          }
         }
-      }
-    });
+      });
+    }
   }
 
   // Ordenar por gravidade e depois por data
