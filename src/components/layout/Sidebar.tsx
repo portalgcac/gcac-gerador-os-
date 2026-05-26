@@ -78,13 +78,22 @@ export function Sidebar() {
       {/* Logo */}
       <div className="p-5 border-b border-brand-dark-5 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <img src="/Logo oficial.png" alt="GCAC" className="w-10 h-10 object-contain"
-            onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+          <img 
+            src="/Logo oficial.png" 
+            alt="GCAC" 
+            className="w-10 h-10 object-contain animate-pulse-subtle"
+            style={{ mixBlendMode: 'darken' }}
+            onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} 
+          />
           <div>
             <p className="font-black text-white text-base leading-tight truncate max-w-[140px]" title={usuario?.empresaNome || 'GCAC'}>
               {usuario?.empresaNome || 'GCAC'}
             </p>
-            <p className="text-brand-green text-xs font-bold tracking-wider">Gerador de O.S.</p>
+            {usuario?.tipoConta === 'cac_individual' ? (
+              <p className="text-brand-blue-light text-xs font-bold tracking-wider">Portal GCAC</p>
+            ) : (
+              <p className="text-brand-green text-xs font-bold tracking-wider">Gerador de O.S.</p>
+            )}
           </div>
         </div>
         
@@ -191,9 +200,15 @@ export function Sidebar() {
             />
             <div className="flex-1 min-w-0">
               <p className="text-xs font-semibold text-white truncate">{usuario.nome}</p>
-              <p className="text-[10px] text-brand-green uppercase font-bold tracking-tighter opacity-70">
-                {usuario.role === 'admin' ? 'Administrador' : 'Colaborador'}
-              </p>
+              {usuario.tipoConta === 'cac_individual' ? (
+                <p className="text-[10px] text-brand-blue-light uppercase font-bold tracking-tighter opacity-80">
+                  Atirador CAC
+                </p>
+              ) : (
+                <p className="text-[10px] text-brand-green uppercase font-bold tracking-tighter opacity-70">
+                  {usuario.role === 'admin' ? 'Administrador' : 'Colaborador'}
+                </p>
+              )}
               <p className="text-[10px] text-gray-500 truncate">{usuario.email}</p>
             </div>
             <button onClick={logout} title="Sair" className="text-gray-500 hover:text-red-400 transition-colors p-1">

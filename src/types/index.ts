@@ -65,6 +65,7 @@ export interface Cliente {
   vencimentoCr?: string;
   numeroCrIbama?: string;
   vencimentoCrIbama?: string;
+  fotoUrl?: string;
   criadoEm: string;
   atualizadoEm: string;
 }

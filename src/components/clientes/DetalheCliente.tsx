@@ -30,7 +30,7 @@ export function DetalheCliente({ cliente }: DetalheClienteProps) {
   const { orcamentos } = useOrcamentos();
   const { recibos } = useRecibos();
   const { agendamentos } = useAgendamentos();
-  const { deletarCliente } = useClientes();
+  const { deletarCliente, atualizarCliente } = useClientes();
 
   const temPermissao = (slug: string) => {
     return usuario?.role === 'admin' || usuario?.permissoes?.includes(slug);
@@ -141,6 +141,56 @@ export function DetalheCliente({ cliente }: DetalheClienteProps) {
     }
   };
 
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 256;
+        const MAX_HEIGHT = 256;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height *= MAX_WIDTH / width;
+            width = MAX_WIDTH;
+          }
+        } else {
+          if (height > MAX_HEIGHT) {
+            width *= MAX_HEIGHT / height;
+            height = MAX_HEIGHT;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const base64 = canvas.toDataURL('image/jpeg', 0.85);
+          
+          atualizarCliente(cliente.id, { fotoUrl: base64 })
+            .then(() => {
+              window.location.reload();
+            })
+            .catch(err => {
+              console.error('Erro ao atualizar foto de perfil:', err);
+              alert('Erro ao salvar a foto de perfil.');
+            });
+        }
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  };
+
   return (
     <div className="space-y-6 animate-fade-in pb-10">
       {/* ── Header ── */}
@@ -196,6 +246,34 @@ export function DetalheCliente({ cliente }: DetalheClienteProps) {
             </div>
 
             <div className="space-y-4">
+              {/* Foto de Perfil (Disponível apenas para CAC Individual) */}
+              {usuario?.tipoConta === 'cac_individual' && (
+                <div className="flex flex-col items-center justify-center pb-4 border-b border-brand-dark-5">
+                  <div className="relative group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
+                    <div className="w-24 h-24 rounded-full overflow-hidden border-2 border-brand-blue/30 group-hover:border-brand-blue transition-all flex items-center justify-center bg-brand-dark-2">
+                      {cliente.fotoUrl ? (
+                        <img src={cliente.fotoUrl} alt={cliente.nome} className="w-full h-full object-cover" />
+                      ) : (
+                        <User size={40} className="text-gray-600 group-hover:text-brand-blue-light transition-colors" />
+                      )}
+                    </div>
+                    
+                    <div className="absolute inset-0 bg-black/60 rounded-full opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center text-white text-[10px] font-black uppercase tracking-wider transition-opacity duration-200">
+                      <Pencil size={14} className="mb-1" />
+                      Alterar
+                    </div>
+                  </div>
+                  <input 
+                    type="file" 
+                    ref={fileInputRef} 
+                    onChange={handleFileChange} 
+                    accept="image/*" 
+                    className="hidden" 
+                  />
+                  <p className="text-[10px] text-gray-500 font-bold uppercase mt-2">Foto de Perfil</p>
+                </div>
+              )}
+
               <div>
                 <p className="text-[10px] text-gray-500 font-bold uppercase mb-1">Nome Completo</p>
                 <p className="text-white font-semibold text-lg">{cliente.nome}</p>
