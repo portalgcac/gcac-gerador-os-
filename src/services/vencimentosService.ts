@@ -3,14 +3,37 @@ import { calcularAlerta, AlertaDocumento } from '../utils/vencimentos';
 
 export async function buscarAlertasGlobais(empresaId?: string): Promise<AlertaDocumento[]> {
   if (!empresaId) return [];
+  return buscarAlertasParaEmpresas([empresaId]);
+}
+
+export async function buscarAlertasCacsVinculados(despachanteEmpresaId: string): Promise<AlertaDocumento[]> {
+  if (!despachanteEmpresaId) return [];
+
+  // Buscar os vínculos ativos
+  const { data: vinculos, error } = await supabase
+    .from('vinculos_despachante_cac')
+    .select('cac_empresa_id')
+    .eq('despachante_empresa_id', despachanteEmpresaId)
+    .eq('status', 'ativo');
+
+  if (error || !vinculos || vinculos.length === 0) {
+    return [];
+  }
+
+  const cacEmpresaIds = vinculos.map(v => v.cac_empresa_id);
+  return buscarAlertasParaEmpresas(cacEmpresaIds, { isVinculado: true });
+}
+
+export async function buscarAlertasParaEmpresas(empresaIds: string[], options?: { isVinculado?: boolean }): Promise<AlertaDocumento[]> {
+  if (!empresaIds || empresaIds.length === 0) return [];
   const alertas: AlertaDocumento[] = [];
   const ocultarIbama = typeof window !== 'undefined' && localStorage.getItem('config_ocultar_ibama') === 'true';
 
   // 1. Buscar Clientes (CR e IBAMA CR)
   const { data: clientes } = await supabase
     .from('clientes')
-    .select('id, nome, numero_cr, vencimento_cr, vencimento_cr_ibama')
-    .eq('empresa_id', empresaId);
+    .select('id, nome, numero_cr, vencimento_cr, vencimento_cr_ibama, empresa_id')
+    .in('empresa_id', empresaIds);
 
   if (clientes) {
     clientes.forEach(c => {
@@ -25,7 +48,9 @@ export async function buscarAlertasGlobais(empresaId?: string): Promise<AlertaDo
             nivel: result.nivel,
             diasRestantes: result.dias,
             clienteNome: c.nome,
-            clienteId: c.id
+            clienteId: c.id,
+            isVinculado: options?.isVinculado,
+            cacEmpresaId: options?.isVinculado ? c.empresa_id : undefined
           });
         }
       }
@@ -40,7 +65,9 @@ export async function buscarAlertasGlobais(empresaId?: string): Promise<AlertaDo
             nivel: result.nivel,
             diasRestantes: result.dias,
             clienteNome: c.nome,
-            clienteId: c.id
+            clienteId: c.id,
+            isVinculado: options?.isVinculado,
+            cacEmpresaId: options?.isVinculado ? c.empresa_id : undefined
           });
         }
       }
@@ -55,9 +82,10 @@ export async function buscarAlertasGlobais(empresaId?: string): Promise<AlertaDo
       modelo, 
       vencimento_craf, 
       cliente_id,
+      empresa_id,
       clientes:cliente_id (nome)
     `)
-    .eq('empresa_id', empresaId);
+    .in('empresa_id', empresaIds);
 
   if (armas) {
     (armas as any[]).forEach((a) => {
@@ -75,7 +103,9 @@ export async function buscarAlertasGlobais(empresaId?: string): Promise<AlertaDo
             clienteNome: cliente?.nome,
             clienteId: a.cliente_id,
             armaModelo: a.modelo,
-            armaId: a.id
+            armaId: a.id,
+            isVinculado: options?.isVinculado,
+            cacEmpresaId: options?.isVinculado ? a.empresa_id : undefined
           });
         }
       }
@@ -89,13 +119,14 @@ export async function buscarAlertasGlobais(empresaId?: string): Promise<AlertaDo
       id, 
       tipo, 
       vencimento, 
+      empresa_id,
       armas:arma_id (
         modelo, 
         cliente_id,
         clientes:cliente_id (nome)
       )
     `)
-    .eq('empresa_id', empresaId);
+    .in('empresa_id', empresaIds);
 
   if (gts) {
     (gts as any[]).forEach((g) => {
@@ -114,7 +145,9 @@ export async function buscarAlertasGlobais(empresaId?: string): Promise<AlertaDo
             clienteNome: cliente?.nome,
             clienteId: arma?.cliente_id,
             armaModelo: arma?.modelo,
-            armaId: arma?.id
+            armaId: arma?.id,
+            isVinculado: options?.isVinculado,
+            cacEmpresaId: options?.isVinculado ? g.empresa_id : undefined
           });
         }
       }
@@ -131,9 +164,10 @@ export async function buscarAlertasGlobais(empresaId?: string): Promise<AlertaDo
         vencimento, 
         cliente_id,
         status,
+        empresa_id,
         clientes:cliente_id (nome)
       `)
-      .eq('empresa_id', empresaId);
+      .in('empresa_id', empresaIds);
 
     if (manejos) {
       (manejos as any[]).forEach((m) => {
@@ -152,7 +186,9 @@ export async function buscarAlertasGlobais(empresaId?: string): Promise<AlertaDo
               nivel: result.nivel,
               diasRestantes: result.dias,
               clienteNome: cliente?.nome,
-              clienteId: m.cliente_id
+              clienteId: m.cliente_id,
+              isVinculado: options?.isVinculado,
+              cacEmpresaId: options?.isVinculado ? m.empresa_id : undefined
             });
           }
         }
@@ -167,3 +203,4 @@ export async function buscarAlertasGlobais(empresaId?: string): Promise<AlertaDo
     return new Date(a.dataVencimento).getTime() - new Date(b.dataVencimento).getTime();
   });
 }
+

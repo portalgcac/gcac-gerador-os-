@@ -18,6 +18,8 @@ export interface AlertaDocumento {
   clienteId?: string;
   armaModelo?: string;
   armaId?: string;
+  isVinculado?: boolean;
+  cacEmpresaId?: string;
 }
 
 /**

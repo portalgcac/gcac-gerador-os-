@@ -4,6 +4,7 @@ import {
   Target, FileText, Award, Shield, User, ChevronRight, Plus,
   Eye, Unlink, RefreshCw, Wifi, WifiOff, Info
 } from 'lucide-react';
+import { useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import {
   buscarVinculosDespachante,
@@ -47,6 +48,7 @@ function BadgeStatus({ status }: { status: VinculoDespachanteCac['status'] }) {
 
 export function PainelClientesCAC() {
   const { usuario } = useAuth();
+  const location = useLocation();
   const [vinculos, setVinculos] = useState<VinculoDespachanteCac[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [modalSolicitar, setModalSolicitar] = useState(false);
@@ -72,6 +74,20 @@ export function PainelClientesCAC() {
     setCarregandoAcervo(null);
     if (acervo) setAcervoAberto({ vinculo, acervo });
   };
+
+  // Efeito para abrir o acervo automaticamente caso o usuário venha do painel de alertas
+  useEffect(() => {
+    if (!carregando && vinculos.length > 0 && location.state?.autoOpenCacEmpresaId) {
+      const targetVinculo = vinculos.find(
+        v => v.cac_empresa_id === location.state.autoOpenCacEmpresaId && v.status === 'ativo'
+      );
+      if (targetVinculo) {
+        abrirAcervo(targetVinculo);
+        // Limpar o state para evitar reaberturas acidentais
+        window.history.replaceState({}, document.title);
+      }
+    }
+  }, [carregando, vinculos, location.state]);
 
   const handleRevogar = async (vinculo: VinculoDespachanteCac) => {
     if (!usuario?.empresaId || !confirm(`Deseja encerrar o vínculo com ${vinculo.cac_nome}?`)) return;
