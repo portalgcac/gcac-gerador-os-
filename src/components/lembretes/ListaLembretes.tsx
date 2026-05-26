@@ -1,20 +1,46 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   Plus, Search, Calendar, 
   CheckCircle2, Clock, Trash2, Edit2, 
-  Bell, CheckCircle, User, MessageCircle, AlertCircle, ListTodo
+  Bell, CheckCircle, User, MessageCircle, AlertCircle, ListTodo,
+  ShieldAlert, ExternalLink, Shield, Target, MapPin
 } from 'lucide-react';
 import { useLembretes } from '../../context/LembretesContext';
 import { useClientes } from '../../context/ClientesContext';
+import { useAuth } from '../../context/AuthContext';
 import { FormularioLembrete } from './FormularioLembrete';
 import { formatarData, removerAcentos } from '../../utils/formatters';
+import { buscarAlertasGlobais } from '../../services/vencimentosService';
+import { AlertaDocumento, obterClasseAlerta } from '../../utils/vencimentos';
+import { useNavigate } from 'react-router-dom';
 
 export function ListaLembretes() {
   const { lembretes, deletarLembrete, marcarConcluido, estaCarregando } = useLembretes();
   const { clientes } = useClientes();
+  const { usuario } = useAuth();
+  const navigate = useNavigate();
   const [modalAberto, setModalAberto] = useState(false);
   const [lembreteEdicao, setLembreteEdicao] = useState<any>(null);
   const [filtro, setFiltro] = useState('');
+  const [alertasVencimento, setAlertasVencimento] = useState<AlertaDocumento[]>([]);
+  const [carregandoAlertas, setCarregandoAlertas] = useState(false);
+
+  useEffect(() => {
+    async function obterAlertas() {
+      if (usuario?.tipoConta === 'cac_individual' && usuario?.empresaId) {
+        setCarregandoAlertas(true);
+        try {
+          const data = await buscarAlertasGlobais(usuario.empresaId);
+          setAlertasVencimento(data);
+        } catch (error) {
+          console.error('Erro ao buscar alertas de vencimento:', error);
+        } finally {
+          setCarregandoAlertas(false);
+        }
+      }
+    }
+    obterAlertas();
+  }, [usuario]);
 
   const lembretesFiltrados = useMemo(() => {
     const termo = removerAcentos(filtro.toLowerCase());
@@ -59,6 +85,88 @@ export function ListaLembretes() {
           Nova Tarefa
         </button>
       </div>
+
+      {usuario?.tipoConta === 'cac_individual' && (
+        <div className="card border-brand-dark-5 bg-brand-dark-3/30 overflow-hidden shadow-lg animate-fade-in">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <ShieldAlert size={20} className="text-orange-500" />
+              <h2 className="text-base font-bold text-white uppercase tracking-wider">Alertas de Documentação e Vencimentos</h2>
+            </div>
+            {alertasVencimento.length > 0 ? (
+              <span className="badge badge-erro">{alertasVencimento.length} pendência{alertasVencimento.length > 1 ? 's' : ''}</span>
+            ) : (
+              <span className="bg-brand-green/20 text-brand-green border border-brand-green/30 px-2.5 py-1 rounded-full text-xs font-semibold flex items-center gap-1">
+                Tudo em dia! 🎉
+              </span>
+            )}
+          </div>
+
+          {carregandoAlertas ? (
+            <div className="text-center py-6 text-gray-500 text-sm animate-pulse">Carregando vencimentos...</div>
+          ) : alertasVencimento.length === 0 ? (
+            <div className="p-4 bg-brand-green/5 border border-brand-green/10 rounded-xl text-center text-gray-400 text-sm italic">
+              Não há documentos perto do vencimento. Excelente! 🛡️
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[350px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-brand-dark-5 scrollbar-track-transparent">
+              {alertasVencimento.map((alerta) => (
+                <div 
+                  key={alerta.id}
+                  className={`flex items-center justify-between p-3.5 rounded-xl border transition-all hover:brightness-110 ${obterClasseAlerta(alerta.nivel)}`}
+                >
+                  <div className="flex items-start gap-3 min-w-0">
+                    <div className="mt-1">
+                      {alerta.tipo === 'CRAF' ? <Target size={16} /> : 
+                       alerta.tipo === 'GT' ? <MapPin size={16} /> :
+                       alerta.tipo === 'MANEJO' ? <Calendar size={16} /> :
+                       <Shield size={16} />}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                         <p className="text-xs font-bold truncate text-white">{alerta.label}</p>
+                         <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-black/20 font-black uppercase tracking-tighter">
+                           {alerta.nivel === 'VENCIDO' ? 'VENCIDO' : 
+                            alerta.nivel === 'CRITICO' ? 'URGENTE' : 'AVISO'}
+                         </span>
+                      </div>
+                      <div className="flex items-center gap-2 mt-1">
+                         <Calendar size={10} className="opacity-50 text-white" />
+                         <p className="text-[10px] font-medium text-gray-300">Vencimento: {formatarData(alerta.dataVencimento)}</p>
+                         <span className="text-[10px] font-black text-gray-500">•</span>
+                         <p className="text-[10px] font-black italic text-gray-300">
+                          {alerta.diasRestantes < 0 
+                            ? `${Math.abs(alerta.diasRestantes)} dia(s) atrasado` 
+                            : `Faltam ${alerta.diasRestantes} dia(s)`}
+                         </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <button 
+                    onClick={() => {
+                      navigate('/clientes', { 
+                        state: { 
+                          aba: 'documentos',
+                          armaId: alerta.armaId 
+                        } 
+                      });
+                    }}
+                    className="p-2 hover:bg-black/10 rounded-lg transition-colors flex-shrink-0 text-white"
+                    title="Ver no Meu Acervo"
+                  >
+                    <ExternalLink size={16} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          
+          <div className="mt-4 pt-3 border-t border-brand-dark-5 flex justify-end">
+            <p className="text-[9px] text-gray-500 font-bold uppercase italic">* Baseado nas regras de alerta do SisGCorp e IBAMA</p>
+          </div>
+        </div>
+      )}
 
       {/* Busca */}
       <div className="relative group">

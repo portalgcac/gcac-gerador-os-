@@ -76,29 +76,40 @@ export function Sidebar() {
   return (
     <aside className="w-64 bg-brand-dark-2 border-r border-brand-dark-5 flex flex-col h-full relative">
       {/* Logo */}
-      <div className="p-5 border-b border-brand-dark-5 flex items-center justify-between">
-        <div className="flex items-center gap-3">
+      <div className="p-5 border-b border-brand-dark-5 flex flex-col items-center text-center gap-3 relative">
+        <div className="flex flex-col items-center w-full">
           <img 
             src="/logo 2.png" 
             alt="GCAC" 
-            className="w-20 h-20 object-contain"
+            className="w-28 h-28 object-contain mb-2"
             style={{ mixBlendMode: 'screen' }}
             onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} 
           />
-          <div>
-            <p className="font-black text-white text-base leading-tight truncate max-w-[140px]" title={usuario?.empresaNome || 'GCAC'}>
-              {usuario?.empresaNome || 'GCAC'}
-            </p>
+          <div className="w-full">
             {usuario?.tipoConta === 'cac_individual' ? (
-              <p className="text-brand-blue-light text-xs font-bold tracking-wider">Portal GCAC</p>
+              <>
+                <p className="text-brand-blue-light text-xs font-bold tracking-wider uppercase mb-1">
+                  Portal GCAC
+                </p>
+                <p className="font-bold text-white text-base leading-tight truncate px-2" title={usuario?.nome}>
+                  {usuario?.nome}
+                </p>
+              </>
             ) : (
-              <p className="text-brand-green text-xs font-bold tracking-wider">Gerador de O.S.</p>
+              <>
+                <p className="text-brand-green text-xs font-bold tracking-wider uppercase mb-1">
+                  Gerador de O.S.
+                </p>
+                <p className="font-black text-white text-base leading-tight truncate px-2" title={usuario?.empresaNome || 'GCAC'}>
+                  {usuario?.empresaNome || 'GCAC'}
+                </p>
+              </>
             )}
           </div>
         </div>
         
         {isAdmin && (
-          <div className="relative">
+          <div className="absolute top-4 right-4">
             <button 
               onClick={() => setDropdownAberto(!dropdownAberto)}
               className={`p-2 rounded-xl transition-all h-10 w-10 flex items-center justify-center relative ${

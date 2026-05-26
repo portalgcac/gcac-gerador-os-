@@ -170,6 +170,15 @@ function RotaProtegida({ children, modulo }: { children: React.ReactNode, modulo
 
   if (!estaAutenticado || !usuario) return <Navigate to="/login" replace />;
 
+  // Restrição estrita para CAC Individual
+  if (usuario.tipoConta === 'cac_individual') {
+    const modulosPermitidos = ['clientes', 'agenda', 'config'];
+    if (modulo && !modulosPermitidos.includes(modulo)) {
+      return <Navigate to="/agenda" replace />;
+    }
+    return <>{children}</>;
+  }
+
   // Admin Mestre sempre tem acesso
   if (usuario.email === 'gui.gomesassis@gmail.com') return <>{children}</>;
 
@@ -185,6 +194,18 @@ function RotaProtegida({ children, modulo }: { children: React.ReactNode, modulo
 }
 
 function ProtecaoIndex() {
+  const { usuario } = useAuth();
+  if (usuario?.tipoConta === 'cac_individual') {
+    return <Navigate to="/agenda" replace />;
+  }
+  return <Navigate to="/dashboard" replace />;
+}
+
+function WildcardRedirect() {
+  const { usuario } = useAuth();
+  if (usuario?.tipoConta === 'cac_individual') {
+    return <Navigate to="/agenda" replace />;
+  }
   return <Navigate to="/dashboard" replace />;
 }
 
@@ -261,7 +282,7 @@ export default function App() {
                               <Route path="recibos/:id" element={<RotaProtegida modulo="recibos"><PaginaDetalheRecibo /></RotaProtegida>} />
                             </Route>
 
-                            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+                            <Route path="*" element={<WildcardRedirect />} />
                           </Routes>
                         </BrowserRouter>
                       </LembretesProvider>
