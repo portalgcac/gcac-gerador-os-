@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
-  LayoutDashboard, FileText, Plus, Settings, LogOut, Cloud, CloudOff, Loader, X, Users, Receipt, Calendar, BarChart3, ListTodo, Bell
+  LayoutDashboard, FileText, Plus, Settings, LogOut, Cloud, CloudOff, Loader, X, Users, Receipt, Calendar, BarChart3, ListTodo, Bell, Shield
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useOrdens } from '../../context/OrdensContext';
@@ -158,7 +158,25 @@ export function Sidebar() {
         })}
 
         {isAdmin && usuario?.tipoConta !== 'cac_individual' && (
-          <div className="pt-2">
+          <div className="pt-2 space-y-1">
+            {/* Link: Gestão de Atiradores */}
+            <NavLink
+              to="/admin/atiradores"
+              className={({ isActive }) =>
+                `nav-link w-full ${
+                  isActive
+                    ? 'bg-brand-blue/20 text-brand-blue-light border border-brand-blue/30'
+                    : 'text-brand-blue-light/70 hover:bg-brand-blue/10 hover:text-brand-blue-light border border-brand-blue/10'
+                }`
+              }
+            >
+              <Shield size={16} className="text-brand-blue" />
+              <span className="flex-1 text-[13px]">Gestão de Atiradores</span>
+              <span className="text-[9px] bg-brand-blue/20 text-brand-blue-light border border-brand-blue/20 px-1.5 py-0.5 rounded-md font-black uppercase tracking-widest">
+                Beta
+              </span>
+            </NavLink>
+            {/* Botão: Nova OS */}
             <button
               onClick={() => navigate('/ordens/nova')}
               className="nav-link w-full text-brand-green-light hover:bg-brand-green/10 hover:text-brand-green border border-brand-green/20"

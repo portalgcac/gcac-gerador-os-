@@ -20,6 +20,7 @@ import { ServicoConfig } from '../../types';
 import { CONTEUDO_MANUAL } from '../../services/manualService';
 import { baixarManualPdf } from '../../services/geradorPdfManual';
 import { exportarAcervoPdf, exportarAcervoExcel } from '../../services/geradorExportacaoAcervo';
+import { incrementarExportacao } from '../../services/adminCacService';
 
 export function Configuracoes() {
   const { usuario, logout } = useAuth();
@@ -93,6 +94,8 @@ export function Configuracoes() {
 
       await exportarAcervoPdf(perfil, armasComGts, manejos);
       mostrar('sucesso', 'PDF do acervo gerado com sucesso!');
+      // Rastreia exportação para o painel admin
+      if (usuario?.email) incrementarExportacao(usuario.email).catch(() => {});
     } catch (e) {
       console.error(e);
       mostrar('erro', 'Falha ao exportar PDF.');
@@ -129,6 +132,8 @@ export function Configuracoes() {
 
       await exportarAcervoExcel(perfil, armasComGts, manejos);
       mostrar('sucesso', 'Planilha Excel gerada com sucesso!');
+      // Rastreia exportação para o painel admin
+      if (usuario?.email) incrementarExportacao(usuario.email).catch(() => {});
     } catch (e) {
       console.error(e);
       mostrar('erro', 'Falha ao exportar Excel.');
@@ -200,6 +205,8 @@ export function Configuracoes() {
       URL.revokeObjectURL(url);
       
       mostrar('sucesso', 'Backup baixado com sucesso!');
+      // Rastreia exportação para o painel admin
+      if (usuario?.email) incrementarExportacao(usuario.email).catch(() => {});
     } catch (e) {
       console.error(e);
       mostrar('erro', 'Falha ao exportar acervo.');

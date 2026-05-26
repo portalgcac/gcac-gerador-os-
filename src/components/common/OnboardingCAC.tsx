@@ -4,6 +4,7 @@ import {
   Settings, User, Target, Sparkles 
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { marcarOnboardingConcluido } from '../../services/adminCacService';
 
 export function OnboardingCAC() {
   const { usuario } = useAuth();
@@ -18,6 +19,10 @@ export function OnboardingCAC() {
   const fechar = () => {
     localStorage.setItem('gcac_onboarding_completed', 'true');
     setAberto(false);
+    // Persiste no banco para o painel admin
+    if (usuario?.email) {
+      marcarOnboardingConcluido(usuario.email).catch(() => {});
+    }
   };
 
   const proximo = () => {

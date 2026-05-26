@@ -40,6 +40,7 @@ import { Financeiro } from './components/financeiro/Financeiro';
 import { RotinaDiaria } from './components/operacional/RotinaDiaria';
 import { LembretesProvider } from './context/LembretesContext';
 import { ListaLembretes } from './components/lembretes/ListaLembretes';
+import { PainelAtiradores } from './components/admin/PainelAtiradores';
 
 const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
@@ -280,6 +281,13 @@ export default function App() {
                                 </RotaProtegida>
                               } />
                               <Route path="recibos/:id" element={<RotaProtegida modulo="recibos"><PaginaDetalheRecibo /></RotaProtegida>} />
+
+                              {/* Admin: Gestão de Atiradores CAC Individual */}
+                              <Route path="admin/atiradores" element={
+                                <RotaProtegida modulo="painel">
+                                  <PainelAtiradores />
+                                </RotaProtegida>
+                              } />
                             </Route>
 
                             <Route path="*" element={<WildcardRedirect />} />

@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { UsuarioGoogle } from '../types';
 import { supabase } from '../db/supabase';
+import { registrarAcesso } from '../services/adminCacService';
 
 interface AuthContextType {
   usuario: UsuarioGoogle | null;
@@ -110,6 +111,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               setUsuario(usuarioAtualizado);
               localStorage.setItem('gcac_usuario', JSON.stringify(usuarioAtualizado));
             }
+            // Registra o último acesso (não-bloqueante)
+            registrarAcesso(u.email).catch(() => {});
           } catch (err) {
             console.error('Erro ao atualizar permissões em background:', err);
           }
@@ -201,6 +204,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUsuario(novoUsuario);
       localStorage.setItem('gcac_usuario', JSON.stringify(novoUsuario));
       sessionStorage.setItem('gcac_token', tokenResponse.access_token);
+
+      // Registra o acesso no banco (para estatísticas do painel admin)
+      registrarAcesso(novoUsuario.email).catch(() => {});
     } catch (err) {
       console.error('Erro ao buscar dados do usuário:', err);
       throw err;
