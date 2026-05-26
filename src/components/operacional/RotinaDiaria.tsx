@@ -22,6 +22,8 @@ export function RotinaDiaria() {
   } = useOrdens();
   const { clientes } = useClientes();
   const [busca, setBusca] = useState('');
+  const [servicoFiltro, setServicoFiltro] = useState('');
+  const [filiadoFiltro, setFiliadoFiltro] = useState('');
 
   // 1. Filtro: Conferência na PF (Protocolados)
   const conferenciasPF = useMemo(() => {
@@ -37,11 +39,42 @@ export function RotinaDiaria() {
     });
   }, [ordens, clientes]);
 
+  // Obter serviços únicos disponíveis na listagem para preenchimento do filtro
+  const servicosDisponiveis = useMemo(() => {
+    const nomes = new Set<string>();
+    conferenciasPF.forEach(o => {
+      o.servicosProtocolados.forEach(s => {
+        nomes.add(s.nome);
+      });
+    });
+    return Array.from(nomes).sort();
+  }, [conferenciasPF]);
+
   const conferenciasFiltradas = useMemo(() => {
-    return conferenciasPF.filter(o => 
-      removerAcentos(o.nomeCliente.toLowerCase()).includes(removerAcentos(busca.toLowerCase()))
-    );
-  }, [conferenciasPF, busca]);
+    return conferenciasPF.filter(o => {
+      // Filtro de texto (busca)
+      const matchBusca = !busca || [
+        o.nomeCliente,
+        o.cpf,
+        String(o.numero),
+        o.servicosProtocolados.map(s => s.nome).join(' '),
+        o.servicosProtocolados.map(s => s.protocolo || '').join(' ')
+      ].some(v => removerAcentos(String(v || '').toLowerCase()).includes(removerAcentos(busca.toLowerCase())));
+
+      // Filtro de serviço (dropdown)
+      const matchServico = !servicoFiltro || o.servicosProtocolados.some(s => s.nome === servicoFiltro);
+
+      // Filtro de filiação (dropdown)
+      let matchFiliado = true;
+      if (filiadoFiltro === 'filiado') {
+        matchFiliado = o.filiadoProTiro === true;
+      } else if (filiadoFiltro === 'nao_filiado') {
+        matchFiliado = o.filiadoProTiro === false;
+      }
+
+      return matchBusca && matchServico && matchFiliado;
+    });
+  }, [conferenciasPF, busca, servicoFiltro, filiadoFiltro]);
 
   // Auto-scroll e realce de O.S. ao voltar para a listagem
   useEffect(() => {
@@ -86,16 +119,42 @@ export function RotinaDiaria() {
           <p className="text-gray-400 text-sm">Central de ações rápidas para processos protocolados.</p>
         </div>
         
-        {/* Barra de Pesquisa */}
-        <div className="relative w-full md:w-80">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
-          <input
-            type="text"
-            className="input pl-9 w-full"
-            placeholder="Buscar por cliente..."
-            value={busca}
-            onChange={e => setBusca(e.target.value)}
-          />
+        {/* Controles de Busca e Filtro */}
+        <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
+          {/* Barra de Pesquisa */}
+          <div className="relative w-full sm:w-64">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
+            <input
+              type="text"
+              className="input pl-9 w-full"
+              placeholder="Buscar por cliente, CPF, O.S..."
+              value={busca}
+              onChange={e => setBusca(e.target.value)}
+            />
+          </div>
+
+          {/* Filtro por Serviço */}
+          <select
+            className="bg-brand-dark-3 border border-brand-dark-5 rounded-xl px-3 py-2 text-sm text-white focus:border-brand-blue outline-none transition-colors w-full sm:w-48"
+            value={servicoFiltro}
+            onChange={e => setServicoFiltro(e.target.value)}
+          >
+            <option value="">Todos os Serviços</option>
+            {servicosDisponiveis.map(nome => (
+              <option key={nome} value={nome}>{nome}</option>
+            ))}
+          </select>
+
+          {/* Filtro por Filiação */}
+          <select
+            className="bg-brand-dark-3 border border-brand-dark-5 rounded-xl px-3 py-2 text-sm text-white focus:border-brand-blue outline-none transition-colors w-full sm:w-40"
+            value={filiadoFiltro}
+            onChange={e => setFiliadoFiltro(e.target.value)}
+          >
+            <option value="">Afiliação (Todas)</option>
+            <option value="filiado">Filiados</option>
+            <option value="nao_filiado">Não Filiados</option>
+          </select>
         </div>
       </div>
 
@@ -111,7 +170,7 @@ export function RotinaDiaria() {
         <div className="space-y-3">
           {conferenciasFiltradas.length === 0 ? (
             <div className="card py-10 text-center text-gray-500 text-sm italic">
-              {busca ? 'Nenhum processo correspondente encontrado.' : 'Nenhum processo aguardando resposta da PF no momento.'}
+              {(busca || servicoFiltro || filiadoFiltro) ? 'Nenhum processo correspondente encontrado.' : 'Nenhum processo aguardando resposta da PF no momento.'}
             </div>
           ) : (
             conferenciasFiltradas.map((o, index) => (
