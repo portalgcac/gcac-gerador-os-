@@ -66,6 +66,8 @@ export function ListaLembretes() {
     window.open(`https://wa.me/55${fone}`, '_blank');
   };
 
+  const isCac = usuario?.tipoConta === 'cac_individual';
+
   return (
     <div className="space-y-6 animate-fade-in pb-20">
       {/* Header */}
@@ -73,172 +75,195 @@ export function ListaLembretes() {
         <div>
           <h1 className="text-2xl font-bold text-white flex items-center gap-2">
             <ListTodo className="text-brand-blue" />
-            Agenda de Lembretes
+            {isCac ? 'Meus Lembretes & Alertas' : 'Agenda de Lembretes'}
           </h1>
-          <p className="text-gray-400 text-sm">Gerencie suas tarefas e compromissos diários.</p>
+          <p className="text-gray-400 text-sm">
+            {isCac 
+              ? 'Acompanhe a validade dos seus documentos e acervo.' 
+              : 'Gerencie suas tarefas e compromissos diários.'}
+          </p>
         </div>
-        <button 
-          onClick={() => { setLembreteEdicao(null); setModalAberto(true); }}
-          className="btn-primary"
-        >
-          <Plus size={18} />
-          Nova Tarefa
-        </button>
+        {!isCac && (
+          <button 
+            onClick={() => { setLembreteEdicao(null); setModalAberto(true); }}
+            className="btn-primary"
+          >
+            <Plus size={18} />
+            Nova Tarefa
+          </button>
+        )}
       </div>
 
-      {usuario?.tipoConta === 'cac_individual' && (
-        <div className="card border-brand-dark-5 bg-brand-dark-3/30 overflow-hidden shadow-lg animate-fade-in">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <ShieldAlert size={20} className="text-orange-500" />
-              <h2 className="text-base font-bold text-white uppercase tracking-wider">Alertas de Documentação e Vencimentos</h2>
+      {isCac ? (
+        /* Renderização Exclusiva para CAC Individual */
+        <div className="space-y-4">
+          <div className="card border-brand-dark-5 bg-brand-dark-3/30 overflow-hidden shadow-lg animate-fade-in">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-2">
+                <ShieldAlert size={20} className="text-orange-500" />
+                <h2 className="text-sm font-black text-white uppercase tracking-widest">
+                  Status de Documentos & Validades
+                </h2>
+              </div>
+              {alertasVencimento.length > 0 ? (
+                <span className="badge badge-erro text-xs px-3 py-1 font-bold">
+                  {alertasVencimento.length} alerta{alertasVencimento.length > 1 ? 's' : ''} ativo{alertasVencimento.length > 1 ? 's' : ''}
+                </span>
+              ) : (
+                <span className="bg-brand-green/20 text-brand-green border border-brand-green/30 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1">
+                  Todos documentos em dia! 🎉
+                </span>
+              )}
             </div>
-            {alertasVencimento.length > 0 ? (
-              <span className="badge badge-erro">{alertasVencimento.length} pendência{alertasVencimento.length > 1 ? 's' : ''}</span>
+
+            {carregandoAlertas ? (
+              <div className="text-center py-12 text-gray-500 text-sm animate-pulse">
+                Carregando vencimentos e acervo...
+              </div>
+            ) : alertasVencimento.length === 0 ? (
+              <div className="card py-16 text-center text-gray-500 text-sm italic border-dashed border-2 flex flex-col items-center justify-center gap-3">
+                <Shield size={40} className="text-brand-green opacity-60 mb-2" />
+                <span>Excelente! Todos os seus documentos (CR, CRAF, GT, Manejo) estão válidos e seguros. 🛡️</span>
+              </div>
             ) : (
-              <span className="bg-brand-green/20 text-brand-green border border-brand-green/30 px-2.5 py-1 rounded-full text-xs font-semibold flex items-center gap-1">
-                Tudo em dia! 🎉
-              </span>
-            )}
-          </div>
-
-          {carregandoAlertas ? (
-            <div className="text-center py-6 text-gray-500 text-sm animate-pulse">Carregando vencimentos...</div>
-          ) : alertasVencimento.length === 0 ? (
-            <div className="p-4 bg-brand-green/5 border border-brand-green/10 rounded-xl text-center text-gray-400 text-sm italic">
-              Não há documentos perto do vencimento. Excelente! 🛡️
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[350px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-brand-dark-5 scrollbar-track-transparent">
-              {alertasVencimento.map((alerta) => (
-                <div 
-                  key={alerta.id}
-                  className={`flex items-center justify-between p-3.5 rounded-xl border transition-all hover:brightness-110 ${obterClasseAlerta(alerta.nivel)}`}
-                >
-                  <div className="flex items-start gap-3 min-w-0">
-                    <div className="mt-1">
-                      {alerta.tipo === 'CRAF' ? <Target size={16} /> : 
-                       alerta.tipo === 'GT' ? <MapPin size={16} /> :
-                       alerta.tipo === 'MANEJO' ? <Calendar size={16} /> :
-                       <Shield size={16} />}
-                    </div>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                         <p className="text-xs font-bold truncate text-white">{alerta.label}</p>
-                         <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-black/20 font-black uppercase tracking-tighter">
-                           {alerta.nivel === 'VENCIDO' ? 'VENCIDO' : 
-                            alerta.nivel === 'CRITICO' ? 'URGENTE' : 'AVISO'}
-                         </span>
-                      </div>
-                      <div className="flex items-center gap-2 mt-1">
-                         <Calendar size={10} className="opacity-50 text-white" />
-                         <p className="text-[10px] font-medium text-gray-300">Vencimento: {formatarData(alerta.dataVencimento)}</p>
-                         <span className="text-[10px] font-black text-gray-500">•</span>
-                         <p className="text-[10px] font-black italic text-gray-300">
-                          {alerta.diasRestantes < 0 
-                            ? `${Math.abs(alerta.diasRestantes)} dia(s) atrasado` 
-                            : `Faltam ${alerta.diasRestantes} dia(s)`}
-                         </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <button 
-                    onClick={() => {
-                      navigate('/clientes', { 
-                        state: { 
-                          aba: 'documentos',
-                          armaId: alerta.armaId 
-                        } 
-                      });
-                    }}
-                    className="p-2 hover:bg-black/10 rounded-lg transition-colors flex-shrink-0 text-white"
-                    title="Ver no Meu Acervo"
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {alertasVencimento.map((alerta) => (
+                  <div 
+                    key={alerta.id}
+                    className={`flex items-center justify-between p-4 rounded-xl border transition-all hover:border-white/10 ${obterClasseAlerta(alerta.nivel)}`}
                   >
-                    <ExternalLink size={16} />
-                  </button>
-                </div>
-              ))}
+                    <div className="flex items-start gap-3 min-w-0">
+                      <div className="mt-1 p-2 rounded-lg bg-black/20 text-white flex-shrink-0">
+                        {alerta.tipo === 'CRAF' ? <Target size={18} /> : 
+                         alerta.tipo === 'GT' ? <MapPin size={18} /> :
+                         alerta.tipo === 'MANEJO' ? <Calendar size={18} /> :
+                         <Shield size={18} />}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                           <p className="text-sm font-bold text-white truncate">{alerta.label}</p>
+                           <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-black/30 font-black uppercase tracking-tighter text-white">
+                             {alerta.nivel === 'VENCIDO' ? 'VENCIDO' : 
+                              alerta.nivel === 'CRITICO' ? 'URGENTE' : 'AVISO'}
+                           </span>
+                        </div>
+                        <div className="flex items-center gap-2 mt-2">
+                           <Calendar size={12} className="opacity-60 text-white" />
+                           <p className="text-xs font-semibold text-gray-300">
+                             Vencimento: {formatarData(alerta.dataVencimento)}
+                           </p>
+                           <span className="text-gray-500">•</span>
+                           <p className="text-xs font-black italic text-gray-300">
+                            {alerta.diasRestantes < 0 
+                              ? `${Math.abs(alerta.diasRestantes)} dia(s) atrasado` 
+                              : `Faltam ${alerta.diasRestantes} dia(s)`}
+                           </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <button 
+                      onClick={() => {
+                        navigate('/clientes', { 
+                          state: { 
+                            aba: 'documentos',
+                            armaId: alerta.armaId 
+                          } 
+                        });
+                      }}
+                      className="p-2.5 hover:bg-white/10 rounded-xl transition-all flex-shrink-0 text-white"
+                      title="Ver no Meu Acervo"
+                    >
+                      <ExternalLink size={18} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            
+            <div className="mt-6 pt-4 border-t border-brand-dark-5 flex justify-end">
+              <p className="text-[10px] text-gray-500 font-bold uppercase italic tracking-wider">
+                * Regras oficiais SisGCorp (Exercito) e IBAMA (Manejo/SIMAF)
+              </p>
             </div>
-          )}
-          
-          <div className="mt-4 pt-3 border-t border-brand-dark-5 flex justify-end">
-            <p className="text-[9px] text-gray-500 font-bold uppercase italic">* Baseado nas regras de alerta do SisGCorp e IBAMA</p>
           </div>
         </div>
+      ) : (
+        /* Renderização para Despachante / Empresas */
+        <>
+          {/* Busca */}
+          <div className="relative group">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 group-hover:text-brand-blue-light transition-colors" size={18} />
+            <input
+              type="text"
+              placeholder="Buscar lembretes, clientes ou descrições..."
+              className="input pl-10 w-full bg-brand-dark-3/50 focus:bg-brand-dark-3 transition-all"
+              value={filtro}
+              onChange={e => setFiltro(e.target.value)}
+            />
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* Coluna Pendentes */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between border-b border-brand-dark-5 pb-2">
+                <h2 className="text-sm font-black text-brand-blue-light uppercase tracking-widest flex items-center gap-2">
+                  <Clock size={16} />
+                  Pendentes ({pendentes.length})
+                </h2>
+              </div>
+
+              <div className="space-y-3">
+                {estaCarregando ? (
+                  <div className="card py-10 text-center text-gray-500 text-sm animate-pulse">Carregando tarefas...</div>
+                ) : pendentes.length === 0 ? (
+                  <div className="card py-10 text-center text-gray-500 text-sm italic border-dashed border-2">
+                    Nenhuma tarefa pendente. Tudo em dia! 🎉
+                  </div>
+                ) : (
+                  pendentes.map(l => (
+                    <CardLembrete 
+                      key={l.id} 
+                      lembrete={l} 
+                      onEdit={() => handleEdit(l)}
+                      onDelete={() => deletarLembrete(l.id)}
+                      onToggle={() => marcarConcluido(l.id, true)}
+                      onWpp={abrirWhatsapp}
+                    />
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* Coluna Concluídos */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between border-b border-brand-dark-5 pb-2">
+                <h2 className="text-sm font-black text-brand-green uppercase tracking-widest flex items-center gap-2">
+                  <CheckCircle2 size={16} />
+                  Concluídos ({concluidos.length})
+                </h2>
+              </div>
+
+              <div className="space-y-3 opacity-60">
+                {concluidos.length === 0 ? (
+                  <div className="card py-10 text-center text-gray-500 text-sm italic">
+                    Nenhuma tarefa concluída hoje.
+                  </div>
+                ) : (
+                  concluidos.map(l => (
+                    <CardLembrete 
+                      key={l.id} 
+                      lembrete={l} 
+                      onDelete={() => deletarLembrete(l.id)}
+                      onToggle={() => marcarConcluido(l.id, false)}
+                    />
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        </>
       )}
-
-      {/* Busca */}
-      <div className="relative group">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 group-hover:text-brand-blue-light transition-colors" size={18} />
-        <input
-          type="text"
-          placeholder="Buscar lembretes, clientes ou descrições..."
-          className="input pl-10 w-full bg-brand-dark-3/50 focus:bg-brand-dark-3 transition-all"
-          value={filtro}
-          onChange={e => setFiltro(e.target.value)}
-        />
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Coluna Pendentes */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between border-b border-brand-dark-5 pb-2">
-            <h2 className="text-sm font-black text-brand-blue-light uppercase tracking-widest flex items-center gap-2">
-              <Clock size={16} />
-              Pendentes ({pendentes.length})
-            </h2>
-          </div>
-
-          <div className="space-y-3">
-            {estaCarregando ? (
-              <div className="card py-10 text-center text-gray-500 text-sm animate-pulse">Carregando tarefas...</div>
-            ) : pendentes.length === 0 ? (
-              <div className="card py-10 text-center text-gray-500 text-sm italic border-dashed border-2">
-                Nenhuma tarefa pendente. Tudo em dia! 🎉
-              </div>
-            ) : (
-              pendentes.map(l => (
-                <CardLembrete 
-                  key={l.id} 
-                  lembrete={l} 
-                  onEdit={() => handleEdit(l)}
-                  onDelete={() => deletarLembrete(l.id)}
-                  onToggle={() => marcarConcluido(l.id, true)}
-                  onWpp={abrirWhatsapp}
-                />
-              ))
-            )}
-          </div>
-        </div>
-
-        {/* Coluna Concluídos */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between border-b border-brand-dark-5 pb-2">
-            <h2 className="text-sm font-black text-brand-green uppercase tracking-widest flex items-center gap-2">
-              <CheckCircle2 size={16} />
-              Concluídos ({concluidos.length})
-            </h2>
-          </div>
-
-          <div className="space-y-3 opacity-60">
-            {concluidos.length === 0 ? (
-              <div className="card py-10 text-center text-gray-500 text-sm italic">
-                Nenhuma tarefa concluída hoje.
-              </div>
-            ) : (
-              concluidos.map(l => (
-                <CardLembrete 
-                  key={l.id} 
-                  lembrete={l} 
-                  onDelete={() => deletarLembrete(l.id)}
-                  onToggle={() => marcarConcluido(l.id, false)}
-                />
-              ))
-            )}
-          </div>
-        </div>
-      </div>
 
       <FormularioLembrete 
         aberto={modalAberto} 
