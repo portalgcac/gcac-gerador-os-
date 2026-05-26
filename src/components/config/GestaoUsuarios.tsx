@@ -3,6 +3,7 @@ import { UserPlus, Shield, Mail, User, Trash2, Edit2, CheckCircle, XCircle, Chev
 import { supabase } from '../../db/supabase';
 import { Notificacao, useNotificacao } from '../common/Notificacao';
 import { useAuth } from '../../context/AuthContext';
+import { DialogConfirmacao } from '../common/DialogConfirmacao';
 
 interface UsuarioAutorizado {
   id: string;
@@ -43,6 +44,8 @@ export function GestaoUsuarios() {
   const [novaEmpresaTipo, setNovaEmpresaTipo] = useState<'empresa' | 'cac_individual'>('empresa');
   const [carregandoEmpresas, setCarregandoEmpresas] = useState(false);
   const [mostrarGerenciarEmpresas, setMostrarGerenciarEmpresas] = useState(false);
+  const [empresaEditando, setEmpresaEditando] = useState<{ id: string; nome: string; tipo_conta: 'empresa' | 'cac_individual' } | null>(null);
+  const [confirmandoDeleteEmpresa, setConfirmandoDeleteEmpresa] = useState<{ id: string; nome: string } | null>(null);
   
   // Modal State
   const [modalAberto, setModalAberto] = useState(false);
@@ -192,6 +195,60 @@ export function GestaoUsuarios() {
     }
   };
 
+  const handleSalvarEdicaoEmpresa = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!empresaEditando || !empresaEditando.nome.trim()) return;
+    try {
+      const { error } = await supabase
+        .from('empresas')
+        .update({
+          nome: empresaEditando.nome.trim(),
+          tipo_conta: empresaEditando.tipo_conta
+        })
+        .eq('id', empresaEditando.id);
+
+      if (error) throw error;
+
+      mostrar('sucesso', 'Empresa atualizada com sucesso.');
+      setEmpresaEditando(null);
+      carregarEmpresas();
+    } catch (err: any) {
+      mostrar('erro', err.message || 'Erro ao editar empresa.');
+    }
+  };
+
+  const handleDeletarEmpresa = async () => {
+    if (!confirmandoDeleteEmpresa) return;
+    try {
+      const { count, error: countError } = await supabase
+        .from('usuarios_autorizados')
+        .select('*', { count: 'exact', head: true })
+        .eq('empresa_id', confirmandoDeleteEmpresa.id);
+      
+      if (countError) throw countError;
+      
+      if (count && count > 0) {
+        mostrar('erro', 'Não é possível excluir esta empresa pois existem usuários vinculados a ela.');
+        setConfirmandoDeleteEmpresa(null);
+        return;
+      }
+
+      const { error } = await supabase
+        .from('empresas')
+        .delete()
+        .eq('id', confirmandoDeleteEmpresa.id);
+
+      if (error) throw error;
+
+      mostrar('sucesso', 'Empresa excluída com sucesso.');
+      setConfirmandoDeleteEmpresa(null);
+      carregarEmpresas();
+    } catch (err: any) {
+      mostrar('erro', err.message || 'Erro ao excluir empresa. Verifique se existem outros registros vinculados.');
+      setConfirmandoDeleteEmpresa(null);
+    }
+  };
+
   const toggleStatus = async (user: UsuarioAutorizado) => {
     if (user.email === 'gui.gomesassis@gmail.com') {
       mostrar('aviso', 'O administrador mestre não pode ser desativado.');
@@ -285,6 +342,23 @@ export function GestaoUsuarios() {
                           </span>
                         </div>
                         <p className="text-[10px] text-gray-500 font-mono select-all mt-1">{e.id}</p>
+                      </div>
+                      
+                      <div className="flex items-center gap-1">
+                        <button 
+                          onClick={() => setEmpresaEditando({ id: e.id, nome: e.nome, tipo_conta: (e.tipo_conta || 'empresa') as any })}
+                          className="p-1.5 text-gray-400 hover:text-brand-blue-light rounded-lg hover:bg-brand-dark-3 transition-colors"
+                          title="Editar Empresa"
+                        >
+                          <Edit2 size={14} />
+                        </button>
+                        <button 
+                          onClick={() => setConfirmandoDeleteEmpresa({ id: e.id, nome: e.nome })}
+                          className="p-1.5 text-gray-400 hover:text-red-400 rounded-lg hover:bg-brand-dark-3 transition-colors"
+                          title="Excluir Empresa"
+                        >
+                          <Trash2 size={14} />
+                        </button>
                       </div>
                     </div>
                   ))}
@@ -519,6 +593,74 @@ export function GestaoUsuarios() {
           </div>
         </div>
       )}
+
+      {/* Modal de Editar Empresa */}
+      {empresaEditando && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm">
+          <div className="bg-brand-dark-3 border border-brand-dark-5 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl animate-scale-in">
+            <div className="bg-brand-dark-2 px-6 py-4 border-b border-brand-dark-5 flex items-center justify-between">
+              <h3 className="font-bold text-white flex items-center gap-2">
+                <Building size={18} className="text-brand-blue" />
+                Editar Empresa (Tenant)
+              </h3>
+              <button onClick={() => setEmpresaEditando(null)} className="text-gray-500 hover:text-white">
+                <XCircle size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSalvarEdicaoEmpresa} className="p-6 space-y-4">
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-gray-500 uppercase">Nome da Empresa</label>
+                <input
+                  type="text"
+                  required
+                  value={empresaEditando.nome}
+                  onChange={e => setEmpresaEditando({ ...empresaEditando, nome: e.target.value })}
+                  className="input"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-gray-500 uppercase">Tipo de Conta</label>
+                <select
+                  value={empresaEditando.tipo_conta}
+                  onChange={e => setEmpresaEditando({ ...empresaEditando, tipo_conta: e.target.value as any })}
+                  className="input w-full"
+                >
+                  <option value="empresa" className="bg-brand-dark-2 text-white">Empresa/Despachante</option>
+                  <option value="cac_individual" className="bg-brand-dark-2 text-white">CAC Individual</option>
+                </select>
+              </div>
+
+              <div className="pt-4 flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setEmpresaEditando(null)}
+                  className="btn-ghost flex-1 justify-center"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="btn-primary flex-1 justify-center"
+                >
+                  Salvar Alterações
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmação de Deletar Empresa */}
+      <DialogConfirmacao
+        aberto={!!confirmandoDeleteEmpresa}
+        titulo="Excluir Empresa (Tenant)"
+        mensagem={`Tem certeza que deseja excluir permanentemente a empresa "${confirmandoDeleteEmpresa?.nome}"? Esta ação não poderá ser desfeita.`}
+        textoBotaoConfirmar="Sim, excluir"
+        onConfirmar={handleDeletarEmpresa}
+        onCancelar={() => setConfirmandoDeleteEmpresa(null)}
+      />
     </div>
   );
 }
