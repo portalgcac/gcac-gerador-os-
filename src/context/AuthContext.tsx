@@ -58,6 +58,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             let rawEmpresaNome = u.empresaNome || 'GCAC Principal';
             let tipoConta: 'empresa' | 'cac_individual' = u.tipoConta || 'empresa';
             let modulosAtivos: string[] = u.modulosAtivos || [];
+            let fotoPerfil = u.fotoPerfil;
             if (rawEmpresaId) {
               const { data: empData } = await supabase
                 .from('empresas')
@@ -69,6 +70,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 tipoConta = (empData.tipo_conta || 'empresa') as 'empresa' | 'cac_individual';
                 modulosAtivos = empData.modulos_ativos || [];
               }
+
+              if (tipoConta === 'cac_individual') {
+                const { data: clientData } = await supabase
+                  .from('clientes')
+                  .select('foto_url')
+                  .eq('empresa_id', rawEmpresaId)
+                  .limit(1)
+                  .maybeSingle();
+                if (clientData?.foto_url) {
+                  fotoPerfil = clientData.foto_url;
+                }
+              }
             }
 
             const usuarioAtualizado = { 
@@ -79,6 +92,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               empresaNome: rawEmpresaNome,
               tipoConta,
               modulosAtivos,
+              fotoPerfil,
               cpf: data?.cpf || undefined,
               contato: data?.contato || undefined
             };
@@ -90,7 +104,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               u.empresaId !== (rawEmpresaId || undefined) ||
               u.empresaNome !== rawEmpresaNome ||
               u.tipoConta !== tipoConta ||
-              JSON.stringify(u.modulosAtivos) !== JSON.stringify(modulosAtivos)
+              JSON.stringify(u.modulosAtivos) !== JSON.stringify(modulosAtivos) ||
+              u.fotoPerfil !== fotoPerfil
             ) {
               setUsuario(usuarioAtualizado);
               localStorage.setItem('gcac_usuario', JSON.stringify(usuarioAtualizado));
@@ -141,6 +156,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       let rawEmpresaNome = 'GCAC Principal';
       let tipoConta: 'empresa' | 'cac_individual' = 'empresa';
       let modulosAtivos: string[] = [];
+      let fotoPerfil = info.picture;
       if (rawEmpresaId) {
         const { data: empData } = await supabase
           .from('empresas')
@@ -152,13 +168,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           tipoConta = (empData.tipo_conta || 'empresa') as 'empresa' | 'cac_individual';
           modulosAtivos = empData.modulos_ativos || [];
         }
+
+        if (tipoConta === 'cac_individual') {
+          const { data: clientData } = await supabase
+            .from('clientes')
+            .select('foto_url')
+            .eq('empresa_id', rawEmpresaId)
+            .limit(1)
+            .maybeSingle();
+          if (clientData?.foto_url) {
+            fotoPerfil = clientData.foto_url;
+          }
+        }
       }
 
       const novoUsuario: UsuarioGoogle = {
         id: info.sub,
         nome: info.name,
         email: info.email,
-        fotoPerfil: info.picture,
+        fotoPerfil,
         accessToken: tokenResponse.access_token,
         role,
         permissoes,

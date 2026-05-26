@@ -178,6 +178,14 @@ export function DetalheCliente({ cliente }: DetalheClienteProps) {
           
           atualizarCliente(cliente.id, { fotoUrl: base64 })
             .then(() => {
+              if (usuario?.tipoConta === 'cac_individual') {
+                const dadosUsuario = localStorage.getItem('gcac_usuario');
+                if (dadosUsuario) {
+                  const u = JSON.parse(dadosUsuario);
+                  u.fotoPerfil = base64;
+                  localStorage.setItem('gcac_usuario', JSON.stringify(u));
+                }
+              }
               window.location.reload();
             })
             .catch(err => {
