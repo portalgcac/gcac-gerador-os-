@@ -11,6 +11,7 @@ interface OrdensContextType {
   criarOrdem: (dados: Omit<OrdemDeServico, 'id' | 'numero' | 'criadoEm' | 'atualizadoEm' | 'driveArquivoJsonId' | 'drivePdfId' | 'ultimaSincronizacao' | 'pendenteSincronizacao'>) => Promise<string>;
   atualizarOrdem: (id: string, dados: Partial<OrdemDeServico>) => Promise<void>;
   atualizarStatusServico: (ordemId: string, servicoId: string, novoStatus: any) => Promise<void>;
+  atualizarGruServico: (ordemId: string, servicoId: string, pago: boolean) => Promise<void>;
   atualizarProtocoloServico: (ordemId: string, servicoId: string, protocolo: string) => Promise<void>;
   deletarOrdem: (id: string) => Promise<void>;
   buscarOrdem: (id: string) => Promise<OrdemDeServico | undefined>;
@@ -229,6 +230,18 @@ export function OrdensProvider({ children }: { children: React.ReactNode }) {
       historicoStatus: novoHistorico
     });
   }, [ordens, atualizarOrdem]);
+
+  const atualizarGruServico = useCallback(async (ordemId: string, servicoId: string, pago: boolean) => {
+    const ordem = ordens.find(o => o.id === ordemId);
+    if (!ordem) return;
+
+    const novosServicos = ordem.servicos.map(s => 
+      s.id === servicoId ? { ...s, pagoGRU: pago } : s
+    );
+
+    await atualizarOrdem(ordemId, { servicos: novosServicos });
+  }, [ordens, atualizarOrdem]);
+
   const atualizarProtocoloServico = useCallback(async (ordemId: string, servicoId: string, protocolo: string) => {
     const ordem = ordens.find(o => o.id === ordemId);
     if (!ordem) return;
@@ -383,6 +396,7 @@ export function OrdensProvider({ children }: { children: React.ReactNode }) {
       criarOrdem,
       atualizarOrdem,
       atualizarStatusServico,
+      atualizarGruServico,
       atualizarProtocoloServico,
       deletarOrdem,
       buscarOrdem,

@@ -126,6 +126,7 @@ export interface OrdemDeServico {
     exigeGRU?: boolean; // Se este serviço exige controle de GRU
     valor?: number;  // Valor individual editável do serviço
     statusExecucao?: StatusExecucaoServico;
+    pagoGRU?: boolean;
     categoria?: 'Honorário' | 'Laudo';
     pagoDireto?: boolean; // Se o pagamento vai direto ao terceiro (instrutor/psicóloga)
     protocolo?: string;
