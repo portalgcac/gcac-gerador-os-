@@ -37,7 +37,6 @@ export function ListaOrdens() {
   const filtrosStatus = useMemo(() => searchParams.getAll('status') as StatusOS[], [searchParams]);
   const filtrosStatusExec = useMemo(() => searchParams.getAll('exec') as StatusExecucaoServico[], [searchParams]);
   const filtrosServico = useMemo(() => searchParams.getAll('servico'), [searchParams]);
-  const filtroGru = (searchParams.get('gru') as 'Todos' | 'Pagas' | 'Pendentes') || 'Todos';
 
   const [confirmandoDelete, setConfirmandoDelete] = useState<string | null>(null);
   const [expandirFiltros, setExpandirFiltros] = useState(false);
@@ -98,19 +97,7 @@ export function ListaOrdens() {
     const matchServico = filtrosServico.length === 0 || 
       (o.servicos && o.servicos.some((s: any) => filtrosServico.includes(s.nome)));
     
-    // Filtro GRU
-    let matchGru = true;
-    const servicosComTaxa = (o.servicos || []).filter((s: any) => (s.taxaPF || 0) > 0);
-    if (filtroGru !== 'Todos') {
-      if (servicosComTaxa.length === 0) {
-        matchGru = (filtroGru === 'Pagas'); // OS sem taxas são consideradas "limpas/pagas"
-      } else {
-        const todasPagas = servicosComTaxa.every((s: any) => s.pagoGRU === true);
-        matchGru = (filtroGru === 'Pagas') ? todasPagas : !todasPagas;
-      }
-    }
-    
-    return matchBusca && matchStatus && matchStatusExec && matchGru && matchServico;
+    return matchBusca && matchStatus && matchStatusExec && matchServico;
   });
 
   const toggleFiltroStatus = (val: StatusOS) => {
@@ -194,22 +181,22 @@ export function ListaOrdens() {
           <button
             onClick={() => setExpandirFiltros(!expandirFiltros)}
             className={`px-4 flex items-center gap-2 rounded-xl border transition-all ${
-              expandirFiltros || filtrosStatus.length > 0 || filtrosStatusExec.length > 0 || filtrosServico.length > 0 || filtroGru !== 'Todos'
+              expandirFiltros || filtrosStatus.length > 0 || filtrosStatusExec.length > 0 || filtrosServico.length > 0
                 ? 'bg-brand-blue/10 border-brand-blue text-brand-blue-light'
                 : 'bg-brand-dark-5 border-brand-dark-5 text-gray-400'
             }`}
           >
             <Filter size={16} />
             <span className="hidden sm:inline">Filtros</span>
-            {(filtrosStatus.length + filtrosStatusExec.length + filtrosServico.length + (filtroGru !== 'Todos' ? 1 : 0)) > 0 && (
+            {(filtrosStatus.length + filtrosStatusExec.length + filtrosServico.length) > 0 && (
               <span className="w-5 h-5 rounded-full bg-brand-blue text-white text-[10px] flex items-center justify-center font-bold">
-                {filtrosStatus.length + filtrosStatusExec.length + filtrosServico.length + (filtroGru !== 'Todos' ? 1 : 0)}
+                {filtrosStatus.length + filtrosStatusExec.length + filtrosServico.length}
               </span>
             )}
           </button>
         </div>
 
-        {(expandirFiltros || filtrosStatus.length > 0 || filtrosStatusExec.length > 0 || filtrosServico.length > 0 || filtroGru !== 'Todos') && (
+        {(expandirFiltros || filtrosStatus.length > 0 || filtrosStatusExec.length > 0 || filtrosServico.length > 0) && (
           <div className="pt-4 border-t border-brand-dark-5 animate-in fade-in slide-in-from-top-2">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               {/* Status Pagamento */}
@@ -261,46 +248,6 @@ export function ListaOrdens() {
                   ))}
                 </div>
               </div>
-
-              {/* Status GRU */}
-              <div className="space-y-3">
-                <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest">
-                  Status da GRU (Taxa PF)
-                </p>
-                <div className="flex flex-col gap-2">
-                  {['Todos', 'Pagas', 'Pendentes'].map((opt) => (
-                    <label key={opt} className="flex items-center gap-3 group cursor-pointer">
-                      <input
-                        type="radio"
-                        name="filtroGru"
-                        className="hidden"
-                        checked={filtroGru === opt}
-                        onChange={() => updateParams('gru', opt)}
-                      />
-                      <div 
-                        className={`w-4 h-4 rounded-full border flex items-center justify-center transition-all ${
-                          filtroGru === opt ? 'bg-brand-blue border-brand-blue' : 'bg-brand-dark-5 border-brand-dark-5 group-hover:border-brand-metal'
-                        }`}
-                      >
-                        {filtroGru === opt && <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />}
-                      </div>
-                      <span className={`text-xs font-semibold transition-colors ${filtroGru === opt ? 'text-brand-blue-light' : 'text-gray-400 group-hover:text-gray-300'}`}>
-                        {opt}
-                      </span>
-                    </label>
-                  ))}
-                </div>
-                
-                <div className="pt-4 mt-2">
-                  <button 
-                    onClick={limparFiltros}
-                    className="text-[10px] font-bold text-red-400/70 hover:text-red-400 underline underline-offset-4 uppercase tracking-wider transition-all"
-                  >
-                    Resetar Todos os Filtros
-                  </button>
-                </div>
-              </div>
-
               {/* Serviços */}
               <div className="space-y-3">
                 <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest flex items-center justify-between">
@@ -331,6 +278,14 @@ export function ListaOrdens() {
                 </div>
               </div>
             </div>
+            <div className="pt-4 mt-4 border-t border-brand-dark-5/30 flex justify-end">
+              <button 
+                onClick={limparFiltros}
+                className="text-[10px] font-bold text-red-400/70 hover:text-red-400 underline underline-offset-4 uppercase tracking-wider transition-all"
+              >
+                Resetar Todos os Filtros
+              </button>
+            </div>
           </div>
         )}
       </div>
@@ -343,11 +298,11 @@ export function ListaOrdens() {
           </div>
           <p className="text-gray-400 font-medium">Nenhuma OS encontrada</p>
           <p className="text-sm text-gray-500 mt-1">
-            {busca || filtrosStatus.length > 0 || filtrosStatusExec.length > 0 || filtroGru !== 'Todos'
+            {busca || filtrosStatus.length > 0 || filtrosStatusExec.length > 0
               ? 'Tente ajustar os filtros de busca'
               : 'Clique em "Nova OS" para criar a primeira ordem'}
           </p>
-          {!busca && filtrosStatus.length === 0 && filtrosStatusExec.length === 0 && filtroGru === 'Todos' && (
+          {!busca && filtrosStatus.length === 0 && filtrosStatusExec.length === 0 && (
             <button onClick={() => navigate('/ordens/nova')} className="btn-primary mt-4 mx-auto">
               <Plus size={16} />
               Criar primeira OS

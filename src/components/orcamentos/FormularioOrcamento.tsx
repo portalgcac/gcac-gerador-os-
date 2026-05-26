@@ -355,8 +355,7 @@ export function FormularioOrcamento({ orcamentoExistente }: FormularioOrcamentoP
           exigeGRU: s.exigeGRU,
           responsavelNome: s.responsavelNome,
           valorRepasse: s.valorRepasse,
-          statusExecucao: 'Não Iniciado',
-          pagoGRU: false
+          statusExecucao: 'Não Iniciado'
         })),
         valor: dados.servicos.filter((s: any) => !s.pagoDireto && s.categoria !== 'Laudo').reduce((acc: number, s: any) => acc + (s.valor || 0), 0),
         valorPago: 0,

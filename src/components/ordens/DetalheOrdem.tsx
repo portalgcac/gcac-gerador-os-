@@ -23,7 +23,7 @@ export function DetalheOrdem({ ordem }: DetalheOrdemProps) {
   const navigate = useNavigate();
   const { 
     deletarOrdem, atualizarStatusServico, atualizarOrdem, 
-    atualizarGruServico, registrarPagamento, removerPagamento,
+    registrarPagamento, removerPagamento,
     sincronizarComPerfil
   } = useOrdens();
   const { clientes, buscarCreditos, adicionarCredito } = useClientes();
@@ -125,7 +125,6 @@ export function DetalheOrdem({ ordem }: DetalheOrdemProps) {
       const icon = s.statusExecucao === 'Concluído' ? '✅' : '🔹';
       msg += `${icon} *${s.nome}*\n`;
       msg += `   Status: _${s.statusExecucao || 'Não Iniciado'}_\n`;
-      if (s.pagoGRU) msg += `   GRU: _Paga_\n`;
       if (s.protocolo) msg += `   📑 Prot: _${s.protocolo}_\n`;
       msg += `\n`;
     });
@@ -172,14 +171,7 @@ export function DetalheOrdem({ ordem }: DetalheOrdemProps) {
     }
   };
 
-  const handleToggleGru = async (servicoId: string, pagoAtual: boolean) => {
-    try {
-      await atualizarGruServico(ordem.id, servicoId, !pagoAtual);
-      mostrar('sucesso', `Status da GRU atualizado para ${!pagoAtual ? 'Paga' : 'Pendente'}`);
-    } catch {
-      mostrar('erro', 'Erro ao atualizar o status da GRU.');
-    }
-  };
+
 
   return (
     <div className="max-w-2xl mx-auto space-y-4">
@@ -357,24 +349,7 @@ export function DetalheOrdem({ ordem }: DetalheOrdemProps) {
                   <div className="flex flex-col items-start gap-1">
                     <p className="font-bold text-white text-base leading-tight">• {serv.nome}</p>
                     
-                    {/* Selo de GRU */}
-                    {(serv.exigeGRU === true || (serv.exigeGRU === undefined && (serv.taxaPF || 0) > 0)) && (
-                      <button
-                        onClick={() => handleToggleGru(serv.id, !!serv.pagoGRU)}
-                        className={`text-[9px] font-black px-2 py-0.5 rounded border transition-all uppercase tracking-widest flex items-center gap-1 ${
-                          serv.pagoGRU 
-                            ? 'bg-brand-green/10 text-brand-green border-brand-green/20 hover:bg-brand-green/20' 
-                            : 'bg-red-500/10 text-red-400 border-red-500/20 hover:bg-red-500/20'
-                        }`}
-                        title={serv.pagoGRU ? 'Clique para marcar como Pendente' : 'Clique para marcar como Paga'}
-                      >
-                        {serv.pagoGRU ? (
-                          <><span>✅</span> GRU PAGA</>
-                        ) : (
-                          <><span>❌</span> GRU PENDENTE</>
-                        )}
-                      </button>
-                    )}
+
                   </div>
                   
                   {/* Dropdown de status */}

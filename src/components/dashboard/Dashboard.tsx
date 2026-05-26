@@ -54,8 +54,7 @@ export function Dashboard() {
 
   // Alertas de Rotina
   const totalPF = ordens.filter(o => o.servicos?.some(s => s.statusExecucao === 'Protocolado — Ag. PF')).length;
-  const totalGRU = ordens.filter(o => o.servicos?.some(s => (s.taxaPF || 0) > 0 && !s.pagoGRU)).length;
-  const possuiAlertas = totalPF > 0 || totalGRU > 0;
+  const possuiAlertas = totalPF > 0;
 
   const orcStats = {
     total:       orcamentos.length,
@@ -121,12 +120,7 @@ export function Dashboard() {
                     {totalPF} processos aguardando conferência na PF
                   </span>
                 )}
-                {totalGRU > 0 && (
-                  <span className="text-[10px] font-bold text-gray-400 flex items-center gap-1">
-                    <div className="w-1 h-1 bg-orange-500 rounded-full" />
-                    {totalGRU} taxas GRU pendentes de pagamento
-                  </span>
-                )}
+
               </div>
             </div>
           </div>

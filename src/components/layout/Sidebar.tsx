@@ -35,8 +35,7 @@ export function Sidebar() {
   // Cálculo de pendências para a Rotina Diária
   const totalRotina = ordens.reduce((acc, o) => {
     const temProtocolado = o.servicos?.some(s => s.statusExecucao === 'Protocolado — Ag. PF');
-    const temGruPendente = o.servicos?.some(s => (s.taxaPF || 0) > 0 && !s.pagoGRU);
-    if (temProtocolado || temGruPendente) return acc + 1;
+    if (temProtocolado) return acc + 1;
     return acc;
   }, 0);
 

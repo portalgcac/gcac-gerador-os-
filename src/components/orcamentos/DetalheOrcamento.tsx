@@ -108,8 +108,7 @@ export function DetalheOrcamento({ orcamento }: DetalheOrcamentoProps) {
           pagoDireto: s.pagoDireto || s.categoria === 'Laudo',
           taxaPF: s.taxaPF,
           exigeGRU: s.exigeGRU,
-          statusExecucao: 'Não Iniciado',
-          pagoGRU: false
+          statusExecucao: 'Não Iniciado'
         })),
         valor: orcamento.servicos.filter(s => !s.pagoDireto && s.categoria !== 'Laudo').reduce((acc, s) => acc + (s.valor || 0), 0),
         valorPago: 0,
