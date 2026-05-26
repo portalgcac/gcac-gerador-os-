@@ -259,6 +259,7 @@ export function NavegacaoInferior() {
 
   const { usuario } = useAuth();
   const linksFiltrados = filtrarLinks(usuario);
+  const isAdmin = usuario?.role === 'admin';
 
   const getShortLabel = (label: string) => {
     if (label === 'Rotina Diária') return 'Rotina';
@@ -301,6 +302,23 @@ export function NavegacaoInferior() {
           </NavLink>
         );
       })}
+      {isAdmin && usuario?.tipoConta !== 'cac_individual' && (
+        <NavLink
+          to="/admin/atiradores"
+          className={({ isActive }) =>
+            `flex-shrink-0 min-w-[75px] flex flex-col items-center gap-1 py-3 text-[10px] font-medium transition-colors ${
+              isActive ? 'text-brand-blue-light' : 'text-brand-blue/60 hover:text-brand-blue-light'
+            }`
+          }
+        >
+          {({ isActive }) => (
+            <>
+              <Shield size={20} className={isActive ? 'scale-110 transition-transform' : ''} />
+              <span className="leading-none whitespace-nowrap">Atiradores</span>
+            </>
+          )}
+        </NavLink>
+      )}
     </nav>
   );
 }
