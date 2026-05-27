@@ -117,7 +117,7 @@ export function ListaClientes() {
                 <tr>
                   <th className="px-4 py-3 rounded-l-lg font-semibold">Nome / CPF</th>
                   <th className="px-4 py-3 font-semibold">Contato</th>
-                  <th className="px-4 py-3 font-semibold">Filiado</th>
+                  <th className="px-4 py-3 font-semibold">Clube Filiado</th>
                   <th className="px-4 py-3 rounded-r-lg font-semibold text-right">Ações</th>
                 </tr>
               </thead>
@@ -125,7 +125,7 @@ export function ListaClientes() {
                 {clientesFiltrados.map(cliente => (
                   <tr key={cliente.id} className="hover:bg-brand-dark-4 transition-colors">
                     <td className="px-4 py-3 cursor-pointer group" onClick={() => navigate(`/clientes/${cliente.id}`)}>
-                      <p className="font-bold text-white group-hover:text-brand-blue-light transition-colors">{cliente.nome}</p>
+                       <p className="font-bold text-white group-hover:text-brand-blue-light transition-colors">{cliente.nome}</p>
                       <p className="text-xs text-brand-metal">{formatarCPF(cliente.cpf)}</p>
                     </td>
                     <td className="px-4 py-3 text-gray-300">
@@ -133,12 +133,16 @@ export function ListaClientes() {
                     </td>
                     <td className="px-4 py-3">
                       {cliente.filiadoProTiro ? (
-                        <span className="bg-brand-green/20 text-brand-green border border-brand-green/30 px-2.5 py-1 rounded-full text-xs font-semibold">
-                          Sim
+                        <span className="bg-brand-green/20 text-brand-green border border-brand-green/30 px-2.5 py-1 rounded-full text-xs font-semibold uppercase" title={usuario?.dadosEmpresa?.clubeParceiroPadrao || 'CLUBE DE TIRO E CAÇA PRÓ TIRO'}>
+                          {usuario?.dadosEmpresa?.clubeParceiroPadrao 
+                            ? (usuario.dadosEmpresa.clubeParceiroPadrao.length > 20 ? usuario.dadosEmpresa.clubeParceiroPadrao.substring(0, 17) + '...' : usuario.dadosEmpresa.clubeParceiroPadrao) 
+                            : 'PRÓ TIRO'}
                         </span>
                       ) : (
-                        <span className="text-gray-400 text-xs">
-                          {cliente.clubeFiliado ? `Não (${cliente.clubeFiliado})` : 'Não'}
+                        <span className="text-gray-400 text-xs uppercase font-medium" title={cliente.clubeFiliado || 'Não filiado'}>
+                          {cliente.clubeFiliado 
+                            ? (cliente.clubeFiliado.length > 20 ? cliente.clubeFiliado.substring(0, 17) + '...' : cliente.clubeFiliado) 
+                            : 'Não filiado'}
                         </span>
                       )}
                     </td>
@@ -244,9 +248,11 @@ export function ListaClientes() {
 
             <div className="space-y-3">
               <div className="flex justify-between text-sm py-2 border-b border-brand-dark-5">
-                <span className="text-gray-500">Filiado:</span>
-                <span className={clienteVisualizando.filiadoProTiro ? 'text-brand-green font-bold' : 'text-gray-400'}>
-                  {clienteVisualizando.filiadoProTiro ? 'Sim' : `Não (${clienteVisualizando.clubeFiliado})`}
+                <span className="text-gray-500">Clube Filiado:</span>
+                <span className={clienteVisualizando.filiadoProTiro ? 'text-brand-green font-bold uppercase' : 'text-gray-400 uppercase'}>
+                  {clienteVisualizando.filiadoProTiro 
+                    ? (usuario?.dadosEmpresa?.clubeParceiroPadrao || 'CLUBE DE TIRO E CAÇA PRÓ TIRO') 
+                    : (clienteVisualizando.clubeFiliado || 'NÃO FILIADO')}
                 </span>
               </div>
               <div className="flex justify-between text-sm py-2">

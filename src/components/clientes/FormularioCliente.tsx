@@ -17,6 +17,8 @@ export function FormularioCliente({ clienteEditando, onFechar }: Props) {
   const [mostrarSenha, setMostrarSenha] = useState(false);
   const [focoClube, setFocoClube] = useState(false);
 
+  const clubeParceiroNome = usuario?.dadosEmpresa?.clubeParceiroPadrao || 'CLUBE DE TIRO E CAÇA PRÓ TIRO';
+
   const [form, setForm] = useState({
     nome: clienteEditando?.nome ?? '',
     cpf: clienteEditando?.cpf ?? '',
@@ -24,6 +26,9 @@ export function FormularioCliente({ clienteEditando, onFechar }: Props) {
     senhaGov: clienteEditando?.senhaGov ?? '',
     filiadoProTiro: clienteEditando?.filiadoProTiro ?? true,
     clubeFiliado: clienteEditando?.clubeFiliado ?? '',
+    clubeFiliadoText: clienteEditando 
+      ? (clienteEditando.filiadoProTiro ? clubeParceiroNome : (clienteEditando.clubeFiliado ?? ''))
+      : clubeParceiroNome,
     observacoes: clienteEditando?.observacoes ?? '',
     endereco: clienteEditando?.endereco ?? '',
     numeroCr: clienteEditando?.numeroCr ?? '',
@@ -34,6 +39,16 @@ export function FormularioCliente({ clienteEditando, onFechar }: Props) {
 
   const atualizar = (campo: string, valor: any) => {
     setForm(f => ({ ...f, [campo]: valor }));
+  };
+
+  const atualizarClube = (texto: string) => {
+    const isParceiro = texto.trim().toUpperCase() === clubeParceiroNome.trim().toUpperCase();
+    setForm(f => ({
+      ...f,
+      clubeFiliadoText: texto,
+      filiadoProTiro: isParceiro,
+      clubeFiliado: isParceiro ? '' : texto
+    }));
   };
 
   const handleCPF = (v: string) => {
@@ -164,54 +179,38 @@ export function FormularioCliente({ clienteEditando, onFechar }: Props) {
             </div>
           </div>
 
-          <div className="bg-brand-dark-4 rounded-xl p-4 border border-brand-dark-5">
-            <div className="flex items-center justify-between gap-3 mb-2">
-              <span className="text-sm font-semibold text-white">Filiado ao {usuario?.dadosEmpresa?.clubeParceiroPadrao || 'CLUBE PARCEIRO'}?</span>
-              <div className="flex gap-2">
-                <button type="button" onClick={() => atualizar('filiadoProTiro', true)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border ${
-                    form.filiadoProTiro ? 'bg-brand-green/30 border-brand-green/60 text-brand-green-light' : 'bg-brand-dark-5 text-gray-400'
-                  }`}>
-                  {form.filiadoProTiro && <CheckCircle size={12} />} Sim
-                </button>
-                <button type="button" onClick={() => atualizar('filiadoProTiro', false)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border ${
-                    !form.filiadoProTiro ? 'bg-red-500/30 border-red-500/60 text-red-300' : 'bg-brand-dark-5 text-gray-400'
-                  }`}>
-                  {!form.filiadoProTiro && <X size={12} />} Não
-                </button>
-              </div>
-            </div>
+          <div>
+            <label className="label">Clube de Tiro e Caça Filiado</label>
+            <div className="relative">
+              <input type="text" className="input uppercase"
+                value={form.clubeFiliadoText}
+                onChange={e => atualizarClube(e.target.value)}
+                placeholder="Ex: CLUBE DE TIRO E CAÇA PRÓ TIRO"
+                onFocus={() => setFocoClube(true)}
+                onBlur={() => setTimeout(() => setFocoClube(false), 200)}
+              />
 
-            {!form.filiadoProTiro && (
-              <div className="mt-3 animate-fade-in relative">
-                <label className="label label-required">Qual clube é filiado?</label>
-                <input type="text" className="input uppercase"
-                  value={form.clubeFiliado}
-                  onChange={e => atualizar('clubeFiliado', e.target.value)}
-                  onFocus={() => setFocoClube(true)}
-                  onBlur={() => setTimeout(() => setFocoClube(false), 200)}
-                />
-
-                {focoClube && clubesRegistrados.length > 0 && (
-                  <div className="absolute left-0 top-[70px] z-50 w-full bg-brand-dark-3 border border-brand-dark-5 rounded-xl shadow-2xl overflow-hidden animate-fade-in">
-                    <div className="max-h-40 overflow-y-auto">
-                      {clubesRegistrados
-                        .filter(c => c.includes(form.clubeFiliado.toUpperCase()) || form.clubeFiliado === '')
-                        .map(clube => (
-                          <div
-                            key={clube}
-                            onClick={() => atualizar('clubeFiliado', clube)}
-                            className="px-4 py-2.5 border-b border-brand-dark-5 hover:bg-brand-blue/20 cursor-pointer transition-colors text-sm text-white font-medium"
-                          >
-                            {clube}
-                          </div>
-                      ))}
-                    </div>
+              {focoClube && (
+                <div className="absolute left-0 top-[50px] z-50 w-full bg-brand-dark-3 border border-brand-dark-5 rounded-xl shadow-2xl overflow-hidden animate-fade-in">
+                  <div className="max-h-40 overflow-y-auto">
+                    {[
+                      clubeParceiroNome,
+                      ...clubesRegistrados.filter(c => c.toUpperCase() !== clubeParceiroNome.toUpperCase())
+                    ]
+                      .filter(c => c.toUpperCase().includes(form.clubeFiliadoText.toUpperCase()) || form.clubeFiliadoText === '')
+                      .map(clube => (
+                        <div
+                          key={clube}
+                          onClick={() => atualizarClube(clube)}
+                          className="px-4 py-2.5 border-b border-brand-dark-5 hover:bg-brand-blue/20 cursor-pointer transition-colors text-sm text-white font-medium"
+                        >
+                          {clube}
+                        </div>
+                    ))}
                   </div>
-                )}
-              </div>
-            )}
+                </div>
+              )}
+            </div>
           </div>
           
           <div>

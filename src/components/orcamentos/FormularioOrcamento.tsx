@@ -132,6 +132,27 @@ export function FormularioOrcamento({ orcamentoExistente }: FormularioOrcamentoP
   const [focoClube, setFocoClube] = useState(false);
   const [mostrarSenha, setMostrarSenha] = useState(false);
   const [usuarios, setUsuarios] = useState<{ id: string; nome: string }[]>([]);
+  const clubeParceiroNome = usuario?.dadosEmpresa?.clubeParceiroPadrao || 'CLUBE DE TIRO E CAÇA PRÓ TIRO';
+
+  const [form, setForm] = useState({
+    nomeCliente:       orcamentoExistente?.nomeCliente       ?? '',
+    contato:           orcamentoExistente?.contato           ?? '',
+    cpf:               orcamentoExistente?.cpf               ?? '',
+    senhaGov:          orcamentoExistente?.senhaGov          ?? '',
+    filiadoProTiro:    orcamentoExistente?.filiadoProTiro    ?? true,
+    clubeFiliado:      orcamentoExistente?.clubeFiliado      ?? '',
+    clubeFiliadoText:  orcamentoExistente 
+                         ? (orcamentoExistente.filiadoProTiro ? clubeParceiroNome : (orcamentoExistente.clubeFiliado ?? ''))
+                         : clubeParceiroNome,
+    endereco:          orcamentoExistente?.endereco          ?? '',
+    servicos:          orcamentoExistente?.servicos          ?? [],
+    valorTotal:        orcamentoExistente 
+                         ? orcamentoExistente.servicos.filter(s => !s.pagoDireto && s.categoria !== 'Laudo').reduce((acc, s) => acc + (s.valor || 0), 0)
+                         : 0,
+    formaPagamento:    (orcamentoExistente as any)?.formaPagamento ?? 'Pendente',
+    status:            (orcamentoExistente?.status           ?? 'Pendente') as StatusOrcamento,
+    observacoes:       orcamentoExistente?.observacoes       ?? '',
+  });
 
   useEffect(() => {
     const carregarUsuarios = async () => {
@@ -147,23 +168,6 @@ export function FormularioOrcamento({ orcamentoExistente }: FormularioOrcamentoP
     carregarUsuarios();
   }, [usuario?.empresaId]);
 
-  const [form, setForm] = useState({
-    nomeCliente:       orcamentoExistente?.nomeCliente       ?? '',
-    contato:           orcamentoExistente?.contato           ?? '',
-    cpf:               orcamentoExistente?.cpf               ?? '',
-    senhaGov:          orcamentoExistente?.senhaGov          ?? '',
-    filiadoProTiro:    orcamentoExistente?.filiadoProTiro    ?? true,
-    clubeFiliado:      orcamentoExistente?.clubeFiliado      ?? '',
-    endereco:          orcamentoExistente?.endereco          ?? '',
-    servicos:          orcamentoExistente?.servicos          ?? [],
-    valorTotal:        orcamentoExistente 
-                         ? orcamentoExistente.servicos.filter(s => !s.pagoDireto && s.categoria !== 'Laudo').reduce((acc, s) => acc + (s.valor || 0), 0)
-                         : 0,
-    formaPagamento:    (orcamentoExistente as any)?.formaPagamento ?? 'Pendente',
-    status:            (orcamentoExistente?.status           ?? 'Pendente') as StatusOrcamento,
-    observacoes:       orcamentoExistente?.observacoes       ?? '',
-  });
-
   // Preenchimento automático vindo do perfil do cliente
   useEffect(() => {
     const state = location.state as { clientePreDefinido?: Cliente };
@@ -177,18 +181,30 @@ export function FormularioOrcamento({ orcamentoExistente }: FormularioOrcamentoP
         senhaGov: c.senhaGov,
         filiadoProTiro: c.filiadoProTiro,
         clubeFiliado: c.clubeFiliado || '',
+        clubeFiliadoText: c.filiadoProTiro ? clubeParceiroNome : (c.clubeFiliado || ''),
         endereco: c.endereco || ''
       }));
       // Limpar o estado para não repetir o preenchimento se o usuário recarregar
       window.history.replaceState({}, document.title);
     }
-  }, [location, orcamentoExistente]);
+  }, [location, orcamentoExistente, clubeParceiroNome]);
 
   const [erros, setErros] = useState<Record<string, string>>({});
 
   const atualizar = (campo: keyof typeof form, valor: any) => {
     setForm(f => ({ ...f, [campo]: valor }));
     setErros(e => { const novo = { ...e }; delete novo[campo]; return novo; });
+  };
+
+  const atualizarClube = (texto: string) => {
+    const isParceiro = texto.trim().toUpperCase() === clubeParceiroNome.trim().toUpperCase();
+    setForm(f => ({
+      ...f,
+      clubeFiliadoText: texto,
+      filiadoProTiro: isParceiro,
+      clubeFiliado: isParceiro ? '' : texto
+    }));
+    setErros(e => { const novo = { ...e }; delete novo.clubeFiliado; return novo; });
   };
 
   const selecionarCliente = (c: Cliente) => {
@@ -200,6 +216,7 @@ export function FormularioOrcamento({ orcamentoExistente }: FormularioOrcamentoP
       senhaGov: c.senhaGov || f.senhaGov,
       filiadoProTiro: c.filiadoProTiro,
       clubeFiliado: c.clubeFiliado || '',
+      clubeFiliadoText: c.filiadoProTiro ? clubeParceiroNome : (c.clubeFiliado || ''),
       endereco: c.endereco || ''
     }));
     setFocoNome(false);
@@ -532,74 +549,39 @@ export function FormularioOrcamento({ orcamentoExistente }: FormularioOrcamentoP
             />
           </div>
 
-          {/* Filiado Pró-Tiro */}
-          <div className="bg-brand-dark-4 rounded-xl p-4 border border-brand-dark-5">
-            <div className="flex items-center justify-between flex-wrap gap-3">
-              <div>
-                <p className="text-sm font-semibold text-white">Filiado ao {usuario?.dadosEmpresa?.clubeParceiroPadrao || 'CLUBE PARCEIRO'}?</p>
-                <p className="text-xs text-gray-500 mt-0.5">Clube de Tiro parceiro do despachante</p>
-              </div>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => atualizar('filiadoProTiro', true)}
-                  className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold border transition-all ${
-                    form.filiadoProTiro
-                      ? 'bg-brand-green/30 border-brand-green/60 text-brand-green-light'
-                      : 'bg-brand-dark-5 border-brand-dark-5 text-gray-400 hover:border-brand-metal'
-                  }`}
-                >
-                  {form.filiadoProTiro && <CheckCircle size={13} />}
-                  Sim
-                </button>
-                <button
-                  type="button"
-                  onClick={() => atualizar('filiadoProTiro', false)}
-                  className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold border transition-all ${
-                    !form.filiadoProTiro
-                      ? 'bg-red-500/30 border-red-500/60 text-red-300'
-                      : 'bg-brand-dark-5 border-brand-dark-5 text-gray-400 hover:border-brand-metal'
-                  }`}
-                >
-                  {!form.filiadoProTiro && <X size={13} />}
-                  Não
-                </button>
-              </div>
-            </div>
+          <div>
+            <label className="label">Clube de Tiro e Caça Filiado</label>
+            <div className="relative">
+              <input type="text" className={`input uppercase ${erros.clubeFiliado ? 'input-error' : ''}`}
+                value={form.clubeFiliadoText}
+                onChange={e => atualizarClube(e.target.value)}
+                placeholder="Ex: CLUBE DE TIRO E CAÇA PRÓ TIRO"
+                onFocus={() => setFocoClube(true)}
+                onBlur={() => setTimeout(() => setFocoClube(false), 200)}
+              />
+              {erros.clubeFiliado && <p className="text-red-400 text-xs mt-1">{erros.clubeFiliado}</p>}
 
-            {!form.filiadoProTiro && (
-              <div className="mt-3 pt-3 border-t border-brand-dark-5 animate-fade-in relative">
-                <label className="label label-required">Qual clube é filiado?</label>
-                <input
-                  type="text"
-                  className={`input uppercase ${erros.clubeFiliado ? 'input-error' : ''}`}
-                  placeholder="Nome do clube de tiro onde é filiado..."
-                  value={form.clubeFiliado}
-                  onChange={e => atualizar('clubeFiliado', e.target.value)}
-                  onFocus={() => setFocoClube(true)}
-                  onBlur={() => setTimeout(() => setFocoClube(false), 200)}
-                />
-                {erros.clubeFiliado && <p className="text-red-400 text-xs mt-1">{erros.clubeFiliado}</p>}
-
-                {focoClube && clubesRegistrados.length > 0 && (
-                  <div className="absolute left-0 top-[75px] z-50 w-full bg-brand-dark-3 border border-brand-dark-5 rounded-xl shadow-2xl overflow-hidden animate-fade-in">
-                    <div className="max-h-40 overflow-y-auto">
-                      {clubesRegistrados
-                        .filter(c => c.includes(form.clubeFiliado.toUpperCase()) || form.clubeFiliado === '')
-                        .map(clube => (
-                          <div
-                            key={clube}
-                            onClick={() => atualizar('clubeFiliado', clube)}
-                            className="px-4 py-2.5 border-b border-brand-dark-5 hover:bg-brand-blue/20 cursor-pointer transition-colors text-sm text-white font-medium"
-                          >
-                            {clube}
-                          </div>
-                      ))}
-                    </div>
+              {focoClube && (
+                <div className="absolute left-0 top-[50px] z-50 w-full bg-brand-dark-3 border border-brand-dark-5 rounded-xl shadow-2xl overflow-hidden animate-fade-in">
+                  <div className="max-h-40 overflow-y-auto">
+                    {[
+                      clubeParceiroNome,
+                      ...clubesRegistrados.filter(c => c.toUpperCase() !== clubeParceiroNome.toUpperCase())
+                    ]
+                      .filter(c => c.toUpperCase().includes(form.clubeFiliadoText.toUpperCase()) || form.clubeFiliadoText === '')
+                      .map(clube => (
+                        <div
+                          key={clube}
+                          onClick={() => atualizarClube(clube)}
+                          className="px-4 py-2.5 border-b border-brand-dark-5 hover:bg-brand-blue/20 cursor-pointer transition-colors text-sm text-white font-medium"
+                        >
+                          {clube}
+                        </div>
+                    ))}
                   </div>
-                )}
-              </div>
-            )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>

@@ -304,13 +304,17 @@ export function DetalheCliente({ cliente }: DetalheClienteProps) {
               )}
               <div>
                 <p className="text-[10px] text-gray-500 font-bold uppercase mb-1">
-                  Filiação ao {usuario?.dadosEmpresa?.clubeParceiroPadrao || 'Clube Parceiro'}
+                  Clube de Tiro e Caça Filiado
                 </p>
-                <p className="text-white font-medium">
+                <p className="text-white font-medium uppercase text-sm">
                   {cliente.filiadoProTiro ? (
-                    <span className="text-brand-green font-bold">Sim</span>
+                    <span className="text-brand-green font-bold">
+                      {usuario?.dadosEmpresa?.clubeParceiroPadrao || 'CLUBE DE TIRO E CAÇA PRÓ TIRO'}
+                    </span>
                   ) : (
-                    <span className="text-gray-400">Não ({cliente.clubeFiliado || 'Sem clube'})</span>
+                    <span className="text-gray-400">
+                      {cliente.clubeFiliado || 'NÃO FILIADO'}
+                    </span>
                   )}
                 </p>
               </div>
