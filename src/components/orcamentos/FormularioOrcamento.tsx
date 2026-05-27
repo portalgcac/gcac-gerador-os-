@@ -536,8 +536,8 @@ export function FormularioOrcamento({ orcamentoExistente }: FormularioOrcamentoP
           <div className="bg-brand-dark-4 rounded-xl p-4 border border-brand-dark-5">
             <div className="flex items-center justify-between flex-wrap gap-3">
               <div>
-                <p className="text-sm font-semibold text-white">Filiado Pró-Tiro?</p>
-                <p className="text-xs text-gray-500 mt-0.5">Clube de Tiro e Caça Pró-Tiro, Jataí-GO</p>
+                <p className="text-sm font-semibold text-white">Filiado ao {usuario?.dadosEmpresa?.clubeParceiroPadrao || 'CLUBE PARCEIRO'}?</p>
+                <p className="text-xs text-gray-500 mt-0.5">Clube de Tiro parceiro do despachante</p>
               </div>
               <div className="flex gap-2">
                 <button

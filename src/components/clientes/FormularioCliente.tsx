@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { Cliente } from '../../types';
 import { useClientes } from '../../context/ClientesContext';
+import { useAuth } from '../../context/AuthContext';
 import { X, Save, Eye, EyeOff, CheckCircle } from 'lucide-react';
 
 interface Props {
@@ -9,6 +10,7 @@ interface Props {
 }
 
 export function FormularioCliente({ clienteEditando, onFechar }: Props) {
+  const { usuario } = useAuth();
   const { criarCliente, atualizarCliente, clubesRegistrados } = useClientes();
   const [salvando, setSalvando] = useState(false);
   const salvandoRef = useRef(false);
@@ -164,7 +166,7 @@ export function FormularioCliente({ clienteEditando, onFechar }: Props) {
 
           <div className="bg-brand-dark-4 rounded-xl p-4 border border-brand-dark-5">
             <div className="flex items-center justify-between gap-3 mb-2">
-              <span className="text-sm font-semibold text-white">Filiado Pró-Tiro?</span>
+              <span className="text-sm font-semibold text-white">Filiado ao {usuario?.dadosEmpresa?.clubeParceiroPadrao || 'CLUBE PARCEIRO'}?</span>
               <div className="flex gap-2">
                 <button type="button" onClick={() => atualizar('filiadoProTiro', true)}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border ${

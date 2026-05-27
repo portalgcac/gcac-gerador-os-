@@ -11,8 +11,9 @@ import {
   Plus, Settings2, Edit2, Trash2, BadgeDollarSign, ChevronDown,
   HelpCircle, FileText, CheckSquare, Square, DownloadCloud,
   ShieldAlert, Shield, Target, MapPin, Calendar, Download,
-  Link2, Unlink
+  Link2, Unlink, Landmark, Loader2
 } from 'lucide-react';
+import { supabase } from '../../db/supabase';
 import { Notificacao, useNotificacao } from '../common/Notificacao';
 import { ModalServico } from './ModalServico';
 import { GestaoUsuarios } from './GestaoUsuarios';
@@ -25,7 +26,7 @@ import { incrementarExportacao } from '../../services/adminCacService';
 import { buscarVinculosCAC, revogarVinculo } from '../../services/vinculosService';
 
 export function Configuracoes() {
-  const { usuario, logout } = useAuth();
+  const { usuario, logout, refreshUsuario } = useAuth();
   const isCac = usuario?.tipoConta === 'cac_individual';
   const { ordens } = useOrdens();
   const { servicos, deletarServico } = useServicos();
@@ -44,6 +45,59 @@ export function Configuracoes() {
   const [servicosExpandido, setServicosExpandido] = useState(false);
   const [usuariosExpandido, setUsuariosExpandido] = useState(false);
   const [manualExpandido, setManualExpandido] = useState(false);
+  const [empresaExpandido, setEmpresaExpandido] = useState(false);
+  
+  const [formEmpresa, setFormEmpresa] = useState({
+    razaoSocial: usuario?.dadosEmpresa?.razaoSocialFantasia || '',
+    cnpj: usuario?.dadosEmpresa?.cnpj || '',
+    endereco: usuario?.dadosEmpresa?.endereco || '',
+    telefone: usuario?.dadosEmpresa?.contatoTelefone || '',
+    responsavel: usuario?.dadosEmpresa?.responsavelNome || '',
+    clubeParceiro: usuario?.dadosEmpresa?.clubeParceiroPadrao || ''
+  });
+  const [salvandoEmpresa, setSalvandoEmpresa] = useState(false);
+
+  useEffect(() => {
+    if (usuario?.dadosEmpresa) {
+      setFormEmpresa({
+        razaoSocial: usuario.dadosEmpresa.razaoSocialFantasia || '',
+        cnpj: usuario.dadosEmpresa.cnpj || '',
+        endereco: usuario.dadosEmpresa.endereco || '',
+        telefone: usuario.dadosEmpresa.contatoTelefone || '',
+        responsavel: usuario.dadosEmpresa.responsavelNome || '',
+        clubeParceiro: usuario.dadosEmpresa.clubeParceiroPadrao || ''
+      });
+    }
+  }, [usuario?.dadosEmpresa]);
+
+  const handleSalvarEmpresa = async () => {
+    if (!usuario?.empresaId) return;
+    setSalvandoEmpresa(true);
+    try {
+      const { error } = await supabase
+        .from('empresas')
+        .update({
+          clube_parceiro_padrao: formEmpresa.clubeParceiro.trim().toUpperCase(),
+          razao_social_fantasia: formEmpresa.razaoSocial.trim(),
+          responsavel_nome: formEmpresa.responsavel.trim(),
+          contato_telefone: formEmpresa.telefone.trim(),
+          endereco: formEmpresa.endereco.trim(),
+          cnpj: formEmpresa.cnpj.trim()
+        })
+        .eq('id', usuario.empresaId);
+
+      if (error) throw error;
+
+      mostrar('sucesso', 'Dados da empresa e clube parceiro atualizados com sucesso!');
+      await refreshUsuario();
+      setEmpresaExpandido(false);
+    } catch (e: any) {
+      console.error(e);
+      mostrar('erro', 'Falha ao salvar dados da empresa: ' + e.message);
+    } finally {
+      setSalvandoEmpresa(false);
+    }
+  };
   
   // Controle de Seleção do Manual
   const [secoesSelecionadas, setSecoesSelecionadas] = useState<string[]>(CONTEUDO_MANUAL.map(s => s.id));
@@ -538,6 +592,123 @@ export function Configuracoes() {
   return (
     <div className="max-w-2xl mx-auto space-y-6 animate-fade-in">
       <h1 className="text-2xl font-bold text-white">Configurações e Serviços</h1>
+
+      {/* ── Dados da Empresa & Clube Parceiro ── */}
+      {usuario?.role === 'admin' && usuario?.tipoConta === 'empresa' && (
+        <div className="card space-y-4">
+          <div 
+            className="flex items-center justify-between cursor-pointer group"
+            onClick={() => setEmpresaExpandido(!empresaExpandido)}
+          >
+            <div className="flex items-center gap-2">
+              <div className={`p-1.5 rounded-lg transition-colors ${empresaExpandido ? 'bg-brand-blue/20 text-brand-blue-light' : 'bg-brand-dark-4 text-gray-500 group-hover:text-white'}`}>
+                <Landmark size={16} />
+              </div>
+              <div>
+                <h2 className="text-sm font-bold text-white tracking-wider">
+                  Dados da Empresa & Clube Parceiro
+                </h2>
+                {!empresaExpandido && (
+                  <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">
+                    Razão Social, Contato, Endereço e Clube Parceiro Padrão • Clique para editar
+                  </p>
+                )}
+              </div>
+            </div>
+            <div className={`text-gray-500 transition-transform duration-300 ${empresaExpandido ? 'rotate-180' : ''}`}>
+              <ChevronDown size={20} />
+            </div>
+          </div>
+
+          {empresaExpandido && (
+            <div className="animate-slide-down space-y-4 pt-3 border-t border-brand-dark-5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="label">Razão Social / Nome Fantasia</label>
+                  <input 
+                    type="text" 
+                    className="input" 
+                    value={formEmpresa.razaoSocial} 
+                    onChange={e => setFormEmpresa({...formEmpresa, razaoSocial: e.target.value})} 
+                    placeholder="Ex: GCAC Despachante Bélico"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="label">CNPJ</label>
+                  <input 
+                    type="text" 
+                    className="input" 
+                    value={formEmpresa.cnpj} 
+                    onChange={e => setFormEmpresa({...formEmpresa, cnpj: e.target.value})} 
+                    placeholder="00.000.000/0000-00"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="label">Nome do Responsável</label>
+                  <input 
+                    type="text" 
+                    className="input" 
+                    value={formEmpresa.responsavel} 
+                    onChange={e => setFormEmpresa({...formEmpresa, responsavel: e.target.value})} 
+                    placeholder="Ex: Guilherme Gomes"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="label">Telefone / Whatsapp</label>
+                  <input 
+                    type="text" 
+                    className="input" 
+                    value={formEmpresa.telefone} 
+                    onChange={e => setFormEmpresa({...formEmpresa, telefone: e.target.value})} 
+                    placeholder="(64) 9.9995-9865"
+                  />
+                </div>
+                <div className="col-span-1 sm:col-span-2 space-y-1">
+                  <label className="label">Endereço Comercial</label>
+                  <input 
+                    type="text" 
+                    className="input" 
+                    value={formEmpresa.endereco} 
+                    onChange={e => setFormEmpresa({...formEmpresa, endereco: e.target.value})} 
+                    placeholder="Endereço exato impresso no cabeçalho dos PDFs"
+                  />
+                </div>
+                <div className="col-span-1 sm:col-span-2 space-y-1 border-t border-brand-dark-5 pt-3">
+                  <label className="label text-brand-blue-light font-bold">Clube de Tiro Parceiro Padrão</label>
+                  <input 
+                    type="text" 
+                    className="input uppercase font-bold text-white bg-brand-dark-3" 
+                    value={formEmpresa.clubeParceiro} 
+                    onChange={e => setFormEmpresa({...formEmpresa, clubeParceiro: e.target.value})} 
+                    placeholder="Ex: CLUBE DE TIRO E CAÇA PRÓ TIRO"
+                  />
+                  <p className="text-[10px] text-gray-500 italic mt-1">
+                    Este clube será o selecionado por padrão quando você marcar o switch "Filiado" nas Ordens de Serviço, Orçamentos e Clientes. Ele também aparecerá no cabeçalho das impressões em PDF.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button 
+                  onClick={() => setEmpresaExpandido(false)} 
+                  className="btn-ghost flex-1 py-2.5"
+                  disabled={salvandoEmpresa}
+                >
+                  Cancelar
+                </button>
+                <button 
+                  onClick={handleSalvarEmpresa} 
+                  className="btn-primary flex-1 py-2.5 flex items-center justify-center gap-2"
+                  disabled={salvandoEmpresa || !formEmpresa.razaoSocial.trim() || !formEmpresa.clubeParceiro.trim()}
+                >
+                  {salvandoEmpresa && <Loader2 size={16} className="animate-spin text-white" />}
+                  {salvandoEmpresa ? 'Salvando...' : 'Salvar Alterações'}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── Manual de Instruções ── */}
       <div className="card space-y-4">

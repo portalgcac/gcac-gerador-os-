@@ -15,6 +15,29 @@ export async function gerarPdfBlob(ordem: OrdemDeServico): Promise<Blob> {
   const altura  = doc.internal.pageSize.getHeight();
   let y = 0;
 
+  // Obter dados da empresa logada para cabeçalho do PDF
+  let nomeEmpresa = 'GCAC Despachante Bélico';
+  let responsavel = 'Guilherme Gomes';
+  let telefone = '(64) 9.9995-9865';
+  let endereco = 'Av. Goias, n 1802, Sala 04 - Bairro Santa Maria - Jatai-GO';
+  let clubeParceiro = 'CLUBE DE TIRO E CAÇA PRÓ TIRO (JATAÍ)';
+
+  try {
+    const dadosUsuario = localStorage.getItem('gcac_usuario');
+    if (dadosUsuario) {
+      const u = JSON.parse(dadosUsuario);
+      if (u.dadosEmpresa) {
+        nomeEmpresa = u.dadosEmpresa.razaoSocialFantasia || u.dadosEmpresa.nome || nomeEmpresa;
+        responsavel = u.dadosEmpresa.responsavelNome || responsavel;
+        telefone = u.dadosEmpresa.contatoTelefone || telefone;
+        endereco = u.dadosEmpresa.endereco || endereco;
+        clubeParceiro = u.dadosEmpresa.clubeParceiroPadrao || clubeParceiro;
+      }
+    }
+  } catch (err) {
+    console.error('Erro ao ler dados da empresa do localStorage:', err);
+  }
+
   // ── Cabeçalho ───────────────────────────────────────────────────────────
   doc.setFillColor(ESCURO);
   doc.rect(0, 0, largura, 42, 'F');
@@ -33,14 +56,14 @@ export async function gerarPdfBlob(ordem: OrdemDeServico): Promise<Blob> {
   doc.setTextColor('#FFFFFF');
   doc.setFontSize(13);
   doc.setFont('helvetica', 'bold');
-  doc.text('GCAC Despachante Bélico', 46, 11);
+  doc.text(nomeEmpresa, 46, 11);
 
   doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor('#CCCCCC');
-  doc.text('Guilherme Gomes', 46, 17);
-  doc.text('(64) 9.9995-9865', 46, 22);
-  doc.text('Av. Goias, n 1802, Sala 04 - Bairro Santa Maria - Jatai-GO', 46, 27);
+  doc.text(responsavel, 46, 17);
+  doc.text(telefone, 46, 22);
+  doc.text(endereco, 46, 27);
 
   // Linha separadora interna
   doc.setDrawColor('#333333');
@@ -78,8 +101,8 @@ export async function gerarPdfBlob(ordem: OrdemDeServico): Promise<Blob> {
   y = linhaInfo(doc, 'Senha GOV.br:', ordem.senhaGov, y, largura);
 
   const textoFiliacao = ordem.filiadoProTiro
-    ? 'Filiado Pró-Tiro (Clube de Tiro e Caça Pró-Tiro, Jataí-GO)'
-    : 'Não filiado ao Pró-Tiro' + (ordem.clubeFiliado ? ' | Clube: ' + ordem.clubeFiliado : '');
+    ? `Filiado ao ${clubeParceiro}`
+    : `Não filiado ao ${clubeParceiro}` + (ordem.clubeFiliado ? ' | Clube: ' + ordem.clubeFiliado : '');
   y = linhaInfo(doc, 'Filiação:', textoFiliacao, y, largura);
 
   y += 4;
@@ -242,7 +265,7 @@ export async function gerarPdfBlob(ordem: OrdemDeServico): Promise<Blob> {
   doc.setTextColor('#AAAAAA');
   doc.setFontSize(7.5);
   doc.setFont('helvetica', 'normal');
-  doc.text('GCAC Despachante Bélico — Documento gerado eletronicamente', largura / 2, altura - 8, { align: 'center' });
+  doc.text(`${nomeEmpresa} — Documento gerado eletronicamente`, largura / 2, altura - 8, { align: 'center' });
   const emitidoPor = ordem.criadoPorNome ? `Emitido por: ${ordem.criadoPorNome} | ` : '';
   doc.text(emitidoPor + 'Gerado em: ' + new Date().toLocaleString('pt-BR'), largura / 2, altura - 4, { align: 'center' });
 

@@ -460,7 +460,7 @@ function EmptyState({ msg }: { msg: string }) {
 
 // --- Formulários Internos (Modais) ---
 
-function ModalArma({ armaParaEditar, onFechar, onSalvar }: { armaParaEditar?: Arma, onFechar: () => void, onSalvar: (d: any) => void }) {
+export function ModalArma({ armaParaEditar, onFechar, onSalvar }: { armaParaEditar?: Arma, onFechar: () => void, onSalvar: (d: any) => void }) {
   const { modelosRegistrados, calibresRegistrados, fabricantesRegistrados } = useClientes();
   const [form, setForm] = useState({
     id: armaParaEditar?.id,
@@ -577,7 +577,7 @@ function ModalArma({ armaParaEditar, onFechar, onSalvar }: { armaParaEditar?: Ar
   );
 }
 
-function ModalGt({ armaAcervo, gtParaEditar, onFechar, onSalvar }: { armaAcervo: string, gtParaEditar?: GuiaTrafego, onFechar: () => void, onSalvar: (d: any) => void }) {
+export function ModalGt({ armaAcervo, gtParaEditar, onFechar, onSalvar }: { armaAcervo: string, gtParaEditar?: GuiaTrafego, onFechar: () => void, onSalvar: (d: any) => void }) {
   const [form, setForm] = useState({ 
     id: gtParaEditar?.id,
     tipo: gtParaEditar?.tipo || 'Caça', 
@@ -693,7 +693,7 @@ function ModalGt({ armaAcervo, gtParaEditar, onFechar, onSalvar }: { armaAcervo:
   );
 }
 
-function ModalManejo({ manejoParaEditar, onFechar, onSalvar }: { manejoParaEditar?: AutorizacaoManejo, onFechar: () => void, onSalvar: (d: any) => void }) {
+export function ModalManejo({ manejoParaEditar, onFechar, onSalvar }: { manejoParaEditar?: AutorizacaoManejo, onFechar: () => void, onSalvar: (d: any) => void }) {
   const [form, setForm] = useState({ 
     id: manejoParaEditar?.id,
     numeroCar: manejoParaEditar?.numeroCar || '', 

@@ -21,17 +21,17 @@ interface ClientesContextType {
   
   // Gestão de Armas
   buscarArmas: (clienteId: string) => Promise<Arma[]>;
-  salvarArma: (arma: Partial<Arma> & { clienteId: string }) => Promise<void>;
+  salvarArma: (arma: Partial<Arma> & { clienteId: string }, overrideEmpresaId?: string) => Promise<void>;
   deletarArma: (id: string) => Promise<void>;
   
   // Gestão de GTs
   buscarGts: (armaId: string) => Promise<GuiaTrafego[]>;
-  salvarGt: (gt: Partial<GuiaTrafego> & { armaId: string }) => Promise<void>;
+  salvarGt: (gt: Partial<GuiaTrafego> & { armaId: string }, overrideEmpresaId?: string) => Promise<void>;
   deletarGt: (id: string) => Promise<void>;
   
   // Gestão de Manejo
   buscarManejos: (clienteId: string) => Promise<AutorizacaoManejo[]>;
-  salvarManejo: (manejo: Partial<AutorizacaoManejo> & { clienteId: string }) => Promise<void>;
+  salvarManejo: (manejo: Partial<AutorizacaoManejo> & { clienteId: string }, overrideEmpresaId?: string) => Promise<void>;
   deletarManejo: (id: string) => Promise<void>;
   
   // Gestão de Créditos
@@ -235,7 +235,7 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
     }));
   }, [usuario]);
 
-  const salvarArma = useCallback(async (dados: Partial<Arma> & { clienteId: string }) => {
+  const salvarArma = useCallback(async (dados: Partial<Arma> & { clienteId: string }, overrideEmpresaId?: string) => {
     if (!usuario?.empresaId) throw new Error('Usuário não autenticado');
     const payload = {
       cliente_id: dados.clienteId,
@@ -247,7 +247,7 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
       numero_sigma: dados.numeroSigma,
       acervo: dados.acervo,
       vencimento_craf: dados.vencimentoCraf || null,
-      empresa_id: usuario.empresaId
+      empresa_id: overrideEmpresaId || usuario.empresaId
     };
 
     if (dados.id) {
@@ -293,14 +293,14 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
     }));
   }, [usuario]);
 
-  const salvarGt = useCallback(async (dados: Partial<GuiaTrafego> & { armaId: string }) => {
+  const salvarGt = useCallback(async (dados: Partial<GuiaTrafego> & { armaId: string }, overrideEmpresaId?: string) => {
     if (!usuario?.empresaId) throw new Error('Usuário não autenticado');
     const payload = {
       arma_id: dados.armaId,
       tipo: dados.tipo,
       vencimento: dados.vencimento,
       destino: dados.destino,
-      empresa_id: usuario.empresaId
+      empresa_id: overrideEmpresaId || usuario.empresaId
     };
 
     if (dados.id) {
@@ -346,7 +346,7 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
     }));
   }, [usuario]);
 
-  const salvarManejo = useCallback(async (dados: Partial<AutorizacaoManejo> & { clienteId: string }) => {
+  const salvarManejo = useCallback(async (dados: Partial<AutorizacaoManejo> & { clienteId: string }, overrideEmpresaId?: string) => {
     if (!usuario?.empresaId) throw new Error('Usuário não autenticado');
     const payload = {
       cliente_id: dados.clienteId,
@@ -356,7 +356,7 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
       cidade: dados.cidade,
       vencimento: dados.vencimento,
       status: dados.status || 'Ativo',
-      empresa_id: usuario.empresaId
+      empresa_id: overrideEmpresaId || usuario.empresaId
     };
 
     if (dados.id) {

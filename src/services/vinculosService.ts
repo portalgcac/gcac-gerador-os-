@@ -31,9 +31,18 @@ export interface VinculoDespachanteCac {
   respondido_em?: string;
   revogado_em?: string;
   revogado_por?: 'cac' | 'despachante' | 'admin_gcac';
+  permite_edicao?: boolean;
+  termo_aceito_texto?: string;
+  autorizado_edicao_em?: string;
 }
 
 export interface AcervoVinculado {
+  vinculo?: {
+    id: string;
+    permite_edicao: boolean;
+    termo_aceito_texto?: string;
+    autorizado_edicao_em?: string;
+  };
   cliente: {
     id: string;
     nome: string;
@@ -93,39 +102,38 @@ export async function buscarCacPorCpf(cpf: string): Promise<{
   const cpfLimpo = cpf.replace(/\D/g, '');
   const cpfFormatado = cpfLimpo.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
 
-  // 1. Busca o CAC pelo CPF na tabela de clientes (perfil do portal)
+  // 1. Busca o CAC pelo CPF na tabela de clientes, filtrando para garantir que pertence a uma conta 'cac_individual'
   const { data: clienteData } = await supabase
     .from('clientes')
-    .select('empresa_id, nome, cpf')
+    .select(`
+      empresa_id,
+      nome,
+      cpf,
+      empresas!inner (
+        id,
+        tipo_conta
+      )
+    `)
     .or(`cpf.eq.${cpfLimpo},cpf.eq.${cpfFormatado}`)
+    .eq('empresas.tipo_conta', 'cac_individual')
     .limit(1)
-    .maybeSingle();
+    .maybeSingle() as any;
 
   if (!clienteData?.empresa_id) {
     return { encontrado: false };
   }
 
-  // 2. Verifica se a empresa desse cliente é do tipo cac_individual
-  const { data: empresaData } = await supabase
-    .from('empresas')
-    .select('id, tipo_conta')
-    .eq('id', clienteData.empresa_id)
-    .single();
-
-  if (!empresaData || empresaData.tipo_conta !== 'cac_individual') {
-    return { encontrado: false };
-  }
-
-  // 3. Busca o email do usuário dessa empresa
+  // 2. Busca o email do usuário dessa empresa (do atirador)
   const { data: usuarioData } = await supabase
     .from('usuarios_autorizados')
     .select('email')
     .eq('empresa_id', clienteData.empresa_id)
-    .single();
+    .limit(1)
+    .maybeSingle();
 
   return {
     encontrado: true,
-    cacEmpresaId: empresaData.id,
+    cacEmpresaId: clienteData.empresa_id,
     cacEmail: usuarioData?.email,
     cacNome: clienteData.nome,
     cacCpf: cpfLimpo,
@@ -145,6 +153,7 @@ export async function solicitarVinculo(params: {
   cac_nome: string;
   cac_cpf?: string;
   mensagem?: string;
+  permite_edicao?: boolean;
 }): Promise<{ sucesso: boolean; erro?: string; vinculoId?: string }> {
   // 1. Verifica limite de CACs vinculados para este despachante
   const { data: empresaData } = await supabase
@@ -193,6 +202,9 @@ export async function solicitarVinculo(params: {
         respondido_em: null,
         revogado_em: null,
         revogado_por: null,
+        permite_edicao: params.permite_edicao || false,
+        termo_aceito_texto: null,
+        autorizado_edicao_em: null,
       })
       .eq('id', existente.id);
 
@@ -215,6 +227,7 @@ export async function solicitarVinculo(params: {
       cac_cpf: params.cac_cpf,
       status: 'pendente',
       mensagem_solicitacao: params.mensagem,
+      permite_edicao: params.permite_edicao || false,
     }])
     .select()
     .single();
@@ -246,6 +259,7 @@ export async function responderVinculo(
   vinculoId: string,
   resposta: 'ativo' | 'rejeitado',
   cacEmpresaId: string,
+  termoAceitoTexto?: string,
 ): Promise<{ sucesso: boolean; erro?: string }> {
   // 1. Valida que o vínculo pertence ao CAC que está respondendo
   const { data: vinculo } = await supabase
@@ -258,13 +272,20 @@ export async function responderVinculo(
   if (!vinculo) return { sucesso: false, erro: 'Solicitação não encontrada.' };
   if (vinculo.status !== 'pendente') return { sucesso: false, erro: 'Esta solicitação já foi respondida.' };
 
+  const updateFields: any = {
+    status: resposta,
+    respondido_em: new Date().toISOString(),
+  };
+
+  if (resposta === 'ativo' && termoAceitoTexto) {
+    updateFields.termo_aceito_texto = termoAceitoTexto;
+    updateFields.autorizado_edicao_em = new Date().toISOString();
+  }
+
   // 2. Atualiza status
   const { error } = await supabase
     .from('vinculos_despachante_cac')
-    .update({
-      status: resposta,
-      respondido_em: new Date().toISOString(),
-    })
+    .update(updateFields)
     .eq('id', vinculoId);
 
   if (error) return { sucesso: false, erro: 'Erro ao registrar resposta.' };
@@ -389,7 +410,7 @@ export async function buscarAcervoVinculado(
   // 1. Verifica vínculo ativo
   const { data: vinculo } = await supabase
     .from('vinculos_despachante_cac')
-    .select('id, status')
+    .select('id, status, permite_edicao, termo_aceito_texto, autorizado_edicao_em')
     .eq('despachante_empresa_id', despachante_empresa_id)
     .eq('cac_empresa_id', cacEmpresaId)
     .eq('status', 'ativo')
@@ -436,6 +457,12 @@ export async function buscarAcervoVinculado(
     .order('vencimento');
 
   return {
+    vinculo: {
+      id: vinculo.id,
+      permite_edicao: !!vinculo.permite_edicao,
+      termo_aceito_texto: vinculo.termo_aceito_texto,
+      autorizado_edicao_em: vinculo.autorizado_edicao_em,
+    },
     cliente: {
       id: clienteData.id,
       nome: clienteData.nome,

@@ -14,6 +14,27 @@ export async function gerarPdfOrcamentoBlob(orcamento: Orcamento): Promise<Blob>
   const altura  = doc.internal.pageSize.getHeight();
   let y = 0;
 
+  // Obter dados da empresa logada para cabeçalho do PDF
+  let nomeEmpresa = 'GCAC Despachante Bélico';
+  let responsavel = 'Guilherme Gomes';
+  let telefone = '(64) 9.9995-9865';
+  let endereco = 'Av. Goias, n 1802, Sala 04 - Bairro Santa Maria - Jatai-GO';
+
+  try {
+    const dadosUsuario = localStorage.getItem('gcac_usuario');
+    if (dadosUsuario) {
+      const u = JSON.parse(dadosUsuario);
+      if (u.dadosEmpresa) {
+        nomeEmpresa = u.dadosEmpresa.razaoSocialFantasia || u.dadosEmpresa.nome || nomeEmpresa;
+        responsavel = u.dadosEmpresa.responsavelNome || responsavel;
+        telefone = u.dadosEmpresa.contatoTelefone || telefone;
+        endereco = u.dadosEmpresa.endereco || endereco;
+      }
+    }
+  } catch (err) {
+    console.error('Erro ao ler dados da empresa do localStorage:', err);
+  }
+
   // ── Cabeçalho ───────────────────────────────────────────────────────────
   doc.setFillColor(ESCURO);
   doc.rect(0, 0, largura, 42, 'F');
@@ -32,14 +53,14 @@ export async function gerarPdfOrcamentoBlob(orcamento: Orcamento): Promise<Blob>
   doc.setTextColor('#FFFFFF');
   doc.setFontSize(13);
   doc.setFont('helvetica', 'bold');
-  doc.text('GCAC Despachante Bélico', 46, 11);
+  doc.text(nomeEmpresa, 46, 11);
 
   doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor('#CCCCCC');
-  doc.text('Guilherme Gomes', 46, 17);
-  doc.text('(64) 9.9995-9865', 46, 22);
-  doc.text('Av. Goias, n 1802, Sala 04 - Bairro Santa Maria - Jatai-GO', 46, 27);
+  doc.text(responsavel, 46, 17);
+  doc.text(telefone, 46, 22);
+  doc.text(endereco, 46, 27);
 
   // Linha separadora interna
   doc.setDrawColor('#333333');
@@ -247,7 +268,7 @@ export async function gerarPdfOrcamentoBlob(orcamento: Orcamento): Promise<Blob>
   doc.setTextColor('#AAAAAA');
   doc.setFontSize(7.5);
   doc.setFont('helvetica', 'normal');
-  doc.text('GCAC Despachante Bélico — Orçamento gerado eletronicamente', largura / 2, altura - 8, { align: 'center' });
+  doc.text(`${nomeEmpresa} — Orçamento gerado eletronicamente`, largura / 2, altura - 8, { align: 'center' });
   const emitidoPor = orcamento.criadoPorNome ? `Emitido por: ${orcamento.criadoPorNome} | ` : '';
   doc.text(emitidoPor + 'Gerado em: ' + new Date().toLocaleString('pt-BR'), largura / 2, altura - 4, { align: 'center' });
 

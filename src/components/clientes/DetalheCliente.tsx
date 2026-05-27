@@ -303,7 +303,9 @@ export function DetalheCliente({ cliente }: DetalheClienteProps) {
                 </div>
               )}
               <div>
-                <p className="text-[10px] text-gray-500 font-bold uppercase mb-1">Filiação Pró-Tiro</p>
+                <p className="text-[10px] text-gray-500 font-bold uppercase mb-1">
+                  Filiação ao {usuario?.dadosEmpresa?.clubeParceiroPadrao || 'Clube Parceiro'}
+                </p>
                 <p className="text-white font-medium">
                   {cliente.filiadoProTiro ? (
                     <span className="text-brand-green font-bold">Sim</span>

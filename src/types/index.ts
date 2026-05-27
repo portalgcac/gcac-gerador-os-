@@ -254,6 +254,18 @@ export interface FilaSincronizacao {
   criadoEm: string;
 }
 
+export interface DadosEmpresa {
+  id: string;
+  nome: string;
+  tipoConta: 'empresa' | 'cac_individual';
+  clubeParceiroPadrao?: string;
+  razaoSocialFantasia?: string;
+  responsavelNome?: string;
+  contatoTelefone?: string;
+  endereco?: string;
+  cnpj?: string;
+}
+
 export interface UsuarioGoogle {
   id: string;
   nome: string;
@@ -268,6 +280,7 @@ export interface UsuarioGoogle {
   modulosAtivos?: string[];
   cpf?: string;
   contato?: string;
+  dadosEmpresa?: DadosEmpresa;
 }
 
 export interface Empresa {

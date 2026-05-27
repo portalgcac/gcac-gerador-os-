@@ -312,12 +312,12 @@ export function DetalheOrdem({ ordem }: DetalheOrdemProps) {
           <CampoDetalhe rotulo="Senha GOV.br" valor={ordem.senhaGov} />
           <CampoDetalhe rotulo="Endereço" valor={ordem.endereco} />
           <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4">
-            <dt className="text-xs font-semibold text-gray-500 uppercase tracking-wider w-32 flex-shrink-0">
-              {ordem.filiadoProTiro ? 'Pró-Tiro' : 'Clube Filiado'}
+            <dt className="text-xs font-semibold text-gray-500 uppercase tracking-wider w-32 flex-shrink-0 text-ellipsis overflow-hidden whitespace-nowrap" title={ordem.filiadoProTiro ? (usuario?.dadosEmpresa?.clubeParceiroPadrao || 'Clube Parceiro') : 'Clube Filiado'}>
+              {ordem.filiadoProTiro ? (usuario?.dadosEmpresa?.clubeParceiroPadrao || 'Clube Parceiro') : 'Clube Filiado'}
             </dt>
             <dd>
               {ordem.filiadoProTiro
-                ? <span className="text-sm font-semibold text-brand-green-light">✓ Filiado Pró-Tiro</span>
+                ? <span className="text-sm font-semibold text-brand-green-light">✓ Filiado ao {usuario?.dadosEmpresa?.clubeParceiroPadrao || 'Clube Parceiro'}</span>
                 : <span className="text-sm text-gray-200">{ordem.clubeFiliado || 'Não informado'}</span>
               }
             </dd>

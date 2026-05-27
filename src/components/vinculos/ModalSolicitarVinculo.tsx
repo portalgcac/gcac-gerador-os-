@@ -18,6 +18,7 @@ export function ModalSolicitarVinculo({ onClose, onSucesso }: Props) {
   const [enviando, setEnviando] = useState(false);
   const [mensagem, setMensagem] = useState('');
   const [erroGlobal, setErroGlobal] = useState('');
+  const [solicitarEdicao, setSolicitarEdicao] = useState(false);
   const [resultado, setResultado] = useState<{
     cacEmpresaId: string;
     cacEmail: string;
@@ -72,6 +73,7 @@ export function ModalSolicitarVinculo({ onClose, onSucesso }: Props) {
       cac_nome: resultado.cacNome,
       cac_cpf: resultado.cacCpf,
       mensagem: mensagem.trim() || undefined,
+      permite_edicao: solicitarEdicao,
     });
 
     setEnviando(false);
@@ -182,10 +184,32 @@ export function ModalSolicitarVinculo({ onClose, onSucesso }: Props) {
                     </div>
                   ))}
                 </div>
-                <div className="mt-3 pt-3 border-t border-brand-dark-5">
-                  <p className="text-[10px] text-gray-600">
-                    ❌ Você <strong className="text-gray-500">NÃO poderá</strong> editar, excluir ou exportar os dados do atirador.
-                  </p>
+
+                <div className="mt-4 pt-3 border-t border-brand-dark-5 space-y-3">
+                  <label className="flex items-center gap-2.5 cursor-pointer group">
+                    <input 
+                      type="checkbox"
+                      checked={solicitarEdicao}
+                      onChange={e => setSolicitarEdicao(e.target.checked)}
+                      className="rounded border-brand-dark-5 bg-brand-dark-4 text-brand-blue focus:ring-brand-blue/30 focus:ring-offset-0 focus:outline-none w-4 h-4"
+                    />
+                    <div className="flex-1">
+                      <p className="text-xs font-bold text-white group-hover:text-brand-blue-light transition-colors">Solicitar permissão de edição</p>
+                      <p className="text-[10px] text-gray-500">Permite adicionar, editar e excluir itens do acervo do atirador.</p>
+                    </div>
+                  </label>
+
+                  <div className="pt-2 border-t border-brand-dark-5/50">
+                    {solicitarEdicao ? (
+                      <p className="text-[10px] text-brand-green font-semibold">
+                        ✓ Você <strong className="text-white">solicitou permissão</strong> para editar e atualizar os dados do acervo deste atirador.
+                      </p>
+                    ) : (
+                      <p className="text-[10px] text-gray-600">
+                        ❌ Você <strong className="text-gray-500">NÃO poderá</strong> editar ou atualizar os dados do acervo (Somente Leitura).
+                      </p>
+                    )}
+                  </div>
                 </div>
               </div>
 

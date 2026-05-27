@@ -11,11 +11,15 @@ interface Props {
 export function NotificacaoVinculo({ vinculo, onClose, onRespondido }: Props) {
   const [carregando, setCarregando] = useState<'ativo' | 'rejeitado' | null>(null);
   const [erro, setErro] = useState('');
+  const [aceitouTermo, setAceitouTermo] = useState(false);
 
   const handleResposta = async (status: 'ativo' | 'rejeitado') => {
     setCarregando(status);
     setErro('');
-    const res = await responderVinculo(vinculo.id, status, vinculo.cac_empresa_id);
+    const termoTexto = (status === 'ativo' && vinculo.permite_edicao) 
+      ? 'Estou ciente e autorizo este despachante a gerenciar, atualizar e editar os dados do meu acervo.' 
+      : undefined;
+    const res = await responderVinculo(vinculo.id, status, vinculo.cac_empresa_id, termoTexto);
     setCarregando(null);
 
     if (!res.sucesso) {
@@ -89,9 +93,15 @@ export function NotificacaoVinculo({ vinculo, onClose, onRespondido }: Props) {
           <div className="space-y-2 text-[11px] text-gray-500 leading-relaxed">
             <div className="flex gap-1.5 items-start">
               <Info size={12} className="text-brand-blue shrink-0 mt-0.5" />
-              <p>
-                <strong>Apenas Leitura:</strong> O despachante NÃO poderá alterar, excluir ou cadastrar nenhuma informação na sua conta. Ele apenas visualizará os dados.
-              </p>
+              {vinculo.permite_edicao ? (
+                <p>
+                  <strong>Permissão de Edição:</strong> Com sua autorização e aceite do termo abaixo, este despachante poderá cadastrar, alterar e excluir armas, guias e manejos directly in your account.
+                </p>
+              ) : (
+                <p>
+                  <strong>Apenas Leitura:</strong> O despachante NÃO poderá alterar, excluir ou cadastrar nenhuma informação na sua conta. Ele apenas visualizará os dados.
+                </p>
+              )}
             </div>
             <div className="flex gap-1.5 items-start">
               <Info size={12} className="text-brand-blue shrink-0 mt-0.5" />
@@ -100,6 +110,29 @@ export function NotificacaoVinculo({ vinculo, onClose, onRespondido }: Props) {
               </p>
             </div>
           </div>
+
+          {/* Consentimento explícito caso solicite edição */}
+          {vinculo.permite_edicao && (
+            <div className="bg-brand-dark-3 border border-brand-dark-5 rounded-xl p-4 space-y-3 animate-fade-in">
+              <h4 className="text-xs font-bold text-yellow-400 flex items-center gap-1.5 uppercase tracking-wider">
+                <AlertTriangle size={12} /> Consentimento de Edição (Escrita)
+              </h4>
+              <p className="text-[11px] text-gray-400 leading-relaxed">
+                Este despachante solicitou permissão para gerenciar e atualizar os dados do seu acervo. Para autorizar, marque a caixa de aceite abaixo:
+              </p>
+              <label className="flex items-start gap-2.5 cursor-pointer group pt-2 border-t border-brand-dark-5/50">
+                <input 
+                  type="checkbox"
+                  checked={aceitouTermo}
+                  onChange={e => setAceitouTermo(e.target.checked)}
+                  className="rounded border-brand-dark-5 bg-brand-dark-4 text-brand-blue focus:ring-brand-blue/30 focus:ring-offset-0 focus:outline-none w-4 h-4 shrink-0 mt-0.5"
+                />
+                <span className="text-[11px] text-gray-300 group-hover:text-white leading-normal transition-colors font-semibold">
+                  Estou ciente e autorizo este despachante a gerenciar, atualizar e editar os dados do meu acervo.
+                </span>
+              </label>
+            </div>
+          )}
 
           {erro && (
             <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3 text-xs text-red-400 flex items-center gap-2">
@@ -119,8 +152,8 @@ export function NotificacaoVinculo({ vinculo, onClose, onRespondido }: Props) {
             </button>
             <button
               onClick={() => handleResposta('ativo')}
-              disabled={carregando !== null}
-              className="btn-primary flex-1 py-3 font-bold flex items-center justify-center gap-2"
+              disabled={carregando !== null || (vinculo.permite_edicao === true && !aceitouTermo)}
+              className="btn-primary flex-1 py-3 font-bold flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {carregando === 'ativo' ? <Loader size={14} className="animate-spin" /> : <Check size={16} />}
               {carregando === 'ativo' ? 'Autorizando...' : 'Autorizar Acesso'}

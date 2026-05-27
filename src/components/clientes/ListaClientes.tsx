@@ -117,7 +117,7 @@ export function ListaClientes() {
                 <tr>
                   <th className="px-4 py-3 rounded-l-lg font-semibold">Nome / CPF</th>
                   <th className="px-4 py-3 font-semibold">Contato</th>
-                  <th className="px-4 py-3 font-semibold">Pró-Tiro</th>
+                  <th className="px-4 py-3 font-semibold">Filiado</th>
                   <th className="px-4 py-3 rounded-r-lg font-semibold text-right">Ações</th>
                 </tr>
               </thead>
@@ -244,7 +244,7 @@ export function ListaClientes() {
 
             <div className="space-y-3">
               <div className="flex justify-between text-sm py-2 border-b border-brand-dark-5">
-                <span className="text-gray-500">Pró-Tiro:</span>
+                <span className="text-gray-500">Filiado:</span>
                 <span className={clienteVisualizando.filiadoProTiro ? 'text-brand-green font-bold' : 'text-gray-400'}>
                   {clienteVisualizando.filiadoProTiro ? 'Sim' : `Não (${clienteVisualizando.clubeFiliado})`}
                 </span>

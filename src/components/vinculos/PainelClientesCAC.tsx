@@ -14,7 +14,7 @@ import {
   AcervoVinculado,
 } from '../../services/vinculosService';
 import { ModalSolicitarVinculo } from './ModalSolicitarVinculo';
-import { AcervoVinculadoReadOnly } from './AcervoVinculadoReadOnly';
+import { AcervoVinculadoGerenciador } from './AcervoVinculadoGerenciador';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -291,7 +291,7 @@ export function PainelClientesCAC() {
 
       {/* Modal de Acervo Vinculado */}
       {acervoAberto && (
-        <AcervoVinculadoReadOnly
+        <AcervoVinculadoGerenciador
           vinculo={acervoAberto.vinculo}
           acervo={acervoAberto.acervo}
           onClose={() => setAcervoAberto(null)}
