@@ -31,19 +31,25 @@ const MODULOS = [
 ];
 
 const RECURSOS_SISTEMA = [
-  { key: 'dash_atencao_diaria', label: 'Dashboard — Atenção Diária' },
-  { key: 'dash_alertas_vencimento', label: 'Dashboard — Alertas Vencimentos' },
+  { key: 'dash_atencao_diaria', label: 'Dashboard — Resumo de Atenção Diária' },
+  { key: 'dash_alertas_vencimento', label: 'Dashboard — Alertas de Vencimentos' },
   { key: 'dash_lembretes', label: 'Dashboard — Lembretes da Equipe' },
-  { key: 'dash_resumo_os', label: 'Dashboard — Resumo OS' },
-  { key: 'dash_margem_operacional', label: 'Dashboard — Margem e Lucros' },
-  { key: 'dash_resumo_operacional', label: 'Dashboard — Resumo Operacional' },
-  { key: 'dash_resumo_orcamentos', label: 'Dashboard — Resumo Orçamentos' },
-  { key: 'dash_ordens_recentes', label: 'Dashboard — Ordens Recentes' },
-  { key: 'fin_fluxo_caixa', label: 'Financeiro — Fluxo de Caixa' },
-  { key: 'fin_relatorio_equipe', label: 'Financeiro — Relatório da Equipe' },
-  { key: 'fin_exportacao', label: 'Financeiro — Exportação Relatórios' },
-  { key: 'acervo_anexos', label: 'Acervo — Salvar Anexos' },
-  { key: 'acervo_gerenciador', label: 'Acervo — Gerenciar Vinculados (Escrita)' },
+  { key: 'dash_resumo_os', label: 'Dashboard — Resumo de Ordens de Serviço' },
+  { key: 'dash_margem_operacional', label: 'Dashboard — Margem de Operações e Lucros' },
+  { key: 'dash_resumo_operacional', label: 'Dashboard — Resumo Operacional de Serviços' },
+  { key: 'dash_resumo_orcamentos', label: 'Dashboard — Resumo de Orçamentos' },
+  { key: 'dash_ordens_recentes', label: 'Dashboard — Listagem de Ordens de Serviço Recentes' },
+  { key: 'fin_fluxo_caixa', label: 'Financeiro — Fluxo de Caixa e Lançamentos' },
+  { key: 'fin_relatorio_equipe', label: 'Financeiro — Relatório de Produtividade da Equipe' },
+  { key: 'fin_exportacao', label: 'Financeiro — Exportação de Relatórios Financeiros' },
+  { key: 'modulo_ordens', label: 'Módulo Ordens de Serviço — Emissão e Controle de Ordens de Serviço' },
+  { key: 'modulo_orcamentos', label: 'Módulo Orçamentos — Emissão e Controle de Orçamentos' },
+  { key: 'modulo_recibos', label: 'Módulo Recibos — Emissão de Recibos de Pagamento' },
+  { key: 'modulo_agendamentos', label: 'Módulo Agendamentos — Controle de Agendamentos e Calendário' },
+  { key: 'modulo_clientes', label: 'Módulo Clientes — Cadastro e Gestão de Clientes' },
+  { key: 'modulo_clientes_cac', label: 'Módulo Clientes CAC — Vinculação e Gestão de Atiradores/Colecionadores' },
+  { key: 'acervo_anexos', label: 'Acervo — Armazenamento de Arquivos e Anexos nos Documentos' },
+  { key: 'acervo_gerenciador', label: 'Acervo — Gerenciador de Clientes Vinculados' },
 ];
 
 export function GestaoUsuarios() {

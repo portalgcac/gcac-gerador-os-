@@ -51,7 +51,22 @@ const temAcessoLink = (link: typeof links[0], usuario: any, temAcessoRecurso: (r
     return temAcessoRecurso('dash_lembretes');
   }
   if (link.slug === 'orcamentos') {
-    return temAcessoRecurso('dash_resumo_orcamentos');
+    return temAcessoRecurso('modulo_orcamentos');
+  }
+  if (link.slug === 'ordens') {
+    return temAcessoRecurso('modulo_ordens');
+  }
+  if (link.slug === 'recibos') {
+    return temAcessoRecurso('modulo_recibos');
+  }
+  if (link.slug === 'agendamentos') {
+    return temAcessoRecurso('modulo_agendamentos');
+  }
+  if (link.slug === 'clientes') {
+    if (link.to === '/clientes-cac') {
+      return temAcessoRecurso('modulo_clientes_cac');
+    }
+    return temAcessoRecurso('modulo_clientes');
   }
 
   return true;

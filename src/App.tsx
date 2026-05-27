@@ -157,7 +157,7 @@ function PaginaDetalheCliente() {
 // ── Guard de Autenticação ────────────────────────────────────────────────
 
 function RotaProtegida({ children, modulo }: { children: React.ReactNode, modulo?: string }) {
-  const { usuario, estaAutenticado, estaCarregando } = useAuth();
+  const { usuario, estaAutenticado, estaCarregando, temAcessoRecurso } = useAuth();
 
   if (estaCarregando) {
     return (
@@ -184,12 +184,48 @@ function RotaProtegida({ children, modulo }: { children: React.ReactNode, modulo
   // Admin Mestre sempre tem acesso
   if (usuario.email === 'gui.gomesassis@gmail.com') return <>{children}</>;
 
-  // Se for admin, tem acesso a tudo
+  // Verificar permissão no nível de empresa (tenant) para outros usuários e admins
+  if (modulo) {
+    let temAcessoTenant = true;
+    if (modulo === 'ordens') {
+      temAcessoTenant = temAcessoRecurso('modulo_ordens');
+    } else if (modulo === 'clientes') {
+      const path = window.location.pathname;
+      if (path.includes('clientes-cac')) {
+        temAcessoTenant = temAcessoRecurso('modulo_clientes_cac');
+      } else {
+        temAcessoTenant = temAcessoRecurso('modulo_clientes');
+      }
+    } else if (modulo === 'orcamentos') {
+      temAcessoTenant = temAcessoRecurso('modulo_orcamentos');
+    } else if (modulo === 'recibos') {
+      temAcessoTenant = temAcessoRecurso('modulo_recibos');
+    } else if (modulo === 'agendamentos') {
+      temAcessoTenant = temAcessoRecurso('modulo_agendamentos');
+    } else if (modulo === 'financeiro') {
+      temAcessoTenant = temAcessoRecurso('fin_fluxo_caixa') || temAcessoRecurso('fin_relatorio_equipe') || temAcessoRecurso('fin_exportacao');
+    } else if (modulo === 'painel') {
+      temAcessoTenant = temAcessoRecurso('dash_atencao_diaria') || temAcessoRecurso('dash_alertas_vencimento') || 
+                        temAcessoRecurso('dash_lembretes') || temAcessoRecurso('dash_resumo_os') || 
+                        temAcessoRecurso('dash_margem_operacional') || temAcessoRecurso('dash_resumo_operacional') || 
+                        temAcessoRecurso('dash_resumo_orcamentos') || temAcessoRecurso('dash_ordens_recentes');
+    } else if (modulo === 'rotina') {
+      temAcessoTenant = temAcessoRecurso('dash_atencao_diaria');
+    } else if (modulo === 'agenda') {
+      temAcessoTenant = temAcessoRecurso('dash_lembretes');
+    }
+
+    if (!temAcessoTenant) {
+      return <Navigate to="/" replace />;
+    }
+  }
+
+  // Se for admin da empresa, tem acesso a tudo liberado para o tenant
   if (usuario.role === 'admin') return <>{children}</>;
 
-  // Se houver um módulo específico, verifica permissão
+  // Se houver um módulo específico, verifica permissão do colaborador
   if (modulo && !usuario.permissoes?.includes(modulo)) {
-    return <Navigate to="/ordens" replace />; // Redireciona para o padrão (Ordens)
+    return <Navigate to="/" replace />;
   }
 
   return <>{children}</>;
