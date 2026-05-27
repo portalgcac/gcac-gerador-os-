@@ -687,7 +687,7 @@ export function GestaoUsuarios() {
                   <label className="text-xs font-bold text-gray-500 uppercase block mb-1">
                     Ferramentas / Recursos Liberados
                   </label>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[220px] overflow-y-auto pr-1 custom-scrollbar">
+                  <div className="flex flex-col gap-2 max-h-[320px] overflow-y-auto pr-1 custom-scrollbar">
                     {RECURSOS_SISTEMA.map(rec => {
                       const ativo = empresaEditando.recursos_liberados?.includes(rec.key);
                       return (
@@ -703,17 +703,17 @@ export function GestaoUsuarios() {
                               recursos_liberados: novosRecursos
                             });
                           }}
-                          className={`flex items-center justify-between p-2.5 rounded-lg border text-[11px] transition-all text-left ${
+                          className={`flex items-center justify-between p-2.5 rounded-lg border text-xs transition-all text-left ${
                             ativo
                               ? 'bg-brand-blue/10 border-brand-blue/30 text-white font-bold'
-                              : 'bg-brand-dark-4 border-brand-dark-5 text-gray-500 hover:border-gray-700'
+                              : 'bg-brand-dark-4 border-brand-dark-5 text-gray-400 hover:border-gray-700'
                           }`}
                         >
-                          <span className="truncate">{rec.label}</span>
+                          <span className="break-words pr-4">{rec.label}</span>
                           {ativo ? (
-                            <CheckCircle size={12} className="text-brand-green shrink-0 ml-1" />
+                            <CheckCircle size={14} className="text-brand-green shrink-0 ml-1" />
                           ) : (
-                            <div className="w-3 h-3 rounded-full border border-gray-700 shrink-0 ml-1" />
+                            <div className="w-3.5 h-3.5 rounded-full border border-gray-700 shrink-0 ml-1" />
                           )}
                         </button>
                       );
