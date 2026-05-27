@@ -52,8 +52,9 @@ export function AbaCreditos({ cliente }: { cliente: Cliente }) {
       setDescricao('');
       setShowForm(false);
       carregar();
-    } catch (error) {
-      alert('Erro ao salvar crédito');
+    } catch (error: any) {
+      console.error('Erro ao salvar crédito:', error);
+      alert(`Erro ao salvar crédito: ${error?.message || JSON.stringify(error) || 'Erro desconhecido'}`);
     }
   };
 
@@ -62,8 +63,9 @@ export function AbaCreditos({ cliente }: { cliente: Cliente }) {
       try {
         await deletarCredito(id);
         carregar();
-      } catch (error) {
-        alert('Erro ao excluir');
+      } catch (error: any) {
+        console.error('Erro ao excluir crédito:', error);
+        alert(`Erro ao excluir: ${error?.message || JSON.stringify(error) || 'Erro desconhecido'}`);
       }
     }
   };
@@ -101,7 +103,7 @@ export function AbaCreditos({ cliente }: { cliente: Cliente }) {
               <select 
                 value={tipo} 
                 onChange={(e) => setTipo(e.target.value as any)}
-                className="input-field w-full"
+                className="select w-full"
               >
                 <option value="entrada">Entrada (Adicionar Saldo)</option>
                 <option value="saida">Saída (Remover Saldo)</option>
@@ -117,7 +119,7 @@ export function AbaCreditos({ cliente }: { cliente: Cliente }) {
                   if (!v) v = '0';
                   setValor((Number(v) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
                 }}
-                className="input-field w-full"
+                className="input w-full"
                 placeholder="0,00"
                 required
               />
@@ -128,7 +130,7 @@ export function AbaCreditos({ cliente }: { cliente: Cliente }) {
                 type="text" 
                 value={descricao}
                 onChange={(e) => setDescricao(e.target.value)}
-                className="input-field w-full"
+                className="input w-full"
                 placeholder="Ex: Troco de serviço, Ajuste manual..."
                 required
               />
