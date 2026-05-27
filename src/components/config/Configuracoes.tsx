@@ -1049,6 +1049,122 @@ export function Configuracoes() {
         )}
       </div>
 
+      {/* ── Notificações Push ── */}
+      <div className="card space-y-4">
+        <div className="flex items-center gap-2 pb-3 border-b border-brand-dark-5">
+          <Bell className="text-brand-blue" size={18} />
+          <div>
+            <h2 className="text-sm font-bold text-white uppercase tracking-wider">Notificações no Celular</h2>
+            <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mt-0.5">
+              Alertas de vencimento direto na sua tela
+            </p>
+          </div>
+        </div>
+
+        {/* Status atual */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            {pushAtivo ? (
+              <div className="w-2.5 h-2.5 rounded-full bg-brand-green animate-pulse" />
+            ) : (
+              <div className="w-2.5 h-2.5 rounded-full bg-gray-600" />
+            )}
+            <p className="text-sm font-bold text-white">
+              {pushPermissao === 'unsupported'
+                ? 'Não suportado neste navegador'
+                : pushPermissao === 'denied'
+                ? 'Notificações bloqueadas'
+                : pushAtivo
+                ? 'Notificações ativadas neste dispositivo'
+                : 'Notificações desativadas'}
+            </p>
+          </div>
+        </div>
+
+        {/* Aviso de bloqueio */}
+        {pushPermissao === 'denied' && (
+          <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3 text-xs text-red-400">
+            <strong>Permissão bloqueada.</strong> Vá nas configurações do navegador/celular,
+            encontre este site e ative as notificações manualmente. Depois volte aqui e ative.
+          </div>
+        )}
+
+        {/* Aviso iOS sem instalar */}
+        {isIOS() && !pushInstalado && pushPermissao !== 'denied' && (
+          <div className="bg-brand-blue/10 border border-brand-blue/20 rounded-xl p-3 space-y-2">
+            <p className="text-xs font-bold text-white flex items-center gap-2">
+              <Smartphone size={14} className="text-brand-blue" />
+              iPhone detectado — instale o app primeiro
+            </p>
+            <p className="text-xs text-gray-400 leading-relaxed">
+              No Safari, toque no ícone <strong className="text-white">Compartilhar ↑</strong> e escolha
+              <strong className="text-white"> "Adicionar à Tela de Início"</strong>.
+              Depois abra o app pela tela inicial e ative as notificações aqui.
+            </p>
+          </div>
+        )}
+
+        {/* Botões de ação */}
+        {pushPermissao !== 'denied' && pushPermissao !== 'unsupported' && (
+          <div className="flex flex-wrap gap-2">
+            {!pushAtivo ? (
+              <button
+                onClick={async () => {
+                  if (!usuario?.empresaId) return;
+                  setPushCarregando(true);
+                  const resultado = await ativarNotificacoesPush(usuario.empresaId);
+                  if (resultado.sucesso) {
+                    setPushAtivo(true);
+                    setPushPermissao('granted');
+                    await enviarNotificacaoTeste();
+                    mostrar('sucesso', 'Notificações ativadas! Você receberá alertas de vencimentos.');
+                  } else {
+                    mostrar('erro', resultado.erro || 'Erro ao ativar notificações.');
+                  }
+                  setPushCarregando(false);
+                }}
+                disabled={pushCarregando || (isIOS() && !pushInstalado)}
+                className="btn-primary flex items-center gap-2 text-xs py-2.5"
+              >
+                {pushCarregando ? <Loader2 size={14} className="animate-spin" /> : <Bell size={14} />}
+                {pushCarregando ? 'Ativando...' : 'Ativar Notificações neste Celular'}
+              </button>
+            ) : (
+              <>
+                <button
+                  onClick={async () => {
+                    await enviarNotificacaoTeste();
+                    mostrar('sucesso', 'Notificação de teste enviada!');
+                  }}
+                  className="btn-ghost flex items-center gap-2 text-xs py-2.5 border border-brand-dark-5"
+                >
+                  <CheckCircle2 size={14} className="text-brand-green" /> Testar Notificação
+                </button>
+                <button
+                  onClick={async () => {
+                    if (!usuario?.empresaId) return;
+                    setPushCarregando(true);
+                    await desativarNotificacoesPush(usuario.empresaId);
+                    setPushAtivo(false);
+                    mostrar('info', 'Notificações desativadas neste dispositivo.');
+                    setPushCarregando(false);
+                  }}
+                  disabled={pushCarregando}
+                  className="btn-ghost flex items-center gap-2 text-xs py-2.5 text-red-400 border border-red-500/20 hover:bg-red-500/10"
+                >
+                  <BellOff size={14} /> Desativar
+                </button>
+              </>
+            )}
+          </div>
+        )}
+
+        <p className="text-[10px] text-gray-600 leading-relaxed">
+          As notificações são enviadas todo dia às <strong className="text-gray-400">09:00h</strong> somente quando
+          há documentos com prazo a vencer naquele dia, de acordo com as suas configurações de alerta acima.
+        </p>
+      </div>
+
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
         {/* ── Conta Google ── */}
         <div className="card space-y-4 h-fit">
