@@ -619,7 +619,7 @@ export function Configuracoes() {
           )}
 
           <p className="text-[10px] text-gray-600 leading-relaxed">
-            As notificações são enviadas todo dia às <strong className="text-gray-400">07:00h</strong> somente quando
+            As notificações são enviadas todo dia às <strong className="text-gray-400">09:00h</strong> somente quando
             há documentos com prazo a vencer naquele dia, de acordo com as suas configurações de alerta acima.
           </p>
         </div>

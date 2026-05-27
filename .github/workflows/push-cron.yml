@@ -1,9 +1,9 @@
 name: Enviar Push Notifications Diárias
 
 on:
-  # Roda todo dia às 10:00 UTC = 07:00 horário de Brasília (GMT-3)
+  # Roda todo dia às 12:00 UTC = 09:00 horário de Brasília (GMT-3)
   schedule:
-    - cron: '0 10 * * *'
+    - cron: '0 12 * * *'
 
   # Permite executar manualmente pelo painel do GitHub (para testes)
   workflow_dispatch:

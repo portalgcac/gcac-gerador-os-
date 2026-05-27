@@ -1,5 +1,5 @@
 // Supabase Edge Function — Envio diário de push notifications de vencimentos
-// Executada via GitHub Actions todo dia às 07:00 (horário de Brasília)
+// Executada via GitHub Actions todo dia às 09:00 (horário de Brasília)
 // Deno runtime
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
