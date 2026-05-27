@@ -269,6 +269,7 @@ export interface DadosEmpresa {
   contatoTelefone?: string;
   endereco?: string;
   cnpj?: string;
+  recursosLiberados?: string[];
 }
 
 export interface UsuarioGoogle {

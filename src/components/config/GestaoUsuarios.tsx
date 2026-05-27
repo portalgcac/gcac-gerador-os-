@@ -30,6 +30,22 @@ const MODULOS = [
   { slug: 'config', label: 'Configurações' },
 ];
 
+const RECURSOS_SISTEMA = [
+  { key: 'dash_atencao_diaria', label: 'Dashboard — Atenção Diária' },
+  { key: 'dash_alertas_vencimento', label: 'Dashboard — Alertas Vencimentos' },
+  { key: 'dash_lembretes', label: 'Dashboard — Lembretes da Equipe' },
+  { key: 'dash_resumo_os', label: 'Dashboard — Resumo OS' },
+  { key: 'dash_margem_operacional', label: 'Dashboard — Margem e Lucros' },
+  { key: 'dash_resumo_operacional', label: 'Dashboard — Resumo Operacional' },
+  { key: 'dash_resumo_orcamentos', label: 'Dashboard — Resumo Orçamentos' },
+  { key: 'dash_ordens_recentes', label: 'Dashboard — Ordens Recentes' },
+  { key: 'fin_fluxo_caixa', label: 'Financeiro — Fluxo de Caixa' },
+  { key: 'fin_relatorio_equipe', label: 'Financeiro — Relatório da Equipe' },
+  { key: 'fin_exportacao', label: 'Financeiro — Exportação Relatórios' },
+  { key: 'acervo_anexos', label: 'Acervo — Salvar Anexos' },
+  { key: 'acervo_gerenciador', label: 'Acervo — Gerenciar Vinculados (Escrita)' },
+];
+
 export function GestaoUsuarios() {
   const { usuario } = useAuth();
   const isMasterAdmin = usuario?.email === 'gui.gomesassis@gmail.com';
@@ -39,12 +55,12 @@ export function GestaoUsuarios() {
   const { estado: notif, mostrar, fechar } = useNotificacao();
 
   // Empresas State (only for master admin)
-  const [empresas, setEmpresas] = useState<{ id: string; nome: string; tipo_conta?: string; limite_cac_vinculados?: number }[]>([]);
+  const [empresas, setEmpresas] = useState<{ id: string; nome: string; tipo_conta?: string; limite_cac_vinculados?: number; recursos_liberados?: string[] }[]>([]);
   const [novaEmpresaNome, setNovaEmpresaNome] = useState('');
   const [novaEmpresaTipo, setNovaEmpresaTipo] = useState<'empresa' | 'cac_individual'>('empresa');
   const [carregandoEmpresas, setCarregandoEmpresas] = useState(false);
   const [mostrarGerenciarEmpresas, setMostrarGerenciarEmpresas] = useState(false);
-  const [empresaEditando, setEmpresaEditando] = useState<{ id: string; nome: string; tipo_conta: 'empresa' | 'cac_individual'; limite_cac_vinculados?: number } | null>(null);
+  const [empresaEditando, setEmpresaEditando] = useState<{ id: string; nome: string; tipo_conta: 'empresa' | 'cac_individual'; limite_cac_vinculados?: number; recursos_liberados: string[] } | null>(null);
   const [confirmandoDeleteEmpresa, setConfirmandoDeleteEmpresa] = useState<{ id: string; nome: string } | null>(null);
   
   // Modal State
@@ -65,7 +81,7 @@ export function GestaoUsuarios() {
     setCarregandoEmpresas(true);
     const { data, error } = await supabase
       .from('empresas')
-      .select('id, nome, tipo_conta, limite_cac_vinculados')
+      .select('id, nome, tipo_conta, limite_cac_vinculados, recursos_liberados')
       .order('nome');
     if (!error && data) {
       setEmpresas(data);
@@ -204,7 +220,8 @@ export function GestaoUsuarios() {
         .update({
           nome: empresaEditando.nome.trim(),
           tipo_conta: empresaEditando.tipo_conta,
-          limite_cac_vinculados: empresaEditando.tipo_conta === 'empresa' ? (empresaEditando.limite_cac_vinculados || 10) : null
+          limite_cac_vinculados: empresaEditando.tipo_conta === 'empresa' ? (empresaEditando.limite_cac_vinculados || 10) : null,
+          recursos_liberados: empresaEditando.recursos_liberados
         })
         .eq('id', empresaEditando.id);
 
@@ -356,7 +373,8 @@ export function GestaoUsuarios() {
                             id: e.id,
                             nome: e.nome,
                             tipo_conta: (e.tipo_conta || 'empresa') as any,
-                            limite_cac_vinculados: e.limite_cac_vinculados ?? 10
+                            limite_cac_vinculados: e.limite_cac_vinculados ?? 10,
+                            recursos_liberados: e.recursos_liberados || []
                           })}
                           className="p-1.5 text-gray-400 hover:text-brand-blue-light rounded-lg hover:bg-brand-dark-3 transition-colors"
                           title="Editar Empresa"
@@ -608,7 +626,7 @@ export function GestaoUsuarios() {
       {/* Modal de Editar Empresa */}
       {empresaEditando && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm">
-          <div className="bg-brand-dark-3 border border-brand-dark-5 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl animate-scale-in">
+          <div className="bg-brand-dark-3 border border-brand-dark-5 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl animate-scale-in">
             <div className="bg-brand-dark-2 px-6 py-4 border-b border-brand-dark-5 flex items-center justify-between">
               <h3 className="font-bold text-white flex items-center gap-2">
                 <Building size={18} className="text-brand-blue" />
@@ -619,7 +637,7 @@ export function GestaoUsuarios() {
               </button>
             </div>
 
-            <form onSubmit={handleSalvarEdicaoEmpresa} className="p-6 space-y-4">
+            <form onSubmit={handleSalvarEdicaoEmpresa} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto custom-scrollbar">
               <div className="space-y-1">
                 <label className="text-xs font-bold text-gray-500 uppercase">Nome da Empresa</label>
                 <input
@@ -658,7 +676,47 @@ export function GestaoUsuarios() {
                 </div>
               )}
 
-              <div className="pt-4 flex gap-3">
+              {empresaEditando.tipo_conta === 'empresa' && (
+                <div className="space-y-2 border-t border-brand-dark-5 pt-3">
+                  <label className="text-xs font-bold text-gray-500 uppercase block mb-1">
+                    Ferramentas / Recursos Liberados
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[220px] overflow-y-auto pr-1 custom-scrollbar">
+                    {RECURSOS_SISTEMA.map(rec => {
+                      const ativo = empresaEditando.recursos_liberados?.includes(rec.key);
+                      return (
+                        <button
+                          key={rec.key}
+                          type="button"
+                          onClick={() => {
+                            const novosRecursos = ativo
+                              ? (empresaEditando.recursos_liberados || []).filter(r => r !== rec.key)
+                              : [...(empresaEditando.recursos_liberados || []), rec.key];
+                            setEmpresaEditando({
+                              ...empresaEditando,
+                              recursos_liberados: novosRecursos
+                            });
+                          }}
+                          className={`flex items-center justify-between p-2.5 rounded-lg border text-[11px] transition-all text-left ${
+                            ativo
+                              ? 'bg-brand-blue/10 border-brand-blue/30 text-white font-bold'
+                              : 'bg-brand-dark-4 border-brand-dark-5 text-gray-500 hover:border-gray-700'
+                          }`}
+                        >
+                          <span className="truncate">{rec.label}</span>
+                          {ativo ? (
+                            <CheckCircle size={12} className="text-brand-green shrink-0 ml-1" />
+                          ) : (
+                            <div className="w-3 h-3 rounded-full border border-gray-700 shrink-0 ml-1" />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              <div className="pt-4 flex gap-3 border-t border-brand-dark-5">
                 <button
                   type="button"
                   onClick={() => setEmpresaEditando(null)}

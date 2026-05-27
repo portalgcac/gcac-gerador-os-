@@ -25,13 +25,40 @@ const links = [
   { to: '/configuracoes', label: 'Configurações', icon: Settings,      slug: 'config' },
 ].sort((a, b) => a.label.localeCompare(b.label));
 
-const filtrarLinks = (usuario: any) => {
-  return links.filter(link => {
-    if (usuario?.tipoConta === 'cac_individual') {
-      return (link.slug === 'clientes' && link.to === '/clientes') || link.slug === 'agenda' || link.slug === 'config';
-    }
-    return usuario?.permissoes?.includes(link.slug) || usuario?.role === 'admin';
-  });
+const temAcessoLink = (link: typeof links[0], usuario: any, temAcessoRecurso: (r: string) => boolean) => {
+  if (usuario?.tipoConta === 'cac_individual') {
+    return (link.slug === 'clientes' && link.to === '/clientes') || link.slug === 'agenda' || link.slug === 'config';
+  }
+
+  // Verificar permissão no nível de usuário
+  const temPermissaoUser = usuario?.permissoes?.includes(link.slug) || usuario?.role === 'admin';
+  if (!temPermissaoUser) return false;
+
+  // Verificar permissão no nível de empresa (tenant)
+  if (link.slug === 'financeiro') {
+    return temAcessoRecurso('fin_fluxo_caixa') || temAcessoRecurso('fin_relatorio_equipe') || temAcessoRecurso('fin_exportacao');
+  }
+  if (link.slug === 'painel') {
+    return temAcessoRecurso('dash_atencao_diaria') || temAcessoRecurso('dash_alertas_vencimento') || 
+           temAcessoRecurso('dash_lembretes') || temAcessoRecurso('dash_resumo_os') || 
+           temAcessoRecurso('dash_margem_operacional') || temAcessoRecurso('dash_resumo_operacional') || 
+           temAcessoRecurso('dash_resumo_orcamentos') || temAcessoRecurso('dash_ordens_recentes');
+  }
+  if (link.slug === 'rotina') {
+    return temAcessoRecurso('dash_atencao_diaria');
+  }
+  if (link.slug === 'agenda') {
+    return temAcessoRecurso('dash_lembretes');
+  }
+  if (link.slug === 'orcamentos') {
+    return temAcessoRecurso('dash_resumo_orcamentos');
+  }
+
+  return true;
+};
+
+const filtrarLinks = (usuario: any, temAcessoRecurso: (r: string) => boolean) => {
+  return links.filter(link => temAcessoLink(link, usuario, temAcessoRecurso));
 };
 
 const getLinkLabel = (link: typeof links[0], usuario: any) => {
@@ -43,7 +70,7 @@ const getLinkLabel = (link: typeof links[0], usuario: any) => {
 };
 
 export function Sidebar() {
-  const { usuario, logout } = useAuth();
+  const { usuario, logout, temAcessoRecurso } = useAuth();
   const { ordens, itensFila } = useOrdens();
   const { lembretes } = useLembretes();
   const { naoLidas } = useNotificacoesSistema();
@@ -70,7 +97,7 @@ export function Sidebar() {
     setSincronizando(false);
   };
 
-  const linksFiltrados = filtrarLinks(usuario);
+  const linksFiltrados = filtrarLinks(usuario, temAcessoRecurso);
 
   const isAdmin = usuario?.role === 'admin';
 
@@ -258,8 +285,8 @@ export function Sidebar() {
 export function NavegacaoInferior() {
   const { itensFila } = useOrdens();
 
-  const { usuario } = useAuth();
-  const linksFiltrados = filtrarLinks(usuario);
+  const { usuario, temAcessoRecurso } = useAuth();
+  const linksFiltrados = filtrarLinks(usuario, temAcessoRecurso);
   const isAdmin = usuario?.role === 'admin';
 
   const getShortLabel = (label: string) => {

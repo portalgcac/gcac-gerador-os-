@@ -10,6 +10,7 @@ interface AuthContextType {
   login: (tokenResponse: { access_token: string }) => Promise<void>;
   logout: () => void;
   refreshUsuario: () => Promise<void>;
+  temAcessoRecurso: (recurso: string) => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -60,7 +61,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (rawEmpresaId) {
         const { data: empData } = await supabase
           .from('empresas')
-          .select('nome, tipo_conta, modulos_ativos, clube_parceiro_padrao, razao_social_fantasia, responsavel_nome, contato_telefone, endereco, cnpj')
+          .select('nome, tipo_conta, modulos_ativos, clube_parceiro_padrao, razao_social_fantasia, responsavel_nome, contato_telefone, endereco, cnpj, recursos_liberados')
           .eq('id', rawEmpresaId)
           .single();
         if (empData) {
@@ -76,7 +77,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             responsavelNome: empData.responsavel_nome,
             contatoTelefone: empData.contato_telefone,
             endereco: empData.endereco,
-            cnpj: empData.cnpj
+            cnpj: empData.cnpj,
+            recursosLiberados: empData.recursos_liberados || []
           };
         }
 
@@ -186,7 +188,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (rawEmpresaId) {
         const { data: empData } = await supabase
           .from('empresas')
-          .select('nome, tipo_conta, modulos_ativos, clube_parceiro_padrao, razao_social_fantasia, responsavel_nome, contato_telefone, endereco, cnpj')
+          .select('nome, tipo_conta, modulos_ativos, clube_parceiro_padrao, razao_social_fantasia, responsavel_nome, contato_telefone, endereco, cnpj, recursos_liberados')
           .eq('id', rawEmpresaId)
           .single();
         if (empData) {
@@ -202,7 +204,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             responsavelNome: empData.responsavel_nome,
             contatoTelefone: empData.contato_telefone,
             endereco: empData.endereco,
-            cnpj: empData.cnpj
+            cnpj: empData.cnpj,
+            recursosLiberados: empData.recursos_liberados || []
           };
         }
 
@@ -250,6 +253,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // We can delete the duplicate logout declaration at the end since we moved it to the top.
 
+  const temAcessoRecurso = useCallback((recurso: string): boolean => {
+    if (!usuario) return false;
+    // Administrador mestre tem acesso total a tudo
+    if (usuario.email === 'gui.gomesassis@gmail.com') return true;
+
+    // CAC Individual tem acesso total aos recursos do acervo
+    if (usuario.tipoConta === 'cac_individual') return true;
+
+    // Contas de empresa dependem das permissões do tenant (recursosLiberados)
+    const recursos = usuario.dadosEmpresa?.recursosLiberados || [];
+    return recursos.includes(recurso);
+  }, [usuario]);
+
   return (
     <AuthContext.Provider value={{
       usuario,
@@ -257,7 +273,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       estaCarregando,
       login,
       logout,
-      refreshUsuario
+      refreshUsuario,
+      temAcessoRecurso
     }}>
       {children}
     </AuthContext.Provider>

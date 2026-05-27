@@ -18,7 +18,7 @@ export function Dashboard() {
   const { ordens, itensFila } = useOrdens();
   const { orcamentos } = useOrcamentos();
   const { despesas } = useFinanceiro();
-  const { usuario } = useAuth();
+  const { usuario, temAcessoRecurso } = useAuth();
   const online = useStatusConexao();
 
   const dataAtual = new Date();
@@ -77,7 +77,7 @@ export function Dashboard() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <BriefingDiario />
+      {temAcessoRecurso('dash_atencao_diaria') && <BriefingDiario />}
       {/* ── Saudação ── */}
       <div className="flex items-start justify-between flex-wrap gap-3">
         <div>
@@ -102,7 +102,7 @@ export function Dashboard() {
         </div>
       </div>
       {/* ── Widget de Atenção (Rotina Diária) ── */}
-      {possuiAlertas && (
+      {temAcessoRecurso('dash_atencao_diaria') && possuiAlertas && (
         <div 
           onClick={() => navigate('/rotina')}
           className="bg-brand-blue/10 border border-brand-blue/30 rounded-2xl p-4 flex items-center justify-between cursor-pointer group hover:bg-brand-blue/20 transition-all shadow-[0_0_15px_rgba(45,141,224,0.1)]"
@@ -132,46 +132,48 @@ export function Dashboard() {
       )}
 
       {/* ── Widget de Lembretes ── */}
-      <WidgetLembretes />
-      <WidgetVencimentos />
+      {temAcessoRecurso('dash_lembretes') && <WidgetLembretes />}
+      {temAcessoRecurso('dash_alertas_vencimento') && <WidgetVencimentos />}
 
       {/* ── Cards de Estatísticas ── */}
-      <div className="space-y-3">
-        <div className="flex items-center gap-2 mb-2">
-          <div className="w-1 h-4 bg-brand-blue rounded-full" />
-          <h2 className="text-xs font-bold text-gray-500 uppercase tracking-widest">Resumo de Ordens de Serviço</h2>
+      {temAcessoRecurso('dash_resumo_os') && (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-1 h-4 bg-brand-blue rounded-full" />
+            <h2 className="text-xs font-bold text-gray-500 uppercase tracking-widest">Resumo de Ordens de Serviço</h2>
+          </div>
+          <div className={`grid grid-cols-1 ${ehAdmin ? 'sm:grid-cols-3' : 'sm:grid-cols-1'} gap-3`}>
+            <StatCard
+              titulo="Total de OS (Mês Atual)"
+              valor={stats.total}
+              icone={<FileText size={20} className="text-brand-blue-light" />}
+              cor="blue"
+              onClick={() => navigate('/ordens')}
+            />
+            {ehAdmin && (
+              <>
+                <StatCard
+                  titulo="Pagamento Pendente"
+                  valor={stats.pendente}
+                  icone={<Clock size={20} className="text-yellow-400" />}
+                  cor="yellow"
+                  onClick={() => navigate('/ordens')}
+                />
+                <StatCard
+                  titulo="Pagas"
+                  valor={stats.pagas}
+                  icone={<CheckCircle size={20} className="text-brand-green" />}
+                  cor="green"
+                  onClick={() => navigate('/ordens')}
+                />
+              </>
+            )}
+          </div>
         </div>
-        <div className={`grid grid-cols-1 ${ehAdmin ? 'sm:grid-cols-3' : 'sm:grid-cols-1'} gap-3`}>
-          <StatCard
-            titulo="Total de OS (Mês Atual)"
-            valor={stats.total}
-            icone={<FileText size={20} className="text-brand-blue-light" />}
-            cor="blue"
-            onClick={() => navigate('/ordens')}
-          />
-          {ehAdmin && (
-            <>
-              <StatCard
-                titulo="Pagamento Pendente"
-                valor={stats.pendente}
-                icone={<Clock size={20} className="text-yellow-400" />}
-                cor="yellow"
-                onClick={() => navigate('/ordens')}
-              />
-              <StatCard
-                titulo="Pagas"
-                valor={stats.pagas}
-                icone={<CheckCircle size={20} className="text-brand-green" />}
-                cor="green"
-                onClick={() => navigate('/ordens')}
-              />
-            </>
-          )}
-        </div>
-      </div>
+      )}
 
       {/* ── Banner de Receita e Lucro ── */}
-      {ehAdmin && (
+      {temAcessoRecurso('dash_margem_operacional') && ehAdmin && (
         <div className="card bg-gradient-to-br from-brand-dark-3 to-brand-dark-2 border border-brand-dark-5 overflow-hidden relative">
           <div className="absolute top-0 right-0 w-32 h-32 bg-brand-green/5 rounded-full blur-3xl -mr-16 -mt-16" />
           
@@ -213,47 +215,49 @@ export function Dashboard() {
       )}
 
       {/* ── Resumo Operacional ── */}
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-base font-bold text-white flex items-center gap-2">
-            <Loader size={18} className="text-brand-blue-light" />
-            Resumo Operacional
-          </h2>
-          <span className="text-xs text-brand-metal font-medium uppercase tracking-wider">Status de Execução</span>
-        </div>
-        
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-          {STATUS_EXECUCAO_SERVICO.map(status => (
-            <div 
-              key={status} 
-              onClick={() => navigate('/ordens', { state: { filtroStatusExecucao: status } })}
-              className="card bg-brand-dark-3/50 border-brand-dark-5 p-3 flex flex-col gap-1 cursor-pointer hover:border-brand-blue/30 hover:bg-brand-dark-3 transition-all group"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-xl">{iconeStatusExecucao(status)}</span>
-                <span className="text-lg font-black text-white">{operStats[status]}</span>
+      {temAcessoRecurso('dash_resumo_operacional') && (
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-base font-bold text-white flex items-center gap-2">
+              <Loader size={18} className="text-brand-blue-light" />
+              Resumo Operacional
+            </h2>
+            <span className="text-xs text-brand-metal font-medium uppercase tracking-wider">Status de Execução</span>
+          </div>
+          
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+            {STATUS_EXECUCAO_SERVICO.map(status => (
+              <div 
+                key={status} 
+                onClick={() => navigate('/ordens', { state: { filtroStatusExecucao: status } })}
+                className="card bg-brand-dark-3/50 border-brand-dark-5 p-3 flex flex-col gap-1 cursor-pointer hover:border-brand-blue/30 hover:bg-brand-dark-3 transition-all group"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xl">{iconeStatusExecucao(status)}</span>
+                  <span className="text-lg font-black text-white">{operStats[status]}</span>
+                </div>
+                <p className="text-[10px] font-bold text-gray-500 uppercase truncate" title={status}>
+                  {status === 'Iniciado — Montando Processo' ? 'Iniciado' : 
+                   status === 'Protocolado — Ag. PF' ? 'Protocolado' : status}
+                </p>
+                <div className="w-full h-1 bg-brand-dark-5 rounded-full mt-1 overflow-hidden">
+                  <div 
+                    className={`h-full opacity-50 ${
+                      status === 'Concluído' ? 'bg-brand-green' : 
+                      status === 'Não Iniciado' ? 'bg-gray-500' :
+                      'bg-brand-blue'
+                    }`}
+                    style={{ width: `${todosServicos.length > 0 ? (operStats[status] / todosServicos.length) * 100 : 0}%` }}
+                  />
+                </div>
               </div>
-              <p className="text-[10px] font-bold text-gray-500 uppercase truncate" title={status}>
-                {status === 'Iniciado — Montando Processo' ? 'Iniciado' : 
-                 status === 'Protocolado — Ag. PF' ? 'Protocolado' : status}
-              </p>
-              <div className="w-full h-1 bg-brand-dark-5 rounded-full mt-1 overflow-hidden">
-                <div 
-                  className={`h-full opacity-50 ${
-                    status === 'Concluído' ? 'bg-brand-green' : 
-                    status === 'Não Iniciado' ? 'bg-gray-500' :
-                    'bg-brand-blue'
-                  }`}
-                  style={{ width: `${todosServicos.length > 0 ? (operStats[status] / todosServicos.length) * 100 : 0}%` }}
-                />
-              </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* ── Resumo de Orçamentos ── */}
-      {ehAdmin && (
+      {temAcessoRecurso('dash_resumo_orcamentos') && ehAdmin && (
         <div>
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-base font-bold text-white flex items-center gap-2">
@@ -299,55 +303,57 @@ export function Dashboard() {
       )}
 
       {/* ── Ordens Recentes ── */}
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-base font-bold text-white">Ordens Recentes</h2>
-          <button onClick={() => navigate('/ordens')} className="text-sm text-brand-blue-light hover:text-white transition-colors">
-            Ver todas →
-          </button>
-        </div>
-
-        {recentes.length === 0 ? (
-          <div className="card text-center py-10">
-            <FileText size={32} className="text-gray-600 mx-auto mb-3" />
-            <p className="text-gray-400 mb-4">Nenhuma OS criada ainda</p>
-            <button onClick={() => navigate('/ordens/nova')} className="btn-primary mx-auto">
-              <Plus size={16} />
-              Criar primeira OS
+      {temAcessoRecurso('dash_ordens_recentes') && (
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-base font-bold text-white">Ordens Recentes</h2>
+            <button onClick={() => navigate('/ordens')} className="text-sm text-brand-blue-light hover:text-white transition-colors">
+              Ver todas →
             </button>
           </div>
-        ) : (
-          <div className="space-y-2">
-            {recentes.map(ordem => (
-              <div
-                key={ordem.id}
-                onClick={() => navigate(`/ordens/${ordem.id}`)}
-                className="card-hover flex items-center gap-3"
-              >
-                <div className="flex-shrink-0 w-12 text-center">
-                  <p className="text-xs text-gray-500 leading-none">OS</p>
-                  <p className="text-sm font-bold text-white">#{String(ordem.numero).padStart(4, '0')}</p>
-                  {ordem.migrado && (
-                    <span className="text-[8px] font-black text-brand-blue-light border border-brand-blue/30 px-1 rounded-sm mt-1 inline-block uppercase tracking-tighter">Histórico</span>
-                  )}
+
+          {recentes.length === 0 ? (
+            <div className="card text-center py-10">
+              <FileText size={32} className="text-gray-600 mx-auto mb-3" />
+              <p className="text-gray-400 mb-4">Nenhuma OS criada ainda</p>
+              <button onClick={() => navigate('/ordens/nova')} className="btn-primary mx-auto">
+                <Plus size={16} />
+                Criar primeira OS
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {recentes.map(ordem => (
+                <div
+                  key={ordem.id}
+                  onClick={() => navigate(`/ordens/${ordem.id}`)}
+                  className="card-hover flex items-center gap-3"
+                >
+                  <div className="flex-shrink-0 w-12 text-center">
+                    <p className="text-xs text-gray-500 leading-none">OS</p>
+                    <p className="text-sm font-bold text-white">#{String(ordem.numero).padStart(4, '0')}</p>
+                    {ordem.migrado && (
+                      <span className="text-[8px] font-black text-brand-blue-light border border-brand-blue/30 px-1 rounded-sm mt-1 inline-block uppercase tracking-tighter">Histórico</span>
+                    )}
+                  </div>
+                  <div className="w-px h-8 bg-brand-dark-5 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-white">{ordem.nomeCliente}</p>
+                    <p className="text-xs text-gray-400">{formatarData(ordem.criadoEm)}</p>
+                  </div>
+                  <div className="flex-shrink-0 flex items-center gap-2">
+                    {ehAdmin && (
+                      <span className="text-sm font-bold text-brand-green">{formatarMoeda(ordem.valor)}</span>
+                    )}
+                    <span className={classeStatus(ordem.status)}>{ordem.status}</span>
+                    <ChevronRight size={14} className="text-gray-600" />
+                  </div>
                 </div>
-                <div className="w-px h-8 bg-brand-dark-5 flex-shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-white">{ordem.nomeCliente}</p>
-                  <p className="text-xs text-gray-400">{formatarData(ordem.criadoEm)}</p>
-                </div>
-                <div className="flex-shrink-0 flex items-center gap-2">
-                  {ehAdmin && (
-                    <span className="text-sm font-bold text-brand-green">{formatarMoeda(ordem.valor)}</span>
-                  )}
-                  <span className={classeStatus(ordem.status)}>{ordem.status}</span>
-                  <ChevronRight size={14} className="text-gray-600" />
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── Botão de Nova OS ── */}
       <button
