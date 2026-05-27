@@ -66,6 +66,8 @@ export interface Cliente {
   numeroCrIbama?: string;
   vencimentoCrIbama?: string;
   fotoUrl?: string;
+  crUrl?: string;
+  crIbamaUrl?: string;
   criadoEm: string;
   atualizadoEm: string;
 }
@@ -81,6 +83,7 @@ export interface Arma {
   numeroSigma: string;
   acervo: 'Caça' | 'Tiro Desportivo' | 'Coleção';
   vencimentoCraf: string;
+  crafUrl?: string;
   criadoEm: string;
 }
 
@@ -90,6 +93,7 @@ export interface GuiaTrafego {
   tipo: 'Treino' | 'Caça' | 'Manutenção' | 'Transferência' | 'Outro';
   vencimento: string;
   destino: string;
+  arquivoUrl?: string;
   criadoEm: string;
 }
 
@@ -101,6 +105,7 @@ export interface AutorizacaoManejo {
   nomeProprietario: string;
   cidade: string;
   vencimento: string;
+  arquivoUrl?: string;
   criadoEm: string;
   status: 'Ativo' | 'Inerte';
 }

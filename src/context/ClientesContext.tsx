@@ -57,6 +57,8 @@ const mapFromDB = (row: any): Cliente => ({
   numeroCrIbama: row.numero_cr_ibama || '',
   vencimentoCrIbama: row.vencimento_cr_ibama || '',
   fotoUrl: row.foto_url || '',
+  crUrl: row.cr_url || '',
+  crIbamaUrl: row.cr_ibama_url || '',
   criadoEm: row.criado_em,
   atualizadoEm: row.atualizado_em,
 });
@@ -76,6 +78,8 @@ const mapToDB = (dados: any) => {
   if (dados.numeroCrIbama !== undefined) payload.numero_cr_ibama = dados.numeroCrIbama;
   if (dados.vencimentoCrIbama !== undefined) payload.vencimento_cr_ibama = dados.vencimentoCrIbama || null;
   if (dados.fotoUrl !== undefined) payload.foto_url = dados.fotoUrl || null;
+  if (dados.crUrl !== undefined) payload.cr_url = dados.crUrl || null;
+  if (dados.crIbamaUrl !== undefined) payload.cr_ibama_url = dados.crIbamaUrl || null;
   return payload;
 };
 
@@ -231,6 +235,7 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
       numeroSigma: row.numero_sigma,
       acervo: row.acervo,
       vencimentoCraf: row.vencimento_craf,
+      crafUrl: row.craf_url,
       criadoEm: row.criado_em
     }));
   }, [usuario]);
@@ -247,6 +252,7 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
       numero_sigma: dados.numeroSigma,
       acervo: dados.acervo,
       vencimento_craf: dados.vencimentoCraf || null,
+      craf_url: (dados as any).crafUrl || null,
       empresa_id: overrideEmpresaId || usuario.empresaId
     };
 
@@ -289,6 +295,7 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
       tipo: row.tipo,
       vencimento: row.vencimento,
       destino: row.destino,
+      arquivoUrl: row.arquivo_url,
       criadoEm: row.criado_em
     }));
   }, [usuario]);
@@ -300,6 +307,7 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
       tipo: dados.tipo,
       vencimento: dados.vencimento,
       destino: dados.destino,
+      arquivo_url: (dados as any).arquivoUrl || null,
       empresa_id: overrideEmpresaId || usuario.empresaId
     };
 
@@ -341,6 +349,7 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
       nomeProprietario: row.nome_proprietario,
       cidade: row.cidade,
       vencimento: row.vencimento,
+      arquivoUrl: row.arquivo_url,
       criadoEm: row.criado_em,
       status: row.status || 'Ativo'
     }));
@@ -356,6 +365,7 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
       cidade: dados.cidade,
       vencimento: dados.vencimento,
       status: dados.status || 'Ativo',
+      arquivo_url: (dados as any).arquivoUrl || null,
       empresa_id: overrideEmpresaId || usuario.empresaId
     };
 

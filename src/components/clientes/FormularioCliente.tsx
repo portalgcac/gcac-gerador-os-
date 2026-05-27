@@ -2,7 +2,8 @@ import React, { useState, useRef } from 'react';
 import { Cliente } from '../../types';
 import { useClientes } from '../../context/ClientesContext';
 import { useAuth } from '../../context/AuthContext';
-import { X, Save, Eye, EyeOff, CheckCircle } from 'lucide-react';
+import { X, Save, Eye, EyeOff, CheckCircle, Upload } from 'lucide-react';
+import { fileToBase64, visualizarDocumentoBase64 } from '../../utils/fileUtils';
 
 interface Props {
   clienteEditando: Cliente | null;
@@ -35,6 +36,8 @@ export function FormularioCliente({ clienteEditando, onFechar }: Props) {
     vencimentoCr: clienteEditando?.vencimentoCr ?? '',
     numeroCrIbama: clienteEditando?.numeroCrIbama ?? '',
     vencimentoCrIbama: clienteEditando?.vencimentoCrIbama ?? '',
+    crUrl: clienteEditando?.crUrl ?? '',
+    crIbamaUrl: clienteEditando?.crIbamaUrl ?? '',
   });
 
   const atualizar = (campo: string, valor: any) => {
@@ -90,6 +93,8 @@ export function FormularioCliente({ clienteEditando, onFechar }: Props) {
         vencimentoCr: form.vencimentoCr,
         numeroCrIbama: form.numeroCrIbama.trim().toUpperCase(),
         vencimentoCrIbama: form.vencimentoCrIbama,
+        crUrl: form.crUrl,
+        crIbamaUrl: form.crIbamaUrl,
       };
 
       if (clienteEditando) {
@@ -165,6 +170,40 @@ export function FormularioCliente({ clienteEditando, onFechar }: Props) {
                 value={form.vencimentoCr} onChange={e => atualizar('vencimentoCr', e.target.value)} />
             </div>
           </div>
+          <div className="-mt-1 mb-2">
+            <label className="label">Anexo do CR Exército (PDF/Imagem)</label>
+            <div className="flex items-center gap-3">
+              <input type="file" accept="application/pdf,image/*" className="hidden" id="cr-attachment"
+                onChange={async e => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    try {
+                      const base64 = await fileToBase64(file);
+                      atualizar('crUrl', base64);
+                    } catch (err) {
+                      console.error(err);
+                      alert('Erro ao carregar o arquivo.');
+                    }
+                  }
+                }} />
+              <label htmlFor="cr-attachment" className="btn-ghost flex items-center gap-2 cursor-pointer text-xs h-10 border border-brand-dark-5 rounded-lg px-3">
+                <Upload size={14} /> {form.crUrl ? 'Alterar Anexo' : 'Anexar Documento'}
+              </label>
+              {form.crUrl && (
+                <>
+                  <button type="button" onClick={() => visualizarDocumentoBase64(form.crUrl, `CR-${form.numeroCr || 'exercito'}`)}
+                    className="text-brand-blue hover:text-brand-blue-light text-xs font-semibold">
+                    Visualizar
+                  </button>
+                  <button type="button" onClick={() => atualizar('crUrl', '')}
+                    className="text-red-400 hover:text-red-300 text-xs font-semibold">
+                    Remover
+                  </button>
+                </>
+              )}
+            </div>
+            {form.crUrl && <span className="text-[10px] text-brand-green font-bold block mt-1">✓ Documento anexado</span>}
+          </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -177,6 +216,40 @@ export function FormularioCliente({ clienteEditando, onFechar }: Props) {
               <input type="date" className="input"
                 value={form.vencimentoCrIbama} onChange={e => atualizar('vencimentoCrIbama', e.target.value)} />
             </div>
+          </div>
+          <div className="-mt-1 mb-2">
+            <label className="label">Anexo do CR IBAMA (PDF/Imagem)</label>
+            <div className="flex items-center gap-3">
+              <input type="file" accept="application/pdf,image/*" className="hidden" id="cr-ibama-attachment"
+                onChange={async e => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    try {
+                      const base64 = await fileToBase64(file);
+                      atualizar('crIbamaUrl', base64);
+                    } catch (err) {
+                      console.error(err);
+                      alert('Erro ao carregar o arquivo.');
+                    }
+                  }
+                }} />
+              <label htmlFor="cr-ibama-attachment" className="btn-ghost flex items-center gap-2 cursor-pointer text-xs h-10 border border-brand-dark-5 rounded-lg px-3">
+                <Upload size={14} /> {form.crIbamaUrl ? 'Alterar Anexo' : 'Anexar Documento'}
+              </label>
+              {form.crIbamaUrl && (
+                <>
+                  <button type="button" onClick={() => visualizarDocumentoBase64(form.crIbamaUrl, `CR-IBAMA-${form.numeroCrIbama || 'ibama'}`)}
+                    className="text-brand-blue hover:text-brand-blue-light text-xs font-semibold">
+                    Visualizar
+                  </button>
+                  <button type="button" onClick={() => atualizar('crIbamaUrl', '')}
+                    className="text-red-400 hover:text-red-300 text-xs font-semibold">
+                    Remover
+                  </button>
+                </>
+              )}
+            </div>
+            {form.crIbamaUrl && <span className="text-[10px] text-brand-green font-bold block mt-1">✓ Documento anexado</span>}
           </div>
 
           <div>

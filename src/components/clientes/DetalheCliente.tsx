@@ -18,6 +18,7 @@ import { useAgendamentos } from '../../context/AgendamentosContext';
 import { useClientes } from '../../context/ClientesContext';
 import { DialogConfirmacao } from '../common/DialogConfirmacao';
 import { useAuth } from '../../context/AuthContext';
+import { visualizarDocumentoBase64 } from '../../utils/fileUtils';
 
 interface DetalheClienteProps {
   cliente: Cliente;
@@ -320,22 +321,44 @@ export function DetalheCliente({ cliente }: DetalheClienteProps) {
               </div>
 
               {(cliente.numeroCr || cliente.vencimentoCr) && (
-                <div className="pt-2 border-t border-brand-dark-5">
-                  <p className="text-[10px] text-gray-500 font-bold uppercase mb-1">CR Exército / PF</p>
-                  <p className="text-white font-medium">
-                    {cliente.numeroCr || 'Não informado'} 
-                    {cliente.vencimentoCr && <span className="text-gray-500 text-xs ml-2">({formatarData(cliente.vencimentoCr)})</span>}
-                  </p>
+                <div className="pt-2 border-t border-brand-dark-5 flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-[10px] text-gray-500 font-bold uppercase mb-1">CR Exército / PF</p>
+                    <p className="text-white font-medium">
+                      {cliente.numeroCr || 'Não informado'} 
+                      {cliente.vencimentoCr && <span className="text-gray-500 text-xs ml-2">({formatarData(cliente.vencimentoCr)})</span>}
+                    </p>
+                  </div>
+                  {cliente.crUrl && (
+                    <button 
+                      onClick={() => visualizarDocumentoBase64(cliente.crUrl!, `CR-${cliente.numeroCr || 'exercito'}`)}
+                      className="p-1.5 rounded-lg bg-brand-dark-3 text-brand-blue hover:text-brand-blue-light border border-brand-dark-5 flex items-center gap-1 text-[10px] uppercase font-bold tracking-wider"
+                      title="Visualizar CR Exército"
+                    >
+                      <FileText size={14} /> Ver Doc
+                    </button>
+                  )}
                 </div>
               )}
 
               {(cliente.numeroCrIbama || cliente.vencimentoCrIbama) && (
-                <div className="pt-2 border-t border-brand-dark-5">
-                  <p className="text-[10px] text-gray-500 font-bold uppercase mb-1">CR IBAMA</p>
-                  <p className="text-white font-medium">
-                    {cliente.numeroCrIbama || 'Não informado'} 
-                    {cliente.vencimentoCrIbama && <span className="text-gray-500 text-xs ml-2">({formatarData(cliente.vencimentoCrIbama)})</span>}
-                  </p>
+                <div className="pt-2 border-t border-brand-dark-5 flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-[10px] text-gray-500 font-bold uppercase mb-1">CR IBAMA</p>
+                    <p className="text-white font-medium">
+                      {cliente.numeroCrIbama || 'Não informado'} 
+                      {cliente.vencimentoCrIbama && <span className="text-gray-500 text-xs ml-2">({formatarData(cliente.vencimentoCrIbama)})</span>}
+                    </p>
+                  </div>
+                  {cliente.crIbamaUrl && (
+                    <button 
+                      onClick={() => visualizarDocumentoBase64(cliente.crIbamaUrl!, `CR-IBAMA-${cliente.numeroCrIbama || 'ibama'}`)}
+                      className="p-1.5 rounded-lg bg-brand-dark-3 text-brand-blue hover:text-brand-blue-light border border-brand-dark-5 flex items-center gap-1 text-[10px] uppercase font-bold tracking-wider"
+                      title="Visualizar CR IBAMA"
+                    >
+                      <FileText size={14} /> Ver Doc
+                    </button>
+                  )}
                 </div>
               )}
               </div>

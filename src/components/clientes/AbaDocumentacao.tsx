@@ -8,6 +8,7 @@ import { useClientes } from '../../context/ClientesContext';
 import { Cliente, Arma, GuiaTrafego, AutorizacaoManejo } from '../../types';
 import { formatarData } from '../../utils/formatters';
 import { calcularAlerta, obterClasseAlerta } from '../../utils/vencimentos';
+import { fileToBase64, visualizarDocumentoBase64 } from '../../utils/fileUtils';
 
 const TIPOS_ARMA = ['Pistola', 'Revólver', 'Carabina / Fuzil', 'Espingarda', 'Rifle'];
 const CALIBRES = [
@@ -166,6 +167,18 @@ export function AbaDocumentacao({ cliente, armaIdInicial }: Props) {
                         <p className="text-[10px] text-gray-500 font-bold uppercase mb-1">Validade CRAF</p>
                         <BadgeVencimento data={arma.vencimentoCraf} tipo="CRAF" />
                       </div>
+                      {arma.crafUrl && (
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            visualizarDocumentoBase64(arma.crafUrl!, `CRAF-${arma.numeroSerie || 'arma'}`);
+                          }}
+                          className="p-2 rounded-lg bg-brand-dark-2 text-brand-blue hover:text-brand-blue-light transition-colors"
+                          title="Visualizar CRAF"
+                        >
+                          <FileText size={16} />
+                        </button>
+                      )}
                       <button 
                         onClick={(e) => {
                           e.stopPropagation();
@@ -215,6 +228,15 @@ export function AbaDocumentacao({ cliente, armaIdInicial }: Props) {
                             </div>
                             <div className="flex items-center gap-3">
                               <BadgeVencimento data={gt.vencimento} tipo="GT" />
+                              {gt.arquivoUrl && (
+                                <button 
+                                  onClick={() => visualizarDocumentoBase64(gt.arquivoUrl!, `GT-${gt.tipo}-${gt.destino}`)}
+                                  className="text-brand-blue hover:text-brand-blue-light p-1"
+                                  title="Visualizar Guia"
+                                >
+                                  <FileText size={14} />
+                                </button>
+                              )}
                               <button onClick={() => setModalGt({armaId: arma.id, gt})} className="text-gray-600 hover:text-brand-blue p-1" title="Editar Guia">
                                 <Pencil size={14} />
                               </button>
@@ -299,6 +321,15 @@ export function AbaDocumentacao({ cliente, armaIdInicial }: Props) {
                       <BadgeVencimento data={m.vencimento} tipo="MANEJO" status={m.status} />
                     </div>
                     <div className="flex items-center gap-2">
+                      {m.arquivoUrl && (
+                        <button 
+                          onClick={() => visualizarDocumentoBase64(m.arquivoUrl!, `Manejo-${m.nomeFazenda}`)} 
+                          className="p-2 rounded-lg bg-brand-dark-2 text-brand-blue hover:text-brand-blue-light transition-colors"
+                          title="Visualizar Autorização"
+                        >
+                          <FileText size={16} />
+                        </button>
+                      )}
                       <button 
                         onClick={() => {
                           setManejoParaEditar(m);
@@ -471,7 +502,8 @@ export function ModalArma({ armaParaEditar, onFechar, onSalvar }: { armaParaEdit
     numeroSerie: armaParaEditar?.numeroSerie || '', 
     numeroSigma: armaParaEditar?.numeroSigma || '', 
     acervo: (armaParaEditar?.acervo || 'Tiro Desportivo') as any, 
-    vencimentoCraf: armaParaEditar?.vencimentoCraf || ''
+    vencimentoCraf: armaParaEditar?.vencimentoCraf || '',
+    crafUrl: armaParaEditar?.crafUrl || ''
   });
 
   const modelosCombinados = Array.from(new Set([...MODELOS_BASE, ...modelosRegistrados])).sort();
@@ -565,6 +597,58 @@ export function ModalArma({ armaParaEditar, onFechar, onSalvar }: { armaParaEdit
             <label className="label">Vencimento CRAF</label>
             <input type="date" className="input" value={form.vencimentoCraf} onChange={e => setForm({...form, vencimentoCraf: e.target.value})} />
           </div>
+          <div>
+            <label className="label">Anexo do CRAF (PDF ou Imagem)</label>
+            <div className="flex items-center gap-3">
+              <input 
+                type="file" 
+                accept="application/pdf,image/*" 
+                className="hidden" 
+                id="craf-attachment" 
+                onChange={async e => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    try {
+                      const base64 = await fileToBase64(file);
+                      setForm({...form, crafUrl: base64});
+                    } catch (err) {
+                      console.error(err);
+                      alert('Erro ao carregar o arquivo.');
+                    }
+                  }
+                }} 
+              />
+              <label 
+                htmlFor="craf-attachment" 
+                className="btn-ghost flex items-center gap-2 cursor-pointer text-xs h-10 border border-brand-dark-5 rounded-lg px-3"
+              >
+                <Upload size={14} /> {form.crafUrl ? 'Alterar Anexo' : 'Anexar Documento'}
+              </label>
+              {form.crafUrl && (
+                <>
+                  <button 
+                    type="button"
+                    onClick={() => visualizarDocumentoBase64(form.crafUrl!, `CRAF-${form.numeroSerie || 'arma'}`)}
+                    className="text-brand-blue hover:text-brand-blue-light text-xs font-semibold"
+                  >
+                    Visualizar
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={() => setForm({...form, crafUrl: ''})}
+                    className="text-red-400 hover:text-red-300 text-xs font-semibold"
+                  >
+                    Remover
+                  </button>
+                </>
+              )}
+            </div>
+            {form.crafUrl && (
+              <span className="text-[10px] text-brand-green font-bold block mt-1">
+                ✓ Documento anexado
+              </span>
+            )}
+          </div>
           <div className="flex gap-3 pt-4">
             <button onClick={onFechar} className="btn-ghost flex-1">Cancelar</button>
             <button onClick={() => onSalvar(form)} className="btn-primary flex-1">
@@ -582,7 +666,8 @@ export function ModalGt({ armaAcervo, gtParaEditar, onFechar, onSalvar }: { arma
     id: gtParaEditar?.id,
     tipo: gtParaEditar?.tipo || 'Caça', 
     vencimento: gtParaEditar?.vencimento || '', 
-    destino: gtParaEditar?.destino || '' 
+    destino: gtParaEditar?.destino || '',
+    arquivoUrl: gtParaEditar?.arquivoUrl || ''
   });
   const [sugestoes, setSugestoes] = useState<string[]>([]);
   const { buscarGts } = useClientes();
@@ -681,6 +766,58 @@ export function ModalGt({ armaAcervo, gtParaEditar, onFechar, onSalvar }: { arma
             <label className="label">Data de Vencimento</label>
             <input type="date" className="input" value={form.vencimento} onChange={e => setForm({...form, vencimento: e.target.value})} />
           </div>
+          <div>
+            <label className="label">Anexo da Guia (PDF ou Imagem)</label>
+            <div className="flex items-center gap-3">
+              <input 
+                type="file" 
+                accept="application/pdf,image/*" 
+                className="hidden" 
+                id="gt-attachment" 
+                onChange={async e => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    try {
+                      const base64 = await fileToBase64(file);
+                      setForm({...form, arquivoUrl: base64});
+                    } catch (err) {
+                      console.error(err);
+                      alert('Erro ao carregar o arquivo.');
+                    }
+                  }
+                }} 
+              />
+              <label 
+                htmlFor="gt-attachment" 
+                className="btn-ghost flex items-center gap-2 cursor-pointer text-xs h-10 border border-brand-dark-5 rounded-lg px-3"
+              >
+                <Upload size={14} /> {form.arquivoUrl ? 'Alterar Anexo' : 'Anexar Documento'}
+              </label>
+              {form.arquivoUrl && (
+                <>
+                  <button 
+                    type="button"
+                    onClick={() => visualizarDocumentoBase64(form.arquivoUrl!, `GT-${form.tipo}-${form.destino}`)}
+                    className="text-brand-blue hover:text-brand-blue-light text-xs font-semibold"
+                  >
+                    Visualizar
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={() => setForm({...form, arquivoUrl: ''})}
+                    className="text-red-400 hover:text-red-300 text-xs font-semibold"
+                  >
+                    Remover
+                  </button>
+                </>
+              )}
+            </div>
+            {form.arquivoUrl && (
+              <span className="text-[10px] text-brand-green font-bold block mt-1">
+                ✓ Documento anexado
+              </span>
+            )}
+          </div>
           <div className="flex gap-3 pt-4">
             <button onClick={onFechar} className="btn-ghost flex-1">Cancelar</button>
             <button onClick={() => onSalvar(form)} className="btn-primary flex-1">
@@ -701,7 +838,8 @@ export function ModalManejo({ manejoParaEditar, onFechar, onSalvar }: { manejoPa
     nomeProprietario: manejoParaEditar?.nomeProprietario || '', 
     cidade: manejoParaEditar?.cidade || '', 
     vencimento: manejoParaEditar?.vencimento || '',
-    status: manejoParaEditar?.status || 'Ativo'
+    status: manejoParaEditar?.status || 'Ativo',
+    arquivoUrl: manejoParaEditar?.arquivoUrl || ''
   });
   const [importando, setImportando] = useState(false);
 
@@ -712,13 +850,15 @@ export function ModalManejo({ manejoParaEditar, onFechar, onSalvar }: { manejoPa
     setImportando(true);
     try {
       const data = await parseIbamaPdf(file);
+      const base64 = await fileToBase64(file);
       setForm(prev => ({
         ...prev,
         numeroCar: data.numeroCar || prev.numeroCar,
         nomeFazenda: data.nomeFazenda || prev.nomeFazenda,
         nomeProprietario: data.nomeProprietario || prev.nomeProprietario,
         cidade: data.cidade || prev.cidade,
-        vencimento: data.vencimento || prev.vencimento
+        vencimento: data.vencimento || prev.vencimento,
+        arquivoUrl: base64
       }));
     } catch (err: any) {
       console.error('Erro ao processar PDF:', err);
@@ -787,6 +927,58 @@ export function ModalManejo({ manejoParaEditar, onFechar, onSalvar }: { manejoPa
                 <option value="Inerte">Inerte</option>
               </select>
             </div>
+          </div>
+          <div>
+            <label className="label">Anexo da Autorização (PDF ou Imagem)</label>
+            <div className="flex items-center gap-3">
+              <input 
+                type="file" 
+                accept="application/pdf,image/*" 
+                className="hidden" 
+                id="manejo-attachment" 
+                onChange={async e => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    try {
+                      const base64 = await fileToBase64(file);
+                      setForm({...form, arquivoUrl: base64});
+                    } catch (err) {
+                      console.error(err);
+                      alert('Erro ao carregar o arquivo.');
+                    }
+                  }
+                }} 
+              />
+              <label 
+                htmlFor="manejo-attachment" 
+                className="btn-ghost flex items-center gap-2 cursor-pointer text-xs h-10 border border-brand-dark-5 rounded-lg px-3"
+              >
+                <Upload size={14} /> {form.arquivoUrl ? 'Alterar Anexo' : 'Anexar Documento'}
+              </label>
+              {form.arquivoUrl && (
+                <>
+                  <button 
+                    type="button"
+                    onClick={() => visualizarDocumentoBase64(form.arquivoUrl!, `Manejo-${form.nomeFazenda || 'fazenda'}`)}
+                    className="text-brand-blue hover:text-brand-blue-light text-xs font-semibold"
+                  >
+                    Visualizar
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={() => setForm({...form, arquivoUrl: ''})}
+                    className="text-red-400 hover:text-red-300 text-xs font-semibold"
+                  >
+                    Remover
+                  </button>
+                </>
+              )}
+            </div>
+            {form.arquivoUrl && (
+              <span className="text-[10px] text-brand-green font-bold block mt-1">
+                ✓ Documento anexado
+              </span>
+            )}
           </div>
           <div className="flex gap-3 pt-4">
             <button onClick={onFechar} className="btn-ghost flex-1">Cancelar</button>

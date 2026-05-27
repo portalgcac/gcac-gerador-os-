@@ -2,12 +2,13 @@ import React, { useState } from 'react';
 import {
   X, Target, FileText, Award, Shield, AlertTriangle,
   CheckCircle, ChevronDown, ChevronUp, Calendar, User,
-  Plus, Pencil, Trash2, ShieldCheck, Loader2, Info
+  Plus, Pencil, Trash2, ShieldCheck, Loader2, Info, Upload
 } from 'lucide-react';
 import { VinculoDespachanteCac, AcervoVinculado, buscarAcervoVinculado } from '../../services/vinculosService';
 import { useClientes } from '../../context/ClientesContext';
 import { Arma, GuiaTrafego, AutorizacaoManejo } from '../../types';
 import { ModalArma, ModalGt, ModalManejo } from '../clientes/AbaDocumentacao';
+import { fileToBase64, visualizarDocumentoBase64 } from '../../utils/fileUtils';
 
 interface Props {
   vinculo: VinculoDespachanteCac;
@@ -92,7 +93,9 @@ export function AcervoVinculadoGerenciador({ vinculo, acervo, onClose }: Props) 
     vencimentoCr: dadosAcervo.cliente.vencimentoCr || '',
     numeroCrIbama: dadosAcervo.cliente.numeroCrIbama || '',
     vencimentoCrIbama: dadosAcervo.cliente.vencimentoCrIbama || '',
-    contato: dadosAcervo.cliente.contato || ''
+    contato: dadosAcervo.cliente.contato || '',
+    crUrl: dadosAcervo.cliente.crUrl || '',
+    crIbamaUrl: dadosAcervo.cliente.crIbamaUrl || ''
   });
 
   // Modais
@@ -117,7 +120,9 @@ export function AcervoVinculadoGerenciador({ vinculo, acervo, onClose }: Props) 
           vencimentoCr: res.cliente.vencimentoCr || '',
           numeroCrIbama: res.cliente.numeroCrIbama || '',
           vencimentoCrIbama: res.cliente.vencimentoCrIbama || '',
-          contato: res.cliente.contato || ''
+          contato: res.cliente.contato || '',
+          crUrl: res.cliente.crUrl || '',
+          crIbamaUrl: res.cliente.crIbamaUrl || ''
         });
       }
     } catch (err) {
@@ -136,7 +141,9 @@ export function AcervoVinculadoGerenciador({ vinculo, acervo, onClose }: Props) 
         vencimentoCr: formCr.vencimentoCr,
         numeroCrIbama: formCr.numeroCrIbama.trim().toUpperCase(),
         vencimentoCrIbama: formCr.vencimentoCrIbama,
-        contato: formCr.contato.trim()
+        contato: formCr.contato.trim(),
+        crUrl: formCr.crUrl,
+        crIbamaUrl: formCr.crIbamaUrl
       });
       setEditandoCr(false);
       await atualizarDados();
@@ -418,6 +425,56 @@ export function AcervoVinculadoGerenciador({ vinculo, acervo, onClose }: Props) 
                   />
                 </div>
 
+                {/* Anexo CR Exército */}
+                <div>
+                  <label className="label text-[10px]">Anexo CR Exército (PDF/Imagem)</label>
+                  <div className="flex items-center gap-2">
+                    <input type="file" accept="application/pdf,image/*" className="hidden" id="avg-cr-attachment"
+                      onChange={async e => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          try { const b = await fileToBase64(file); setFormCr({...formCr, crUrl: b}); }
+                          catch { alert('Erro ao carregar arquivo.'); }
+                        }
+                      }} />
+                    <label htmlFor="avg-cr-attachment" className="btn-ghost flex items-center gap-1 cursor-pointer text-[10px] h-8 border border-brand-dark-5 rounded-lg px-2">
+                      <Upload size={12} /> {formCr.crUrl ? 'Alterar' : 'Anexar'}
+                    </label>
+                    {formCr.crUrl && (
+                      <>
+                        <button type="button" onClick={() => visualizarDocumentoBase64(formCr.crUrl, `CR-${formCr.numeroCr || 'exercito'}`)} className="text-brand-blue hover:text-brand-blue-light text-[10px] font-semibold">Visualizar</button>
+                        <button type="button" onClick={() => setFormCr({...formCr, crUrl: ''})} className="text-red-400 hover:text-red-300 text-[10px] font-semibold">Remover</button>
+                      </>
+                    )}
+                  </div>
+                  {formCr.crUrl && <span className="text-[9px] text-brand-green font-bold block mt-0.5">✓ Documento anexado</span>}
+                </div>
+
+                {/* Anexo CR IBAMA */}
+                <div>
+                  <label className="label text-[10px]">Anexo CR IBAMA (PDF/Imagem)</label>
+                  <div className="flex items-center gap-2">
+                    <input type="file" accept="application/pdf,image/*" className="hidden" id="avg-cr-ibama-attachment"
+                      onChange={async e => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          try { const b = await fileToBase64(file); setFormCr({...formCr, crIbamaUrl: b}); }
+                          catch { alert('Erro ao carregar arquivo.'); }
+                        }
+                      }} />
+                    <label htmlFor="avg-cr-ibama-attachment" className="btn-ghost flex items-center gap-1 cursor-pointer text-[10px] h-8 border border-brand-dark-5 rounded-lg px-2">
+                      <Upload size={12} /> {formCr.crIbamaUrl ? 'Alterar' : 'Anexar'}
+                    </label>
+                    {formCr.crIbamaUrl && (
+                      <>
+                        <button type="button" onClick={() => visualizarDocumentoBase64(formCr.crIbamaUrl, `CR-IBAMA-${formCr.numeroCrIbama || 'ibama'}`)} className="text-brand-blue hover:text-brand-blue-light text-[10px] font-semibold">Visualizar</button>
+                        <button type="button" onClick={() => setFormCr({...formCr, crIbamaUrl: ''})} className="text-red-400 hover:text-red-300 text-[10px] font-semibold">Remover</button>
+                      </>
+                    )}
+                  </div>
+                  {formCr.crIbamaUrl && <span className="text-[9px] text-brand-green font-bold block mt-0.5">✓ Documento anexado</span>}
+                </div>
+
                 <div className="flex gap-2 justify-end pt-2 border-t border-brand-dark-5">
                   <button onClick={() => setEditandoCr(false)} className="btn-ghost py-1 px-3 text-xs">Cancelar</button>
                   <button onClick={handleSalvarCr} className="btn-primary py-1 px-3 text-xs">Salvar Alterações</button>
@@ -425,17 +482,27 @@ export function AcervoVinculadoGerenciador({ vinculo, acervo, onClose }: Props) 
               </div>
             ) : (
               <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-[10px] text-gray-600 uppercase tracking-wide mb-1">Nº CR Exército</p>
+                <div className="flex flex-col gap-1">
+                  <p className="text-[10px] text-gray-600 uppercase tracking-wide">Nº CR Exército</p>
                   <p className="text-sm text-white font-mono">{cliente.numeroCr || 'Não cadastrado'}</p>
+                  {cliente.crUrl && (
+                    <button onClick={() => visualizarDocumentoBase64(cliente.crUrl!, `CR-${cliente.numeroCr || 'exercito'}`)} className="mt-1 flex items-center gap-1 text-[9px] font-black text-brand-blue hover:text-brand-blue-light uppercase tracking-wider">
+                      <FileText size={10} /> Ver Doc
+                    </button>
+                  )}
                 </div>
                 <div>
                   <p className="text-[10px] text-gray-600 uppercase tracking-wide mb-1">Validade CR</p>
                   <BadgeVencimento data={cliente.vencimentoCr} />
                 </div>
-                <div>
-                  <p className="text-[10px] text-gray-600 uppercase tracking-wide mb-1">Nº CR IBAMA</p>
+                <div className="flex flex-col gap-1">
+                  <p className="text-[10px] text-gray-600 uppercase tracking-wide">Nº CR IBAMA</p>
                   <p className="text-sm text-white font-mono">{cliente.numeroCrIbama || '—'}</p>
+                  {cliente.crIbamaUrl && (
+                    <button onClick={() => visualizarDocumentoBase64(cliente.crIbamaUrl!, `CR-IBAMA-${cliente.numeroCrIbama || 'ibama'}`)} className="mt-1 flex items-center gap-1 text-[9px] font-black text-brand-blue hover:text-brand-blue-light uppercase tracking-wider">
+                      <FileText size={10} /> Ver Doc
+                    </button>
+                  )}
                 </div>
                 <div>
                   <p className="text-[10px] text-gray-600 uppercase tracking-wide mb-1">Validade CR IBAMA</p>
@@ -529,9 +596,20 @@ export function AcervoVinculadoGerenciador({ vinculo, acervo, onClose }: Props) 
                         <div className="grid grid-cols-2 gap-3 text-xs">
                           <div><span className="text-gray-600">Série: </span><span className="text-white font-mono">{arma.numeroSerie}</span></div>
                           <div><span className="text-gray-600">Sigma: </span><span className="text-white font-mono">{arma.numeroSigma}</span></div>
-                          <div className="col-span-2">
-                            <span className="text-gray-600">CRAF válido até: </span>
-                            <BadgeVencimento data={arma.vencimentoCraf} />
+                          <div className="col-span-2 flex items-center gap-3">
+                            <div>
+                              <span className="text-gray-600">CRAF válido até: </span>
+                              <BadgeVencimento data={arma.vencimentoCraf} />
+                            </div>
+                            {(arma as any).crafUrl && (
+                              <button
+                                onClick={() => visualizarDocumentoBase64((arma as any).crafUrl, `CRAF-${arma.numeroSerie || arma.modelo}`)}
+                                className="flex items-center gap-1 text-[9px] font-black text-brand-blue hover:text-brand-blue-light uppercase tracking-wider"
+                                title="Visualizar CRAF"
+                              >
+                                <FileText size={10} /> Ver CRAF
+                              </button>
+                            )}
                           </div>
                         </div>
 
@@ -562,6 +640,15 @@ export function AcervoVinculadoGerenciador({ vinculo, acervo, onClose }: Props) 
                                   </div>
                                   <div className="flex items-center gap-2">
                                     <BadgeVencimento data={gt.vencimento} />
+                                    {(gt as any).arquivoUrl && (
+                                      <button
+                                        onClick={() => visualizarDocumentoBase64((gt as any).arquivoUrl, `GT-${gt.tipo}-${gt.destino}`)}
+                                        className="p-0.5 text-brand-blue hover:text-brand-blue-light transition-colors"
+                                        title="Visualizar Guia"
+                                      >
+                                        <FileText size={11} />
+                                      </button>
+                                    )}
                                     {podeEditar && (
                                       <div className="flex gap-1 border-l border-brand-dark-5 pl-1.5">
                                         <button 
@@ -641,11 +728,20 @@ export function AcervoVinculadoGerenciador({ vinculo, acervo, onClose }: Props) 
                         <p className="text-xs text-gray-500">{m.nomeProprietario} · {m.cidade}</p>
                         <p className="text-[11px] text-gray-600 mt-0.5 font-mono">CAR: {m.numeroCar}</p>
                       </div>
-                      <div className="text-right shrink-0">
+                      <div className="text-right shrink-0 flex flex-col items-end gap-1">
                         <BadgeVencimento data={m.vencimento} />
-                        <p className={`text-[10px] mt-1 font-bold ${m.status === 'Ativo' ? 'text-green-400' : 'text-gray-500'}`}>
+                        <p className={`text-[10px] font-bold ${m.status === 'Ativo' ? 'text-green-400' : 'text-gray-500'}`}>
                           {m.status}
                         </p>
+                        {(m as any).arquivoUrl && (
+                          <button
+                            onClick={() => visualizarDocumentoBase64((m as any).arquivoUrl, `Manejo-${m.nomeFazenda}`)}
+                            className="flex items-center gap-1 text-[9px] font-black text-brand-blue hover:text-brand-blue-light uppercase tracking-wider"
+                            title="Visualizar Autorização"
+                          >
+                            <FileText size={10} /> Ver Doc
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
