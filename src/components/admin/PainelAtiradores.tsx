@@ -238,7 +238,7 @@ function ModalDetalheAtirador({ perfil, onClose }: { perfil: PerfilAtirador; onC
               Este painel é somente de <strong className="text-white">leitura e monitoramento</strong>. Para ações de suporte direto, entre em contato com o usuário pelo email <strong className="text-brand-blue-light">{perfil.email}</strong>{perfil.contato ? ` ou pelo WhatsApp ${perfil.contato}` : ''}.
             </p>
             <a
-              href={`mailto:${perfil.email}?subject=Suporte GCAC Portal - ${perfil.nome}`}
+              href={`mailto:${perfil.email}?subject=Suporte Portal G CAC - ${perfil.nome}`}
               className="inline-flex items-center gap-2 mt-3 text-xs font-bold text-brand-blue-light hover:text-brand-blue bg-brand-blue/10 hover:bg-brand-blue/20 border border-brand-blue/20 px-3 py-1.5 rounded-lg transition-all"
             >
               <MessageSquare size={12} /> Enviar Email de Suporte

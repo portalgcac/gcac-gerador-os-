@@ -122,7 +122,7 @@ export function BriefingDiario() {
         {/* Footer */}
         <div className="bg-brand-dark-3 p-4 text-center border-t border-brand-dark-5">
           <p className="text-[10px] text-gray-500 uppercase tracking-widest font-bold">
-            Gerador de O.S. — Seu foco é sua arma
+            Portal G CAC — Seu foco é sua arma
           </p>
         </div>
 

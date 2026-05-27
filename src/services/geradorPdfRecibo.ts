@@ -252,8 +252,8 @@ export async function gerarPdfReciboBlob(recibo: Recibo): Promise<Blob> {
   doc.setTextColor(CINZA_TEXTO);
   doc.setFontSize(7);
   doc.setFont('helvetica', 'bold');
-  const footer1 = 'ESTE RECIBO É UM DOCUMENTO DE QUITAÇÃO DE PAGAMENTO EMITIDO ELETRONICAMENTE PELA PLATAFORMA GCAC GERADOR DE O.S.';
-  const footer2 = `SISTEMAS PORTAL GCAC © ${new Date().getFullYear()} — TODOS OS DIREITOS RESERVADOS.`;
+  const footer1 = 'ESTE RECIBO É UM DOCUMENTO DE QUITAÇÃO DE PAGAMENTO EMITIDO ELETRONICAMENTE PELA PLATAFORMA PORTAL G CAC.';
+  const footer2 = `SISTEMAS PORTAL G CAC © ${new Date().getFullYear()} — TODOS OS DIREITOS RESERVADOS.`;
   const operador = recibo.criadoPorNome ? ` — OPERADOR: ${recibo.criadoPorNome.toUpperCase()}` : '';
   doc.text(footer1, largura / 2, altura - 20, { align: 'center' });
   doc.text(footer2 + operador, largura / 2, altura - 15, { align: 'center' });

@@ -63,9 +63,9 @@ export function PaginaLogin() {
               }}
             />
           </div>
-          <h1 className="text-3xl font-black text-white tracking-tight">GCAC</h1>
-          <p className="text-brand-green font-bold text-lg tracking-widest uppercase">Gerador de O.S.</p>
-          <p className="text-gray-500 text-sm mt-2">Sistema de Ordens de Serviço</p>
+          <h1 className="text-3xl font-black text-white tracking-tight">PORTAL G CAC</h1>
+          <p className="text-brand-green font-bold text-lg tracking-widest uppercase">Gestão & Documentos</p>
+          <p className="text-gray-500 text-sm mt-2">Sistema Integrado para CAC</p>
         </div>
 
         {/* Card de login */}
@@ -122,7 +122,7 @@ export function PaginaLogin() {
         </div>
 
         <p className="text-center text-xs text-gray-600 mt-6">
-          GCAC Gerador de O.S. v1.0 — Uso pessoal
+          Portal G CAC v1.0 — Uso pessoal
         </p>
       </div>
     </div>

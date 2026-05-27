@@ -528,7 +528,7 @@ export function Configuracoes() {
         </div>
 
         <div className="text-center text-[10px] text-gray-600 uppercase tracking-widest pt-4">
-          Portal GCAC Atirador v3.0
+          Portal G CAC Atirador v3.0
         </div>
         <Notificacao {...notif} onFechar={fechar} />
       </div>

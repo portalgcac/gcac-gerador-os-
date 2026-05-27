@@ -9,9 +9,9 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['logo.jpg', 'favicon.svg'],
       manifest: {
-        name: 'GCAC Gerador de O.S.',
-        short_name: 'GCAC OS',
-        description: 'Gerador de Ordens de Serviço para CAC',
+        name: 'Portal G CAC',
+        short_name: 'Portal G CAC',
+        description: 'Sistema Integrado de Gestão e Ordens de Serviço para CAC',
         theme_color: '#0D0D0D',
         background_color: '#0D0D0D',
         display: 'standalone',

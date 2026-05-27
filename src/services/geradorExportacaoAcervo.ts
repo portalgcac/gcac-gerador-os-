@@ -70,7 +70,7 @@ export async function exportarAcervoPdf(perfil: any, armas: any[], manejos: any[
   doc.setTextColor('#FFFFFF');
   doc.setFontSize(13);
   doc.setFont('helvetica', 'bold');
-  doc.text('Portal GCAC — Acervo do Atirador', 48, 14);
+  doc.text('Portal G CAC — Acervo do Atirador', 48, 14);
 
   doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
@@ -223,7 +223,7 @@ export async function exportarAcervoPdf(perfil: any, armas: any[], manejos: any[
     doc.setTextColor(CINZA);
     doc.setFontSize(7.5);
     doc.setFont('helvetica', 'normal');
-    doc.text('Portal GCAC — Gestão Inteligente de Acervos', 12, altura - 12);
+    doc.text('Portal G CAC — Gestão Inteligente de Acervos', 12, altura - 12);
     doc.text(`Página ${i} de ${totalPaginas}`, largura - 12, altura - 12, { align: 'right' });
   }
 

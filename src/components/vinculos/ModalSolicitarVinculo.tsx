@@ -46,7 +46,7 @@ export function ModalSolicitarVinculo({ onClose, onSucesso }: Props) {
     setBuscando(false);
 
     if (!res.encontrado || !res.cacEmpresaId || !res.cacEmail || !res.cacNome) {
-      setErroGlobal('Nenhum atirador com portal GCAC encontrado para este CPF. O atirador precisa estar cadastrado no Portal GCAC Individual.');
+      setErroGlobal('Nenhum atirador com portal G CAC encontrado para este CPF. O atirador precisa estar cadastrado no Portal G CAC Individual.');
       return;
     }
 
@@ -95,7 +95,7 @@ export function ModalSolicitarVinculo({ onClose, onSucesso }: Props) {
             </div>
             <div>
               <h2 className="text-base font-black text-white">Solicitar Acesso a Atirador</h2>
-              <p className="text-[10px] text-gray-500">Busca por CPF no portal GCAC</p>
+              <p className="text-[10px] text-gray-500">Busca por CPF no portal G CAC</p>
             </div>
           </div>
           <button onClick={onClose} className="p-2 text-gray-500 hover:text-white rounded-xl transition-colors">
@@ -108,7 +108,7 @@ export function ModalSolicitarVinculo({ onClose, onSucesso }: Props) {
           {etapa === 'busca' && (
             <>
               <div className="bg-brand-dark-3 border border-brand-dark-5 rounded-xl p-4 text-xs text-gray-400 leading-relaxed">
-                Digite o <strong className="text-white">CPF do atirador</strong> para verificar se ele possui uma conta no Portal GCAC Individual. Se encontrado, você poderá enviar uma solicitação de acesso que ele deverá aprovar.
+                Digite o <strong className="text-white">CPF do atirador</strong> para verificar se ele possui uma conta no Portal G CAC Individual. Se encontrado, você poderá enviar uma solicitação de acesso que ele deverá aprovar.
               </div>
 
               <div>
@@ -152,7 +152,7 @@ export function ModalSolicitarVinculo({ onClose, onSucesso }: Props) {
               <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-4 flex items-center gap-3">
                 <UserCheck size={20} className="text-green-400 shrink-0" />
                 <div>
-                  <p className="text-sm font-bold text-green-300">Atirador encontrado no Portal GCAC</p>
+                  <p className="text-sm font-bold text-green-300">Atirador encontrado no Portal G CAC</p>
                   <p className="text-xs text-green-400/70 mt-0.5">Conta verificada e ativa</p>
                 </div>
               </div>

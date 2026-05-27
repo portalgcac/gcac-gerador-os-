@@ -69,7 +69,7 @@ export function OnboardingCAC() {
                     <Sparkles size={28} />
                   </div>
                   <div>
-                    <h2 className="text-xl font-black text-white leading-tight">Bem-vindo ao Portal GCAC!</h2>
+                    <h2 className="text-xl font-black text-white leading-tight">Bem-vindo ao Portal G CAC!</h2>
                     <p className="text-xs text-brand-blue-light font-bold uppercase tracking-wider mt-0.5">{usuario.nome}</p>
                   </div>
                 </div>

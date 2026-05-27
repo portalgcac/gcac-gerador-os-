@@ -90,7 +90,7 @@ export function Sidebar() {
             {usuario?.tipoConta === 'cac_individual' ? (
               <>
                 <p className="text-brand-blue-light text-xs font-bold tracking-wider uppercase mb-1">
-                  Portal GCAC
+                  Portal G CAC
                 </p>
                 <p className="font-bold text-white text-base leading-tight truncate px-2" title={usuario?.nome}>
                   {usuario?.nome}
@@ -99,7 +99,7 @@ export function Sidebar() {
             ) : (
               <>
                 <p className="text-brand-green text-xs font-bold tracking-wider uppercase mb-1">
-                  Gerador de O.S.
+                  Portal G CAC
                 </p>
                 <p className="font-black text-white text-base leading-tight truncate px-2" title={usuario?.empresaNome || 'GCAC'}>
                   {usuario?.empresaNome || 'GCAC'}

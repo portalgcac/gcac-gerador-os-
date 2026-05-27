@@ -73,7 +73,7 @@ export function DetalheRecibo({ recibo }: DetalheReciboProps) {
                  `Cliente: ${recibo.clienteNome}\n` +
                  `Valor: ${formatarMoeda(recibo.valorTotal)}\n` +
                  `Emitido em: ${formatarData(recibo.criadoEm)}\n\n` +
-                 `Gerado por: GCAC - Gerador de O.S.`;
+                 `Gerado por: Portal G CAC`;
     
     if (navigator.share) {
       navigator.share({
