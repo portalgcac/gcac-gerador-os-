@@ -9,6 +9,7 @@ import { OnboardingCAC } from '../common/OnboardingCAC';
 import { buscarVinculosPendentesCAC, VinculoDespachanteCac } from '../../services/vinculosService';
 import { NotificacaoVinculo } from '../vinculos/NotificacaoVinculo';
 import { supabase } from '../../db/supabase';
+import { InstallPwaPrompt } from '../common/InstallPwaPrompt';
 
 export function AppShell() {
   const { estaAutenticado, usuario } = useAuth();
@@ -122,6 +123,9 @@ export function AppShell() {
       {/* Navegação inferior — apenas mobile */}
       <NavegacaoInferior />
 
+      {/* Prompt de instalação do PWA */}
+      <InstallPwaPrompt />
+
       {/* Tutorial de Boas-vindas para CAC Individual */}
       <OnboardingCAC />
 
@@ -136,3 +140,4 @@ export function AppShell() {
     </div>
   );
 }
+
