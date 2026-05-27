@@ -1,3 +1,12 @@
+// Polyfill para Uint8Array.prototype.toHex (necessário para navegadores móveis e WebViews mais antigos)
+if (typeof Uint8Array !== 'undefined' && !(Uint8Array.prototype as any).toHex) {
+  (Uint8Array.prototype as any).toHex = function(this: Uint8Array) {
+    return Array.from(this)
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('');
+  };
+}
+
 import * as pdfjsLib from 'pdfjs-dist';
 
 // Configurar o worker do PDF.js usando um CDN estável
