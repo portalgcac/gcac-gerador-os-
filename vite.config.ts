@@ -7,7 +7,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['logo.jpg', 'favicon.svg'],
+      includeAssets: ['logo.png', 'favicon.svg'],
       manifest: {
         name: 'Portal G CAC',
         short_name: 'Portal G CAC',
@@ -19,14 +19,14 @@ export default defineConfig({
         start_url: '/',
         icons: [
           {
-            src: 'logo.jpg',
+            src: 'logo.png',
             sizes: '192x192',
-            type: 'image/jpeg',
+            type: 'image/png',
           },
           {
-            src: 'logo.jpg',
+            src: 'logo.png',
             sizes: '512x512',
-            type: 'image/jpeg',
+            type: 'image/png',
           },
         ],
       },

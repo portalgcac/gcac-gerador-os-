@@ -46,8 +46,8 @@ async function enviarPush(sub: PushSubscription, titulo: string, corpo: string, 
     const payload = JSON.stringify({
       title: titulo,
       body: corpo,
-      icon: '/logo.jpg',
-      badge: '/logo.jpg',
+      icon: '/logo.png',
+      badge: '/logo.png',
       data: { url },
       tag: `gcac-${Date.now()}`,
     });
