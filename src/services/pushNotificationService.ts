@@ -148,3 +148,30 @@ export async function enviarNotificacaoTeste(): Promise<void> {
     data: { url: '/' },
   });
 }
+
+/**
+ * Dispara o envio imediato de uma push notification via Supabase Edge Function
+ */
+export async function dispararPushImediato(params: {
+  empresaId: string;
+  titulo: string;
+  mensagem: string;
+  link?: string;
+}): Promise<void> {
+  try {
+    const { error } = await supabase.functions.invoke('enviar-push-imediato', {
+      body: {
+        empresa_id: params.empresaId,
+        titulo: params.titulo,
+        mensagem: params.mensagem,
+        link: params.link || '/',
+      },
+    });
+    if (error) {
+      console.warn('Erro ao disparar push imediato via Edge Function:', error);
+    }
+  } catch (err) {
+    console.error('Erro ao chamar a Edge Function de push:', err);
+  }
+}
+

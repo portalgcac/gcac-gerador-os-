@@ -12,6 +12,8 @@
  */
 
 import { supabase } from '../db/supabase';
+import { dispararPushImediato } from './pushNotificationService';
+
 
 // ── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -248,13 +250,25 @@ export async function solicitarVinculo(params: {
 }
 
 async function inserirNotificacaoCac(cacEmpresaId: string, despachantNome: string, vinculoId: string) {
+  const titulo = `🔗 Solicitação de vínculo`;
+  const mensagem = `${despachantNome} solicitou acesso ao seu acervo como despachante autorizado.`;
+  const link = `/vinculo-pendente/${vinculoId}`;
+
   await supabase.from('notificacoes_sistema').insert([{
-    titulo: `🔗 Solicitação de vínculo`,
-    mensagem: `${despachantNome} solicitou acesso ao seu acervo como despachante autorizado.`,
+    titulo,
+    mensagem,
     tipo: 'info',
-    link: `/vinculo-pendente/${vinculoId}`,
+    link,
     empresa_id: cacEmpresaId,
   }]);
+
+  // Envia a push notification em segundo plano
+  dispararPushImediato({
+    empresaId: cacEmpresaId,
+    titulo,
+    mensagem,
+    link,
+  });
 }
 
 /**
@@ -297,13 +311,23 @@ export async function responderVinculo(
 
   // 3. Notifica o despachante sobre a resposta
   const emoji = resposta === 'ativo' ? '✅' : '❌';
-  const acao = resposta === 'ativo' ? 'autorizou seu acesso ao acervo' : 'recusou a solicitação de vínculo';
+  const tituloNotif = `${emoji} Resposta de vínculo`;
+  const mensagemNotif = `O atirador respondeu à sua solicitação: acesso ${resposta === 'ativo' ? 'autorizado' : 'recusado'}.`;
+
   await supabase.from('notificacoes_sistema').insert([{
-    titulo: `${emoji} Resposta de vínculo`,
-    mensagem: `O atirador respondeu à sua solicitação: acesso ${resposta === 'ativo' ? 'autorizado' : 'recusado'}.`,
+    titulo: tituloNotif,
+    mensagem: mensagemNotif,
     tipo: resposta === 'ativo' ? 'sucesso' : 'alerta',
     empresa_id: vinculo.despachante_empresa_id,
   }]);
+
+  // Envia push notification imediata em segundo plano para o despachante
+  dispararPushImediato({
+    empresaId: vinculo.despachante_empresa_id,
+    titulo: tituloNotif,
+    mensagem: mensagemNotif,
+    link: '/configuracoes', // Redireciona o despachante para a tela de configurações / controle
+  });
 
   return { sucesso: true };
 }
@@ -337,24 +361,43 @@ export async function revogarVinculo(
   if (error) return { sucesso: false, erro: 'Erro ao revogar vínculo.' };
 
   // Notifica a outra parte
+  let tituloNotif = '';
+  let mensagemNotif = '';
+  let destinatarioEmpresaId = '';
+  let rotaRedirecionamento = '/';
+
   if (revogadoPor === 'cac') {
-    await supabase.from('notificacoes_sistema').insert([{
-      titulo: '⚠️ Acesso revogado',
-      mensagem: `O atirador ${vinculo.cac_nome} revogou seu acesso ao acervo.`,
-      tipo: 'alerta',
-      empresa_id: vinculo.despachante_empresa_id,
-    }]);
+    tituloNotif = '⚠️ Acesso revogado';
+    mensagemNotif = `O atirador ${vinculo.cac_nome} revogou seu acesso ao acervo.`;
+    destinatarioEmpresaId = vinculo.despachante_empresa_id;
+    rotaRedirecionamento = '/clientes-cac';
   } else if (revogadoPor === 'despachante') {
+    tituloNotif = '⚠️ Vínculo encerrado';
+    mensagemNotif = `O despachante ${vinculo.despachante_nome} encerrou o vínculo com seu acervo.`;
+    destinatarioEmpresaId = vinculo.cac_empresa_id;
+    rotaRedirecionamento = '/configuracoes';
+  }
+
+  if (destinatarioEmpresaId) {
     await supabase.from('notificacoes_sistema').insert([{
-      titulo: '⚠️ Vínculo encerrado',
-      mensagem: `O despachante ${vinculo.despachante_nome} encerrou o vínculo com seu acervo.`,
+      titulo: tituloNotif,
+      mensagem: mensagemNotif,
       tipo: 'alerta',
-      empresa_id: vinculo.cac_empresa_id,
+      empresa_id: destinatarioEmpresaId,
     }]);
+
+    // Envia push notification imediata em segundo plano
+    dispararPushImediato({
+      empresaId: destinatarioEmpresaId,
+      titulo: tituloNotif,
+      mensagem: mensagemNotif,
+      link: rotaRedirecionamento,
+    });
   }
 
   return { sucesso: true };
 }
+
 
 /**
  * Lista todos os CACs vinculados a um despachante.
