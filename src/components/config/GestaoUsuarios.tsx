@@ -609,6 +609,38 @@ export function GestaoUsuarios() {
                 </div>
               </div>
 
+              {formData.role === 'colaborador' && (
+                <div className="space-y-2 border-t border-brand-dark-5 pt-3">
+                  <label className="text-xs font-bold text-gray-500 uppercase block mb-2">Permissões Especiais</label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => togglePermissao('fat_geral')}
+                      className={`flex items-center justify-between p-2.5 rounded-lg border text-sm transition-all ${
+                        formData.permissoes.includes('fat_geral')
+                          ? 'bg-brand-blue/10 border-brand-blue/30 text-white font-bold'
+                          : 'bg-brand-dark-4 border-brand-dark-5 text-gray-500 hover:border-gray-700'
+                      }`}
+                    >
+                      Ver Faturamento Geral
+                      {formData.permissoes.includes('fat_geral') ? <CheckCircle size={14} className="text-brand-green" /> : <div className="w-3.5 h-3.5 rounded-full border border-gray-700" />}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => togglePermissao('excluir_registros')}
+                      className={`flex items-center justify-between p-2.5 rounded-lg border text-sm transition-all ${
+                        formData.permissoes.includes('excluir_registros')
+                          ? 'bg-brand-blue/10 border-brand-blue/30 text-white font-bold'
+                          : 'bg-brand-dark-4 border-brand-dark-5 text-gray-500 hover:border-gray-700'
+                      }`}
+                    >
+                      Excluir Registros (OS/Fin/etc.)
+                      {formData.permissoes.includes('excluir_registros') ? <CheckCircle size={14} className="text-brand-green" /> : <div className="w-3.5 h-3.5 rounded-full border border-gray-700" />}
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <div className="pt-4 flex gap-3">
                 <button
                   type="button"

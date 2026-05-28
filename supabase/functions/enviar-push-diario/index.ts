@@ -104,7 +104,7 @@ function nivelAlerta(tipo: string, dias: number): 'CRITICO' | 'AVISO' | 'VENCIDO
   return null;
 }
 
-async function buscarAlertasDaEmpresa(empresaId: string): Promise<AlertaItem[]> {
+async function buscarAlertasDaEmpresa(empresaId: string, isCacIndividual: boolean, empresaNome: string): Promise<AlertaItem[]> {
   const alertas: AlertaItem[] = [];
 
   // CR Exército
@@ -117,12 +117,14 @@ async function buscarAlertasDaEmpresa(empresaId: string): Promise<AlertaItem[]> 
     if (c.vencimento_cr) {
       const dias = calcularDias(c.vencimento_cr);
       const nivel = nivelAlerta('CR', dias);
-      if (nivel) alertas.push({ tipo: 'CR', label: `CR Exército — ${c.nome}`, diasRestantes: dias, nivel });
+      const label = `CR Exército — ${c.nome}`;
+      if (nivel) alertas.push({ tipo: 'CR', label, diasRestantes: dias, nivel });
     }
     if (c.vencimento_cr_ibama) {
       const dias = calcularDias(c.vencimento_cr_ibama);
       const nivel = nivelAlerta('CR', dias);
-      if (nivel) alertas.push({ tipo: 'CR_IBAMA', label: `CR IBAMA — ${c.nome}`, diasRestantes: dias, nivel });
+      const label = `CR IBAMA — ${c.nome}`;
+      if (nivel) alertas.push({ tipo: 'CR_IBAMA', label, diasRestantes: dias, nivel });
     }
   });
 
@@ -136,7 +138,8 @@ async function buscarAlertasDaEmpresa(empresaId: string): Promise<AlertaItem[]> 
     if (a.vencimento_craf) {
       const dias = calcularDias(a.vencimento_craf);
       const nivel = nivelAlerta('CRAF', dias);
-      if (nivel) alertas.push({ tipo: 'CRAF', label: `CRAF — ${a.modelo}`, diasRestantes: dias, nivel });
+      const label = isCacIndividual ? `CRAF — ${a.modelo} (${empresaNome})` : `CRAF — ${a.modelo}`;
+      if (nivel) alertas.push({ tipo: 'CRAF', label, diasRestantes: dias, nivel });
     }
   });
 
@@ -151,7 +154,10 @@ async function buscarAlertasDaEmpresa(empresaId: string): Promise<AlertaItem[]> 
       const dias = calcularDias(g.vencimento);
       const nivel = nivelAlerta('GT', dias);
       const modelo = Array.isArray(g.armas) ? g.armas[0]?.modelo : g.armas?.modelo;
-      if (nivel) alertas.push({ tipo: 'GT', label: `Guia de Tráfego ${g.tipo} — ${modelo || ''}`, diasRestantes: dias, nivel });
+      const label = isCacIndividual 
+        ? `Guia de Tráfego ${g.tipo} — ${modelo || ''} (${empresaNome})` 
+        : `Guia de Tráfego ${g.tipo} — ${modelo || ''}`;
+      if (nivel) alertas.push({ tipo: 'GT', label, diasRestantes: dias, nivel });
     }
   });
 
@@ -166,7 +172,8 @@ async function buscarAlertasDaEmpresa(empresaId: string): Promise<AlertaItem[]> 
     if (m.vencimento) {
       const dias = calcularDias(m.vencimento);
       const nivel = nivelAlerta('MANEJO', dias);
-      if (nivel) alertas.push({ tipo: 'MANEJO', label: `Manejo — ${m.nome_fazenda}`, diasRestantes: dias, nivel });
+      const label = isCacIndividual ? `Manejo — ${m.nome_fazenda} (${empresaNome})` : `Manejo — ${m.nome_fazenda}`;
+      if (nivel) alertas.push({ tipo: 'MANEJO', label, diasRestantes: dias, nivel });
     }
   });
 
@@ -222,7 +229,26 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Agrupar por empresa_id
+    // Buscar todas as empresas para mapear tipos e nomes
+    const { data: todasEmpresas } = await supabase
+      .from('empresas')
+      .select('id, nome, tipo_conta');
+    
+    const empresaMap = new Map((todasEmpresas || []).map(e => [e.id, e]));
+
+    // Buscar vínculos ativos de despachantes com CACs
+    const { data: todosVinculos } = await supabase
+      .from('vinculos_despachante_cac')
+      .select('cac_empresa_id, despachante_empresa_id')
+      .eq('status', 'ativo');
+
+    const vinculosPorCac = (todosVinculos || []).reduce((acc: Record<string, string[]>, v) => {
+      if (!acc[v.cac_empresa_id]) acc[v.cac_empresa_id] = [];
+      acc[v.cac_empresa_id].push(v.despachante_empresa_id);
+      return acc;
+    }, {});
+
+    // Agrupar subscriptions por empresa_id
     const porEmpresa = subscriptions.reduce((acc: Record<string, PushSubscription[]>, sub) => {
       if (!acc[sub.empresa_id]) acc[sub.empresa_id] = [];
       acc[sub.empresa_id].push(sub);
@@ -230,29 +256,60 @@ Deno.serve(async (req) => {
     }, {});
 
     let totalEnviados = 0;
-    let totalEmpresas = 0;
+    let totalEmpresasComAlerta = 0;
+
+    // Para evitar duplicidade de envio nas assinaturas do despachante
+    const pushEnviadosEndpoints = new Set<string>();
 
     for (const [empresaId, subs] of Object.entries(porEmpresa)) {
-      const alertas = await buscarAlertasDaEmpresa(empresaId);
+      const empInfo = empresaMap.get(empresaId);
+      const isCacIndividual = empInfo?.tipo_conta === 'cac_individual';
+      const empresaNome = empInfo?.nome || '';
+
+      const alertas = await buscarAlertasDaEmpresa(empresaId, isCacIndividual, empresaNome);
 
       if (alertas.length === 0) {
-        console.log(`✅ Empresa ${empresaId.substring(0, 8)}: sem alertas hoje.`);
+        console.log(`✅ Empresa ${empresaNome || empresaId.substring(0, 8)}: sem alertas hoje.`);
         continue;
       }
 
       const { titulo, corpo } = montarMensagem(alertas);
-      totalEmpresas++;
+      totalEmpresasComAlerta++;
 
+      // 1. Enviar para as assinaturas do próprio usuário (CAC ou Despachante)
       for (const sub of subs) {
-        const sucesso = await enviarPush(sub, titulo, corpo, '/');
-        if (sucesso) totalEnviados++;
+        if (!pushEnviadosEndpoints.has(sub.endpoint)) {
+          const sucesso = await enviarPush(sub, titulo, corpo, '/');
+          if (sucesso) {
+            totalEnviados++;
+            pushEnviadosEndpoints.add(sub.endpoint);
+          }
+        }
+      }
+
+      // 2. Se for um CAC Individual, enviar também para os despachantes vinculados
+      if (isCacIndividual) {
+        const despachantesVinculados = vinculosPorCac[empresaId] || [];
+        for (const despachanteId of despachantesVinculados) {
+          const subsDespachante = porEmpresa[despachanteId] || [];
+          for (const sub of subsDespachante) {
+            if (!pushEnviadosEndpoints.has(sub.endpoint)) {
+              // Envia o alerta do CAC para o celular/navegador do despachante
+              const sucesso = await enviarPush(sub, titulo, corpo, '/');
+              if (sucesso) {
+                totalEnviados++;
+                pushEnviadosEndpoints.add(sub.endpoint);
+              }
+            }
+          }
+        }
       }
     }
 
-    console.log(`✅ Push enviados: ${totalEnviados} para ${totalEmpresas} empresa(s)`);
+    console.log(`✅ Push enviados: ${totalEnviados} para ${totalEmpresasComAlerta} conta(s) com alerta.`);
 
     return new Response(
-      JSON.stringify({ ok: true, enviados: totalEnviados, empresas: totalEmpresas }),
+      JSON.stringify({ ok: true, enviados: totalEnviados, empresasComAlerta: totalEmpresasComAlerta }),
       { headers: { 'Content-Type': 'application/json' } }
     );
   } catch (err: any) {

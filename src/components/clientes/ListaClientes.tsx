@@ -136,7 +136,7 @@ export function ListaClientes() {
                         <span className="bg-brand-green/20 text-brand-green border border-brand-green/30 px-2.5 py-1 rounded-full text-xs font-semibold uppercase" title={usuario?.dadosEmpresa?.clubeParceiroPadrao || 'CLUBE DE TIRO E CAÇA PRÓ TIRO'}>
                           {usuario?.dadosEmpresa?.clubeParceiroPadrao 
                             ? (usuario.dadosEmpresa.clubeParceiroPadrao.length > 20 ? usuario.dadosEmpresa.clubeParceiroPadrao.substring(0, 17) + '...' : usuario.dadosEmpresa.clubeParceiroPadrao) 
-                            : 'PRÓ TIRO'}
+                            : 'FILIADO'}
                         </span>
                       ) : (
                         <span className="text-gray-400 text-xs uppercase font-medium" title={cliente.clubeFiliado || 'Não filiado'}>

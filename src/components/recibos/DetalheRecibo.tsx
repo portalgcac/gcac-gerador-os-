@@ -12,6 +12,7 @@ import { useRecibos } from '../../context/RecibosContext';
 import { DialogConfirmacao } from '../common/DialogConfirmacao';
 import { ModalEscolhaWhatsApp } from '../common/ModalEscolhaWhatsApp';
 import { MessageCircle } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 
 interface DetalheReciboProps {
   recibo: Recibo;
@@ -20,6 +21,8 @@ interface DetalheReciboProps {
 export function DetalheRecibo({ recibo }: DetalheReciboProps) {
   const navigate = useNavigate();
   const { deletarRecibo } = useRecibos();
+  const { usuario } = useAuth();
+  const podeExcluir = usuario?.role === 'admin' || usuario?.permissoes?.includes('excluir_registros');
   const [gerandoPdf, setGerandoPdf] = React.useState(false);
   const [confirmandoDelete, setConfirmandoDelete] = React.useState(false);
   const [modalWhatsAppAberto, setModalWhatsAppAberto] = React.useState(false);
@@ -108,13 +111,15 @@ export function DetalheRecibo({ recibo }: DetalheReciboProps) {
             WhatsApp
           </button>
 
-          <button 
-            onClick={() => setConfirmandoDelete(true)}
-            className="btn-ghost border-red-500/30 text-red-500 hover:bg-red-500 hover:text-white transition-all shadow-lg shadow-red-500/5"
-          >
-            <Trash2 size={18} />
-            Excluir
-          </button>
+          {podeExcluir && (
+            <button 
+              onClick={() => setConfirmandoDelete(true)}
+              className="btn-ghost border-red-500/30 text-red-500 hover:bg-red-500 hover:text-white transition-all shadow-lg shadow-red-500/5"
+            >
+              <Trash2 size={18} />
+              Excluir
+            </button>
+          )}
           
           <button 
             onClick={handleCompartilhar}

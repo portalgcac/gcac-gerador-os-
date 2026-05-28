@@ -6,6 +6,7 @@ import { useStatusConexao } from '../../hooks/useStatusConexao';
 import { useOrdens } from '../../context/OrdensContext';
 import { sincronizarPendentes } from '../../services/driveSync';
 import { OnboardingCAC } from '../common/OnboardingCAC';
+import { OnboardingEmpresa } from '../common/OnboardingEmpresa';
 import { buscarVinculosPendentesCAC, VinculoDespachanteCac } from '../../services/vinculosService';
 import { NotificacaoVinculo } from '../vinculos/NotificacaoVinculo';
 import { supabase } from '../../db/supabase';
@@ -128,6 +129,9 @@ export function AppShell() {
 
       {/* Tutorial de Boas-vindas para CAC Individual */}
       <OnboardingCAC />
+
+      {/* Tutorial de Boas-vindas para Despachante / Empresa */}
+      <OnboardingEmpresa />
 
       {/* Modal de Detalhes do Vínculo Pendente */}
       {modalVinculoAberto && vinculoPendente && (

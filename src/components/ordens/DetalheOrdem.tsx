@@ -28,6 +28,7 @@ export function DetalheOrdem({ ordem }: DetalheOrdemProps) {
   } = useOrdens();
   const { clientes, buscarCreditos, adicionarCredito } = useClientes();
   const { estaAutenticado, usuario } = useAuth();
+  const podeExcluir = usuario?.role === 'admin' || usuario?.permissoes?.includes('excluir_registros');
   const { estado: notif, mostrar, fechar } = useNotificacao();
   const [confirmandoDelete, setConfirmandoDelete] = useState(false);
   const [gerandoPdf, setGerandoPdf] = useState(false);
@@ -189,13 +190,15 @@ export function DetalheOrdem({ ordem }: DetalheOrdemProps) {
           <button onClick={() => navigate(-1)} className="btn-ghost btn-sm">
             <ArrowLeft size={16} />
           </button>
-          <button 
-            onClick={() => setConfirmandoDelete(true)}
-            className="p-1 px-2 bg-red-500/10 text-red-500 border border-red-500/20 rounded-lg hover:bg-red-500 hover:text-white transition-all group"
-            title="Excluir O.S."
-          >
-            <Trash2 size={14} className="group-hover:scale-110 transition-transform" />
-          </button>
+          {podeExcluir && (
+            <button 
+              onClick={() => setConfirmandoDelete(true)}
+              className="p-1 px-2 bg-red-500/10 text-red-500 border border-red-500/20 rounded-lg hover:bg-red-500 hover:text-white transition-all group"
+              title="Excluir O.S."
+            >
+              <Trash2 size={14} className="group-hover:scale-110 transition-transform" />
+            </button>
+          )}
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-xl font-bold text-white">{formatarNumeroOS(ordem.numero)}</h1>
@@ -255,13 +258,15 @@ export function DetalheOrdem({ ordem }: DetalheOrdemProps) {
           <Edit size={15} />
           Editar
         </button>
-        <button 
-          onClick={() => setConfirmandoDelete(true)} 
-          className="btn-danger-soft w-full justify-center text-sm font-black uppercase tracking-wider"
-        >
-          <Trash2 size={16} />
-          Excluir Ordem de Serviço
-        </button>
+        {podeExcluir && (
+          <button 
+            onClick={() => setConfirmandoDelete(true)} 
+            className="btn-danger-soft w-full justify-center text-sm font-black uppercase tracking-wider"
+          >
+            <Trash2 size={16} />
+            Excluir Ordem de Serviço
+          </button>
+        )}
       </div>
 
       {/* ── Status de Sync ── */}

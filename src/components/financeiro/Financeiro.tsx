@@ -32,6 +32,7 @@ export function Financeiro() {
   const { clientes } = useClientes();
   const { despesas, criarDespesa, deletarDespesa } = useFinanceiro();
   const { usuario } = useAuth();
+  const podeExcluir = usuario?.role === 'admin' || usuario?.permissoes?.includes('excluir_registros');
 
   const [abaAtiva, setAbaAtiva] = useState<'relatorio' | 'despesas' | 'equipe' | 'comissoes'>('relatorio');
   const [dataFiltro, setDataFiltro] = useState(new Date());
@@ -380,12 +381,14 @@ export function Financeiro() {
                       </td>
                       <td className="table-cell">
                         <div className="flex justify-center">
-                          <button 
-                            onClick={() => { if(confirm('Excluir esta despesa?')) deletarDespesa(d.id) }}
-                            className="p-1.5 text-gray-500 hover:text-red-500 transition-colors rounded-lg hover:bg-red-500/10"
-                          >
-                            <Trash2 size={16} />
-                          </button>
+                          {podeExcluir && (
+                            <button 
+                              onClick={() => { if(confirm('Excluir esta despesa?')) deletarDespesa(d.id) }}
+                              className="p-1.5 text-gray-500 hover:text-red-500 transition-colors rounded-lg hover:bg-red-500/10"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>

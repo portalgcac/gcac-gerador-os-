@@ -36,6 +36,7 @@ export function Dashboard() {
   const valorDespesas = despesasMes.reduce((s, d) => s + (d.valor || 0), 0);
   
   const ehAdmin = usuario?.role === 'admin';
+  const podeVerFaturamento = ehAdmin || usuario?.permissoes?.includes('fat_geral');
 
   const stats = {
     // Contagens Globais (Mês Atual)
@@ -142,7 +143,7 @@ export function Dashboard() {
             <div className="w-1 h-4 bg-brand-blue rounded-full" />
             <h2 className="text-xs font-bold text-gray-500 uppercase tracking-widest">Resumo de Ordens de Serviço</h2>
           </div>
-          <div className={`grid grid-cols-1 ${ehAdmin ? 'sm:grid-cols-3' : 'sm:grid-cols-1'} gap-3`}>
+          <div className={`grid grid-cols-1 ${podeVerFaturamento ? 'sm:grid-cols-3' : 'sm:grid-cols-1'} gap-3`}>
             <StatCard
               titulo="Total de OS (Mês Atual)"
               valor={stats.total}
@@ -150,7 +151,7 @@ export function Dashboard() {
               cor="blue"
               onClick={() => navigate('/ordens')}
             />
-            {ehAdmin && (
+            {podeVerFaturamento && (
               <>
                 <StatCard
                   titulo="Pagamento Pendente"
@@ -173,7 +174,7 @@ export function Dashboard() {
       )}
 
       {/* ── Banner de Receita e Lucro ── */}
-      {temAcessoRecurso('dash_margem_operacional') && ehAdmin && (
+      {temAcessoRecurso('dash_margem_operacional') && podeVerFaturamento && (
         <div className="card bg-gradient-to-br from-brand-dark-3 to-brand-dark-2 border border-brand-dark-5 overflow-hidden relative">
           <div className="absolute top-0 right-0 w-32 h-32 bg-brand-green/5 rounded-full blur-3xl -mr-16 -mt-16" />
           
@@ -257,7 +258,7 @@ export function Dashboard() {
       )}
 
       {/* ── Resumo de Orçamentos ── */}
-      {temAcessoRecurso('dash_resumo_orcamentos') && ehAdmin && (
+      {temAcessoRecurso('dash_resumo_orcamentos') && podeVerFaturamento && (
         <div>
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-base font-bold text-white flex items-center gap-2">
@@ -342,7 +343,7 @@ export function Dashboard() {
                     <p className="text-xs text-gray-400">{formatarData(ordem.criadoEm)}</p>
                   </div>
                   <div className="flex-shrink-0 flex items-center gap-2">
-                    {ehAdmin && (
+                    {podeVerFaturamento && (
                       <span className="text-sm font-bold text-brand-green">{formatarMoeda(ordem.valor)}</span>
                     )}
                     <span className={classeStatus(ordem.status)}>{ordem.status}</span>

@@ -7,6 +7,7 @@ import { StatusOS, StatusExecucaoServico } from '../../types';
 import { formatarMoeda, formatarData, formatarNumeroOS, classeStatus, classeStatusExecucao, iconeStatusExecucao, obterResumoExecucao, isOrdemConcluida, removerAcentos } from '../../utils/formatters';
 import { DialogConfirmacao } from '../common/DialogConfirmacao';
 import { Notificacao, useNotificacao } from '../common/Notificacao';
+import { useAuth } from '../../context/AuthContext';
 
 const STATUS_FILTROS: { label: string; valor: StatusOS }[] = [
   { label: 'Aguardando Pagamento', valor: 'Aguardando Pagamento' },
@@ -28,6 +29,8 @@ export function ListaOrdens() {
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const { ordens, deletarOrdem } = useOrdens();
+  const { usuario } = useAuth();
+  const podeExcluir = usuario?.role === 'admin' || usuario?.permissoes?.includes('excluir_registros');
   const { servicos } = useServicos();
   const { estado: notif, mostrar, fechar } = useNotificacao();
   
@@ -388,16 +391,18 @@ export function ListaOrdens() {
 
               {/* Ações */}
               <div className="flex flex-col items-center gap-2">
-                <button 
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setConfirmandoDelete(ordem.id);
-                  }}
-                  className="p-1.5 text-gray-600 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-all"
-                  title="Excluir O.S."
-                >
-                  <Trash2 size={16} />
-                </button>
+                {podeExcluir && (
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setConfirmandoDelete(ordem.id);
+                    }}
+                    className="p-1.5 text-gray-600 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-all"
+                    title="Excluir O.S."
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                )}
                 <ChevronRight size={16} className="text-gray-600 flex-shrink-0" />
               </div>
             </div>

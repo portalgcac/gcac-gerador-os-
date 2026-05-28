@@ -12,6 +12,7 @@ import { useClientes } from '../../context/ClientesContext';
 import { DialogConfirmacao } from '../common/DialogConfirmacao';
 import { Notificacao, useNotificacao } from '../common/Notificacao';
 import { ModalEscolhaWhatsApp } from '../common/ModalEscolhaWhatsApp';
+import { useAuth } from '../../context/AuthContext';
 
 interface DetalheOrcamentoProps {
   orcamento: Orcamento;
@@ -19,6 +20,7 @@ interface DetalheOrcamentoProps {
 
 export function DetalheOrcamento({ orcamento }: DetalheOrcamentoProps) {
   const navigate = useNavigate();
+  const { usuario } = useAuth();
   const { criarOrdem, ordens } = useOrdens();
   const { atualizarOrcamento, deletarOrcamento } = useOrcamentos();
   const { clientes, criarCliente } = useClientes();
@@ -142,6 +144,8 @@ export function DetalheOrcamento({ orcamento }: DetalheOrcamentoProps) {
     }
   };
 
+  const podeExcluir = usuario?.role === 'admin' || usuario?.permissoes?.includes('excluir_registros');
+
   return (
     <div className="space-y-4 max-w-4xl mx-auto pb-6">
       <Notificacao {...notif} onFechar={fechar} />
@@ -155,12 +159,14 @@ export function DetalheOrcamento({ orcamento }: DetalheOrcamentoProps) {
           <button onClick={() => navigate(`/orcamentos/${orcamento.id}/editar`)} className="btn-primary py-1.5 px-3 text-sm">
             <Edit2 size={14} /> Editar Orçamento
           </button>
-          <button 
-            onClick={() => setConfirmandoDelete(true)}
-            className="btn-danger-soft px-3 py-1.5 text-sm font-black uppercase tracking-wider"
-          >
-            <Trash2 size={16} /> Excluir Orçamento
-          </button>
+          {podeExcluir && (
+            <button 
+              onClick={() => setConfirmandoDelete(true)}
+              className="btn-danger-soft px-3 py-1.5 text-sm font-black uppercase tracking-wider"
+            >
+              <Trash2 size={16} /> Excluir Orçamento
+            </button>
+          )}
         </div>
       </div>
 

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, Plus, FileText, ChevronRight, Trash2 } from 'lucide-react';
 import { useOrcamentos } from '../../context/OrcamentosContext';
+import { useAuth } from '../../context/AuthContext';
 import { StatusOrcamento } from '../../types';
 import { formatarMoeda, formatarDataHora, classeStatusOrcamento, removerAcentos } from '../../utils/formatters';
 import { DialogConfirmacao } from '../common/DialogConfirmacao';
@@ -17,6 +18,8 @@ const STATUS_FILTROS: { label: string; valor: StatusOrcamento | 'Todos' }[] = [
 export function ListaOrcamentos() {
   const navigate = useNavigate();
   const { orcamentos, deletarOrcamento } = useOrcamentos();
+  const { usuario } = useAuth();
+  const podeExcluir = usuario?.role === 'admin' || usuario?.permissoes?.includes('excluir_registros');
   const { estado: notif, mostrar, fechar } = useNotificacao();
   const [busca, setBusca] = useState('');
   const [filtroStatus, setFiltroStatus] = useState<StatusOrcamento | 'Todos'>('Todos');
@@ -152,16 +155,18 @@ export function ListaOrcamentos() {
 
               {/* Botões de Ação */}
               <div className="flex flex-col items-center gap-2">
-                <button 
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setConfirmandoDelete(orcamento.id);
-                  }}
-                  className="p-1.5 text-gray-600 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-all"
-                  title="Excluir Orçamento"
-                >
-                  <Trash2 size={16} />
-                </button>
+                {podeExcluir && (
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setConfirmandoDelete(orcamento.id);
+                    }}
+                    className="p-1.5 text-gray-600 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-all"
+                    title="Excluir Orçamento"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                )}
                 <ChevronRight size={16} className="text-gray-600 flex-shrink-0" />
               </div>
             </div>

@@ -18,18 +18,21 @@ export function FormularioCliente({ clienteEditando, onFechar }: Props) {
   const [mostrarSenha, setMostrarSenha] = useState(false);
   const [focoClube, setFocoClube] = useState(false);
 
-  const clubeParceiroNome = usuario?.dadosEmpresa?.clubeParceiroPadrao || 'CLUBE DE TIRO E CAÇA PRÓ TIRO';
+  const clubeParceiroNome = usuario?.dadosEmpresa?.clubeParceiroPadrao || '';
+  const temClubeParceiro = !!clubeParceiroNome;
 
   const [form, setForm] = useState({
     nome: clienteEditando?.nome ?? '',
     cpf: clienteEditando?.cpf ?? '',
     contato: clienteEditando?.contato ?? '',
     senhaGov: clienteEditando?.senhaGov ?? '',
-    filiadoProTiro: clienteEditando?.filiadoProTiro ?? true,
+    filiadoProTiro: clienteEditando 
+      ? clienteEditando.filiadoProTiro 
+      : (temClubeParceiro ? true : false),
     clubeFiliado: clienteEditando?.clubeFiliado ?? '',
     clubeFiliadoText: clienteEditando 
-      ? (clienteEditando.filiadoProTiro ? clubeParceiroNome : (clienteEditando.clubeFiliado ?? ''))
-      : clubeParceiroNome,
+      ? (clienteEditando.filiadoProTiro ? (clubeParceiroNome || 'CLUBE DE TIRO E CAÇA PRÓ TIRO') : (clienteEditando.clubeFiliado ?? ''))
+      : (temClubeParceiro ? clubeParceiroNome : ''),
     observacoes: clienteEditando?.observacoes ?? '',
     endereco: clienteEditando?.endereco ?? '',
     numeroCr: clienteEditando?.numeroCr ?? '',
@@ -258,7 +261,7 @@ export function FormularioCliente({ clienteEditando, onFechar }: Props) {
               <input type="text" className="input uppercase"
                 value={form.clubeFiliadoText}
                 onChange={e => atualizarClube(e.target.value)}
-                placeholder="Ex: CLUBE DE TIRO E CAÇA PRÓ TIRO"
+                placeholder={clubeParceiroNome ? `Ex: ${clubeParceiroNome}` : "Digite o clube de tiro (opcional)"}
                 onFocus={() => setFocoClube(true)}
                 onBlur={() => setTimeout(() => setFocoClube(false), 200)}
               />
@@ -267,8 +270,8 @@ export function FormularioCliente({ clienteEditando, onFechar }: Props) {
                 <div className="absolute left-0 top-[50px] z-50 w-full bg-brand-dark-3 border border-brand-dark-5 rounded-xl shadow-2xl overflow-hidden animate-fade-in">
                   <div className="max-h-40 overflow-y-auto">
                     {[
-                      clubeParceiroNome,
-                      ...clubesRegistrados.filter(c => c.toUpperCase() !== clubeParceiroNome.toUpperCase())
+                      ...(clubeParceiroNome ? [clubeParceiroNome] : []),
+                      ...clubesRegistrados.filter(c => !clubeParceiroNome || c.toUpperCase() !== clubeParceiroNome.toUpperCase())
                     ]
                       .filter(c => c.toUpperCase().includes(form.clubeFiliadoText.toUpperCase()) || form.clubeFiliadoText === '')
                       .map(clube => (

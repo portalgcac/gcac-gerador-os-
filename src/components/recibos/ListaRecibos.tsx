@@ -6,10 +6,13 @@ import {
 } from 'lucide-react';
 import { useRecibos } from '../../context/RecibosContext';
 import { formatarMoeda, formatarData, removerAcentos } from '../../utils/formatters';
+import { useAuth } from '../../context/AuthContext';
 
 export function ListaRecibos() {
   const navigate = useNavigate();
   const { recibos, deletarRecibo } = useRecibos();
+  const { usuario } = useAuth();
+  const podeExcluir = usuario?.role === 'admin' || usuario?.permissoes?.includes('excluir_registros');
   const [busca, setBusca] = useState('');
 
   const filtrados = recibos.filter(r => 
@@ -113,13 +116,15 @@ export function ListaRecibos() {
               </div>
 
               <div className="flex items-center justify-between pt-4 border-t border-brand-dark-5">
-                <button
-                  onClick={(e) => handleDeletar(recibo.id, e)}
-                  className="p-2 text-gray-500 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-all"
-                  title="Deletar Recibo"
-                >
-                  <Trash2 size={16} />
-                </button>
+                {podeExcluir && (
+                  <button
+                    onClick={(e) => handleDeletar(recibo.id, e)}
+                    className="p-2 text-gray-500 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-all"
+                    title="Deletar Recibo"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                )}
                 <div className="flex items-center gap-1 text-xs text-brand-blue-light font-bold opacity-0 group-hover:opacity-100 transition-opacity">
                   Ver Detalhes
                   <ChevronRight size={14} />

@@ -168,18 +168,21 @@ export function FormularioOrdem({ ordemExistente }: FormularioOrdemProps) {
     carregarUsuarios();
   }, [usuario?.empresaId]);
 
-  const clubeParceiroNome = usuario?.dadosEmpresa?.clubeParceiroPadrao || 'CLUBE DE TIRO E CAÇA PRÓ TIRO';
+  const clubeParceiroNome = usuario?.dadosEmpresa?.clubeParceiroPadrao || '';
+  const temClubeParceiro = !!clubeParceiroNome;
 
   const [form, setForm] = useState({
     nomeCliente:       ordemExistente?.nomeCliente       ?? '',
     contato:           ordemExistente?.contato           ?? '',
     cpf:               ordemExistente?.cpf               ?? '',
     senhaGov:          ordemExistente?.senhaGov          ?? '',
-    filiadoProTiro:    ordemExistente?.filiadoProTiro     ?? true,
+    filiadoProTiro:    ordemExistente 
+                         ? ordemExistente.filiadoProTiro 
+                         : (temClubeParceiro ? true : false),
     clubeFiliado:      ordemExistente?.clubeFiliado       ?? '',
     clubeFiliadoText:  ordemExistente 
-                         ? (ordemExistente.filiadoProTiro ? clubeParceiroNome : (ordemExistente.clubeFiliado ?? ''))
-                         : clubeParceiroNome,
+                         ? (ordemExistente.filiadoProTiro ? (clubeParceiroNome || 'CLUBE DE TIRO E CAÇA PRÓ TIRO') : (ordemExistente.clubeFiliado ?? ''))
+                         : (temClubeParceiro ? clubeParceiroNome : ''),
     endereco:          ordemExistente?.endereco           ?? '',
     servicos:          ordemExistente?.servicos          ?? [],
     valor:             ordemExistente 
@@ -210,7 +213,7 @@ export function FormularioOrdem({ ordemExistente }: FormularioOrdemProps) {
         senhaGov: c.senhaGov,
         filiadoProTiro: c.filiadoProTiro,
         clubeFiliado: c.clubeFiliado || '',
-        clubeFiliadoText: c.filiadoProTiro ? clubeParceiroNome : (c.clubeFiliado || ''),
+        clubeFiliadoText: c.filiadoProTiro ? (clubeParceiroNome || 'CLUBE DE TIRO E CAÇA PRÓ TIRO') : (c.clubeFiliado || ''),
         endereco: c.endereco || ''
       }));
       // Limpar o estado para não repetir o preenchimento se o usuário recarregar
@@ -245,7 +248,7 @@ export function FormularioOrdem({ ordemExistente }: FormularioOrdemProps) {
       senhaGov: c.senhaGov,
       filiadoProTiro: c.filiadoProTiro,
       clubeFiliado: c.clubeFiliado || '',
-      clubeFiliadoText: c.filiadoProTiro ? clubeParceiroNome : (c.clubeFiliado || ''),
+      clubeFiliadoText: c.filiadoProTiro ? (clubeParceiroNome || 'CLUBE DE TIRO E CAÇA PRÓ TIRO') : (c.clubeFiliado || ''),
       endereco: c.endereco
     }));
     setFocoNome(false);
@@ -567,7 +570,7 @@ export function FormularioOrdem({ ordemExistente }: FormularioOrdemProps) {
               <input type="text" className={`input uppercase ${erros.clubeFiliado ? 'input-error' : ''}`}
                 value={form.clubeFiliadoText}
                 onChange={e => atualizarClube(e.target.value)}
-                placeholder="Ex: CLUBE DE TIRO E CAÇA PRÓ TIRO"
+                placeholder={clubeParceiroNome ? `Ex: ${clubeParceiroNome}` : "Digite o clube de tiro (opcional)"}
                 onFocus={() => setFocoClube(true)}
                 onBlur={() => setTimeout(() => setFocoClube(false), 200)}
               />
@@ -577,8 +580,8 @@ export function FormularioOrdem({ ordemExistente }: FormularioOrdemProps) {
                 <div className="absolute left-0 top-[50px] z-50 w-full bg-brand-dark-3 border border-brand-dark-5 rounded-xl shadow-2xl overflow-hidden animate-fade-in">
                   <div className="max-h-40 overflow-y-auto">
                     {[
-                      clubeParceiroNome,
-                      ...clubesRegistrados.filter(c => c.toUpperCase() !== clubeParceiroNome.toUpperCase())
+                      ...(clubeParceiroNome ? [clubeParceiroNome] : []),
+                      ...clubesRegistrados.filter(c => !clubeParceiroNome || c.toUpperCase() !== clubeParceiroNome.toUpperCase())
                     ]
                       .filter(c => c.toUpperCase().includes(form.clubeFiliadoText.toUpperCase()) || form.clubeFiliadoText === '')
                       .map(clube => (
