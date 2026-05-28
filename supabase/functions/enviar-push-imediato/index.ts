@@ -3,13 +3,12 @@
 // Deno runtime
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import elliptic from 'https://esm.sh/elliptic';
+import webpush from 'https://esm.sh/web-push';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const VAPID_PUBLIC_KEY = Deno.env.get('VAPID_PUBLIC_KEY')!;
 const VAPID_PRIVATE_KEY = Deno.env.get('VAPID_PRIVATE_KEY')!;
-const VAPID_SUBJECT = 'mailto:contato@gcac.com.br';
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
@@ -25,110 +24,24 @@ interface PushSubscription {
   p256dh: string;
 }
 
-// ─── Helpers VAPID ────────────────────────────────────────────────────────────
+// Configurar detalhes do VAPID para o envio de push
+webpush.setVapidDetails(
+  'mailto:contato@gcac.com.br',
+  VAPID_PUBLIC_KEY,
+  VAPID_PRIVATE_KEY
+);
 
-function base64UrlToUint8Array(base64String: string): Uint8Array {
-  // Limpar cabeçalhos PEM, rodapés, quebras de linha e espaços em branco
-  const cleanBase64 = base64String
-    .replace(/-----BEGIN[^-]*-----/, '')
-    .replace(/-----END[^-]*-----/, '')
-    .replace(/\s/g, '');
-
-  const padding = '='.repeat((4 - (cleanBase64.length % 4)) % 4);
-  const base64 = (cleanBase64 + padding).replace(/-/g, '+').replace(/_/g, '/');
-  const rawData = atob(base64);
-  return Uint8Array.from([...rawData].map(c => c.charCodeAt(0)));
-}
-
-function uint8ArrayToBase64Url(arr: Uint8Array): string {
-  return btoa(String.fromCharCode(...arr))
-    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
-
-async function criarJwtVapid(audience: string): Promise<string> {
-  const privateKeyBytes = base64UrlToUint8Array(VAPID_PRIVATE_KEY);
-
-  const privateKey = await crypto.subtle.importKey(
-    'pkcs8',
-    privateKeyBytes,
-    { name: 'ECDSA', namedCurve: 'P-256' },
-    false,
-    ['sign']
-  ).catch(async () => {
-    // Se falhar como pkcs8 direta (geralmente chave bruta de 32 bytes),
-    // derivamos as coordenadas públicas x e y usando elliptic para montar um JWK válido.
-    if (privateKeyBytes.length === 32) {
-      const ec = new (elliptic as any).ec('p256');
-      const keyPair = ec.keyFromPrivate(privateKeyBytes);
-      const pub = keyPair.getPublic();
-      
-      const x = pub.getX().toArray('be', 32);
-      const y = pub.getY().toArray('be', 32);
-
-      const jwk = {
-        kty: 'EC',
-        crv: 'P-256',
-        x: uint8ArrayToBase64Url(new Uint8Array(x)),
-        y: uint8ArrayToBase64Url(new Uint8Array(y)),
-        d: uint8ArrayToBase64Url(privateKeyBytes),
-      };
-
-      return await crypto.subtle.importKey(
-        'jwk',
-        jwk,
-        { name: 'ECDSA', namedCurve: 'P-256' },
-        false,
-        ['sign']
-      );
-    }
-
-    // Fallback genérico caso não seja de 32 bytes (levantará erro apropriado)
-    return await crypto.subtle.importKey(
-      'raw',
-      privateKeyBytes,
-      { name: 'ECDSA', namedCurve: 'P-256' },
-      false,
-      ['sign']
-    );
-  });
-
-
-
-  const header = { alg: 'ES256', typ: 'JWT' };
-  const now = Math.floor(Date.now() / 1000);
-  const payload = {
-    aud: audience,
-    exp: now + 12 * 3600,
-    sub: VAPID_SUBJECT,
-  };
-
-  const encodedHeader = uint8ArrayToBase64Url(
-    new TextEncoder().encode(JSON.stringify(header))
-  );
-  const encodedPayload = uint8ArrayToBase64Url(
-    new TextEncoder().encode(JSON.stringify(payload))
-  );
-
-  const signingInput = `${encodedHeader}.${encodedPayload}`;
-  const signature = await crypto.subtle.sign(
-    { name: 'ECDSA', hash: 'SHA-256' },
-    privateKey,
-    new TextEncoder().encode(signingInput)
-  );
-
-  const encodedSignature = uint8ArrayToBase64Url(new Uint8Array(signature));
-  return `${signingInput}.${encodedSignature}`;
-}
-
-// ─── Enviar Push ──────────────────────────────────────────────────────────────
+// ─── Enviar Push Criptografado ──────────────────────────────────────────────
 
 async function enviarPush(sub: PushSubscription, titulo: string, corpo: string, url: string): Promise<boolean> {
   try {
-    const endpoint = sub.endpoint;
-    const urlObj = new URL(endpoint);
-    const audience = `${urlObj.protocol}//${urlObj.host}`;
-
-    const jwt = await criarJwtVapid(audience);
+    const pushSubscription = {
+      endpoint: sub.endpoint,
+      keys: {
+        auth: sub.auth,
+        p256dh: sub.p256dh,
+      },
+    };
 
     const payload = JSON.stringify({
       title: titulo,
@@ -139,32 +52,19 @@ async function enviarPush(sub: PushSubscription, titulo: string, corpo: string, 
       tag: `gcac-${Date.now()}`,
     });
 
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'Authorization': `vapid t=${jwt}, k=${VAPID_PUBLIC_KEY}`,
-        'Content-Type': 'application/json',
-        'TTL': '86400',
-      },
-      body: payload,
-    });
-
-    if (!response.ok && response.status !== 201 && response.status !== 202) {
-      console.warn(`Push failed for endpoint (status ${response.status}):`, endpoint.substring(0, 50));
-
-      // Se retornar 404/410, o dispositivo foi desregistrado → remover do banco
-      if (response.status === 404 || response.status === 410) {
-        await supabase
-          .from('push_subscriptions')
-          .delete()
-          .eq('endpoint', endpoint);
-      }
-      return false;
-    }
-
+    // Envia usando a biblioteca web-push (criptografia RFC 8291 automática)
+    await webpush.sendNotification(pushSubscription, payload);
     return true;
-  } catch (err) {
-    console.error('Erro ao enviar push:', err);
+  } catch (err: any) {
+    console.error('Erro ao enviar push via web-push:', err);
+
+    // Se o dispositivo foi desregistrado (Gone 404/410), remover do banco
+    if (err.statusCode === 404 || err.statusCode === 410) {
+      await supabase
+        .from('push_subscriptions')
+        .delete()
+        .eq('endpoint', sub.endpoint);
+    }
     return false;
   }
 }
