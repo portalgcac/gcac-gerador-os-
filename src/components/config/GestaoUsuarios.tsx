@@ -72,6 +72,7 @@ export function GestaoUsuarios() {
   // Modal State
   const [modalAberto, setModalAberto] = useState(false);
   const [editando, setEditando] = useState<UsuarioAutorizado | null>(null);
+  const [buscaUsuario, setBuscaUsuario] = useState('');
   const [formData, setFormData] = useState({
     nome: '',
     email: '',
@@ -80,6 +81,32 @@ export function GestaoUsuarios() {
     role: 'colaborador' as 'admin' | 'colaborador',
     permissoes: ['ordens'] as string[],
     empresa_id: '00000000-0000-0000-0000-000000000001'
+  });
+
+  const getRecursosDisponiveis = () => {
+    if (isMasterAdmin) {
+      const empId = formData.empresa_id;
+      if (empId === '00000000-0000-0000-0000-000000000001') {
+        return RECURSOS_SISTEMA;
+      }
+      const empresaSelecionada = empresas.find(e => e.id === empId);
+      if (empresaSelecionada) {
+        return RECURSOS_SISTEMA.filter(r => (empresaSelecionada.recursos_liberados || []).includes(r.key));
+      }
+      return RECURSOS_SISTEMA;
+    }
+    const recursosDaEmpresa = usuario?.dadosEmpresa?.recursosLiberados || [];
+    return RECURSOS_SISTEMA.filter(r => recursosDaEmpresa.includes(r.key));
+  };
+
+  const usuariosFiltrados = usuarios.filter(u => {
+    const termo = buscaUsuario.toLowerCase().trim();
+    if (!termo) return true;
+    return (
+      (u.nome || '').toLowerCase().includes(termo) ||
+      (u.email || '').toLowerCase().includes(termo) ||
+      (u.cpf || '').toLowerCase().includes(termo)
+    );
   });
 
   const carregarEmpresas = async () => {
@@ -424,57 +451,104 @@ export function GestaoUsuarios() {
             <p className="text-sm text-gray-500">Nenhum usuário cadastrado.</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="text-gray-500 text-xs uppercase bg-brand-dark-3/50">
-                <tr>
-                  <th className="px-3 py-2 font-bold">Usuário / E-mail</th>
-                  <th className="px-3 py-2 font-bold">Nível</th>
-                  {isMasterAdmin && <th className="px-3 py-2 font-bold">Empresa</th>}
-                  <th className="px-3 py-2 font-bold">Status</th>
-                  <th className="px-3 py-2 font-bold text-right">Ações</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-brand-dark-5">
-                {usuarios.map(u => (
-                  <tr key={u.id} className="hover:bg-brand-dark-4 transition-colors">
-                    <td className="px-3 py-3">
-                      <p className="font-bold text-white text-sm">{u.nome}</p>
-                      <p className="text-xs text-gray-500">{u.email}</p>
-                    </td>
-                    <td className="px-3 py-3">
-                      <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${
-                        u.role === 'admin' ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' 
-                                         : 'bg-brand-blue/10 text-brand-blue-light border border-brand-blue/20'
-                      }`}>
-                        {u.role === 'admin' ? 'Administrador' : 'Colaborador'}
-                      </span>
-                    </td>
-                    {isMasterAdmin && (
-                      <td className="px-3 py-3 text-sm text-gray-300 font-medium">
-                        {empresas.find(e => e.id === u.empresa_id)?.nome || 'GCAC Principal'}
-                      </td>
-                    )}
-                    <td className="px-3 py-3">
-                      <button 
+          <div className="space-y-4">
+            {/* Input de busca para suportar grande volume de dados */}
+            <div className="relative">
+              <input
+                type="text"
+                value={buscaUsuario}
+                onChange={e => setBuscaUsuario(e.target.value)}
+                placeholder="Buscar usuário por nome, e-mail ou CPF..."
+                className="input w-full text-sm pl-9"
+              />
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </span>
+              {buscaUsuario && (
+                <button
+                  onClick={() => setBuscaUsuario('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white"
+                >
+                  <XCircle size={16} />
+                </button>
+              )}
+            </div>
+
+            {usuariosFiltrados.length === 0 ? (
+              <div className="text-center py-6 bg-brand-dark-4 border border-brand-dark-5 rounded-xl">
+                <p className="text-sm text-gray-500">Nenhum usuário encontrado para a busca.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {usuariosFiltrados.map(u => (
+                  <div 
+                    key={u.id} 
+                    className="p-4 bg-brand-dark-4 border border-brand-dark-5 rounded-2xl flex flex-col justify-between gap-3 hover:border-gray-700 transition-all shadow-md group relative"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="w-10 h-10 rounded-full bg-brand-blue/10 border border-brand-blue/20 flex items-center justify-center text-brand-blue font-black text-sm shrink-0 uppercase">
+                        {u.nome ? u.nome.charAt(0) : '?'}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h4 className="font-bold text-white text-sm truncate max-w-[180px] sm:max-w-xs" title={u.nome}>
+                            {u.nome}
+                          </h4>
+                          <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full tracking-wider ${
+                            u.role === 'admin' 
+                              ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' 
+                              : 'bg-brand-blue/10 text-brand-blue-light border border-brand-blue/20'
+                          }`}>
+                            {u.role === 'admin' ? 'Admin' : 'Colaborador'}
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-400 truncate mt-0.5" title={u.email}>{u.email}</p>
+                        {u.cpf && <p className="text-[10px] text-gray-500 mt-0.5">CPF: {u.cpf}</p>}
+                        
+                        {isMasterAdmin && (
+                          <div className="mt-1 flex items-center gap-1 text-[10px] text-gray-500 bg-brand-dark-3 py-0.5 px-2 rounded-md w-fit font-semibold">
+                            <Building size={10} className="text-brand-blue" />
+                            <span className="truncate max-w-[160px]">
+                              {empresas.find(e => e.id === u.empresa_id)?.nome || 'GCAC Principal'}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between border-t border-brand-dark-5 pt-3 mt-1">
+                      {/* Status / Toggle button */}
+                      <button
+                        type="button"
                         onClick={() => toggleStatus(u)}
-                        className={`flex items-center gap-1.5 text-xs font-bold transition-colors ${
-                          u.ativo ? 'text-brand-green hover:text-brand-green-light' : 'text-red-400 hover:text-red-300'
+                        className={`flex items-center gap-1.5 text-xs font-bold transition-all px-2.5 py-1 rounded-lg ${
+                          u.ativo 
+                            ? 'bg-brand-green/10 text-brand-green hover:bg-brand-green/20' 
+                            : 'bg-red-500/10 text-red-400 hover:bg-red-500/20'
                         }`}
                       >
-                        {u.ativo ? <CheckCircle size={14} /> : <XCircle size={14} />}
+                        {u.ativo ? <CheckCircle size={13} /> : <XCircle size={13} />}
                         {u.ativo ? 'Ativo' : 'Inativo'}
                       </button>
-                    </td>
-                    <td className="px-3 py-3 text-right">
-                      <button onClick={() => handleAbrirModal(u)} className="p-1.5 text-gray-400 hover:text-brand-blue-light">
-                        <Edit2 size={16} />
-                      </button>
-                    </td>
-                  </tr>
+
+                      {/* Botões de Ação */}
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => handleAbrirModal(u)}
+                          className="p-1.5 text-gray-400 hover:text-brand-blue-light hover:bg-brand-dark-3 rounded-xl transition-all"
+                          title="Editar Usuário"
+                        >
+                          <Edit2 size={15} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
                 ))}
-              </tbody>
-            </table>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -640,6 +714,50 @@ export function GestaoUsuarios() {
                   </div>
                 </div>
               )}
+
+              <div className="space-y-2 border-t border-brand-dark-5 pt-3">
+                <label className="text-xs font-bold text-gray-500 uppercase block mb-1">
+                  Ferramentas / Recursos Liberados
+                </label>
+                {getRecursosDisponiveis().length === 0 ? (
+                  <p className="text-xs text-gray-500 italic">
+                    Nenhuma ferramenta ou recurso adicional liberado para a empresa deste usuário.
+                  </p>
+                ) : (
+                  <div className="flex flex-col gap-2 max-h-[220px] overflow-y-auto pr-1 custom-scrollbar">
+                    {getRecursosDisponiveis().map(rec => {
+                      const ativo = formData.permissoes.includes(rec.key);
+                      return (
+                        <button
+                          key={rec.key}
+                          type="button"
+                          onClick={() => {
+                            const novasPermissoes = ativo
+                              ? formData.permissoes.filter(p => p !== rec.key)
+                              : [...formData.permissoes, rec.key];
+                            setFormData({
+                              ...formData,
+                              permissoes: novasPermissoes
+                            });
+                          }}
+                          className={`flex items-center justify-between p-2.5 rounded-lg border text-xs transition-all text-left ${
+                            ativo
+                              ? 'bg-brand-blue/10 border-brand-blue/30 text-white font-bold'
+                              : 'bg-brand-dark-4 border-brand-dark-5 text-gray-400 hover:border-gray-700'
+                          }`}
+                        >
+                          <span className="break-words pr-4">{rec.label}</span>
+                          {ativo ? (
+                            <CheckCircle size={14} className="text-brand-green shrink-0 ml-1" />
+                          ) : (
+                            <div className="w-3.5 h-3.5 rounded-full border border-gray-700 shrink-0 ml-1" />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
 
               <div className="pt-4 flex gap-3">
                 <button

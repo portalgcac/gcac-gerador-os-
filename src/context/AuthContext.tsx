@@ -262,8 +262,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (usuario.tipoConta === 'cac_individual') return true;
 
     // Contas de empresa dependem das permissões do tenant (recursosLiberados)
-    const recursos = usuario.dadosEmpresa?.recursosLiberados || [];
-    return recursos.includes(recurso);
+    const recursosTenant = usuario.dadosEmpresa?.recursosLiberados || [];
+    if (!recursosTenant.includes(recurso)) return false;
+
+    const userPerms = usuario.permissoes || [];
+
+    // Se o usuário tem alguma das chaves de recursos do sistema em seu array de permissões,
+    // significa que ele foi personalizado de forma granular. Portanto, validamos estritamente.
+    const chavesRecursosSistema = [
+      'dash_atencao_diaria', 'dash_alertas_vencimento', 'dash_lembretes', 'dash_resumo_os',
+      'dash_margem_operacional', 'dash_resumo_operacional', 'dash_resumo_orcamentos', 'dash_ordens_recentes',
+      'fin_fluxo_caixa', 'fin_relatorio_equipe', 'fin_exportacao',
+      'modulo_ordens', 'modulo_orcamentos', 'modulo_recibos', 'modulo_agendamentos', 'modulo_clientes',
+      'modulo_clientes_cac', 'acervo_anexos', 'acervo_gerenciador'
+    ];
+    
+    const temCustomizacaoGranular = userPerms.some(p => chavesRecursosSistema.includes(p));
+
+    if (temCustomizacaoGranular) {
+      return userPerms.includes(recurso);
+    }
+
+    // Caso contrário, usamos a regra de retrocompatibilidade baseada no papel ou nos módulos padrão
+    if (usuario.role === 'admin') return true;
+
+    // Mapeamento de retrocompatibilidade para colaboradores legados
+    if (recurso.startsWith('fin_') && userPerms.includes('financeiro')) return true;
+    if (recurso.startsWith('dash_') && userPerms.includes('painel')) return true;
+    if (recurso === 'modulo_ordens' && userPerms.includes('ordens')) return true;
+    if (recurso === 'modulo_orcamentos' && userPerms.includes('orcamentos')) return true;
+    if (recurso === 'modulo_recibos' && userPerms.includes('recibos')) return true;
+    if (recurso === 'modulo_agendamentos' && userPerms.includes('agendamentos')) return true;
+    if (recurso === 'modulo_clientes' && userPerms.includes('clientes')) return true;
+    if (recurso === 'modulo_clientes_cac' && userPerms.includes('clientes')) return true;
+    if (recurso.startsWith('acervo_') && userPerms.includes('clientes')) return true;
+
+    return false;
   }, [usuario]);
 
   return (
