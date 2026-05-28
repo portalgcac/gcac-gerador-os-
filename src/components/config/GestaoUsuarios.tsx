@@ -487,7 +487,7 @@ export function GestaoUsuarios() {
                 <p className="text-sm text-gray-500 italic py-4">Nenhuma empresa B2B cadastrada.</p>
               ) : (
                 <div className="overflow-x-auto rounded-2xl border border-brand-dark-5">
-                  <table className="w-full text-left border-collapse">
+                  <table className="w-full text-left border-collapse min-w-[850px]">
                     <thead>
                       <tr className="bg-brand-dark-3 border-b border-brand-dark-5">
                         <th className="p-4 text-xs font-black text-gray-400 uppercase tracking-wider">Empresa (Tenant)</th>
@@ -695,7 +695,7 @@ export function GestaoUsuarios() {
                     <p className="text-sm text-gray-500 italic text-center py-8">Nenhum funcionário cadastrado para esta empresa.</p>
                   ) : (
                     <div className="overflow-x-auto rounded-2xl border border-brand-dark-5">
-                      <table className="w-full text-left border-collapse">
+                      <table className="w-full text-left border-collapse min-w-[850px]">
                         <thead>
                           <tr className="bg-brand-dark-3 border-b border-brand-dark-5">
                             <th className="p-3 text-xs font-black text-gray-400 uppercase tracking-wider">Usuário</th>
@@ -790,7 +790,7 @@ export function GestaoUsuarios() {
                 <p className="text-sm text-gray-500 italic text-center py-8">Nenhum atirador ou caçador individual cadastrado no sistema.</p>
               ) : (
                 <div className="overflow-x-auto rounded-2xl border border-brand-dark-5">
-                  <table className="w-full text-left border-collapse">
+                  <table className="w-full text-left border-collapse min-w-[850px]">
                     <thead>
                       <tr className="bg-brand-dark-3 border-b border-brand-dark-5">
                         <th className="p-3 text-xs font-black text-gray-400 uppercase tracking-wider">Atirador / Caçador</th>
@@ -808,7 +808,13 @@ export function GestaoUsuarios() {
                             <p className="text-xs text-gray-400 font-mono mt-0.5">{u.email}</p>
                           </td>
                           <td className="p-3 text-xs font-mono text-gray-400">
-                            {u.empresa_id || 'Não Vinculado'}
+                            {u.empresa_id ? (
+                              <span className="bg-brand-dark-3 px-2 py-1 rounded text-xs select-all hover:text-white transition-colors animate-fade-in" title={u.empresa_id}>
+                                {u.empresa_id.substring(0, 8)}...
+                              </span>
+                            ) : (
+                              <span className="text-gray-600 italic">Não Vinculado</span>
+                            )}
                           </td>
                           <td className="p-3 text-xs text-gray-300">
                             {u.cpf ? <p className="font-mono">{u.cpf}</p> : <p className="text-gray-500 italic">Sem CPF</p>}
@@ -877,7 +883,7 @@ export function GestaoUsuarios() {
                 <p className="text-sm text-gray-500 italic text-center py-8">Nenhum funcionário cadastrado no escritório central.</p>
               ) : (
                 <div className="overflow-x-auto rounded-2xl border border-brand-dark-5">
-                  <table className="w-full text-left border-collapse">
+                  <table className="w-full text-left border-collapse min-w-[850px]">
                     <thead>
                       <tr className="bg-brand-dark-3 border-b border-brand-dark-5">
                         <th className="p-3 text-xs font-black text-gray-400 uppercase tracking-wider">Colaborador</th>
@@ -972,7 +978,7 @@ export function GestaoUsuarios() {
             <p className="text-sm text-gray-500 italic text-center py-8">Nenhum colaborador cadastrado para esta empresa.</p>
           ) : (
             <div className="overflow-x-auto rounded-2xl border border-brand-dark-5">
-              <table className="w-full text-left border-collapse">
+              <table className="w-full text-left border-collapse min-w-[850px]">
                 <thead>
                   <tr className="bg-brand-dark-3 border-b border-brand-dark-5">
                     <th className="p-3 text-xs font-black text-gray-400 uppercase tracking-wider">Usuário</th>
