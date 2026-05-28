@@ -12,12 +12,12 @@ self.addEventListener('push', (event) => {
     }
   }
 
-  const title = data.title || 'Alerta de Vencimento';
+  const title = data.title || 'Portal G CAC';
   const options = {
-    body: data.body || 'Você tem novos documentos vencendo.',
+    body: data.body || 'Você tem uma nova notificação no sistema.',
     icon: data.icon || '/logo.jpg',
     badge: data.badge || '/logo.jpg',
-    tag: data.tag || 'alerta-vencimento',
+    tag: data.tag || 'notificacao-sistema',
     data: data.data || { url: '/' },
   };
 
