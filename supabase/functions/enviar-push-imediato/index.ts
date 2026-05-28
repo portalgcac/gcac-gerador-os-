@@ -3,6 +3,7 @@
 // Deno runtime
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import elliptic from 'https://esm.sh/elliptic';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -55,20 +56,26 @@ async function criarJwtVapid(audience: string): Promise<string> {
     ['sign']
   ).catch(async () => {
     // Se falhar como pkcs8 direta (geralmente chave bruta de 32 bytes),
-    // envolvemos a chave bruta de 32 bytes no cabeçalho ASN.1 PKCS#8 apropriado para EC P-256.
+    // derivamos as coordenadas públicas x e y usando elliptic para montar um JWK válido.
     if (privateKeyBytes.length === 32) {
-      const pkcs8Header = new Uint8Array([
-        0x30, 0x41, 0x02, 0x01, 0x00, 0x30, 0x13, 0x06, 0x07, 0x2a, 0x86, 0x48, 
-        0xce, 0x3d, 0x02, 0x01, 0x06, 0x08, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x03, 
-        0x01, 0x07, 0x04, 0x27, 0x30, 0x25, 0x02, 0x01, 0x01, 0x04, 0x20
-      ]);
-      const pkcs8Bytes = new Uint8Array(pkcs8Header.length + privateKeyBytes.length);
-      pkcs8Bytes.set(pkcs8Header, 0);
-      pkcs8Bytes.set(privateKeyBytes, pkcs8Header.length);
+      const ec = new (elliptic as any).ec('p256');
+      const keyPair = ec.keyFromPrivate(privateKeyBytes);
+      const pub = keyPair.getPublic();
+      
+      const x = pub.getX().toArray('be', 32);
+      const y = pub.getY().toArray('be', 32);
+
+      const jwk = {
+        kty: 'EC',
+        crv: 'P-256',
+        x: uint8ArrayToBase64Url(new Uint8Array(x)),
+        y: uint8ArrayToBase64Url(new Uint8Array(y)),
+        d: uint8ArrayToBase64Url(privateKeyBytes),
+      };
 
       return await crypto.subtle.importKey(
-        'pkcs8',
-        pkcs8Bytes,
+        'jwk',
+        jwk,
         { name: 'ECDSA', namedCurve: 'P-256' },
         false,
         ['sign']
@@ -84,6 +91,7 @@ async function criarJwtVapid(audience: string): Promise<string> {
       ['sign']
     );
   });
+
 
 
   const header = { alg: 'ES256', typ: 'JWT' };
