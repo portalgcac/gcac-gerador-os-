@@ -1055,7 +1055,7 @@ export function Configuracoes() {
       </div>
       )}
 
-      {/* ── Gestão de Usuários (Apenas Admin) ── */}
+      {/* ── Painel de Controle de Usuários (Apenas Admin) ── */}
       {usuario?.role === 'admin' && (
         <div className="card space-y-4">
           <div 
@@ -1068,11 +1068,11 @@ export function Configuracoes() {
               </div>
               <div>
                 <h2 className="text-sm font-bold text-white tracking-wider">
-                  E-mails de Liberação e Acessos
+                  Painel de Controle de Usuários
                 </h2>
                 {!usuariosExpandido && (
                   <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">
-                    Gerencie quem acessa o sistema • Clique para expandir
+                    Gerencie as empresas despachantes, atiradores e caçadores individuais CAC e a equipe do seu escritório central • Clique para expandir
                   </p>
                 )}
               </div>
