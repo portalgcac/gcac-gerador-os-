@@ -42,6 +42,7 @@ import { LembretesProvider } from './context/LembretesContext';
 import { ListaLembretes } from './components/lembretes/ListaLembretes';
 import { PainelAtiradores } from './components/admin/PainelAtiradores';
 import { PainelClientesCAC } from './components/vinculos/PainelClientesCAC';
+import { ConviteAceitarPage } from './pages/ConviteAceitarPage';
 
 const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
@@ -327,6 +328,9 @@ export default function App() {
                                 </RotaProtegida>
                               } />
                             </Route>
+
+                            {/* Rota pública: landing page de aceite de convite CAC */}
+                            <Route path="/convite/:token" element={<ConviteAceitarPage />} />
 
                             <Route path="*" element={<WildcardRedirect />} />
                           </Routes>

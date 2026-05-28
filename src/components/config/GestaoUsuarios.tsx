@@ -50,6 +50,11 @@ const RECURSOS_SISTEMA = [
   { key: 'modulo_clientes_cac', label: 'Módulo Clientes CAC — Vinculação e Gestão de Atiradores/Colecionadores' },
   { key: 'acervo_anexos', label: 'Acervo — Armazenamento de Arquivos e Anexos nos Documentos' },
   { key: 'acervo_gerenciador', label: 'Acervo — Gerenciador de Clientes Vinculados' },
+  // ── Configurações (seções internas) ──
+  { key: 'config_alertas_vencimento', label: 'Configurações — Alertas de Prazos de Vencimento (CR, CRAF, GT, Manejo)' },
+  { key: 'config_notificacoes_push', label: 'Configurações — Notificações Push no Celular' },
+  { key: 'config_servicos', label: 'Configurações — Gerenciar Serviços e Taxas' },
+  { key: 'config_manual', label: 'Configurações — Manual de Instruções' },
 ];
 
 export function GestaoUsuarios() {
@@ -84,19 +89,7 @@ export function GestaoUsuarios() {
   });
 
   const getRecursosDisponiveis = () => {
-    if (isMasterAdmin) {
-      const empId = formData.empresa_id;
-      if (empId === '00000000-0000-0000-0000-000000000001') {
-        return RECURSOS_SISTEMA;
-      }
-      const empresaSelecionada = empresas.find(e => e.id === empId);
-      if (empresaSelecionada) {
-        return RECURSOS_SISTEMA.filter(r => (empresaSelecionada.recursos_liberados || []).includes(r.key));
-      }
-      return RECURSOS_SISTEMA;
-    }
-    const recursosDaEmpresa = usuario?.dadosEmpresa?.recursosLiberados || [];
-    return RECURSOS_SISTEMA.filter(r => recursosDaEmpresa.includes(r.key));
+    return RECURSOS_SISTEMA;
   };
 
   const usuariosFiltrados = usuarios.filter(u => {
@@ -481,21 +474,42 @@ export function GestaoUsuarios() {
                 <p className="text-sm text-gray-500">Nenhum usuário encontrado para a busca.</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {usuariosFiltrados.map(u => (
-                  <div 
-                    key={u.id} 
-                    className="p-4 bg-brand-dark-4 border border-brand-dark-5 rounded-2xl flex flex-col justify-between gap-3 hover:border-gray-700 transition-all shadow-md group relative"
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="w-10 h-10 rounded-full bg-brand-blue/10 border border-brand-blue/20 flex items-center justify-center text-brand-blue font-black text-sm shrink-0 uppercase">
-                        {u.nome ? u.nome.charAt(0) : '?'}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <h4 className="font-bold text-white text-sm truncate max-w-[180px] sm:max-w-xs" title={u.nome}>
-                            {u.nome}
-                          </h4>
+              <div className="overflow-x-auto rounded-2xl border border-brand-dark-5">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-brand-dark-3 border-b border-brand-dark-5">
+                      <th className="p-4 text-xs font-black text-gray-400 uppercase tracking-wider">Usuário</th>
+                      <th className="p-4 text-xs font-black text-gray-400 uppercase tracking-wider">Nível</th>
+                      <th className="p-4 text-xs font-black text-gray-400 uppercase tracking-wider">CPF / Contato</th>
+                      {isMasterAdmin && (
+                        <th className="p-4 text-xs font-black text-gray-400 uppercase tracking-wider">Empresa (Tenant)</th>
+                      )}
+                      <th className="p-4 text-xs font-black text-gray-400 uppercase tracking-wider">Status</th>
+                      <th className="p-4 text-xs font-black text-gray-400 uppercase tracking-wider text-right">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-brand-dark-5">
+                    {usuariosFiltrados.map(u => (
+                      <tr 
+                        key={u.id} 
+                        className="bg-brand-dark-4/40 hover:bg-brand-dark-4 transition-colors"
+                      >
+                        <td className="p-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-full bg-brand-blue/10 border border-brand-blue/20 flex items-center justify-center text-brand-blue font-black text-xs shrink-0 uppercase">
+                              {u.nome ? u.nome.charAt(0) : '?'}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="font-bold text-white text-sm truncate max-w-[200px]" title={u.nome}>
+                                {u.nome}
+                              </p>
+                              <p className="text-xs text-gray-400 truncate max-w-[200px]" title={u.email}>
+                                {u.email}
+                              </p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="p-4">
                           <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full tracking-wider ${
                             u.role === 'admin' 
                               ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' 
@@ -503,50 +517,46 @@ export function GestaoUsuarios() {
                           }`}>
                             {u.role === 'admin' ? 'Admin' : 'Colaborador'}
                           </span>
-                        </div>
-                        <p className="text-xs text-gray-400 truncate mt-0.5" title={u.email}>{u.email}</p>
-                        {u.cpf && <p className="text-[10px] text-gray-500 mt-0.5">CPF: {u.cpf}</p>}
-                        
+                        </td>
+                        <td className="p-4 text-xs text-gray-300">
+                          {u.cpf ? <p className="font-mono">{u.cpf}</p> : <p className="text-gray-500 italic">Sem CPF</p>}
+                          {u.contato && <p className="text-gray-400 mt-0.5">{u.contato}</p>}
+                        </td>
                         {isMasterAdmin && (
-                          <div className="mt-1 flex items-center gap-1 text-[10px] text-gray-500 bg-brand-dark-3 py-0.5 px-2 rounded-md w-fit font-semibold">
-                            <Building size={10} className="text-brand-blue" />
-                            <span className="truncate max-w-[160px]">
-                              {empresas.find(e => e.id === u.empresa_id)?.nome || 'GCAC Principal'}
-                            </span>
-                          </div>
+                          <td className="p-4">
+                            <div className="flex items-center gap-1 text-xs text-brand-blue-light bg-brand-blue/5 border border-brand-blue/10 py-1 px-2.5 rounded-lg w-fit font-semibold">
+                              <Building size={11} className="shrink-0" />
+                              <span className="truncate max-w-[150px]" title={empresas.find(e => e.id === u.empresa_id)?.nome || 'GCAC Principal'}>
+                                {empresas.find(e => e.id === u.empresa_id)?.nome || 'GCAC Principal'}
+                              </span>
+                            </div>
+                          </td>
                         )}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-between border-t border-brand-dark-5 pt-3 mt-1">
-                      {/* Status / Toggle button */}
-                      <button
-                        type="button"
-                        onClick={() => toggleStatus(u)}
-                        className={`flex items-center gap-1.5 text-xs font-bold transition-all px-2.5 py-1 rounded-lg ${
-                          u.ativo 
-                            ? 'bg-brand-green/10 text-brand-green hover:bg-brand-green/20' 
-                            : 'bg-red-500/10 text-red-400 hover:bg-red-500/20'
-                        }`}
-                      >
-                        {u.ativo ? <CheckCircle size={13} /> : <XCircle size={13} />}
-                        {u.ativo ? 'Ativo' : 'Inativo'}
-                      </button>
-
-                      {/* Botões de Ação */}
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => handleAbrirModal(u)}
-                          className="p-1.5 text-gray-400 hover:text-brand-blue-light hover:bg-brand-dark-3 rounded-xl transition-all"
-                          title="Editar Usuário"
-                        >
-                          <Edit2 size={15} />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+                        <td className="p-4">
+                          <button
+                            type="button"
+                            onClick={() => toggleStatus(u)}
+                            className="flex items-center gap-1 text-[11px] font-black uppercase transition-all px-2.5 py-1 rounded-lg bg-brand-dark-3 border border-brand-dark-5 hover:border-gray-600"
+                          >
+                            <span className={u.ativo ? 'text-brand-green' : 'text-red-400'}>
+                              {u.ativo ? 'Ativo' : 'Inativo'}
+                            </span>
+                          </button>
+                        </td>
+                        <td className="p-4 text-right">
+                          <button
+                            type="button"
+                            onClick={() => handleAbrirModal(u)}
+                            className="p-2 text-gray-400 hover:text-brand-blue-light hover:bg-brand-dark-3 rounded-xl transition-all inline-flex items-center"
+                            title="Editar Usuário"
+                          >
+                            <Edit2 size={15} />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             )}
           </div>

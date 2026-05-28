@@ -274,7 +274,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       'dash_margem_operacional', 'dash_resumo_operacional', 'dash_resumo_orcamentos', 'dash_ordens_recentes',
       'fin_fluxo_caixa', 'fin_relatorio_equipe', 'fin_exportacao',
       'modulo_ordens', 'modulo_orcamentos', 'modulo_recibos', 'modulo_agendamentos', 'modulo_clientes',
-      'modulo_clientes_cac', 'acervo_anexos', 'acervo_gerenciador'
+      'modulo_clientes_cac', 'acervo_anexos', 'acervo_gerenciador',
+      'config_alertas_vencimento', 'config_notificacoes_push', 'config_servicos', 'config_manual'
     ];
     
     const temCustomizacaoGranular = userPerms.some(p => chavesRecursosSistema.includes(p));
@@ -296,6 +297,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (recurso === 'modulo_clientes' && userPerms.includes('clientes')) return true;
     if (recurso === 'modulo_clientes_cac' && userPerms.includes('clientes')) return true;
     if (recurso.startsWith('acervo_') && userPerms.includes('clientes')) return true;
+    // Retrocompatibilidade: colaboradores com módulo 'config' legado veem todas as seções
+    if (recurso.startsWith('config_') && userPerms.includes('config')) return true;
 
     return false;
   }, [usuario]);

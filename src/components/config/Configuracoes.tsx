@@ -36,7 +36,7 @@ import {
 } from '../../services/pushNotificationService';
 
 export function Configuracoes() {
-  const { usuario, logout, refreshUsuario } = useAuth();
+  const { usuario, logout, refreshUsuario, temAcessoRecurso } = useAuth();
   const isCac = usuario?.tipoConta === 'cac_individual';
   const { ordens } = useOrdens();
   const { servicos, deletarServico } = useServicos();
@@ -56,6 +56,12 @@ export function Configuracoes() {
   const [usuariosExpandido, setUsuariosExpandido] = useState(false);
   const [manualExpandido, setManualExpandido] = useState(false);
   const [empresaExpandido, setEmpresaExpandido] = useState(false);
+  const [alertasExpandido, setAlertasExpandido] = useState(false);
+
+  const salvarAlertaEmpresa = (chave: string, valor: string) => {
+    localStorage.setItem(chave, valor);
+    mostrar('sucesso', 'Prazo de alerta atualizado!');
+  };
   
   const [formEmpresa, setFormEmpresa] = useState({
     razaoSocial: usuario?.dadosEmpresa?.razaoSocialFantasia || '',
@@ -853,7 +859,128 @@ export function Configuracoes() {
         </div>
       )}
 
+      {/* ── Alertas de Vencimento (empresa/colaborador) ── */}
+      {temAcessoRecurso('config_alertas_vencimento') && (
+        <div className="card space-y-4">
+          <div
+            className="flex items-center justify-between cursor-pointer group"
+            onClick={() => setAlertasExpandido(!alertasExpandido)}
+          >
+            <div className="flex items-center gap-2">
+              <div className={`p-1.5 rounded-lg transition-colors ${alertasExpandido ? 'bg-yellow-500/20 text-yellow-400' : 'bg-brand-dark-4 text-gray-500 group-hover:text-white'}`}>
+                <ShieldAlert size={16} />
+              </div>
+              <div>
+                <h2 className="text-sm font-bold text-white tracking-wider">
+                  Alertas de Prazos de Vencimento
+                </h2>
+                {!alertasExpandido && (
+                  <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">
+                    Configure antecedência dos alertas de CR, CRAF, GT e Manejo • Clique para editar
+                  </p>
+                )}
+              </div>
+            </div>
+            <div className={`text-gray-500 transition-transform duration-300 ${alertasExpandido ? 'rotate-180' : ''}`}>
+              <ChevronDown size={20} />
+            </div>
+          </div>
+
+          {alertasExpandido && (
+            <div className="animate-slide-down space-y-4 pt-3 border-t border-brand-dark-5">
+              <p className="text-[10px] text-gray-400 leading-relaxed">
+                Defina com quantos dias de antecedência o sistema deve alertar sobre o vencimento de cada documento.
+                Estas configurações são <strong className="text-white">pessoais</strong> e ficam salvas neste dispositivo.
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* CR */}
+                <div className="bg-brand-dark-4 border border-brand-dark-5 rounded-xl p-3 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Shield size={14} className="text-brand-blue-light" />
+                    <span className="text-xs font-bold text-white uppercase tracking-wider">CR / CRAF</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number" min={7} max={365}
+                      value={alertaCr}
+                      onChange={e => setAlertaCr(e.target.value)}
+                      className="input text-center font-bold w-20 text-sm"
+                    />
+                    <span className="text-xs text-gray-400">dias antes</span>
+                    <button
+                      onClick={() => salvarAlertaEmpresa('config_alerta_cr', alertaCr)}
+                      className="btn-primary btn-sm ml-auto px-3"
+                    >Salvar</button>
+                  </div>
+                </div>
+                {/* CRAF */}
+                <div className="bg-brand-dark-4 border border-brand-dark-5 rounded-xl p-3 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Target size={14} className="text-brand-blue-light" />
+                    <span className="text-xs font-bold text-white uppercase tracking-wider">Renovação CRAF</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number" min={7} max={365}
+                      value={alertaCraf}
+                      onChange={e => setAlertaCraf(e.target.value)}
+                      className="input text-center font-bold w-20 text-sm"
+                    />
+                    <span className="text-xs text-gray-400">dias antes</span>
+                    <button
+                      onClick={() => salvarAlertaEmpresa('config_alerta_craf', alertaCraf)}
+                      className="btn-primary btn-sm ml-auto px-3"
+                    >Salvar</button>
+                  </div>
+                </div>
+                {/* GT */}
+                <div className="bg-brand-dark-4 border border-brand-dark-5 rounded-xl p-3 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <MapPin size={14} className="text-yellow-400" />
+                    <span className="text-xs font-bold text-white uppercase tracking-wider">Guia de Tráfego (GT)</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number" min={1} max={90}
+                      value={alertaGt}
+                      onChange={e => setAlertaGt(e.target.value)}
+                      className="input text-center font-bold w-20 text-sm"
+                    />
+                    <span className="text-xs text-gray-400">dias antes</span>
+                    <button
+                      onClick={() => salvarAlertaEmpresa('config_alerta_gt', alertaGt)}
+                      className="btn-primary btn-sm ml-auto px-3"
+                    >Salvar</button>
+                  </div>
+                </div>
+                {/* Manejo */}
+                <div className="bg-brand-dark-4 border border-brand-dark-5 rounded-xl p-3 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Calendar size={14} className="text-brand-green" />
+                    <span className="text-xs font-bold text-white uppercase tracking-wider">Aut. de Manejo</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number" min={1} max={60}
+                      value={alertaManejo}
+                      onChange={e => setAlertaManejo(e.target.value)}
+                      className="input text-center font-bold w-20 text-sm"
+                    />
+                    <span className="text-xs text-gray-400">dias antes</span>
+                    <button
+                      onClick={() => salvarAlertaEmpresa('config_alerta_manejo', alertaManejo)}
+                      className="btn-primary btn-sm ml-auto px-3"
+                    >Salvar</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* ── Manual de Instruções ── */}
+      {temAcessoRecurso('config_manual') && (
       <div className="card space-y-4">
         <div 
           className="flex items-center justify-between cursor-pointer group"
@@ -926,6 +1053,7 @@ export function Configuracoes() {
           </div>
         )}
       </div>
+      )}
 
       {/* ── Gestão de Usuários (Apenas Admin) ── */}
       {usuario?.role === 'admin' && (
@@ -962,6 +1090,7 @@ export function Configuracoes() {
       )}
 
       {/* ── Gerenciador de Serviços ── */}
+      {(usuario?.role === 'admin' || temAcessoRecurso('config_servicos')) && (
       <div className="card space-y-4">
         <div 
           className="flex items-center justify-between cursor-pointer group"
@@ -1048,8 +1177,10 @@ export function Configuracoes() {
           </div>
         )}
       </div>
+      )}
 
       {/* ── Notificações Push ── */}
+      {temAcessoRecurso('config_notificacoes_push') && (
       <div className="card space-y-4">
         <div className="flex items-center gap-2 pb-3 border-b border-brand-dark-5">
           <Bell className="text-brand-blue" size={18} />
@@ -1164,6 +1295,7 @@ export function Configuracoes() {
           há documentos com prazo a vencer naquele dia, de acordo com as suas configurações de alerta acima.
         </p>
       </div>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
         {/* ── Conta Google ── */}

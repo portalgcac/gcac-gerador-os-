@@ -19,6 +19,7 @@ import { useClientes } from '../../context/ClientesContext';
 import { DialogConfirmacao } from '../common/DialogConfirmacao';
 import { useAuth } from '../../context/AuthContext';
 import { visualizarDocumentoBase64 } from '../../utils/fileUtils';
+import { BotaoConvidarCac } from './BotaoConvidarCac';
 
 interface DetalheClienteProps {
   cliente: Cliente;
@@ -26,7 +27,7 @@ interface DetalheClienteProps {
 
 export function DetalheCliente({ cliente }: DetalheClienteProps) {
   const navigate = useNavigate();
-  const { usuario } = useAuth();
+  const { usuario, temAcessoRecurso } = useAuth();
   const { ordens } = useOrdens();
   const { orcamentos } = useOrcamentos();
   const { recibos } = useRecibos();
@@ -223,7 +224,7 @@ export function DetalheCliente({ cliente }: DetalheClienteProps) {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <button 
             onClick={() => setEditando(true)}
             className="btn-ghost px-3 py-1.5 text-sm font-black uppercase tracking-wider flex items-center gap-2 border border-brand-dark-5"
@@ -231,6 +232,11 @@ export function DetalheCliente({ cliente }: DetalheClienteProps) {
             <Pencil size={16} />
             Editar Cadastro
           </button>
+
+          {/* Botão de convite para Portal CAC (apenas despachantes/empresa) */}
+          {usuario?.tipoConta !== 'cac_individual' && (usuario?.role === 'admin' || temAcessoRecurso('modulo_clientes_cac')) && (
+            <BotaoConvidarCac cliente={cliente} />
+          )}
           
           {usuario?.tipoConta !== 'cac_individual' && (
             <button 
