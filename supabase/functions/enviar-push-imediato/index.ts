@@ -27,8 +27,14 @@ interface PushSubscription {
 // ─── Helpers VAPID ────────────────────────────────────────────────────────────
 
 function base64UrlToUint8Array(base64String: string): Uint8Array {
-  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
-  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  // Limpar cabeçalhos PEM, rodapés, quebras de linha e espaços em branco
+  const cleanBase64 = base64String
+    .replace(/-----BEGIN[^-]*-----/, '')
+    .replace(/-----END[^-]*-----/, '')
+    .replace(/\s/g, '');
+
+  const padding = '='.repeat((4 - (cleanBase64.length % 4)) % 4);
+  const base64 = (cleanBase64 + padding).replace(/-/g, '+').replace(/_/g, '/');
   const rawData = atob(base64);
   return Uint8Array.from([...rawData].map(c => c.charCodeAt(0)));
 }
@@ -48,7 +54,28 @@ async function criarJwtVapid(audience: string): Promise<string> {
     false,
     ['sign']
   ).catch(async () => {
-    // Tentar como raw se pkcs8 falhar
+    // Se falhar como pkcs8 direta (geralmente chave bruta de 32 bytes),
+    // envolvemos a chave bruta de 32 bytes no cabeçalho ASN.1 PKCS#8 apropriado para EC P-256.
+    if (privateKeyBytes.length === 32) {
+      const pkcs8Header = new Uint8Array([
+        0x30, 0x41, 0x02, 0x01, 0x00, 0x30, 0x13, 0x06, 0x07, 0x2a, 0x86, 0x48, 
+        0xce, 0x3d, 0x02, 0x01, 0x06, 0x08, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x03, 
+        0x01, 0x07, 0x04, 0x27, 0x30, 0x25, 0x02, 0x01, 0x01, 0x04, 0x20
+      ]);
+      const pkcs8Bytes = new Uint8Array(pkcs8Header.length + privateKeyBytes.length);
+      pkcs8Bytes.set(pkcs8Header, 0);
+      pkcs8Bytes.set(privateKeyBytes, pkcs8Header.length);
+
+      return await crypto.subtle.importKey(
+        'pkcs8',
+        pkcs8Bytes,
+        { name: 'ECDSA', namedCurve: 'P-256' },
+        false,
+        ['sign']
+      );
+    }
+
+    // Fallback genérico caso não seja de 32 bytes (levantará erro apropriado)
     return await crypto.subtle.importKey(
       'raw',
       privateKeyBytes,
@@ -57,6 +84,7 @@ async function criarJwtVapid(audience: string): Promise<string> {
       ['sign']
     );
   });
+
 
   const header = { alg: 'ES256', typ: 'JWT' };
   const now = Math.floor(Date.now() / 1000);
