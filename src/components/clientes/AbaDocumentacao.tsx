@@ -4,6 +4,7 @@ import {
   ChevronDown, ChevronUp, FileText, Globe, Landmark, Upload, Loader2, Pencil
 } from 'lucide-react';
 import { parseIbamaPdf } from '../../services/ibamaParserService';
+import { parseGtPdf } from '../../services/gtParserService';
 import { useClientes } from '../../context/ClientesContext';
 import { Cliente, Arma, GuiaTrafego, AutorizacaoManejo } from '../../types';
 import { formatarData } from '../../utils/formatters';
@@ -698,7 +699,7 @@ export function ModalArma({ armaParaEditar, onFechar, onSalvar }: { armaParaEdit
 export function ModalGt({ armaAcervo, gtParaEditar, onFechar, onSalvar }: { armaAcervo: string, gtParaEditar?: GuiaTrafego, onFechar: () => void, onSalvar: (d: any) => void }) {
   const [form, setForm] = useState({ 
     id: gtParaEditar?.id,
-    tipo: gtParaEditar?.tipo || 'Caça', 
+    tipo: (gtParaEditar?.tipo || 'Caça') as string, 
     vencimento: gtParaEditar?.vencimento || '', 
     destino: gtParaEditar?.destino || '',
     arquivoUrl: gtParaEditar?.arquivoUrl || ''
@@ -710,6 +711,7 @@ export function ModalGt({ armaAcervo, gtParaEditar, onFechar, onSalvar }: { arma
   const [selectedCidade, setSelectedCidade] = useState('');
   const [cidades, setCidades] = useState<string[]>([]);
   const [carregandoCidades, setCarregandoCidades] = useState(false);
+  const [importando, setImportando] = useState(false);
 
   const { buscarGts } = useClientes();
 
@@ -799,6 +801,36 @@ export function ModalGt({ armaAcervo, gtParaEditar, onFechar, onSalvar }: { arma
     setForm(prev => ({ ...prev, destino: cidade && selectedUf ? `${cidade}-${selectedUf}` : '' }));
   };
 
+  const handleImportPdf = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setImportando(true);
+    try {
+      const data = await parseGtPdf(file);
+      const base64 = await fileToBase64(file);
+      setForm(prev => {
+        const novoTipo = data.tipo || prev.tipo;
+        if (novoTipo !== prev.tipo) {
+          setSelectedUf('');
+          setSelectedCidade('');
+        }
+        return {
+          ...prev,
+          tipo: novoTipo,
+          vencimento: data.vencimento || prev.vencimento,
+          arquivoUrl: base64
+        };
+      });
+    } catch (err: any) {
+      console.error('Erro ao processar PDF da GT:', err);
+      const msgErro = err.message || '';
+      alert(`Erro ao ler PDF da Guia: ${msgErro}\n\nVerifique se o arquivo é uma Guia de Tráfego válida ou tente novamente.`);
+    } finally {
+      setImportando(false);
+    }
+  };
+
   const handleSalvar = () => {
     if (form.tipo === 'Caça') {
       const parts = form.destino.split('-');
@@ -840,9 +872,32 @@ export function ModalGt({ armaAcervo, gtParaEditar, onFechar, onSalvar }: { arma
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
       <div className="card w-full max-w-sm animate-scale-up" onClick={e => e.stopPropagation()}>
-        <h3 className="text-lg font-bold text-white mb-2">
-          {gtParaEditar ? 'Editar Guia de Tráfego' : 'Nova Guia de Tráfego'}
-        </h3>
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="text-lg font-bold text-white">
+            {gtParaEditar ? 'Editar Guia de Tráfego' : 'Nova Guia de Tráfego'}
+          </h3>
+          <div className="relative">
+            <input 
+              type="file" 
+              accept="application/pdf" 
+              className="hidden" 
+              id="import-gt-pdf" 
+              onChange={handleImportPdf}
+              disabled={importando}
+            />
+            <label 
+              htmlFor="import-gt-pdf" 
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all cursor-pointer border ${
+                importando 
+                  ? 'bg-gray-500/10 text-gray-500 border-gray-500/20' 
+                  : 'bg-brand-blue/10 text-brand-blue border-brand-blue/20 hover:bg-brand-blue/20'
+              }`}
+            >
+              {importando ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
+              {importando ? 'Processando...' : 'Importar PDF'}
+            </label>
+          </div>
+        </div>
         <p className="text-[10px] text-brand-blue font-black uppercase mb-6 tracking-widest">
           Arma em Acervo de: {armaAcervo}
         </p>
