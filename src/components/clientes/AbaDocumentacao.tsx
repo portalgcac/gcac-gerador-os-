@@ -38,6 +38,36 @@ const MODELOS_BASE = [
   'SUPERNOVA', 'STOCK II', 'STOCK III', 'DEFORCE', 'HI-POWER', 'BUCK MARK', 'SXP', 'MODEL 70'
 ];
 
+const ESTADOS_BRASIL = [
+  { sigla: 'AC', nome: 'Acre' },
+  { sigla: 'AL', nome: 'Alagoas' },
+  { sigla: 'AP', nome: 'Amapá' },
+  { sigla: 'AM', nome: 'Amazonas' },
+  { sigla: 'BA', nome: 'Bahia' },
+  { sigla: 'CE', nome: 'Ceará' },
+  { sigla: 'DF', nome: 'Distrito Federal' },
+  { sigla: 'ES', nome: 'Espírito Santo' },
+  { sigla: 'GO', nome: 'Goiás' },
+  { sigla: 'MA', nome: 'Maranhão' },
+  { sigla: 'MT', nome: 'Mato Grosso' },
+  { sigla: 'MS', nome: 'Mato Grosso do Sul' },
+  { sigla: 'MG', nome: 'Minas Gerais' },
+  { sigla: 'PA', nome: 'Pará' },
+  { sigla: 'PB', nome: 'Paraíba' },
+  { sigla: 'PR', nome: 'Paraná' },
+  { sigla: 'PE', nome: 'Pernambuco' },
+  { sigla: 'PI', nome: 'Piauí' },
+  { sigla: 'RJ', nome: 'Rio de Janeiro' },
+  { sigla: 'RN', nome: 'Rio Grande do Norte' },
+  { sigla: 'RS', nome: 'Rio Grande do Sul' },
+  { sigla: 'RO', nome: 'Rondônia' },
+  { sigla: 'RR', nome: 'Roraima' },
+  { sigla: 'SC', nome: 'Santa Catarina' },
+  { sigla: 'SP', nome: 'São Paulo' },
+  { sigla: 'SE', nome: 'Sergipe' },
+  { sigla: 'TO', nome: 'Tocantins' }
+];
+
 interface Props {
   cliente: Cliente;
   armaIdInicial?: string;
@@ -674,7 +704,49 @@ export function ModalGt({ armaAcervo, gtParaEditar, onFechar, onSalvar }: { arma
     arquivoUrl: gtParaEditar?.arquivoUrl || ''
   });
   const [sugestoes, setSugestoes] = useState<string[]>([]);
+  
+  // Estados para UF e Cidade (para guias do tipo Caça)
+  const [selectedUf, setSelectedUf] = useState('');
+  const [selectedCidade, setSelectedCidade] = useState('');
+  const [cidades, setCidades] = useState<string[]>([]);
+  const [carregandoCidades, setCarregandoCidades] = useState(false);
+
   const { buscarGts } = useClientes();
+
+  // Parsing inicial na edição
+  useEffect(() => {
+    if (form.tipo === 'Caça' && form.destino) {
+      const parts = form.destino.split('-');
+      if (parts.length === 2) {
+        setSelectedUf(parts[1].trim().toUpperCase());
+        setSelectedCidade(parts[0].trim().toUpperCase());
+      }
+    }
+  }, []);
+
+  // Carregar cidades do estado via API do IBGE
+  useEffect(() => {
+    if (!selectedUf) {
+      setCidades([]);
+      return;
+    }
+    const carregarCidades = async () => {
+      setCarregandoCidades(true);
+      try {
+        const response = await fetch(`https://servicodados.ibge.gov.br/api/v1/localidades/estados/${selectedUf}/municipios`);
+        if (response.ok) {
+          const data = await response.json();
+          const nomes = data.map((m: any) => m.nome.toUpperCase()).sort();
+          setCidades(nomes);
+        }
+      } catch (err) {
+        console.error('Erro ao carregar cidades do IBGE:', err);
+      } finally {
+        setCarregandoCidades(false);
+      }
+    };
+    carregarCidades();
+  }, [selectedUf]);
 
   // Carregar sugestões do banco de dados baseadas em guias existentes
   useEffect(() => {
@@ -690,13 +762,21 @@ export function ModalGt({ armaAcervo, gtParaEditar, onFechar, onSalvar }: { arma
           const uniqueDestinos = new Set<string>();
           data.forEach(gt => {
             if (gt.destino) {
-              // Normaliza para evitar duplicatas (ex: "JATAÍ-GO" vs "JATAÍ - GO")
+              // Normaliza para evitar duplicatas
               const normalizado = gt.destino
                 .toUpperCase()
                 .replace(/\s+/g, ' ')
                 .replace(/\s?-\s?/g, '-')
                 .trim();
-              uniqueDestinos.add(normalizado);
+              
+              // Verifica se o destino tem formato de cidade/UF (ex: JATAÍ-GO)
+              const isCityUf = /^[A-ZÀ-ÿ\s.-]+-[A-Z]{2}$/.test(normalizado);
+
+              if (form.tipo === 'Caça') {
+                if (isCityUf) uniqueDestinos.add(normalizado);
+              } else {
+                if (!isCityUf) uniqueDestinos.add(normalizado);
+              }
             }
           });
           setSugestoes(Array.from(uniqueDestinos).sort());
@@ -706,7 +786,34 @@ export function ModalGt({ armaAcervo, gtParaEditar, onFechar, onSalvar }: { arma
       }
     };
     carregarSugestoes();
-  }, []);
+  }, [form.tipo]);
+
+  const handleUfChange = (uf: string) => {
+    setSelectedUf(uf);
+    setSelectedCidade('');
+    setForm(prev => ({ ...prev, destino: uf ? `-${uf}` : '' }));
+  };
+
+  const handleCidadeChange = (cidade: string) => {
+    setSelectedCidade(cidade);
+    setForm(prev => ({ ...prev, destino: cidade && selectedUf ? `${cidade}-${selectedUf}` : '' }));
+  };
+
+  const handleSalvar = () => {
+    if (form.tipo === 'Caça') {
+      const parts = form.destino.split('-');
+      if (parts.length !== 2 || !parts[0].trim() || !parts[1].trim()) {
+        alert('Por favor, selecione o Estado (UF) e o Município de destino.');
+        return;
+      }
+    } else {
+      if (!form.destino.trim()) {
+        alert('Por favor, preencha o Campo de Destino.');
+        return;
+      }
+    }
+    onSalvar(form);
+  };
 
   const getLabelDestino = () => {
     const acervoUpper = armaAcervo.toUpperCase();
@@ -743,7 +850,16 @@ export function ModalGt({ armaAcervo, gtParaEditar, onFechar, onSalvar }: { arma
         <div className="space-y-4">
           <div>
             <label className="label">Tipo de Guia</label>
-            <select className="input" value={form.tipo} onChange={e => setForm({...form, tipo: e.target.value as any})}>
+            <select 
+              className="input" 
+              value={form.tipo} 
+              onChange={e => {
+                const novoTipo = e.target.value;
+                setForm({...form, tipo: novoTipo as any, destino: ''});
+                setSelectedUf('');
+                setSelectedCidade('');
+              }}
+            >
               <option value="Caça">Caça</option>
               <option value="Caça Treino">Caça Treino</option>
               <option value="Treino">Treino (Tiro Desportivo)</option>
@@ -752,20 +868,71 @@ export function ModalGt({ armaAcervo, gtParaEditar, onFechar, onSalvar }: { arma
               <option value="Outro">Outro</option>
             </select>
           </div>
-          <div>
-            <label className="label">{getLabelDestino()}</label>
-            <input 
-              list="sugestoes-destino"
-              type="text" 
-              className="input uppercase" 
-              placeholder={getPlaceholderDestino()} 
-              value={form.destino} 
-              onChange={e => setForm({...form, destino: e.target.value})} 
-            />
-            <datalist id="sugestoes-destino">
-              {sugestoes.map(s => <option key={s} value={s} />)}
-            </datalist>
-          </div>
+
+          {form.tipo === 'Caça' ? (
+            <div className="grid grid-cols-3 gap-2">
+              <div className="col-span-1">
+                <label className="label">UF <span className="text-red-500">*</span></label>
+                <select 
+                  className="input uppercase" 
+                  value={selectedUf} 
+                  onChange={e => handleUfChange(e.target.value)}
+                >
+                  <option value="">UF</option>
+                  {ESTADOS_BRASIL.map(est => (
+                    <option key={est.sigla} value={est.sigla}>{est.sigla}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="col-span-2">
+                <label className="label">Município de Destino <span className="text-red-500">*</span></label>
+                {!selectedUf ? (
+                  <select className="input" disabled>
+                    <option>Selecione a UF...</option>
+                  </select>
+                ) : carregandoCidades ? (
+                  <select className="input" disabled>
+                    <option>Carregando...</option>
+                  </select>
+                ) : cidades.length === 0 ? (
+                  <input 
+                    type="text" 
+                    className="input uppercase" 
+                    value={selectedCidade} 
+                    onChange={e => handleCidadeChange(e.target.value.toUpperCase())}
+                    placeholder="Ex: JATAÍ"
+                  />
+                ) : (
+                  <select 
+                    className="input uppercase" 
+                    value={selectedCidade} 
+                    onChange={e => handleCidadeChange(e.target.value)}
+                  >
+                    <option value="">Selecione...</option>
+                    {cidades.map(c => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div>
+              <label className="label">{getLabelDestino()} <span className="text-red-500">*</span></label>
+              <input 
+                list="sugestoes-destino"
+                type="text" 
+                className="input uppercase" 
+                placeholder={getPlaceholderDestino()} 
+                value={form.destino} 
+                onChange={e => setForm({...form, destino: e.target.value})} 
+              />
+              <datalist id="sugestoes-destino">
+                {sugestoes.map(s => <option key={s} value={s} />)}
+              </datalist>
+            </div>
+          )}
+
           <div>
             <label className="label">Data de Vencimento</label>
             <input type="date" className="input" value={form.vencimento} onChange={e => setForm({...form, vencimento: e.target.value})} />
@@ -824,7 +991,7 @@ export function ModalGt({ armaAcervo, gtParaEditar, onFechar, onSalvar }: { arma
           </div>
           <div className="flex gap-3 pt-4">
             <button onClick={onFechar} className="btn-ghost flex-1">Cancelar</button>
-            <button onClick={() => onSalvar(form)} className="btn-primary flex-1">
+            <button onClick={handleSalvar} className="btn-primary flex-1">
               {gtParaEditar ? 'Salvar Alterações' : 'Salvar Guia'}
             </button>
           </div>
