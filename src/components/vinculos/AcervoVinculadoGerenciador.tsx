@@ -772,6 +772,7 @@ export function AcervoVinculadoGerenciador({ vinculo, acervo, onClose }: Props) 
       {modalGtAberto && (
         <ModalGt 
           armaAcervo={armas.find(a => a.id === modalGtAberto.armaId)?.acervo || 'Tiro Desportivo'}
+          armaNumeroSerie={armas.find(a => a.id === modalGtAberto.armaId)?.numeroSerie}
           gtParaEditar={modalGtAberto.gt}
           onFechar={() => setModalGtAberto(null)}
           onSalvar={handleSalvarGt}

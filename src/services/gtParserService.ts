@@ -8,6 +8,7 @@ export interface GtData {
   tipo?: string;
   cidade?: string;
   uf?: string;
+  rawText?: string;
 }
 
 export async function parseGtPdf(file: File): Promise<GtData> {
@@ -78,6 +79,8 @@ export async function parseGtPdf(file: File): Promise<GtData> {
     data.cidade = matchLocal[1].trim();
     data.uf = matchLocal[2].trim();
   }
+
+  data.rawText = text;
 
   return data;
 }

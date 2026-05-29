@@ -429,6 +429,7 @@ export function AbaDocumentacao({ cliente, armaIdInicial }: Props) {
       {modalGt && (
         <ModalGt 
           armaAcervo={armas.find(a => a.id === modalGt.armaId)?.acervo || 'Tiro Desportivo'}
+          armaNumeroSerie={armas.find(a => a.id === modalGt.armaId)?.numeroSerie}
           gtParaEditar={modalGt.gt}
           onFechar={() => setModalGt(null)} 
           onSalvar={(d) => 
@@ -696,7 +697,7 @@ export function ModalArma({ armaParaEditar, onFechar, onSalvar }: { armaParaEdit
   );
 }
 
-export function ModalGt({ armaAcervo, gtParaEditar, onFechar, onSalvar }: { armaAcervo: string, gtParaEditar?: GuiaTrafego, onFechar: () => void, onSalvar: (d: any) => void }) {
+export function ModalGt({ armaAcervo, armaNumeroSerie, gtParaEditar, onFechar, onSalvar }: { armaAcervo: string, armaNumeroSerie?: string, gtParaEditar?: GuiaTrafego, onFechar: () => void, onSalvar: (d: any) => void }) {
   const [form, setForm] = useState({ 
     id: gtParaEditar?.id,
     tipo: (gtParaEditar?.tipo || 'Caça') as string, 
@@ -836,6 +837,21 @@ export function ModalGt({ armaAcervo, gtParaEditar, onFechar, onSalvar }: { arma
     setImportando(true);
     try {
       const data = await parseGtPdf(file);
+
+      // Validação do número de série da arma
+      if (armaNumeroSerie) {
+        const normalizedSerial = armaNumeroSerie.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim();
+        const pdfText = data.rawText || '';
+        const sectionIndex = pdfText.indexOf('PRODUTOS CONTROLADOS');
+        const searchArea = sectionIndex !== -1 ? pdfText.substring(sectionIndex) : pdfText;
+
+        if (!searchArea.includes(normalizedSerial)) {
+          alert(`Divergência de segurança detectada!\n\nEste documento (PDF) não pertence à arma selecionada. O número de série '${armaNumeroSerie}' não foi localizado no documento.`);
+          e.target.value = '';
+          return;
+        }
+      }
+
       const base64 = await fileToBase64(file);
       
       setForm(prev => {
