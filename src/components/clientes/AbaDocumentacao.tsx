@@ -141,32 +141,33 @@ export function AbaDocumentacao({ cliente, armaIdInicial }: Props) {
               <div key={arma.id} className="card bg-brand-dark-3/50 border-brand-dark-5 p-0 overflow-hidden">
                 <div 
                   onClick={() => setExpandirArma(expandirArma === arma.id ? null : arma.id)}
-                  className="p-4 flex items-center justify-between cursor-pointer hover:bg-brand-dark-3 transition-colors"
+                  className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer hover:bg-brand-dark-3 transition-colors"
                 >
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-xl bg-brand-blue/10 flex items-center justify-center text-brand-blue">
+                  <div className="flex items-start sm:items-center gap-3 min-w-0">
+                    <div className="w-10 h-10 rounded-xl bg-brand-blue/10 flex items-center justify-center text-brand-blue shrink-0">
                       <Target size={20} />
                     </div>
-                    <div>
-                      <p className="text-sm font-bold text-white">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-bold text-white truncate">
                         {arma.tipo ? `${arma.tipo} - ` : ''}{arma.modelo} • {arma.calibre}
                       </p>
-                      <div className="flex items-center gap-2">
-                        <p className="text-[10px] text-gray-500 uppercase font-bold tracking-widest">
+                      <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                        <p className="text-[10px] text-gray-500 uppercase font-bold tracking-widest truncate">
                           Série: {arma.numeroSerie} • SIGMA: {arma.numeroSigma}
                         </p>
-                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-brand-blue/20 text-brand-blue-light font-black uppercase tracking-tighter">
+                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-brand-blue/20 text-brand-blue-light font-black uppercase tracking-tighter shrink-0">
                           {arma.acervo}
                         </span>
                       </div>
                     </div>
                   </div>
                   
-                    <div className="flex items-center gap-3">
-                      <div className="text-right">
-                        <p className="text-[10px] text-gray-500 font-bold uppercase mb-1">Validade CRAF</p>
-                        <BadgeVencimento data={arma.vencimentoCraf} tipo="CRAF" />
-                      </div>
+                  <div className="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t border-brand-dark-5/30 sm:border-0">
+                    <div className="text-left sm:text-right flex flex-row sm:flex-col items-center sm:items-end gap-1.5 sm:gap-0 shrink-0">
+                      <p className="text-[9px] text-gray-500 font-bold uppercase sm:mb-1">CRAF:</p>
+                      <BadgeVencimento data={arma.vencimentoCraf} tipo="CRAF" />
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
                       {arma.crafUrl && (
                         <button 
                           onClick={(e) => {
@@ -190,9 +191,12 @@ export function AbaDocumentacao({ cliente, armaIdInicial }: Props) {
                       >
                         <Pencil size={16} />
                       </button>
-                      {expandirArma === arma.id ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                      <div className="p-1 text-gray-400">
+                        {expandirArma === arma.id ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                      </div>
                     </div>
                   </div>
+                </div>
 
                 {expandirArma === arma.id && (
                   <div className="border-t border-brand-dark-5 p-4 bg-brand-dark-4 animate-slide-down">
@@ -293,34 +297,34 @@ export function AbaDocumentacao({ cliente, armaIdInicial }: Props) {
           <div className="space-y-3">
             {manejos.map(m => (
               <div key={m.id} className="card bg-brand-dark-3/50 border-brand-dark-5 p-0 overflow-hidden group">
-                <div className="p-4 flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center text-green-500">
+                <div className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-start sm:items-center gap-3 min-w-0">
+                    <div className="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center text-green-500 shrink-0">
                       <FileText size={20} />
                     </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm font-bold text-white">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-sm font-bold text-white truncate">
                           {m.nomeFazenda} • {m.cidade}
                         </p>
                         {m.status === 'Inerte' && (
-                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-gray-500/10 text-gray-400 font-black uppercase tracking-tighter">
+                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-gray-500/10 text-gray-400 font-black uppercase tracking-tighter shrink-0">
                             Inerte
                           </span>
                         )}
                       </div>
-                      <p className="text-[10px] text-gray-500 uppercase font-bold tracking-widest">
+                      <p className="text-[10px] text-gray-500 uppercase font-bold tracking-widest truncate mt-0.5">
                         CAR: {m.numeroCar} • {m.nomeProprietario}
                       </p>
                     </div>
                   </div>
                   
-                  <div className="flex items-center gap-4">
-                    <div className="text-right">
-                      <p className="text-[10px] text-gray-500 font-bold uppercase mb-1">Validade Manejo</p>
+                  <div className="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t border-brand-dark-5/30 sm:border-0">
+                    <div className="text-left sm:text-right flex flex-row sm:flex-col items-center sm:items-end gap-1.5 sm:gap-0 shrink-0">
+                      <p className="text-[9px] text-gray-500 font-bold uppercase sm:mb-1">Validade:</p>
                       <BadgeVencimento data={m.vencimento} tipo="MANEJO" status={m.status} />
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5 shrink-0">
                       {m.arquivoUrl && (
                         <button 
                           onClick={() => visualizarDocumentoBase64(m.arquivoUrl!, `Manejo-${m.nomeFazenda}`)} 
@@ -444,17 +448,17 @@ export function AbaDocumentacao({ cliente, armaIdInicial }: Props) {
 
 function CardVencimento({ label, numero, data, tipo, icon }: { label: string, numero?: string, data?: string, tipo: string, icon: React.ReactNode }) {
   return (
-    <div className="card bg-brand-dark-3/50 border-brand-dark-5 flex items-center justify-between p-4">
-      <div className="flex items-center gap-4">
-        <div className="p-3 rounded-2xl bg-brand-blue/10 text-brand-blue">
+    <div className="card bg-brand-dark-3/50 border-brand-dark-5 flex flex-row items-center justify-between p-4 gap-3 flex-wrap xs:flex-nowrap">
+      <div className="flex items-center gap-3 min-w-0">
+        <div className="p-2.5 rounded-2xl bg-brand-blue/10 text-brand-blue shrink-0">
           {icon}
         </div>
-        <div>
-          <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-0.5">{label}</p>
-          <p className="text-white font-bold">{numero || 'DATA DE VALIDADE'}</p>
+        <div className="min-w-0">
+          <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-0.5 truncate">{label}</p>
+          <p className="text-white font-bold text-sm truncate" title={numero}>{numero || 'DATA DE VALIDADE'}</p>
         </div>
       </div>
-      <div className="text-right">
+      <div className="text-right shrink-0">
         <p className="text-[9px] text-gray-600 font-bold uppercase mb-1">Vencimento</p>
         <BadgeVencimento data={data} tipo={tipo} />
       </div>
@@ -854,8 +858,6 @@ export function ModalManejo({ manejoParaEditar, onFechar, onSalvar }: { manejoPa
       setForm(prev => ({
         ...prev,
         numeroCar: data.numeroCar || prev.numeroCar,
-        nomeFazenda: data.nomeFazenda || prev.nomeFazenda,
-        nomeProprietario: data.nomeProprietario || prev.nomeProprietario,
         cidade: data.cidade || prev.cidade,
         vencimento: data.vencimento || prev.vencimento,
         arquivoUrl: base64
@@ -867,6 +869,18 @@ export function ModalManejo({ manejoParaEditar, onFechar, onSalvar }: { manejoPa
     } finally {
       setImportando(false);
     }
+  };
+
+  const handleSalvar = () => {
+    if (!form.nomeFazenda.trim()) {
+      alert('O campo Nome da Fazenda é obrigatório.');
+      return;
+    }
+    if (!form.nomeProprietario.trim()) {
+      alert('O campo Proprietário é obrigatório.');
+      return;
+    }
+    onSalvar(form);
   };
 
   return (
@@ -904,11 +918,11 @@ export function ModalManejo({ manejoParaEditar, onFechar, onSalvar }: { manejoPa
             <input type="text" className="input uppercase" value={form.numeroCar} onChange={e => setForm({...form, numeroCar: e.target.value})} />
           </div>
           <div>
-            <label className="label">Nome da Fazenda</label>
+            <label className="label">Nome da Fazenda <span className="text-red-500">*</span></label>
             <input type="text" className="input uppercase" value={form.nomeFazenda} onChange={e => setForm({...form, nomeFazenda: e.target.value})} />
           </div>
           <div>
-            <label className="label">Proprietário</label>
+            <label className="label">Proprietário <span className="text-red-500">*</span></label>
             <input type="text" className="input uppercase" value={form.nomeProprietario} onChange={e => setForm({...form, nomeProprietario: e.target.value})} />
           </div>
           <div>
@@ -982,7 +996,7 @@ export function ModalManejo({ manejoParaEditar, onFechar, onSalvar }: { manejoPa
           </div>
           <div className="flex gap-3 pt-4">
             <button onClick={onFechar} className="btn-ghost flex-1">Cancelar</button>
-            <button onClick={() => onSalvar(form)} className="btn-primary flex-1">
+            <button onClick={handleSalvar} className="btn-primary flex-1">
               {manejoParaEditar ? 'Salvar Alterações' : 'Salvar Manejo'}
             </button>
           </div>

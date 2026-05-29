@@ -30,25 +30,6 @@ CREATE INDEX IF NOT EXISTS idx_convites_cac_despachante
 CREATE INDEX IF NOT EXISTS idx_convites_cac_status
   ON convites_cac(status);
 
--- Row Level Security
-ALTER TABLE convites_cac ENABLE ROW LEVEL SECURITY;
+-- Row Level Security (Desativado conforme padrão do projeto, já que o frontend conecta utilizando chave anônima)
+ALTER TABLE convites_cac DISABLE ROW LEVEL SECURITY;
 
--- Política: service_role pode tudo (Edge Functions)
-CREATE POLICY "service_role_full_access" ON convites_cac
-  FOR ALL TO service_role USING (true) WITH CHECK (true);
-
--- Política: qualquer usuário autenticado pode ler pelo token (landing page pública via anon key)
-CREATE POLICY "anon_read_by_token" ON convites_cac
-  FOR SELECT TO anon USING (true);
-
--- Política: anon pode atualizar (aceitar convite)
-CREATE POLICY "anon_update_accept" ON convites_cac
-  FOR UPDATE TO anon USING (true) WITH CHECK (true);
-
--- Política: authenticated pode inserir (despachante gera convite)
-CREATE POLICY "authenticated_insert" ON convites_cac
-  FOR INSERT TO authenticated WITH CHECK (true);
-
--- Política: authenticated pode ler/atualizar os seus convites
-CREATE POLICY "authenticated_own_access" ON convites_cac
-  FOR ALL TO authenticated USING (true) WITH CHECK (true);

@@ -549,7 +549,7 @@ function TabButton({ children, ativo, onClick, count }: { children: React.ReactN
   return (
     <button 
       onClick={onClick}
-      className={`px-6 py-4 text-xs font-bold uppercase transition-all flex items-center gap-2 border-b-2 ${
+      className={`px-6 py-4 text-xs font-bold uppercase transition-all flex items-center gap-2 border-b-2 shrink-0 ${
         ativo ? 'text-brand-blue border-brand-blue bg-brand-blue/5' : 'text-gray-500 border-transparent hover:text-gray-300'
       }`}
     >
