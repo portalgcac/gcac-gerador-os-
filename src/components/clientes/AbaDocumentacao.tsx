@@ -712,6 +712,7 @@ export function ModalGt({ armaAcervo, gtParaEditar, onFechar, onSalvar }: { arma
   const [cidades, setCidades] = useState<string[]>([]);
   const [carregandoCidades, setCarregandoCidades] = useState(false);
   const [importando, setImportando] = useState(false);
+  const [pendingCidade, setPendingCidade] = useState('');
 
   const { buscarGts } = useClientes();
 
@@ -749,6 +750,33 @@ export function ModalGt({ armaAcervo, gtParaEditar, onFechar, onSalvar }: { arma
     };
     carregarCidades();
   }, [selectedUf]);
+
+  // Cruzamento inteligente de cidade obtida com a lista do IBGE
+  useEffect(() => {
+    if (pendingCidade && cidades.length > 0) {
+      const normalizedPending = pendingCidade.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim();
+      const matched = cidades.find(c => {
+        const normalizedC = c.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim();
+        return normalizedC === normalizedPending;
+      });
+      
+      if (matched) {
+        setSelectedCidade(matched);
+        setForm(prev => ({
+          ...prev,
+          destino: `${matched}-${selectedUf}`
+        }));
+      } else {
+        // Se não achou na lista oficial, usa o valor original cru
+        setSelectedCidade(pendingCidade);
+        setForm(prev => ({
+          ...prev,
+          destino: `${pendingCidade}-${selectedUf}`
+        }));
+      }
+      setPendingCidade('');
+    }
+  }, [cidades, pendingCidade, selectedUf]);
 
   // Carregar sugestões do banco de dados baseadas em guias existentes
   useEffect(() => {
@@ -809,19 +837,36 @@ export function ModalGt({ armaAcervo, gtParaEditar, onFechar, onSalvar }: { arma
     try {
       const data = await parseGtPdf(file);
       const base64 = await fileToBase64(file);
+      
       setForm(prev => {
         const novoTipo = data.tipo || prev.tipo;
+        let novoDestino = prev.destino;
+        
         if (novoTipo !== prev.tipo) {
           setSelectedUf('');
           setSelectedCidade('');
         }
+        
+        // Se a guia importada é do tipo Caça e temos cidade e estado
+        if (novoTipo === 'Caça' && data.cidade && data.uf) {
+          novoDestino = `${data.cidade}-${data.uf}`;
+        }
+        
         return {
           ...prev,
           tipo: novoTipo,
           vencimento: data.vencimento || prev.vencimento,
+          destino: novoDestino,
           arquivoUrl: base64
         };
       });
+
+      if (data.tipo === 'Caça' && data.uf) {
+        setSelectedUf(data.uf);
+        if (data.cidade) {
+          setPendingCidade(data.cidade);
+        }
+      }
     } catch (err: any) {
       console.error('Erro ao processar PDF da GT:', err);
       const msgErro = err.message || '';

@@ -6,6 +6,8 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLi
 export interface GtData {
   vencimento?: string;
   tipo?: string;
+  cidade?: string;
+  uf?: string;
 }
 
 export async function parseGtPdf(file: File): Promise<GtData> {
@@ -66,6 +68,15 @@ export async function parseGtPdf(file: File): Promise<GtData> {
     data.tipo = 'Transferência';
   } else {
     data.tipo = 'Outro';
+  }
+
+  // 3. Extrair Local de Destino (Cidade e UF)
+  // Exemplo: "PAIS / CIDADE / UF / AEROPORTO-PORTO: XXX / JATAI /GO / XXX"
+  const localDestinoRegex = /PAIS\s*\/\s*CIDADE\s*\/\s*UF\s*\/\s*AEROPORTO-PORTO:\s*[^/]+\/\s*([A-Z\s.-]+)\s*\/\s*([A-Z]{2})\s*\//;
+  const matchLocal = text.match(localDestinoRegex);
+  if (matchLocal) {
+    data.cidade = matchLocal[1].trim();
+    data.uf = matchLocal[2].trim();
   }
 
   return data;
