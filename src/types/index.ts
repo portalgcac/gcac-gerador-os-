@@ -270,6 +270,7 @@ export interface DadosEmpresa {
   endereco?: string;
   cnpj?: string;
   recursosLiberados?: string[];
+  logoUrl?: string;
 }
 
 export interface UsuarioGoogle {

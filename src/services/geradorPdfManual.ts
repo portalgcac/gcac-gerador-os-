@@ -16,13 +16,37 @@ export async function gerarPdfManual(secoesIds: string[]): Promise<Blob> {
   doc.setFillColor(ESCURO);
   doc.rect(0, 0, largura, altura, 'F');
 
+  let nomeEmpresa = 'GCAC Despachante Bélico';
   // Logo (Tentativa)
   try {
-    const logoRes = await fetch('/Logo oficial.png');
-    if (logoRes.ok) {
-      const logoBlob = await logoRes.blob();
-      const logoBase64 = await blobParaBase64(logoBlob);
-      doc.addImage(logoBase64, 'PNG', (largura / 2) - 25, 40, 50, 55);
+    let logoBase64 = '';
+    const dadosUsuario = localStorage.getItem('gcac_usuario');
+    if (dadosUsuario) {
+      const u = JSON.parse(dadosUsuario);
+      if (u.dadosEmpresa?.logoUrl) {
+        logoBase64 = u.dadosEmpresa.logoUrl;
+      }
+      if (u.dadosEmpresa?.razaoSocialFantasia) {
+        nomeEmpresa = u.dadosEmpresa.razaoSocialFantasia;
+      }
+    }
+
+    if (!logoBase64) {
+      const logoRes = await fetch('/Logo oficial.png');
+      if (logoRes.ok) {
+        const logoBlob = await logoRes.blob();
+        logoBase64 = await blobParaBase64(logoBlob);
+      }
+    }
+
+    if (logoBase64) {
+      let format = 'PNG';
+      if (logoBase64.startsWith('data:image/jpeg') || logoBase64.startsWith('data:image/jpg')) {
+        format = 'JPEG';
+      } else if (logoBase64.startsWith('data:image/webp')) {
+        format = 'WEBP';
+      }
+      doc.addImage(logoBase64, format, (largura / 2) - 25, 40, 50, 55);
     }
   } catch { /* logo nao disponivel */ }
 
@@ -43,7 +67,7 @@ export async function gerarPdfManual(secoesIds: string[]): Promise<Blob> {
   doc.setTextColor('#AAAAAA');
   doc.setFont('helvetica', 'normal');
   doc.text('Versão: 1.0.0 — Atualizado em: ' + new Date().toLocaleDateString('pt-BR'), largura / 2, altura - 20, { align: 'center' });
-  doc.text('GCAC Despachante Bélico', largura / 2, altura - 15, { align: 'center' });
+  doc.text(nomeEmpresa, largura / 2, altura - 15, { align: 'center' });
 
   // ── Conteúdo ───────────────────────────────────────────────────────────
   const secoesParaGerar = CONTEUDO_MANUAL.filter(s => secoesIds.includes(s.id));
@@ -109,7 +133,7 @@ export async function gerarPdfManual(secoesIds: string[]): Promise<Blob> {
     doc.setFontSize(8);
     doc.setTextColor('#999999');
     doc.text(`Página ${i - 1} de ${pageCount - 1}`, largura - 20, altura - 10, { align: 'right' });
-    doc.text('GCAC Despachante Bélico — Manual de Uso Privado', 20, altura - 10);
+    doc.text(`${nomeEmpresa} — Manual de Uso Privado`, 20, altura - 10);
   }
 
   return doc.output('blob');

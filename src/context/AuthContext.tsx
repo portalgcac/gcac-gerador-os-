@@ -61,7 +61,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (rawEmpresaId) {
         const { data: empData } = await supabase
           .from('empresas')
-          .select('nome, tipo_conta, modulos_ativos, clube_parceiro_padrao, razao_social_fantasia, responsavel_nome, contato_telefone, endereco, cnpj, recursos_liberados')
+          .select('nome, tipo_conta, modulos_ativos, clube_parceiro_padrao, razao_social_fantasia, responsavel_nome, contato_telefone, endereco, cnpj, recursos_liberados, logo_url')
           .eq('id', rawEmpresaId)
           .single();
         if (empData) {
@@ -78,7 +78,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             contatoTelefone: empData.contato_telefone,
             endereco: empData.endereco,
             cnpj: empData.cnpj,
-            recursosLiberados: empData.recursos_liberados || []
+            recursosLiberados: empData.recursos_liberados || [],
+            logoUrl: empData.logo_url || undefined
           };
         }
 
@@ -188,7 +189,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (rawEmpresaId) {
         const { data: empData } = await supabase
           .from('empresas')
-          .select('nome, tipo_conta, modulos_ativos, clube_parceiro_padrao, razao_social_fantasia, responsavel_nome, contato_telefone, endereco, cnpj, recursos_liberados')
+          .select('nome, tipo_conta, modulos_ativos, clube_parceiro_padrao, razao_social_fantasia, responsavel_nome, contato_telefone, endereco, cnpj, recursos_liberados, logo_url')
           .eq('id', rawEmpresaId)
           .single();
         if (empData) {
@@ -205,7 +206,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             contatoTelefone: empData.contato_telefone,
             endereco: empData.endereco,
             cnpj: empData.cnpj,
-            recursosLiberados: empData.recursos_liberados || []
+            recursosLiberados: empData.recursos_liberados || [],
+            logoUrl: empData.logo_url || undefined
           };
         }
 

@@ -11,13 +11,15 @@ import {
   Plus, Settings2, Edit2, Trash2, BadgeDollarSign, ChevronDown,
   HelpCircle, FileText, CheckSquare, Square, DownloadCloud,
   ShieldAlert, Shield, Target, MapPin, Calendar, Download,
-  Link2, Unlink, Landmark, Loader2, Bell, BellOff, Smartphone, CheckCircle2
+  Link2, Unlink, Landmark, Loader2, Bell, BellOff, Smartphone, CheckCircle2,
+  Upload
 } from 'lucide-react';
 import { supabase } from '../../db/supabase';
 import { Notificacao, useNotificacao } from '../common/Notificacao';
 import { ModalServico } from './ModalServico';
 import { GestaoUsuarios } from './GestaoUsuarios';
 import { formatarMoeda, formatarData } from '../../utils/formatters';
+import { compressImage } from '../../utils/fileUtils';
 import { ServicoConfig } from '../../types';
 import { CONTEUDO_MANUAL } from '../../services/manualService';
 import { baixarManualPdf } from '../../services/geradorPdfManual';
@@ -69,7 +71,8 @@ export function Configuracoes() {
     endereco: usuario?.dadosEmpresa?.endereco || '',
     telefone: usuario?.dadosEmpresa?.contatoTelefone || '',
     responsavel: usuario?.dadosEmpresa?.responsavelNome || '',
-    clubeParceiro: usuario?.dadosEmpresa?.clubeParceiroPadrao || ''
+    clubeParceiro: usuario?.dadosEmpresa?.clubeParceiroPadrao || '',
+    logoUrl: usuario?.dadosEmpresa?.logoUrl || ''
   });
   const [salvandoEmpresa, setSalvandoEmpresa] = useState(false);
 
@@ -81,7 +84,8 @@ export function Configuracoes() {
         endereco: usuario.dadosEmpresa.endereco || '',
         telefone: usuario.dadosEmpresa.contatoTelefone || '',
         responsavel: usuario.dadosEmpresa.responsavelNome || '',
-        clubeParceiro: usuario.dadosEmpresa.clubeParceiroPadrao || ''
+        clubeParceiro: usuario.dadosEmpresa.clubeParceiroPadrao || '',
+        logoUrl: usuario.dadosEmpresa.logoUrl || ''
       });
     }
   }, [usuario?.dadosEmpresa]);
@@ -98,7 +102,8 @@ export function Configuracoes() {
           responsavel_nome: formEmpresa.responsavel.trim(),
           contato_telefone: formEmpresa.telefone.trim(),
           endereco: formEmpresa.endereco.trim(),
-          cnpj: formEmpresa.cnpj.trim()
+          cnpj: formEmpresa.cnpj.trim(),
+          logo_url: formEmpresa.logoUrl || null
         })
         .eq('id', usuario.empresaId);
 
@@ -834,6 +839,57 @@ export function Configuracoes() {
                   <p className="text-[10px] text-gray-500 italic mt-1">
                     Este clube será o selecionado por padrão quando você marcar o switch "Filiado" nas Ordens de Serviço, Orçamentos e Clientes. Ele também aparecerá no cabeçalho das impressões em PDF.
                   </p>
+                </div>
+
+                <div className="col-span-1 sm:col-span-2 space-y-2 border-t border-brand-dark-5 pt-3">
+                  <label className="label text-brand-blue-light font-bold">Logotipo Personalizado da Empresa</label>
+                  <div className="flex flex-col sm:flex-row items-center gap-4 bg-brand-dark-3/55 p-3 rounded-lg border border-brand-dark-5">
+                    <div className="w-24 h-24 rounded-lg bg-brand-dark-4 border border-brand-dark-5 flex items-center justify-center overflow-hidden relative group">
+                      {formEmpresa.logoUrl ? (
+                        <>
+                          <img src={formEmpresa.logoUrl} alt="Logo" className="w-full h-full object-contain p-1" />
+                          <button
+                            type="button"
+                            onClick={() => setFormEmpresa({ ...formEmpresa, logoUrl: '' })}
+                            className="absolute inset-0 bg-red-600/80 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white text-[10px] font-bold"
+                          >
+                            Remover
+                          </button>
+                        </>
+                      ) : (
+                        <div className="text-gray-600 flex flex-col items-center justify-center gap-1">
+                          <Landmark size={24} />
+                          <span className="text-[8px] uppercase font-bold tracking-wider">Sem Logo</span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex-1 space-y-1.5 w-full">
+                      <label className="btn-secondary py-2 px-3 cursor-pointer inline-flex items-center gap-2 text-xs w-full sm:w-auto justify-center bg-brand-dark-4 hover:bg-brand-dark-5 border border-brand-dark-5 text-white rounded">
+                        <Upload size={14} />
+                        Escolher Logotipo
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              try {
+                                const compressedBase64 = await compressImage(file, 350, 350, 0.85);
+                                setFormEmpresa({ ...formEmpresa, logoUrl: compressedBase64 });
+                              } catch (err) {
+                                console.error('Erro ao processar imagem:', err);
+                                mostrar('erro', 'Falha ao processar imagem.');
+                              }
+                            }
+                          }}
+                        />
+                      </label>
+                      <p className="text-[10px] text-gray-500 leading-normal">
+                        PNG, JPG ou WEBP. Dimensão máxima recomendada de 350x350px. Imagens grandes serão redimensionadas e comprimidas localmente de forma automática.
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </div>
 

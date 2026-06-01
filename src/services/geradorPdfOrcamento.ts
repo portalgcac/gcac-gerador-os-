@@ -41,11 +41,31 @@ export async function gerarPdfOrcamentoBlob(orcamento: Orcamento): Promise<Blob>
 
   // Logo
   try {
-    const logoRes = await fetch('/Logo oficial.png');
-    if (logoRes.ok) {
-      const logoBlob = await logoRes.blob();
-      const logoBase64 = await blobParaBase64(logoBlob);
-      doc.addImage(logoBase64, 'PNG', 6, 2, 34, 38);
+    let logoBase64 = '';
+    const dadosUsuario = localStorage.getItem('gcac_usuario');
+    if (dadosUsuario) {
+      const u = JSON.parse(dadosUsuario);
+      if (u.dadosEmpresa?.logoUrl) {
+        logoBase64 = u.dadosEmpresa.logoUrl;
+      }
+    }
+
+    if (!logoBase64) {
+      const logoRes = await fetch('/Logo oficial.png');
+      if (logoRes.ok) {
+        const logoBlob = await logoRes.blob();
+        logoBase64 = await blobParaBase64(logoBlob);
+      }
+    }
+
+    if (logoBase64) {
+      let format = 'PNG';
+      if (logoBase64.startsWith('data:image/jpeg') || logoBase64.startsWith('data:image/jpg')) {
+        format = 'JPEG';
+      } else if (logoBase64.startsWith('data:image/webp')) {
+        format = 'WEBP';
+      }
+      doc.addImage(logoBase64, format, 6, 2, 34, 38);
     }
   } catch { /* logo nao disponivel */ }
 
