@@ -117,7 +117,10 @@ export function GestaoUsuarios() {
       .from('empresas')
       .select('id, nome, tipo_conta, limite_cac_vinculados, recursos_liberados, plano, plano_status, frequencia_pagamento, data_vencimento, taxa_implementacao_paga, valor_implementacao, valor_assinatura_personalizado, is_gratis, limite_usuarios_staff')
       .order('nome');
-    if (!error && data) {
+    if (error) {
+      console.error('Erro ao carregar empresas:', error);
+      mostrar('erro', `Erro ao carregar empresas: ${error.message}. Por favor, certifique-se de executar a migração SQL de faturamento no painel do Supabase.`);
+    } else if (data) {
       setEmpresas(data);
     }
     setCarregandoEmpresas(false);
