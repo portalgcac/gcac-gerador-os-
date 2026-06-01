@@ -11,9 +11,10 @@ import { buscarVinculosPendentesCAC, VinculoDespachanteCac } from '../../service
 import { NotificacaoVinculo } from '../vinculos/NotificacaoVinculo';
 import { supabase } from '../../db/supabase';
 import { InstallPwaPrompt } from '../common/InstallPwaPrompt';
+import { Lock, MessageCircle } from 'lucide-react';
 
 export function AppShell() {
-  const { estaAutenticado, usuario } = useAuth();
+  const { estaAutenticado, usuario, logout } = useAuth();
   const { itensFila } = useOrdens();
   const online = useStatusConexao();
   const location = useLocation();
@@ -79,6 +80,90 @@ export function AppShell() {
     setVinculoPendente(null);
   };
 
+  // Lógica de Vencimento e Bloqueio (Pricing & Planos)
+  const planoStatus = usuario?.dadosEmpresa?.planoStatus;
+  const dataVencimento = usuario?.dadosEmpresa?.dataVencimento;
+  const isGratis = usuario?.dadosEmpresa?.isGratis;
+  const isMasterAdmin = usuario?.email === 'gui.gomesassis@gmail.com';
+
+  const hoje = new Date();
+  hoje.setHours(0, 0, 0, 0);
+
+  let estaBloqueado = false;
+  let diasAteVencer: number | null = null;
+
+  if (estaAutenticado && !isMasterAdmin && !isGratis) {
+    if (planoStatus === 'suspenso') {
+      estaBloqueado = true;
+    } else if (dataVencimento) {
+      const vencDate = new Date(dataVencimento + 'T00:00:00');
+      if (hoje > vencDate) {
+        estaBloqueado = true;
+      } else {
+        const diffTime = vencDate.getTime() - hoje.getTime();
+        diasAteVencer = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      }
+    }
+  }
+
+  if (estaBloqueado) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-brand-dark overflow-hidden p-4">
+        {/* Efeito de fundo decorativo */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-brand-blue/10 rounded-full blur-3xl pointer-events-none"></div>
+        <div className="absolute top-12 left-12 w-24 h-24 bg-red-500/5 rounded-full blur-2xl pointer-events-none"></div>
+
+        <div className="relative w-full max-w-md bg-white/[0.03] border border-white/[0.08] backdrop-blur-xl rounded-2xl p-6 sm:p-8 text-center shadow-2xl">
+          {/* Logo / Header icon */}
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-red-500/10 border border-red-500/20 text-red-400 mb-6 animate-pulse">
+            <Lock size={28} />
+          </div>
+
+          <h2 className="text-xl sm:text-2xl font-black text-white uppercase tracking-tight mb-2">
+            Acesso Restrito
+          </h2>
+          
+          <p className="text-gray-400 text-xs sm:text-sm mb-6 leading-relaxed">
+            {planoStatus === 'suspenso' ? (
+              <>
+                A assinatura da empresa <strong className="text-white">{usuario?.dadosEmpresa?.nome || usuario?.empresaNome}</strong> foi suspensa temporariamente.
+              </>
+            ) : (
+              <>
+                O período de licença do portal GCAC para a empresa <strong className="text-white">{usuario?.dadosEmpresa?.nome || usuario?.empresaNome}</strong> expirou em <strong className="text-white">{dataVencimento ? new Date(dataVencimento + 'T00:00:00').toLocaleDateString('pt-BR') : ''}</strong>.
+              </>
+            )}
+            <br />
+            Por favor, entre em contato com o suporte do Portal GCAC para regularizar seu plano e restabelecer o acesso aos recursos.
+          </p>
+
+          <div className="flex flex-col gap-3">
+            <a
+              href={`https://wa.me/5511999999999?text=${encodeURIComponent(`Olá, gostaria de regularizar a assinatura do Portal GCAC para a empresa ${usuario?.dadosEmpresa?.nome || usuario?.empresaNome || ''}`)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full flex items-center justify-center gap-2 bg-brand-blue hover:bg-brand-blue-light text-white text-xs font-black uppercase tracking-wider py-3 px-4 rounded-xl border border-brand-blue-light/20 transition-all shadow-lg shadow-brand-blue/20"
+            >
+              <MessageCircle size={16} />
+              Falar com Suporte (WhatsApp)
+            </a>
+            
+            <button
+              onClick={() => logout()}
+              className="w-full bg-white/[0.05] hover:bg-white/[0.1] text-gray-300 hover:text-white text-xs font-bold uppercase tracking-wider py-3 px-4 rounded-xl border border-white/[0.05] transition-all"
+            >
+              Sair da Conta
+            </button>
+          </div>
+
+          <div className="mt-8 pt-6 border-t border-white/[0.05] text-[10px] text-gray-500 font-bold uppercase tracking-wider">
+            Portal GCAC — Solução para Atiradores, Colecionadores, Caçadores e Despachantes de Armas
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-screen bg-brand-dark overflow-hidden">
       {/* Sidebar — visível apenas em sm+ */}
@@ -93,6 +178,19 @@ export function AppShell() {
           <div className="bg-yellow-500/20 border-b border-yellow-500/30 px-4 py-2 text-center">
             <p className="text-xs text-yellow-300 font-medium">
               ⚠️ Modo offline — suas alterações serão sincronizadas ao reconectar
+            </p>
+          </div>
+        )}
+
+        {/* Banner Vencimento em Breve */}
+        {diasAteVencer !== null && diasAteVencer <= 5 && (
+          <div className="bg-yellow-500/20 border-b border-yellow-500/30 px-4 py-2.5 flex items-center justify-center gap-3">
+            <span className="flex h-2 w-2 relative shrink-0">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-yellow-400"></span>
+            </span>
+            <p className="text-xs text-yellow-300 font-bold truncate">
+              ⚠️ Atenção: Sua assinatura do plano {usuario?.dadosEmpresa?.plano || 'GCAC'} vence em {diasAteVencer} {diasAteVencer === 1 ? 'dia' : 'dias'} ({dataVencimento ? new Date(dataVencimento + 'T00:00:00').toLocaleDateString('pt-BR') : ''}). Regularize para evitar a suspensão.
             </p>
           </div>
         )}

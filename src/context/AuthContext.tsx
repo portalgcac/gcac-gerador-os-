@@ -61,7 +61,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (rawEmpresaId) {
         const { data: empData } = await supabase
           .from('empresas')
-          .select('nome, tipo_conta, modulos_ativos, clube_parceiro_padrao, razao_social_fantasia, responsavel_nome, contato_telefone, endereco, cnpj, recursos_liberados, logo_url')
+          .select('nome, tipo_conta, modulos_ativos, clube_parceiro_padrao, razao_social_fantasia, responsavel_nome, contato_telefone, endereco, cnpj, recursos_liberados, logo_url, plano, plano_status, frequencia_pagamento, data_vencimento, taxa_implementacao_paga, valor_implementacao, valor_assinatura_personalizado, is_gratis, limite_usuarios_staff')
           .eq('id', rawEmpresaId)
           .single();
         if (empData) {
@@ -79,7 +79,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             endereco: empData.endereco,
             cnpj: empData.cnpj,
             recursosLiberados: empData.recursos_liberados || [],
-            logoUrl: empData.logo_url || undefined
+            logoUrl: empData.logo_url || undefined,
+            plano: empData.plano,
+            planoStatus: empData.plano_status,
+            frequenciaPagamento: empData.frequencia_pagamento,
+            dataVencimento: empData.data_vencimento,
+            taxaImplementacaoPaga: empData.taxa_implementacao_paga,
+            valorImplementacao: empData.valor_implementacao ? Number(empData.valor_implementacao) : undefined,
+            valorAssinaturaPersonalizado: empData.valor_assinatura_personalizado ? Number(empData.valor_assinatura_personalizado) : undefined,
+            isGratis: empData.is_gratis,
+            limiteUsuariosStaff: empData.limite_usuarios_staff
           };
         }
 
@@ -189,7 +198,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (rawEmpresaId) {
         const { data: empData } = await supabase
           .from('empresas')
-          .select('nome, tipo_conta, modulos_ativos, clube_parceiro_padrao, razao_social_fantasia, responsavel_nome, contato_telefone, endereco, cnpj, recursos_liberados, logo_url')
+          .select('nome, tipo_conta, modulos_ativos, clube_parceiro_padrao, razao_social_fantasia, responsavel_nome, contato_telefone, endereco, cnpj, recursos_liberados, logo_url, plano, plano_status, frequencia_pagamento, data_vencimento, taxa_implementacao_paga, valor_implementacao, valor_assinatura_personalizado, is_gratis, limite_usuarios_staff')
           .eq('id', rawEmpresaId)
           .single();
         if (empData) {
@@ -207,7 +216,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             endereco: empData.endereco,
             cnpj: empData.cnpj,
             recursosLiberados: empData.recursos_liberados || [],
-            logoUrl: empData.logo_url || undefined
+            logoUrl: empData.logo_url || undefined,
+            plano: empData.plano,
+            planoStatus: empData.plano_status,
+            frequenciaPagamento: empData.frequencia_pagamento,
+            dataVencimento: empData.data_vencimento,
+            taxaImplementacaoPaga: empData.taxa_implementacao_paga,
+            valorImplementacao: empData.valor_implementacao ? Number(empData.valor_implementacao) : undefined,
+            valorAssinaturaPersonalizado: empData.valor_assinatura_personalizado ? Number(empData.valor_assinatura_personalizado) : undefined,
+            isGratis: empData.is_gratis,
+            limiteUsuariosStaff: empData.limite_usuarios_staff
           };
         }
 

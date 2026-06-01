@@ -271,6 +271,15 @@ export interface DadosEmpresa {
   cnpj?: string;
   recursosLiberados?: string[];
   logoUrl?: string;
+  plano?: string;
+  planoStatus?: string;
+  frequenciaPagamento?: string;
+  dataVencimento?: string;
+  taxaImplementacaoPaga?: boolean;
+  valorImplementacao?: number;
+  valorAssinaturaPersonalizado?: number;
+  isGratis?: boolean;
+  limiteUsuariosStaff?: number;
 }
 
 export interface UsuarioGoogle {
