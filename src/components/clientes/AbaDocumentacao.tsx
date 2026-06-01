@@ -554,11 +554,12 @@ export function ModalArma({ armaParaEditar, onFechar, onSalvar }: { armaParaEdit
 
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div className="card w-full max-w-md animate-scale-up" onClick={e => e.stopPropagation()}>
+      <div className="card w-full max-w-md max-h-[90vh] flex flex-col animate-scale-up" onClick={e => e.stopPropagation()}>
         <h3 className="text-lg font-bold text-white mb-6">
           {armaParaEditar ? 'Editar Arma' : 'Cadastrar Nova Arma'}
         </h3>
-        <div className="space-y-4">
+        
+        <div className="flex-1 overflow-y-auto pr-1 space-y-4 scrollbar-thin scrollbar-thumb-slate-800">
           <div>
             <label className="label">Tipo de Arma</label>
             <input 
@@ -691,12 +692,13 @@ export function ModalArma({ armaParaEditar, onFechar, onSalvar }: { armaParaEdit
               </span>
             )}
           </div>
-          <div className="flex gap-3 pt-4">
-            <button onClick={onFechar} className="btn-ghost flex-1">Cancelar</button>
-            <button onClick={() => onSalvar(form)} className="btn-primary flex-1">
-              {armaParaEditar ? 'Salvar Alterações' : 'Salvar Arma'}
-            </button>
-          </div>
+        </div>
+
+        <div className="flex gap-3 pt-6 border-t border-slate-800/60 mt-4">
+          <button onClick={onFechar} className="btn-ghost flex-1">Cancelar</button>
+          <button onClick={() => onSalvar(form)} className="btn-primary flex-1">
+            {armaParaEditar ? 'Salvar Alterações' : 'Salvar Arma'}
+          </button>
         </div>
       </div>
     </div>
@@ -1174,7 +1176,7 @@ export function ModalManejo({ manejoParaEditar, onFechar, onSalvar }: { manejoPa
 
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div className="card w-full max-w-md animate-scale-up" onClick={e => e.stopPropagation()}>
+      <div className="card w-full max-w-md max-h-[90vh] flex flex-col animate-scale-up" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-lg font-bold text-white">
             {manejoParaEditar ? 'Editar Autorização de Manejo' : 'Autorização de Manejo (IBAMA)'}
@@ -1201,7 +1203,8 @@ export function ModalManejo({ manejoParaEditar, onFechar, onSalvar }: { manejoPa
             </label>
           </div>
         </div>
-        <div className="space-y-4">
+        
+        <div className="flex-1 overflow-y-auto pr-1 space-y-4 scrollbar-thin scrollbar-thumb-slate-800">
           <div>
             <label className="label">Nº do CAR da Fazenda</label>
             <input type="text" className="input uppercase" value={form.numeroCar} onChange={e => setForm({...form, numeroCar: e.target.value})} />
@@ -1283,12 +1286,13 @@ export function ModalManejo({ manejoParaEditar, onFechar, onSalvar }: { manejoPa
               </span>
             )}
           </div>
-          <div className="flex gap-3 pt-4">
-            <button onClick={onFechar} className="btn-ghost flex-1">Cancelar</button>
-            <button onClick={handleSalvar} className="btn-primary flex-1">
-              {manejoParaEditar ? 'Salvar Alterações' : 'Salvar Manejo'}
-            </button>
-          </div>
+        </div>
+
+        <div className="flex gap-3 pt-6 border-t border-slate-800/60 mt-4">
+          <button onClick={onFechar} className="btn-ghost flex-1">Cancelar</button>
+          <button onClick={handleSalvar} className="btn-primary flex-1">
+            {manejoParaEditar ? 'Salvar Alterações' : 'Salvar Manejo'}
+          </button>
         </div>
       </div>
     </div>
