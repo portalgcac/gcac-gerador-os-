@@ -2,6 +2,7 @@ import React, { createContext, useContext, useCallback, useState, useEffect } fr
 import { v4 as uuidv4 } from 'uuid';
 import { Cliente, Arma, GuiaTrafego, AutorizacaoManejo, CreditoCliente } from '../types';
 import { supabase } from '../db/supabase';
+import { uploadBase64File } from '../utils/fileUtils';
 
 import { useAuth } from './AuthContext';
 
@@ -147,9 +148,33 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
     dados: Omit<Cliente, 'id' | 'criadoEm' | 'atualizadoEm'>
   ): Promise<string> => {
     if (!usuario?.empresaId) throw new Error('Usuário não autenticado');
+    
+    const clienteId = uuidv4();
+    
+    let crUrl = dados.crUrl;
+    let crIbamaUrl = dados.crIbamaUrl;
+    
+    if (crUrl && crUrl.startsWith('data:')) {
+      const ext = crUrl.split(';base64,')[0].split(':')[1].split('/')[1] || 'pdf';
+      const path = `${usuario.empresaId}/clientes/${clienteId}/cr_${uuidv4()}.${ext}`;
+      crUrl = await uploadBase64File(crUrl, 'documentos-clientes', path) || '';
+    }
+    
+    if (crIbamaUrl && crIbamaUrl.startsWith('data:')) {
+      const ext = crIbamaUrl.split(';base64,')[0].split(':')[1].split('/')[1] || 'pdf';
+      const path = `${usuario.empresaId}/clientes/${clienteId}/cr_ibama_${uuidv4()}.${ext}`;
+      crIbamaUrl = await uploadBase64File(crIbamaUrl, 'documentos-clientes', path) || '';
+    }
+    
+    const dadosComUrls = {
+      ...dados,
+      crUrl,
+      crIbamaUrl
+    };
+
     const { data, error } = await supabase
       .from('clientes')
-      .insert([{ ...mapToDB(dados), empresa_id: usuario.empresaId }])
+      .insert([{ id: clienteId, ...mapToDB(dadosComUrls), empresa_id: usuario.empresaId }])
       .select()
       .single();
 
@@ -159,14 +184,37 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
   }, [carregarClientes, usuario]);
 
   const atualizarCliente = useCallback(async (id: string, dados: Partial<Cliente>) => {
+    if (!usuario?.empresaId) throw new Error('Usuário não autenticado');
+    
+    let crUrl = dados.crUrl;
+    let crIbamaUrl = dados.crIbamaUrl;
+    
+    if (crUrl && crUrl.startsWith('data:')) {
+      const ext = crUrl.split(';base64,')[0].split(':')[1].split('/')[1] || 'pdf';
+      const path = `${usuario.empresaId}/clientes/${id}/cr_${uuidv4()}.${ext}`;
+      crUrl = await uploadBase64File(crUrl, 'documentos-clientes', path) || '';
+    }
+    
+    if (crIbamaUrl && crIbamaUrl.startsWith('data:')) {
+      const ext = crIbamaUrl.split(';base64,')[0].split(':')[1].split('/')[1] || 'pdf';
+      const path = `${usuario.empresaId}/clientes/${id}/cr_ibama_${uuidv4()}.${ext}`;
+      crIbamaUrl = await uploadBase64File(crIbamaUrl, 'documentos-clientes', path) || '';
+    }
+    
+    const dadosComUrls = {
+      ...dados
+    };
+    if (crUrl !== undefined) dadosComUrls.crUrl = crUrl;
+    if (crIbamaUrl !== undefined) dadosComUrls.crIbamaUrl = crIbamaUrl;
+
     const { error } = await supabase
       .from('clientes')
-      .update({ ...mapToDB(dados), atualizado_em: new Date().toISOString() })
+      .update({ ...mapToDB(dadosComUrls), atualizado_em: new Date().toISOString() })
       .eq('id', id);
 
     if (error) throw error;
     await carregarClientes();
-  }, [carregarClientes]);
+  }, [carregarClientes, usuario]);
 
   const deletarCliente = useCallback(async (id: string) => {
     const { error } = await supabase
@@ -242,6 +290,16 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
 
   const salvarArma = useCallback(async (dados: Partial<Arma> & { clienteId: string }, overrideEmpresaId?: string) => {
     if (!usuario?.empresaId) throw new Error('Usuário não autenticado');
+    const empresaId = overrideEmpresaId || usuario.empresaId;
+    const armaId = dados.id || uuidv4();
+
+    let crafUrl = (dados as any).crafUrl;
+    if (crafUrl && crafUrl.startsWith('data:')) {
+      const ext = crafUrl.split(';base64,')[0].split(':')[1].split('/')[1] || 'pdf';
+      const path = `${empresaId}/clientes/${dados.clienteId}/armas/${armaId}/craf_${uuidv4()}.${ext}`;
+      crafUrl = await uploadBase64File(crafUrl, 'documentos-clientes', path) || '';
+    }
+
     const payload = {
       cliente_id: dados.clienteId,
       tipo: dados.tipo,
@@ -252,8 +310,8 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
       numero_sigma: dados.numeroSigma,
       acervo: dados.acervo,
       vencimento_craf: dados.vencimentoCraf || null,
-      craf_url: (dados as any).crafUrl || null,
-      empresa_id: overrideEmpresaId || usuario.empresaId
+      craf_url: crafUrl || null,
+      empresa_id: empresaId
     };
 
     if (dados.id) {
@@ -265,7 +323,7 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
     } else {
       const { error } = await supabase
         .from('armas')
-        .insert([payload]);
+        .insert([{ id: armaId, ...payload }]);
       if (error) throw error;
     }
     
@@ -302,13 +360,23 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
 
   const salvarGt = useCallback(async (dados: Partial<GuiaTrafego> & { armaId: string }, overrideEmpresaId?: string) => {
     if (!usuario?.empresaId) throw new Error('Usuário não autenticado');
+    const empresaId = overrideEmpresaId || usuario.empresaId;
+    const gtId = dados.id || uuidv4();
+
+    let arquivoUrl = (dados as any).arquivoUrl;
+    if (arquivoUrl && arquivoUrl.startsWith('data:')) {
+      const ext = arquivoUrl.split(';base64,')[0].split(':')[1].split('/')[1] || 'pdf';
+      const path = `${empresaId}/armas/${dados.armaId}/gts/${gtId}/gt_${uuidv4()}.${ext}`;
+      arquivoUrl = await uploadBase64File(arquivoUrl, 'documentos-clientes', path) || '';
+    }
+
     const payload = {
       arma_id: dados.armaId,
       tipo: dados.tipo,
       vencimento: dados.vencimento,
       destino: dados.destino,
-      arquivo_url: (dados as any).arquivoUrl || null,
-      empresa_id: overrideEmpresaId || usuario.empresaId
+      arquivo_url: arquivoUrl || null,
+      empresa_id: empresaId
     };
 
     if (dados.id) {
@@ -320,7 +388,7 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
     } else {
       const { error } = await supabase
         .from('guias_trafego')
-        .insert([payload]);
+        .insert([{ id: gtId, ...payload }]);
       if (error) throw error;
     }
   }, [usuario]);
@@ -357,6 +425,16 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
 
   const salvarManejo = useCallback(async (dados: Partial<AutorizacaoManejo> & { clienteId: string }, overrideEmpresaId?: string) => {
     if (!usuario?.empresaId) throw new Error('Usuário não autenticado');
+    const empresaId = overrideEmpresaId || usuario.empresaId;
+    const manejoId = dados.id || uuidv4();
+
+    let arquivoUrl = (dados as any).arquivoUrl;
+    if (arquivoUrl && arquivoUrl.startsWith('data:')) {
+      const ext = arquivoUrl.split(';base64,')[0].split(':')[1].split('/')[1] || 'pdf';
+      const path = `${empresaId}/clientes/${dados.clienteId}/manejos/${manejoId}/manejo_${uuidv4()}.${ext}`;
+      arquivoUrl = await uploadBase64File(arquivoUrl, 'documentos-clientes', path) || '';
+    }
+
     const payload = {
       cliente_id: dados.clienteId,
       numero_car: dados.numeroCar,
@@ -365,8 +443,8 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
       cidade: dados.cidade,
       vencimento: dados.vencimento,
       status: dados.status || 'Ativo',
-      arquivo_url: (dados as any).arquivoUrl || null,
-      empresa_id: overrideEmpresaId || usuario.empresaId
+      arquivo_url: arquivoUrl || null,
+      empresa_id: empresaId
     };
 
     if (dados.id) {
@@ -378,7 +456,7 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
     } else {
       const { error } = await supabase
         .from('autorizacoes_manejo')
-        .insert([payload]);
+        .insert([{ id: manejoId, ...payload }]);
       if (error) throw error;
     }
   }, [usuario]);

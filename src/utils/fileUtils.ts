@@ -1,3 +1,57 @@
+import { supabase } from '../db/supabase';
+
+/**
+ * Converte uma string Base64 em Blob para upload.
+ */
+export async function base64ToBlob(base64Data: string): Promise<{ blob: Blob; mimeType: string }> {
+  const parts = base64Data.split(';base64,');
+  const mimeType = parts[0].split(':')[1];
+  const byteCharacters = atob(parts[1]);
+  const byteNumbers = new Array(byteCharacters.length);
+  for (let i = 0; i < byteCharacters.length; i++) {
+    byteNumbers[i] = byteCharacters.charCodeAt(i);
+  }
+  const byteArray = new Uint8Array(byteNumbers);
+  return {
+    blob: new Blob([byteArray], { type: mimeType }),
+    mimeType
+  };
+}
+
+/**
+ * Realiza o upload de um arquivo em Base64 para um bucket do Supabase Storage.
+ * Retorna a URL pública do arquivo enviado.
+ */
+export async function uploadBase64File(
+  base64Data: string | null | undefined,
+  bucketName: string,
+  path: string
+): Promise<string | null> {
+  if (!base64Data) return null;
+  if (!base64Data.startsWith('data:')) {
+    return base64Data; // Já é uma URL ou caminho normal
+  }
+
+  const { blob, mimeType } = await base64ToBlob(base64Data);
+
+  const { error } = await supabase.storage
+    .from(bucketName)
+    .upload(path, blob, {
+      contentType: mimeType,
+      upsert: true
+    });
+
+  if (error) {
+    throw error;
+  }
+
+  const { data: publicUrlData } = supabase.storage
+    .from(bucketName)
+    .getPublicUrl(path);
+
+  return publicUrlData.publicUrl;
+}
+
 /**
  * Converte um objeto File em uma string Base64 Data URL.
  */
