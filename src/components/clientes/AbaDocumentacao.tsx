@@ -465,11 +465,17 @@ export function AbaDocumentacao({ cliente, armaIdInicial }: Props) {
             cidade: d.cidade?.trim().toUpperCase(),
             clienteId: cliente.id,
             id: manejoParaEditar?.id
-          }).then(() => { 
-            carregarDados(); 
-            setModalManejo(false);
-            setManejoParaEditar(null);
-          })} 
+          })
+            .then(() => { 
+              carregarDados(); 
+              setModalManejo(false);
+              setManejoParaEditar(null);
+            })
+            .catch((err) => {
+              console.error('Erro ao salvar manejo:', err);
+              alert('Erro ao salvar manejo: ' + (err.message || JSON.stringify(err)));
+            })
+          } 
         />
       )}
     </div>
