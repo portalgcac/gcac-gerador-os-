@@ -663,14 +663,14 @@ export function GestaoUsuarios() {
                 <p className="text-sm text-gray-500 italic py-4">Nenhuma empresa B2B cadastrada.</p>
               ) : (
                 <div className="overflow-x-auto rounded-2xl border border-brand-dark-5">
-                  <table className="w-full text-left border-collapse min-w-[850px]">
+                  <table className="w-full text-left border-collapse min-w-[700px]">
                     <thead>
                       <tr className="bg-brand-dark-3 border-b border-brand-dark-5">
-                        <th className="p-4 text-xs font-black text-gray-400 uppercase tracking-wider">Empresa (Tenant)</th>
-                        <th className="p-4 text-xs font-black text-gray-400 uppercase tracking-wider">Plano / Cobrança</th>
-                        <th className="p-4 text-xs font-black text-gray-400 uppercase tracking-wider">Limites (Staff/CACs)</th>
-                        <th className="p-4 text-xs font-black text-gray-400 uppercase tracking-wider">Vencimento / Setup</th>
-                        <th className="p-4 text-xs font-black text-gray-400 uppercase tracking-wider text-right">Ações</th>
+                        <th className="px-3 py-3 text-xs font-black text-gray-400 uppercase tracking-wider">Empresa (Tenant)</th>
+                        <th className="px-3 py-3 text-xs font-black text-gray-400 uppercase tracking-wider">Plano / Cobrança</th>
+                        <th className="px-3 py-3 text-xs font-black text-gray-400 uppercase tracking-wider">Limites (Staff/CACs)</th>
+                        <th className="px-3 py-3 text-xs font-black text-gray-400 uppercase tracking-wider">Vencimento / Setup</th>
+                        <th className="px-3 py-3 text-xs font-black text-gray-400 uppercase tracking-wider text-right">Ações</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-brand-dark-5">
@@ -681,7 +681,7 @@ export function GestaoUsuarios() {
                          const ehExpirado = dataVenc && dataVenc < hoje && !e.is_gratis;
                          
                          const obterPrecoEstilizado = () => {
-                           if (e.is_gratis) return 'Isento (Gratuidade)';
+                           if (e.is_gratis) return 'Isento';
                            if (e.valor_assinatura_personalizado != null) return `R$ ${parseFloat(e.valor_assinatura_personalizado).toFixed(2)}`;
                            if (e.plano === '.22LR') return 'R$ 30,00';
                            if (e.plano === '.357mag') return 'R$ 50,00';
@@ -697,19 +697,19 @@ export function GestaoUsuarios() {
 
                          return (
                            <tr key={e.id} className="bg-brand-dark-4/40 hover:bg-brand-dark-4 transition-colors">
-                             <td className="p-4">
-                               <div className="flex items-center gap-2">
-                                 <p className="font-bold text-white text-sm">{e.nome}</p>
-                                 <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full tracking-wider bg-purple-500/10 text-purple-400 border border-purple-500/20">
+                             <td className="px-3 py-3">
+                               <div className="flex items-center gap-1.5">
+                                 <p className="font-bold text-white text-sm truncate max-w-[150px]" title={e.nome}>{e.nome}</p>
+                                 <span className="text-[8px] font-black uppercase px-1.5 py-0.5 rounded-full tracking-wider bg-purple-500/10 text-purple-400 border border-purple-500/20">
                                    B2B
                                  </span>
                                </div>
-                               <p className="text-[10px] text-gray-500 font-mono select-all mt-0.5">{e.id}</p>
+                               <p className="text-[10px] text-gray-500 font-mono mt-0.5 select-all truncate max-w-[120px]" title={e.id}>{e.id.substring(0, 8)}...</p>
                              </td>
-                             <td className="p-4">
-                               <div className="flex flex-col gap-1">
-                                 <div className="flex items-center gap-1.5">
-                                   <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${
+                             <td className="px-3 py-3">
+                               <div className="flex flex-col gap-0.5">
+                                 <div className="flex items-center gap-1">
+                                   <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md border ${
                                      e.plano === '.308win' ? 'bg-brand-blue/15 text-brand-blue-light border-brand-blue/30' :
                                      e.plano === '.357mag' ? 'bg-brand-green/10 text-brand-green-light border-brand-green/20' :
                                      'bg-gray-600/20 text-gray-400 border-gray-500/20'
@@ -717,12 +717,12 @@ export function GestaoUsuarios() {
                                      {e.plano || '.22LR'}
                                    </span>
                                    {e.is_gratis && (
-                                     <span className="text-[8px] font-bold uppercase bg-brand-green/15 text-brand-green px-1.5 py-0.5 rounded border border-brand-green/20">
-                                       Cortesia
+                                     <span className="text-[8px] font-bold uppercase bg-brand-green/15 text-brand-green px-1 py-0.5 rounded border border-brand-green/20">
+                                       Isento
                                      </span>
                                    )}
                                    {e.valor_assinatura_personalizado != null && !e.is_gratis && (
-                                     <span className="text-[8px] font-bold uppercase bg-yellow-500/10 text-yellow-400 px-1.5 py-0.5 rounded border border-yellow-500/20">
+                                     <span className="text-[8px] font-bold uppercase bg-yellow-500/10 text-yellow-400 px-1 py-0.5 rounded border border-yellow-500/20">
                                        Custom
                                      </span>
                                    )}
@@ -732,51 +732,51 @@ export function GestaoUsuarios() {
                                  </span>
                                </div>
                              </td>
-                             <td className="p-4">
-                               <div className="text-xs text-gray-300 space-y-0.5">
-                                 <p>Equipe: <strong className="text-white">{e.limite_usuarios_staff ?? 1}</strong></p>
-                                 <p>Clientes: <strong className="text-white">{e.limite_cac_vinculados ?? 20}</strong></p>
+                             <td className="px-3 py-3">
+                               <div className="text-[11px] text-gray-300 space-y-0.5">
+                                 <p>Eq: <strong className="text-white">{e.limite_usuarios_staff ?? 1}</strong></p>
+                                 <p>Cac: <strong className="text-white">{e.limite_cac_vinculados ?? 20}</strong></p>
                                </div>
                              </td>
-                             <td className="p-4 text-xs">
-                               <div className="space-y-1">
-                                 <div className="flex items-center gap-1.5">
+                             <td className="px-3 py-3 text-xs">
+                               <div className="space-y-0.5">
+                                 <div className="flex items-center gap-1">
                                    <span className={`text-[10px] font-bold ${ehExpirado ? 'text-red-400' : 'text-gray-400'}`}>
                                      Venc: {e.data_vencimento ? formatarData(e.data_vencimento) : 'Sem data'}
                                    </span>
                                    {ehExpirado && (
                                      <span className="text-[8px] font-black uppercase bg-red-500/10 text-red-400 border border-red-500/20 px-1 py-0.5 rounded">
-                                       Expirado
+                                       Vencido
                                      </span>
                                    )}
                                  </div>
                                  <p className="text-[10px] flex items-center gap-1 text-gray-500">
                                    Setup: {' '}
                                    <span className={e.taxa_implementacao_paga ? 'text-brand-green font-bold' : 'text-yellow-500 font-bold'}>
-                                     {e.taxa_implementacao_paga ? 'Pago' : `Pendente (R$ ${e.valor_implementacao || '150'})`}
+                                     {e.taxa_implementacao_paga ? 'Pago' : `Pendente`}
                                    </span>
                                  </p>
                                </div>
                              </td>
-                             <td className="p-4 text-right">
-                               <div className="flex items-center justify-end gap-1.5">
+                             <td className="px-3 py-3 text-right">
+                               <div className="flex items-center justify-end gap-1">
                                  <button
                                    onClick={() => setEmpresaGerenciada(e)}
-                                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-brand-blue/10 border border-brand-blue/20 hover:bg-brand-blue/20 text-brand-blue-light text-xs font-bold uppercase tracking-wider transition-colors"
+                                   className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-brand-blue/10 border border-brand-blue/20 hover:bg-brand-blue/20 text-brand-blue-light text-[10px] font-bold uppercase tracking-wider transition-colors"
                                  >
-                                   <Settings2 size={13} />
-                                   Gerenciar Empresa
+                                   <Settings2 size={12} />
+                                   Gerenciar
                                  </button>
                                  <button 
                                    onClick={() => setEmpresaEditando({ ...e })}
-                                   className="p-2 text-gray-400 hover:text-brand-blue-light hover:bg-brand-dark-3 rounded-xl transition-all"
+                                   className="p-1.5 text-gray-400 hover:text-brand-blue-light hover:bg-brand-dark-3 rounded-xl transition-all"
                                    title="Editar Cadastro Básico"
                                  >
                                    <Edit2 size={14} />
                                  </button>
                                  <button 
                                    onClick={() => setConfirmandoDeleteEmpresa({ id: e.id, nome: e.nome })}
-                                   className="p-2 text-gray-400 hover:text-red-400 hover:bg-brand-dark-3 rounded-xl transition-all"
+                                   className="p-1.5 text-gray-400 hover:text-red-400 hover:bg-brand-dark-3 rounded-xl transition-all"
                                    title="Excluir Empresa"
                                  >
                                    <Trash2 size={14} />
@@ -1234,15 +1234,15 @@ export function GestaoUsuarios() {
                 </div>
 
                 <div className="overflow-x-auto rounded-2xl border border-brand-dark-5">
-                  <table className="w-full text-left border-collapse min-w-[900px]">
+                  <table className="w-full text-left border-collapse min-w-[700px]">
                     <thead>
                       <tr className="bg-brand-dark-3 border-b border-brand-dark-5">
-                        <th className="p-4 text-xs font-black text-gray-400 uppercase tracking-wider">Empresa</th>
-                        <th className="p-4 text-xs font-black text-gray-400 uppercase tracking-wider">Plano</th>
-                        <th className="p-4 text-xs font-black text-gray-400 uppercase tracking-wider">Preço Custom / Período</th>
-                        <th className="p-4 text-xs font-black text-gray-400 uppercase tracking-wider">Situação</th>
-                        <th className="p-4 text-xs font-black text-gray-400 uppercase tracking-wider">Vencimento</th>
-                        <th className="p-4 text-xs font-black text-gray-400 uppercase tracking-wider text-right">Ações Rápidas</th>
+                        <th className="px-3 py-3 text-xs font-black text-gray-400 uppercase tracking-wider">Empresa</th>
+                        <th className="px-3 py-3 text-xs font-black text-gray-400 uppercase tracking-wider">Plano</th>
+                        <th className="px-3 py-3 text-xs font-black text-gray-400 uppercase tracking-wider">Preço Custom / Período</th>
+                        <th className="px-3 py-3 text-xs font-black text-gray-400 uppercase tracking-wider">Situação</th>
+                        <th className="px-3 py-3 text-xs font-black text-gray-400 uppercase tracking-wider">Vencimento</th>
+                        <th className="px-3 py-3 text-xs font-black text-gray-400 uppercase tracking-wider text-right">Ações Rápidas</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-brand-dark-5">
@@ -1254,7 +1254,7 @@ export function GestaoUsuarios() {
                         const diasAteVencer = dataVenc ? Math.ceil((dataVenc.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24)) : null;
                         
                         const obterPrecoEstilizado = () => {
-                          if (e.is_gratis) return 'R$ 0,00 (Isento)';
+                          if (e.is_gratis) return 'Isento';
                           if (e.valor_assinatura_personalizado != null) return `R$ ${parseFloat(e.valor_assinatura_personalizado).toFixed(2)}`;
                           if (e.plano === '.22LR') return 'R$ 30,00';
                           if (e.plano === '.357mag') return 'R$ 50,00';
@@ -1286,12 +1286,12 @@ export function GestaoUsuarios() {
 
                         return (
                           <tr key={e.id} className="bg-brand-dark-4/40 hover:bg-brand-dark-4 transition-colors">
-                            <td className="p-4">
-                              <p className="font-bold text-white text-sm">{e.nome}</p>
-                              <p className="text-[10px] text-gray-500 font-mono mt-0.5 select-all">{e.id}</p>
+                            <td className="px-3 py-3">
+                              <p className="font-bold text-white text-sm truncate max-w-[150px]" title={e.nome}>{e.nome}</p>
+                              <p className="text-[10px] text-gray-500 font-mono mt-0.5 select-all truncate max-w-[120px]" title={e.id}>{e.id.substring(0, 8)}...</p>
                             </td>
-                            <td className="p-4">
-                              <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded border ${
+                            <td className="px-3 py-3">
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
                                 e.plano === '.308win' ? 'bg-brand-blue/15 text-brand-blue-light border-brand-blue/30' :
                                 e.plano === '.357mag' ? 'bg-brand-green/10 text-brand-green-light border-brand-green/20' :
                                 'bg-gray-600/20 text-gray-400 border-gray-500/20'
@@ -1299,18 +1299,18 @@ export function GestaoUsuarios() {
                                 {e.plano || '.22LR'}
                               </span>
                             </td>
-                            <td className="p-4 text-xs text-gray-300">
+                            <td className="px-3 py-3 text-xs text-gray-300">
                               <p className="font-bold text-white">{obterPrecoEstilizado()}</p>
                               <p className="text-gray-500 text-[10px] uppercase font-semibold">{obterFrequenciaLabel()}</p>
                             </td>
-                            <td className="p-4">
+                            <td className="px-3 py-3">
                               {obterStatusBadge()}
                             </td>
-                            <td className="p-4 text-xs text-gray-300">
+                            <td className="px-3 py-3 text-xs text-gray-300">
                               {e.data_vencimento ? formatarData(e.data_vencimento) : <span className="text-gray-500 italic">Sem vencimento</span>}
                             </td>
-                            <td className="p-4 text-right">
-                              <div className="flex items-center justify-end gap-1.5">
+                            <td className="px-3 py-3 text-right">
+                              <div className="flex items-center justify-end gap-1">
                                 <button
                                   type="button"
                                   onClick={() => {
@@ -1330,9 +1330,9 @@ export function GestaoUsuarios() {
                                     });
                                     setModalPagamentoManualAberto(true);
                                   }}
-                                  className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-brand-green/10 border border-brand-green/20 hover:bg-brand-green/20 text-brand-green-light text-[11px] font-bold uppercase tracking-wider transition-colors"
+                                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-brand-green/10 border border-brand-green/20 hover:bg-brand-green/20 text-brand-green-light text-[10px] font-bold uppercase tracking-wider transition-colors"
                                 >
-                                  <BadgeDollarSign size={13} />
+                                  <BadgeDollarSign size={12} />
                                   Confirmar Pago
                                 </button>
                                 <button
@@ -1341,9 +1341,9 @@ export function GestaoUsuarios() {
                                     setEmpresaFaturamentoSelecionada(e);
                                     buscarHistoricoPagamentos(e.id);
                                   }}
-                                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-brand-dark-3 border border-brand-dark-5 hover:border-gray-600 text-gray-300 hover:text-white text-[11px] font-bold uppercase tracking-wider transition-colors"
+                                  className="flex items-center gap-1 px-2 py-1.5 rounded-xl bg-brand-dark-3 border border-brand-dark-5 hover:border-gray-600 text-gray-300 hover:text-white text-[10px] font-bold uppercase tracking-wider transition-colors"
                                 >
-                                  <Calendar size={13} />
+                                  <Calendar size={12} />
                                   Histórico
                                 </button>
                               </div>
