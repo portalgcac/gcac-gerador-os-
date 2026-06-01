@@ -165,7 +165,8 @@ export function GestaoUsuarios() {
         setEmpresaGerenciada(atual);
       }
     }
-  }, [empresas, empresaGerenciada]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [empresas]);
 
   const handleAbrirModal = (user?: UsuarioAutorizado) => {
     if (user) {

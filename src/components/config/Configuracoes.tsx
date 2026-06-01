@@ -911,7 +911,7 @@ export function Configuracoes() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6 animate-fade-in">
+    <div className="max-w-6xl mx-auto space-y-6 animate-fade-in">
       <h1 className="text-2xl font-bold text-white">Configurações e Serviços</h1>
 
       {/* ── Dados da Empresa & Clube Parceiro ── */}
