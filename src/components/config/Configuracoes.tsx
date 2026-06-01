@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { v4 as uuidv4 } from 'uuid';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useStatusConexao } from '../../hooks/useStatusConexao';
@@ -12,14 +13,14 @@ import {
   HelpCircle, FileText, CheckSquare, Square, DownloadCloud,
   ShieldAlert, Shield, Target, MapPin, Calendar, Download,
   Link2, Unlink, Landmark, Loader2, Bell, BellOff, Smartphone, CheckCircle2,
-  Upload
+  Upload, Database
 } from 'lucide-react';
 import { supabase } from '../../db/supabase';
 import { Notificacao, useNotificacao } from '../common/Notificacao';
 import { ModalServico } from './ModalServico';
 import { GestaoUsuarios } from './GestaoUsuarios';
 import { formatarMoeda, formatarData } from '../../utils/formatters';
-import { compressImage } from '../../utils/fileUtils';
+import { compressImage, uploadBase64File } from '../../utils/fileUtils';
 import { ServicoConfig } from '../../types';
 import { CONTEUDO_MANUAL } from '../../services/manualService';
 import { baixarManualPdf } from '../../services/geradorPdfManual';
@@ -59,10 +60,176 @@ export function Configuracoes() {
   const [manualExpandido, setManualExpandido] = useState(false);
   const [empresaExpandido, setEmpresaExpandido] = useState(false);
   const [alertasExpandido, setAlertasExpandido] = useState(false);
+  const [otimizacaoExpandido, setOtimizacaoExpandido] = useState(false);
+  const [migrando, setMigrando] = useState(false);
+  const [progressoMigracao, setProgressoMigracao] = useState('');
 
   const salvarAlertaEmpresa = (chave: string, valor: string) => {
     localStorage.setItem(chave, valor);
     mostrar('sucesso', 'Prazo de alerta atualizado!');
+  };
+
+  const handleMigrarArquivosParaStorage = async () => {
+    if (!usuario?.empresaId) return;
+    if (!window.confirm('Deseja iniciar a migração de documentos antigos para o Supabase Storage? Isso removerá as imagens/PDFs pesados de dentro do banco de dados e os converterá em links rápidos. Esse processo pode demorar alguns minutos dependendo do volume de dados.')) {
+      return;
+    }
+
+    setMigrando(true);
+    setProgressoMigracao('Iniciando migração...');
+
+    try {
+      let totalMigrados = 0;
+
+      // 1. Clientes
+      setProgressoMigracao('Buscando clientes para migração...');
+      const { data: dbClientes, error: errC } = await supabase
+        .from('clientes')
+        .select('id, nome, cr_url, cr_ibama_url')
+        .eq('empresa_id', usuario.empresaId);
+      
+      if (errC) throw errC;
+
+      if (dbClientes) {
+        const clientesParaMigrar = dbClientes.filter(c => 
+          (c.cr_url && c.cr_url.startsWith('data:')) || 
+          (c.cr_ibama_url && c.cr_ibama_url.startsWith('data:'))
+        );
+
+        for (let i = 0; i < clientesParaMigrar.length; i++) {
+          const c = clientesParaMigrar[i];
+          setProgressoMigracao(`Migrando documentos do cliente (${i + 1}/${clientesParaMigrar.length}): ${c.nome}...`);
+
+          let crUrl = c.cr_url;
+          let crIbamaUrl = c.cr_ibama_url;
+
+          if (crUrl && crUrl.startsWith('data:')) {
+            const ext = crUrl.split(';base64,')[0]?.split(':')[1]?.split('/')[1] || 'pdf';
+            const path = `${usuario.empresaId}/clientes/${c.id}/cr_${uuidv4()}.${ext}`;
+            crUrl = await uploadBase64File(crUrl, 'documentos-clientes', path) || '';
+          }
+
+          if (crIbamaUrl && crIbamaUrl.startsWith('data:')) {
+            const ext = crIbamaUrl.split(';base64,')[0]?.split(':')[1]?.split('/')[1] || 'pdf';
+            const path = `${usuario.empresaId}/clientes/${c.id}/cr_ibama_${uuidv4()}.${ext}`;
+            crIbamaUrl = await uploadBase64File(crIbamaUrl, 'documentos-clientes', path) || '';
+          }
+
+          const { error: errUpdate } = await supabase
+            .from('clientes')
+            .update({ cr_url: crUrl || null, cr_ibama_url: crIbamaUrl || null })
+            .eq('id', c.id);
+
+          if (errUpdate) console.error(`Erro ao atualizar cr do cliente ${c.nome}:`, errUpdate);
+          else totalMigrados++;
+        }
+      }
+
+      // 2. Armas
+      setProgressoMigracao('Buscando armas para migração...');
+      const { data: dbArmas, error: errA } = await supabase
+        .from('armas')
+        .select('id, cliente_id, craf_url, numero_serie')
+        .eq('empresa_id', usuario.empresaId);
+
+      if (errA) throw errA;
+
+      if (dbArmas) {
+        const armasParaMigrar = dbArmas.filter(a => a.craf_url && a.craf_url.startsWith('data:'));
+
+        for (let i = 0; i < armasParaMigrar.length; i++) {
+          const a = armasParaMigrar[i];
+          setProgressoMigracao(`Migrando CRAF da arma (${i + 1}/${armasParaMigrar.length}) Série ${a.numero_serie}...`);
+
+          let crafUrl = a.craf_url;
+          const ext = crafUrl.split(';base64,')[0]?.split(':')[1]?.split('/')[1] || 'pdf';
+          const path = `${usuario.empresaId}/clientes/${a.cliente_id}/armas/${a.id}/craf_${uuidv4()}.${ext}`;
+          crafUrl = await uploadBase64File(crafUrl, 'documentos-clientes', path) || '';
+
+          const { error: errUpdate } = await supabase
+            .from('armas')
+            .update({ craf_url: crafUrl || null })
+            .eq('id', a.id);
+
+          if (errUpdate) console.error(`Erro ao atualizar craf da arma ${a.id}:`, errUpdate);
+          else totalMigrados++;
+        }
+      }
+
+      // 3. Guias de Tráfego
+      setProgressoMigracao('Buscando guias de tráfego para migração...');
+      const { data: dbGts, error: errG } = await supabase
+        .from('guias_trafego')
+        .select('id, arma_id, arquivo_url')
+        .eq('empresa_id', usuario.empresaId);
+
+      if (errG) throw errG;
+
+      if (dbGts) {
+        const gtsParaMigrar = dbGts.filter(g => g.arquivo_url && g.arquivo_url.startsWith('data:'));
+
+        for (let i = 0; i < gtsParaMigrar.length; i++) {
+          const g = gtsParaMigrar[i];
+          setProgressoMigracao(`Migrando Guia de Tráfego (${i + 1}/${gtsParaMigrar.length})...`);
+
+          let arquivoUrl = g.arquivo_url;
+          const ext = arquivoUrl.split(';base64,')[0]?.split(':')[1]?.split('/')[1] || 'pdf';
+          const path = `${usuario.empresaId}/armas/${g.arma_id}/gts/${g.id}/gt_${uuidv4()}.${ext}`;
+          arquivoUrl = await uploadBase64File(arquivoUrl, 'documentos-clientes', path) || '';
+
+          const { error: errUpdate } = await supabase
+            .from('guias_trafego')
+            .update({ arquivo_url: arquivoUrl || null })
+            .eq('id', g.id);
+
+          if (errUpdate) console.error(`Erro ao atualizar gt ${g.id}:`, errUpdate);
+          else totalMigrados++;
+        }
+      }
+
+      // 4. Autorizações de Manejo
+      setProgressoMigracao('Buscando autorizações de manejo para migração...');
+      const { data: dbManejos, error: errM } = await supabase
+        .from('autorizacoes_manejo')
+        .select('id, cliente_id, nome_fazenda, arquivo_url')
+        .eq('empresa_id', usuario.empresaId);
+
+      if (errM) throw errM;
+
+      if (dbManejos) {
+        const manejosParaMigrar = dbManejos.filter(m => m.arquivo_url && m.arquivo_url.startsWith('data:'));
+
+        for (let i = 0; i < manejosParaMigrar.length; i++) {
+          const m = manejosParaMigrar[i];
+          setProgressoMigracao(`Migrando Autorização de Manejo (${i + 1}/${manejosParaMigrar.length}): ${m.nome_fazenda}...`);
+
+          let arquivoUrl = m.arquivo_url;
+          const ext = arquivoUrl.split(';base64,')[0]?.split(':')[1]?.split('/')[1] || 'pdf';
+          const path = `${usuario.empresaId}/clientes/${m.cliente_id}/manejos/${m.id}/manejo_${uuidv4()}.${ext}`;
+          arquivoUrl = await uploadBase64File(arquivoUrl, 'documentos-clientes', path) || '';
+
+          const { error: errUpdate } = await supabase
+            .from('autorizacoes_manejo')
+            .update({ arquivo_url: arquivoUrl || null })
+            .eq('id', m.id);
+
+          if (errUpdate) console.error(`Erro ao atualizar manejo ${m.id}:`, errUpdate);
+          else totalMigrados++;
+        }
+      }
+
+      setProgressoMigracao(`Concluído! Total de arquivos migrados com sucesso: ${totalMigrados}`);
+      mostrar('sucesso', 'Migração concluída com sucesso! Recarregando a página...');
+      setTimeout(() => {
+        window.location.reload();
+      }, 2000);
+    } catch (e: any) {
+      console.error('Erro na migração:', e);
+      setProgressoMigracao(`Falha na migração: ${e.message}`);
+      mostrar('erro', 'Falha ao migrar arquivos: ' + e.message);
+    } finally {
+      setMigrando(false);
+    }
   };
   
   const [formEmpresa, setFormEmpresa] = useState({
@@ -1351,6 +1518,58 @@ export function Configuracoes() {
           há documentos com prazo a vencer naquele dia, de acordo com as suas configurações de alerta acima.
         </p>
       </div>
+      )}
+
+      {/* ── Otimização de Armazenamento (Banco -> Storage) ── */}
+      {!isCac && (
+        <div className="card space-y-4 mb-5">
+          <div 
+            className="flex items-center justify-between cursor-pointer group"
+            onClick={() => setOtimizacaoExpandido(!otimizacaoExpandido)}
+          >
+            <div className="flex items-center gap-2">
+              <div className={`p-1.5 rounded-lg transition-colors ${otimizacaoExpandido ? 'bg-brand-blue/20 text-brand-blue-light' : 'bg-brand-dark-4 text-gray-500 group-hover:text-white'}`}>
+                <Database className="w-4 h-4" />
+              </div>
+              <div>
+                <h2 className="text-sm font-bold text-white tracking-wider">
+                  Otimização de Banco de Dados (Storage)
+                </h2>
+                {!otimizacaoExpandido && (
+                  <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">
+                    Migre documentos antigos do banco de dados para o Storage para acelerar o sistema
+                  </p>
+                )}
+              </div>
+            </div>
+            <div className={`text-gray-500 transition-transform duration-300 ${otimizacaoExpandido ? 'rotate-180' : ''}`}>
+              <ChevronDown size={20} />
+            </div>
+          </div>
+
+          {otimizacaoExpandido && (
+            <div className="animate-slide-down space-y-4 pt-3 border-t border-brand-dark-5">
+              <p className="text-xs text-gray-400 leading-relaxed">
+                Transfere arquivos pesados salvos antigamente no banco de dados para a nuvem do Supabase Storage. Isso reduzirá drasticamente o consumo de banda e tornará o carregamento de "Meus Clientes" instantâneo.
+              </p>
+              
+              {progressoMigracao && (
+                <div className="bg-brand-dark-4 p-3 rounded-lg border border-brand-dark-5 font-mono text-[10px] text-brand-blue-light whitespace-pre-wrap">
+                  {progressoMigracao}
+                </div>
+              )}
+
+              <button
+                onClick={handleMigrarArquivosParaStorage}
+                disabled={migrando}
+                className="btn-primary w-full py-2.5 flex items-center justify-center gap-2"
+              >
+                {migrando ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
+                {migrando ? 'Migrando Arquivos...' : 'Iniciar Otimização'}
+              </button>
+            </div>
+          )}
+        </div>
       )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
