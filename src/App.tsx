@@ -43,6 +43,7 @@ import { ListaLembretes } from './components/lembretes/ListaLembretes';
 import { PainelAtiradores } from './components/admin/PainelAtiradores';
 import { PainelClientesCAC } from './components/vinculos/PainelClientesCAC';
 import { ConviteAceitarPage } from './pages/ConviteAceitarPage';
+import { TermosUso, PoliticaPrivacidade } from './components/public/TermosPrivacidade';
 
 const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
@@ -267,6 +268,8 @@ export default function App() {
                           <Routes>
                             {/* Login */}
                             <Route path="/login" element={<PaginaLoginGuard />} />
+                            <Route path="/termos" element={<TermosUso />} />
+                            <Route path="/privacidade" element={<PoliticaPrivacidade />} />
 
                             {/* App protegido */}
                             <Route path="/" element={

@@ -1,6 +1,7 @@
 import React from 'react';
 import { useGoogleLogin } from '@react-oauth/google';
 import { Wifi, WifiOff, ShieldCheck } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useStatusConexao } from '../../hooks/useStatusConexao';
 
@@ -124,6 +125,11 @@ export function PaginaLogin() {
         <p className="text-center text-xs text-gray-600 mt-6">
           Portal G CAC v1.0 — Uso pessoal
         </p>
+        <div className="flex justify-center gap-4 text-xs text-gray-500 mt-2">
+          <Link to="/termos" className="hover:text-white transition-colors">Termos de Uso</Link>
+          <span>•</span>
+          <Link to="/privacidade" className="hover:text-white transition-colors">Política de Privacidade</Link>
+        </div>
       </div>
     </div>
   );
