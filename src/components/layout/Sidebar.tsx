@@ -134,7 +134,7 @@ export function Sidebar() {
                 <p className="text-brand-blue-light text-xs font-bold tracking-wider uppercase mb-1">
                   Portal G CAC
                 </p>
-                <p className="font-bold text-white text-base leading-tight truncate px-2" title={usuario?.nome}>
+                <p className="font-bold text-white text-base leading-tight break-words px-2" title={usuario?.nome}>
                   {usuario?.nome}
                 </p>
               </>
@@ -143,7 +143,7 @@ export function Sidebar() {
                 <p className="text-brand-green text-xs font-bold tracking-wider uppercase mb-1">
                   Portal G CAC
                 </p>
-                <p className="font-black text-white text-base leading-tight truncate px-2" title={usuario?.empresaNome || 'GCAC'}>
+                <p className="font-black text-white text-base leading-tight break-words px-2" title={usuario?.empresaNome || 'GCAC'}>
                   {usuario?.empresaNome || 'GCAC'}
                 </p>
               </>
