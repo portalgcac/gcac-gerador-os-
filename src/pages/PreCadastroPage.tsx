@@ -133,6 +133,37 @@ export function PreCadastroPage() {
         throw error;
       }
 
+      // 1. Enviar notificação em tela no app para o Super Admin (empresa_id da Matriz)
+      const nomeFormatado = nome.toUpperCase();
+      const planoFormatado = plano;
+      const tipoUsuarioFormatado = tipoUsuario === 'cac_individual' 
+        ? 'CAC Individual' 
+        : 'Despachante';
+
+      await supabase
+        .from('notificacoes_sistema')
+        .insert([{
+          titulo: '🎯 Novo Pré-Cadastro Recebido',
+          mensagem: `O cliente ${nomeFormatado} se pré-cadastrou no plano ${planoFormatado} como ${tipoUsuarioFormatado}.`,
+          tipo: 'info',
+          link: '/portal-admin?tab=leads',
+          empresa_id: '00000000-0000-0000-0000-000000000001'
+        }]);
+
+      // 2. Disparar push notification imediata para o Super Admin
+      try {
+        await supabase.functions.invoke('enviar-push-imediato', {
+          body: {
+            empresa_id: '00000000-0000-0000-0000-000000000001',
+            titulo: '🎯 Novo Pré-Cadastro',
+            mensagem: `${nomeFormatado} se cadastrou no ${planoFormatado} como ${tipoUsuarioFormatado}.`,
+            link: '/portal-admin?tab=leads'
+          }
+        });
+      } catch (pushErr) {
+        console.warn('Erro ao disparar push imediato:', pushErr);
+      }
+
       setStep(6); // Tela de sucesso
     } catch (err: any) {
       console.error('Erro ao salvar pré-cadastro:', err);
@@ -569,10 +600,16 @@ export function PreCadastroPage() {
               </div>
 
               <div className="border-t border-brand-dark-5/50 pt-6 max-w-md mx-auto space-y-4">
+                <div className="bg-brand-dark-4/65 border border-brand-dark-5 rounded-xl p-3.5 text-left mb-4">
+                  <p className="text-xs font-bold text-white mb-1">💳 Como ativar seu acesso:</p>
+                  <p className="text-[11px] text-gray-400 leading-relaxed">
+                    Entre em contato com o suporte abaixo para obter a <strong>Chave PIX (Banco Inter)</strong> ou o <strong>Link de Pagamento (InfinitePay)</strong> da primeira taxa do plano selecionado. Envie o comprovante e sua conta será ativada instantaneamente.
+                  </p>
+                </div>
                 <p className="text-xs text-gray-400 leading-normal">
                   {tipoUsuario === 'cac_individual'
-                    ? 'Como seu cadastro é individual, envie uma mensagem no WhatsApp do suporte do Portal GCAC para acelerar a liberação e vinculação da sua conta com o sistema:'
-                    : 'Como este é um sistema homologado para despachantes de armas, clique em um dos canais abaixo para validar seus dados com o suporte e liberar seu login comercial imediato:'
+                    ? 'Clique em um dos canais abaixo para chamar o suporte, solicitar os dados de pagamento e ativar sua conta CAC:'
+                    : 'Clique em um dos canais abaixo para chamar o suporte, solicitar os dados de pagamento e liberar seu painel de despachante:'
                   }
                 </p>
 
