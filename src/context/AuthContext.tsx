@@ -33,11 +33,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const emailLower = u.email.trim().toLowerCase();
       const ehMasterAdmin = emailLower === 'gui.gomesassis@gmail.com';
 
+      console.log('[DEBUG Auth] refreshUsuario starting for:', emailLower);
       const { data, error } = await supabase
         .from('usuarios_autorizados')
         .select('role, permissoes, ativo, empresa_id, cpf, contato')
         .eq('email', emailLower)
         .single();
+
+      if (error) {
+        console.error('[DEBUG Auth] refreshUsuario error fetching user auth:', error);
+      } else {
+        console.log('[DEBUG Auth] refreshUsuario user auth success:', data);
+      }
 
       if (error || !data || !data.ativo) {
         if (!ehMasterAdmin) {
@@ -59,11 +66,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       let fotoPerfil = u.fotoPerfil;
       let dadosEmpresa: any = u.dadosEmpresa || null;
       if (rawEmpresaId) {
-        const { data: empData } = await supabase
+        console.log('[DEBUG Auth] refreshUsuario fetching company for ID:', rawEmpresaId);
+        const { data: empData, error: empError } = await supabase
           .from('empresas')
           .select('nome, tipo_conta, modulos_ativos, clube_parceiro_padrao, razao_social_fantasia, responsavel_nome, contato_telefone, endereco, cnpj, recursos_liberados, logo_url, plano, plano_status, frequencia_pagamento, data_vencimento, taxa_implementacao_paga, valor_implementacao, valor_assinatura_personalizado, is_gratis, limite_usuarios_staff')
           .eq('id', rawEmpresaId)
           .single();
+        if (empError) {
+          console.error('[DEBUG Auth] refreshUsuario error fetching company:', empError);
+        } else {
+          console.log('[DEBUG Auth] refreshUsuario company success:', empData);
+        }
         if (empData) {
           rawEmpresaNome = empData.nome;
           tipoConta = (empData.tipo_conta || 'empresa') as 'empresa' | 'cac_individual';
@@ -169,12 +182,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const emailLower = info.email.trim().toLowerCase();
 
       // 1. Busca na Whitelist do Banco de Dados
+      console.log('[DEBUG Auth] login starting for:', emailLower);
       const { data: whitelistData, error: whitelistError } = await supabase
         .from('usuarios_autorizados')
         .select('*')
         .eq('email', emailLower)
         .eq('ativo', true)
         .single();
+
+      if (whitelistError) {
+        console.error('[DEBUG Auth] login whitelistError:', whitelistError);
+      } else {
+        console.log('[DEBUG Auth] login whitelist success:', whitelistData);
+      }
 
       // 2. Cadeado de segurança para Administrador Mestre (Fallback)
       const ehMasterAdmin = emailLower === 'gui.gomesassis@gmail.com';
@@ -196,11 +216,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       let fotoPerfil = info.picture;
       let dadosEmpresa: any = null;
       if (rawEmpresaId) {
-        const { data: empData } = await supabase
+        console.log('[DEBUG Auth] login fetching company for ID:', rawEmpresaId);
+        const { data: empData, error: empError } = await supabase
           .from('empresas')
           .select('nome, tipo_conta, modulos_ativos, clube_parceiro_padrao, razao_social_fantasia, responsavel_nome, contato_telefone, endereco, cnpj, recursos_liberados, logo_url, plano, plano_status, frequencia_pagamento, data_vencimento, taxa_implementacao_paga, valor_implementacao, valor_assinatura_personalizado, is_gratis, limite_usuarios_staff')
           .eq('id', rawEmpresaId)
           .single();
+        if (empError) {
+          console.error('[DEBUG Auth] login empError:', empError);
+        } else {
+          console.log('[DEBUG Auth] login company success:', empData);
+        }
         if (empData) {
           rawEmpresaNome = empData.nome;
           tipoConta = (empData.tipo_conta || 'empresa') as 'empresa' | 'cac_individual';
