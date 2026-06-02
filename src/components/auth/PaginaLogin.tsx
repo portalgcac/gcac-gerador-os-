@@ -135,6 +135,44 @@ export function PaginaLogin() {
               Apenas arquivos criados por este app serão acessados no seu Drive (escopo drive.file). Seus arquivos existentes permanecem intocados.
             </p>
           </div>
+
+          {/* Divisor */}
+          <div className="relative flex py-2 items-center">
+            <div className="flex-grow border-t border-brand-dark-5"></div>
+            <span className="flex-shrink mx-3 text-[10px] text-gray-500 font-bold uppercase tracking-widest">Ainda não tem conta?</span>
+            <div className="flex-grow border-t border-brand-dark-5"></div>
+          </div>
+
+          {/* Chamada Comercial / Suporte */}
+          <div className="space-y-3 pt-1">
+            <p className="text-[11px] text-gray-400 text-center leading-normal">
+              <strong>Despachante Bélico:</strong> Fale com nosso comercial para solicitar sua ativação.<br />
+              <strong>Atirador (CAC):</strong> Solicite seu convite direto com seu despachante parceiro.
+            </p>
+
+            <div className="grid grid-cols-2 gap-2">
+              <a
+                href={`https://wa.me/5564999559865?text=${encodeURIComponent('Olá! Conheci o Portal G CAC e gostaria de solicitar uma demonstração comercial para meu escritório de despachante.')}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-1.5 bg-[#25D366]/10 hover:bg-[#25D366]/20 text-[#25D366] border border-[#25D366]/20 font-bold py-2.5 px-2 rounded-xl text-[10px] sm:text-xs uppercase transition-all text-center"
+              >
+                Comercial 1
+              </a>
+              <a
+                href={`https://wa.me/5564999681003?text=${encodeURIComponent('Olá! Conheci o Portal G CAC e gostaria de solicitar uma demonstração comercial para meu escritório de despachante.')}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-1.5 bg-[#25D366]/10 hover:bg-[#25D366]/20 text-[#25D366] border border-[#25D366]/20 font-bold py-2.5 px-2 rounded-xl text-[10px] sm:text-xs uppercase transition-all text-center"
+              >
+                Comercial 2
+              </a>
+            </div>
+
+            <p className="text-[10px] text-gray-500 text-center font-bold">
+              Contato: <a href="mailto:portalgcac@gmail.com" className="text-brand-blue hover:underline">portalgcac@gmail.com</a>
+            </p>
+          </div>
         </div>
 
         <p className="text-center text-xs text-gray-600 mt-6">
