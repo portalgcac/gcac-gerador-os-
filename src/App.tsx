@@ -44,6 +44,7 @@ import { PainelAtiradores } from './components/admin/PainelAtiradores';
 import { PainelClientesCAC } from './components/vinculos/PainelClientesCAC';
 import { ConviteAceitarPage } from './pages/ConviteAceitarPage';
 import { PreCadastroPage } from './pages/PreCadastroPage';
+import PortalAdminPage from './pages/PortalAdminPage';
 import { TermosUso, PoliticaPrivacidade } from './components/public/TermosPrivacidade';
 
 const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
@@ -234,6 +235,23 @@ function RotaProtegida({ children, modulo }: { children: React.ReactNode, modulo
   return <>{children}</>;
 }
 
+function RotaMasterAdmin({ children }: { children: React.ReactNode }) {
+  const { usuario, estaAutenticado, estaCarregando } = useAuth();
+  if (estaCarregando) {
+    return (
+      <div className="min-h-screen bg-brand-dark flex items-center justify-center p-6">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-2 border-brand-blue border-t-transparent rounded-full animate-spin" />
+          <p className="text-gray-400 text-sm">Carregando...</p>
+        </div>
+      </div>
+    );
+  }
+  if (!estaAutenticado || !usuario) return <Navigate to="/login" replace />;
+  if (usuario.email !== 'gui.gomesassis@gmail.com') return <Navigate to="/" replace />;
+  return <>{children}</>;
+}
+
 function ProtecaoIndex() {
   const { usuario } = useAuth();
   if (usuario?.tipoConta === 'cac_individual') {
@@ -331,6 +349,13 @@ export default function App() {
                                 <RotaProtegida modulo="painel">
                                   <PainelAtiradores />
                                 </RotaProtegida>
+                              } />
+
+                              {/* Super Admin: Painel de Controle Portal GCAC */}
+                              <Route path="portal-admin" element={
+                                <RotaMasterAdmin>
+                                  <PortalAdminPage />
+                                </RotaMasterAdmin>
                               } />
                             </Route>
 

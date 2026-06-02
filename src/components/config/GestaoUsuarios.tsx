@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { UserPlus, Shield, Mail, User, Trash2, Edit2, CheckCircle, XCircle, ChevronDown, ChevronUp, Lock, Building, ArrowLeft, Settings2, BadgeDollarSign, Calendar, CreditCard } from 'lucide-react';
+import { UserPlus, Shield, Mail, User, Trash2, Edit2, CheckCircle, XCircle, ChevronDown, ChevronUp, Lock, Building, ArrowLeft, Settings2, BadgeDollarSign, Calendar, CreditCard, Crosshair } from 'lucide-react';
 import { supabase } from '../../db/supabase';
 import { Notificacao, useNotificacao } from '../common/Notificacao';
 import { useAuth } from '../../context/AuthContext';
@@ -58,12 +58,24 @@ const RECURSOS_SISTEMA = [
   { key: 'config_manual', label: 'Configurações — Manual de Instruções' },
 ];
 
-export function GestaoUsuarios() {
+import { PainelAtiradores } from '../admin/PainelAtiradores';
+
+interface GestaoUsuariosProps {
+  abaInicial?: 'empresas' | 'cacs' | 'equipe_interna' | 'faturamento' | 'leads' | 'monitor_cacs';
+}
+
+export function GestaoUsuarios({ abaInicial }: GestaoUsuariosProps = {}) {
   const { usuario } = useAuth();
   const isMasterAdmin = usuario?.email === 'gui.gomesassis@gmail.com';
 
   // Sub-painel ativo para Master Admin
-  const [subPainelAtivo, setSubPainelAtivo] = useState<'empresas' | 'cacs' | 'equipe_interna' | 'faturamento' | 'leads'>('empresas');
+  const [subPainelAtivo, setSubPainelAtivo] = useState<'empresas' | 'cacs' | 'equipe_interna' | 'faturamento' | 'leads' | 'monitor_cacs'>(abaInicial || 'empresas');
+
+  useEffect(() => {
+    if (abaInicial) {
+      setSubPainelAtivo(abaInicial);
+    }
+  }, [abaInicial]);
   const [leads, setLeads] = useState<any[]>([]);
   const [carregandoLeads, setCarregandoLeads] = useState(false);
   
@@ -780,6 +792,18 @@ export function GestaoUsuarios() {
               >
                 <UserPlus size={14} />
                 Pré-Cadastros (Leads)
+              </button>
+              <button
+                type="button"
+                onClick={() => { setSubPainelAtivo('monitor_cacs'); setBuscaUsuario(''); }}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all border ${
+                  subPainelAtivo === 'monitor_cacs'
+                    ? 'bg-brand-blue/15 border-brand-blue/30 text-white font-bold'
+                    : 'bg-brand-dark-3 border-brand-dark-5 text-gray-400 hover:text-white'
+                }`}
+              >
+                <Crosshair size={14} />
+                Monitor de Atiradores (Acervo)
               </button>
             </div>
           )}
@@ -1631,6 +1655,12 @@ export function GestaoUsuarios() {
                   </table>
                 </div>
               )}
+            </div>
+          )}
+          {/* ABA 6: MONITOR GLOBAL DE ATIRADORES CAC */}
+          {subPainelAtivo === 'monitor_cacs' && (
+            <div className="animate-fade-in pt-2">
+              <PainelAtiradores />
             </div>
           )}
         </div>

@@ -200,25 +200,29 @@ export function Sidebar() {
           );
         })}
 
-        {isAdmin && usuario?.tipoConta !== 'cac_individual' && (
+        {usuario?.email === 'gui.gomesassis@gmail.com' && (
           <div className="pt-2 space-y-1">
-            {/* Link: Gestão de Atiradores */}
             <NavLink
-              to="/admin/atiradores"
+              to="/portal-admin"
               className={({ isActive }) =>
                 `nav-link w-full ${
                   isActive
-                    ? 'bg-brand-blue/20 text-brand-blue-light border border-brand-blue/30'
-                    : 'text-brand-blue-light/70 hover:bg-brand-blue/10 hover:text-brand-blue-light border border-brand-blue/10'
+                    ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
+                    : 'text-purple-400/80 hover:bg-purple-500/10 hover:text-purple-300 border border-purple-500/10'
                 }`
               }
             >
-              <Shield size={16} className="text-brand-blue" />
-              <span className="flex-1 text-[13px]">Gestão de Atiradores</span>
-              <span className="text-[9px] bg-brand-blue/20 text-brand-blue-light border border-brand-blue/20 px-1.5 py-0.5 rounded-md font-black uppercase tracking-widest">
-                Beta
+              <Shield size={16} className="text-purple-400" />
+              <span className="flex-1 text-[13px] font-bold">Painel Portal GCAC</span>
+              <span className="text-[9px] bg-purple-500/20 text-purple-300 border border-purple-500/20 px-1.5 py-0.5 rounded-md font-black uppercase tracking-widest">
+                Master
               </span>
             </NavLink>
+          </div>
+        )}
+
+        {isAdmin && usuario?.tipoConta !== 'cac_individual' && (
+          <div className="pt-2 space-y-1">
             {/* Botão: Nova OS */}
             <button
               onClick={() => navigate('/ordens/nova')}
@@ -346,19 +350,19 @@ export function NavegacaoInferior() {
           </NavLink>
         );
       })}
-      {isAdmin && usuario?.tipoConta !== 'cac_individual' && (
+      {usuario?.email === 'gui.gomesassis@gmail.com' && (
         <NavLink
-          to="/admin/atiradores"
+          to="/portal-admin"
           className={({ isActive }) =>
             `flex-shrink-0 min-w-[75px] flex flex-col items-center gap-1 py-3 text-[10px] font-medium transition-colors ${
-              isActive ? 'text-brand-blue-light' : 'text-brand-blue/60 hover:text-brand-blue-light'
+              isActive ? 'text-purple-400' : 'text-purple-500/60 hover:text-purple-400'
             }`
           }
         >
           {({ isActive }) => (
             <>
               <Shield size={20} className={isActive ? 'scale-110 transition-transform' : ''} />
-              <span className="leading-none whitespace-nowrap">Atiradores</span>
+              <span className="leading-none whitespace-nowrap">Portal GCAC</span>
             </>
           )}
         </NavLink>

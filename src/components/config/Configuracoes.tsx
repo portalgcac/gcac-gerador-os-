@@ -1278,8 +1278,8 @@ export function Configuracoes() {
       </div>
       )}
 
-      {/* ── Painel de Controle de Usuários (Apenas Admin) ── */}
-      {usuario?.role === 'admin' && (
+      {/* ── Painel de Controle de Usuários (Apenas Admin da Empresa) ── */}
+      {usuario?.role === 'admin' && usuario?.email !== 'gui.gomesassis@gmail.com' && (
         <div className="card space-y-4">
           <div 
             className="flex items-center justify-between cursor-pointer group"
