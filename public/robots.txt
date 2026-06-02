@@ -1,0 +1,15 @@
+User-agent: *
+Allow: /
+Allow: /termos
+Allow: /privacidade
+Disallow: /dashboard
+Disallow: /ordens
+Disallow: /clientes
+Disallow: /agendamentos
+Disallow: /financeiro
+Disallow: /rotina
+Disallow: /agenda
+Disallow: /configuracoes
+Disallow: /admin
+
+Sitemap: https://portalgcac.com.br/sitemap.xml
