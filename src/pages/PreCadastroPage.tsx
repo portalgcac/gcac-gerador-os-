@@ -1,0 +1,527 @@
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { supabase } from '../db/supabase';
+import { 
+  User, 
+  Mail, 
+  Phone, 
+  FileText, 
+  CheckCircle2, 
+  Target, 
+  ShieldCheck, 
+  ArrowRight, 
+  ArrowLeft, 
+  HelpCircle,
+  Check
+} from 'lucide-react';
+
+export function PreCadastroPage() {
+  const navigate = useNavigate();
+  const [step, setStep] = useState(1);
+  const [carregando, setCarregando] = useState(false);
+  const [erro, setErro] = useState('');
+
+  // Formulário
+  const [nome, setNome] = useState('');
+  const [email, setEmail] = useState('');
+  const [cpf, setCpf] = useState('');
+  const [contato, setContato] = useState('');
+  const [plano, setPlano] = useState('.357mag');
+
+  // Máscaras de digitação
+  const formatarCPF = (val: string) => {
+    const limpo = val.replace(/\D/g, '');
+    if (limpo.length <= 3) return limpo;
+    if (limpo.length <= 6) return `${limpo.slice(0, 3)}.${limpo.slice(3)}`;
+    if (limpo.length <= 9) return `${limpo.slice(0, 3)}.${limpo.slice(3, 6)}.${limpo.slice(6)}`;
+    return `${limpo.slice(0, 3)}.${limpo.slice(3, 6)}.${limpo.slice(6, 9)}-${limpo.slice(9, 11)}`;
+  };
+
+  const formatarTelefone = (val: string) => {
+    const limpo = val.replace(/\D/g, '');
+    if (limpo.length === 0) return '';
+    if (limpo.length <= 2) return `(${limpo}`;
+    if (limpo.length <= 6) return `(${limpo.slice(0, 2)}) ${limpo.slice(2)}`;
+    if (limpo.length <= 10) return `(${limpo.slice(0, 2)}) ${limpo.slice(2, 6)}-${limpo.slice(6)}`;
+    return `(${limpo.slice(0, 2)}) ${limpo.slice(2, 7)}-${limpo.slice(7, 11)}`;
+  };
+
+  const handleCpfChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setCpf(formatarCPF(e.target.value));
+  };
+
+  const handleTelefoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setContato(formatarTelefone(e.target.value));
+  };
+
+  // Validações por etapa
+  const validarPasso = () => {
+    setErro('');
+    if (step === 1) {
+      if (!nome.trim() || nome.trim().split(' ').length < 2) {
+        setErro('Por favor, insira seu nome completo (nome e sobrenome).');
+        return false;
+      }
+      if (!email.trim() || !email.includes('@') || !email.includes('.')) {
+        setErro('Por favor, insira um e-mail válido.');
+        return false;
+      }
+    } else if (step === 2) {
+      const cpfLimpo = cpf.replace(/\D/g, '');
+      if (cpfLimpo.length !== 11) {
+        setErro('Por favor, insira um CPF válido com 11 dígitos.');
+        return false;
+      }
+      const telefoneLimpo = contato.replace(/\D/g, '');
+      if (telefoneLimpo.length < 10 || telefoneLimpo.length > 11) {
+        setErro('Por favor, insira um número de telefone com DDD válido.');
+        return false;
+      }
+    }
+    return true;
+  };
+
+  const avancar = () => {
+    if (validarPasso()) {
+      setStep(prev => prev + 1);
+    }
+  };
+
+  const voltar = () => {
+    setErro('');
+    setStep(prev => prev - 1);
+  };
+
+  const enviarCadastro = async () => {
+    setErro('');
+    setCarregando(true);
+
+    try {
+      const { error } = await supabase
+        .from('leads_pre_cadastro')
+        .insert([
+          {
+            nome: nome.toUpperCase(),
+            cpf: cpf.replace(/\D/g, ''),
+            email: email.toLowerCase().trim(),
+            contato: contato.replace(/\D/g, ''),
+            plano,
+            status: 'pendente'
+          }
+        ]);
+
+      if (error) {
+        throw error;
+      }
+
+      setStep(5); // Tela de sucesso
+    } catch (err: any) {
+      console.error('Erro ao salvar pré-cadastro:', err);
+      setErro('Ocorreu um erro ao salvar seu cadastro. Por favor, tente novamente ou fale com o suporte.');
+    } finally {
+      setCarregando(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-brand-dark flex flex-col items-center justify-center p-6 relative overflow-hidden">
+      {/* Elementos visuais de fundo */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-40 -left-40 w-80 h-80 rounded-full bg-brand-blue/10 blur-3xl animate-pulse-slow" />
+        <div className="absolute -bottom-40 -right-40 w-80 h-80 rounded-full bg-brand-green/10 blur-3xl animate-pulse-slow" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 rounded-full bg-brand-blue/5 blur-3xl" />
+      </div>
+
+      <div className="w-full max-w-2xl z-10">
+        {/* Cabeçalho */}
+        <div className="text-center mb-8">
+          <h1 className="text-3xl font-black text-white tracking-tight flex items-center justify-center gap-2">
+            <Target className="text-brand-green w-8 h-8" />
+            PORTAL G CAC
+          </h1>
+          <p className="text-gray-400 text-sm mt-1">Pré-Cadastro e Seleção de Plano de Licenciamento</p>
+        </div>
+
+        {/* Card Principal */}
+        <div className="card border border-brand-dark-5 bg-brand-dark-3/90 backdrop-blur-md shadow-2xl relative">
+          
+          {/* Barra de Progresso (Passos 1 a 4) */}
+          {step <= 4 && (
+            <div className="mb-8">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-xs text-gray-500 font-bold uppercase tracking-wider">Etapa {step} de 4</span>
+                <span className="text-xs text-brand-green font-bold uppercase tracking-wider">
+                  {step === 1 && 'Identificação'}
+                  {step === 2 && 'Contato'}
+                  {step === 3 && 'Escolha de Plano'}
+                  {step === 4 && 'Confirmar Dados'}
+                </span>
+              </div>
+              <div className="h-2 bg-brand-dark-4 rounded-full overflow-hidden flex gap-0.5">
+                <div className={`h-full transition-all duration-300 ${step >= 1 ? 'bg-brand-blue' : 'bg-brand-dark-5'} flex-1`} />
+                <div className={`h-full transition-all duration-300 ${step >= 2 ? 'bg-brand-blue' : 'bg-brand-dark-5'} flex-1`} />
+                <div className={`h-full transition-all duration-300 ${step >= 3 ? 'bg-brand-blue' : 'bg-brand-dark-5'} flex-1`} />
+                <div className={`h-full transition-all duration-300 ${step >= 4 ? 'bg-brand-blue' : 'bg-brand-dark-5'} flex-1`} />
+              </div>
+            </div>
+          )}
+
+          {erro && (
+            <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-sm rounded-xl p-4 mb-6 animate-fade-in text-center font-medium">
+              {erro}
+            </div>
+          )}
+
+          {/* ── ETAPA 1: Nome e E-mail ──────────────────────────────────────── */}
+          {step === 1 && (
+            <div className="space-y-6 animate-slide-up">
+              <div className="text-center md:text-left">
+                <h2 className="text-xl font-bold text-white flex items-center gap-2 justify-center md:justify-start">
+                  <User className="text-brand-blue" /> Quem é você?
+                </h2>
+                <p className="text-gray-400 text-sm mt-1">Queremos te conhecer melhor. Insira seu nome completo e melhor e-mail.</p>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="label label-required text-lg md:text-sm">Nome Completo</label>
+                  <input
+                    type="text"
+                    value={nome}
+                    onChange={(e) => setNome(e.target.value)}
+                    placeholder="Ex: João da Silva"
+                    className="input py-3 text-base md:text-sm"
+                    autoFocus
+                  />
+                </div>
+
+                <div>
+                  <label className="label label-required text-lg md:text-sm">Seu melhor E-mail</label>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="Ex: joao@seuemail.com"
+                    className="input py-3 text-base md:text-sm"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── ETAPA 2: CPF e Telefone ──────────────────────────────────────── */}
+          {step === 2 && (
+            <div className="space-y-6 animate-slide-up">
+              <div className="text-center md:text-left">
+                <h2 className="text-xl font-bold text-white flex items-center gap-2 justify-center md:justify-start">
+                  <FileText className="text-brand-blue" /> Documento & Contato
+                </h2>
+                <p className="text-gray-400 text-sm mt-1">Dados essenciais para seu cadastro e para podermos entrar em contato pelo WhatsApp.</p>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="label label-required text-lg md:text-sm">CPF</label>
+                  <input
+                    type="text"
+                    value={cpf}
+                    onChange={handleCpfChange}
+                    maxLength={14}
+                    placeholder="000.000.000-00"
+                    className="input py-3 text-base md:text-sm"
+                    autoFocus
+                  />
+                </div>
+
+                <div>
+                  <label className="label label-required text-lg md:text-sm">WhatsApp de Contato</label>
+                  <input
+                    type="text"
+                    value={contato}
+                    onChange={handleTelefoneChange}
+                    maxLength={15}
+                    placeholder="(00) 90000-0000"
+                    className="input py-3 text-base md:text-sm"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── ETAPA 3: Escolha do Plano ────────────────────────────────────── */}
+          {step === 3 && (
+            <div className="space-y-6 animate-slide-up">
+              <div className="text-center">
+                <h2 className="text-xl font-bold text-white">Qual plano melhor atende seu negócio?</h2>
+                <p className="text-gray-400 text-sm mt-1">Selecione uma das opções abaixo baseada no calibre comercial.</p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+                
+                {/* Plano .22LR */}
+                <div 
+                  onClick={() => setPlano('.22LR')}
+                  className={`border rounded-xl p-5 cursor-pointer transition-all flex flex-col justify-between relative hover:border-brand-blue/60 ${
+                    plano === '.22LR' 
+                      ? 'border-brand-blue bg-brand-blue/10 shadow-glow-blue' 
+                      : 'border-brand-dark-5 bg-brand-dark-4'
+                  }`}
+                >
+                  <div className="flex justify-between items-start">
+                    <span className="bg-brand-dark-5 text-[11px] text-gray-300 font-bold px-2 py-0.5 rounded-full">
+                      .22LR
+                    </span>
+                    {plano === '.22LR' && (
+                      <span className="w-5 h-5 bg-brand-blue rounded-full flex items-center justify-center text-white">
+                        <Check size={12} strokeWidth={3} />
+                      </span>
+                    )}
+                  </div>
+                  <div className="my-4">
+                    <h3 className="text-lg font-extrabold text-white">Iniciante / Solo</h3>
+                    <p className="text-xs text-gray-400 mt-1 leading-snug">Ideal para 1 único operador/gestor.</p>
+                  </div>
+                  <div className="border-t border-brand-dark-5/50 pt-3">
+                    <span className="text-2xl font-black text-white">R$ 30</span>
+                    <span className="text-xs text-gray-500"> /mês</span>
+                  </div>
+                </div>
+
+                {/* Plano .357mag - Recomendado */}
+                <div 
+                  onClick={() => setPlano('.357mag')}
+                  className={`border rounded-xl p-5 cursor-pointer transition-all flex flex-col justify-between relative hover:border-brand-green/60 ${
+                    plano === '.357mag' 
+                      ? 'border-brand-green bg-brand-green/10 shadow-glow' 
+                      : 'border-brand-dark-5 bg-brand-dark-4'
+                  }`}
+                >
+                  <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-brand-green text-brand-dark font-black text-[10px] uppercase tracking-widest px-3 py-1 rounded-full shadow-lg">
+                    Recomendado
+                  </span>
+
+                  <div className="flex justify-between items-start mt-1">
+                    <span className="bg-brand-green/20 text-brand-green text-[11px] font-bold px-2 py-0.5 rounded-full">
+                      .357mag
+                    </span>
+                    {plano === '.357mag' && (
+                      <span className="w-5 h-5 bg-brand-green rounded-full flex items-center justify-center text-brand-dark">
+                        <Check size={12} strokeWidth={3} />
+                      </span>
+                    )}
+                  </div>
+                  <div className="my-4">
+                    <h3 className="text-lg font-extrabold text-white">Profissional</h3>
+                    <p className="text-xs text-gray-300 mt-1 leading-snug">Até 4 usuários da equipe + financeiro completo.</p>
+                  </div>
+                  <div className="border-t border-brand-dark-5/50 pt-3">
+                    <span className="text-2xl font-black text-white">R$ 50</span>
+                    <span className="text-xs text-gray-500"> /mês</span>
+                  </div>
+                </div>
+
+                {/* Plano .308win */}
+                <div 
+                  onClick={() => setPlano('.308win')}
+                  className={`border rounded-xl p-5 cursor-pointer transition-all flex flex-col justify-between relative hover:border-brand-blue/60 ${
+                    plano === '.308win' 
+                      ? 'border-brand-blue bg-brand-blue/10 shadow-glow-blue' 
+                      : 'border-brand-dark-5 bg-brand-dark-4'
+                  }`}
+                >
+                  <div className="flex justify-between items-start">
+                    <span className="bg-brand-dark-5 text-[11px] text-gray-300 font-bold px-2 py-0.5 rounded-full">
+                      .308win
+                    </span>
+                    {plano === '.308win' && (
+                      <span className="w-5 h-5 bg-brand-blue rounded-full flex items-center justify-center text-white">
+                        <Check size={12} strokeWidth={3} />
+                      </span>
+                    )}
+                  </div>
+                  <div className="my-4">
+                    <h3 className="text-lg font-extrabold text-white">Premium / VIP</h3>
+                    <p className="text-xs text-gray-400 mt-1 leading-snug">Acessos ilimitados + Suporte prioritário.</p>
+                  </div>
+                  <div className="border-t border-brand-dark-5/50 pt-3">
+                    <span className="text-2xl font-black text-white">R$ 100</span>
+                    <span className="text-xs text-gray-500"> /mês</span>
+                  </div>
+                </div>
+
+              </div>
+              
+              <div className="bg-brand-dark-4/50 border border-brand-dark-5/50 rounded-xl p-4 flex gap-3 items-start">
+                <HelpCircle className="text-brand-blue flex-shrink-0 mt-0.5" />
+                <p className="text-xs text-gray-400 leading-normal">
+                  Todos os planos contam com taxa única de adesão e treinamento (Setup Fee) variando de R$ 150 a R$ 300, a ser acertada diretamente com o comercial no momento da ativação da sua chave de acesso.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* ── ETAPA 4: Resumo dos Dados ────────────────────────────────────── */}
+          {step === 4 && (
+            <div className="space-y-6 animate-slide-up">
+              <div className="text-center md:text-left">
+                <h2 className="text-xl font-bold text-white flex items-center gap-2 justify-center md:justify-start">
+                  <ShieldCheck className="text-brand-green" /> Confirmar seus dados
+                </h2>
+                <p className="text-gray-400 text-sm mt-1">Revise as informações antes de finalizar o pré-cadastro.</p>
+              </div>
+
+              <div className="bg-brand-dark-4 border border-brand-dark-5/60 rounded-xl p-5 space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="text-gray-500 font-semibold block text-xs uppercase tracking-wider">Nome do Titular</span>
+                    <span className="text-white font-bold text-base">{nome}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500 font-semibold block text-xs uppercase tracking-wider">E-mail</span>
+                    <span className="text-white font-bold text-base">{email}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500 font-semibold block text-xs uppercase tracking-wider">CPF</span>
+                    <span className="text-white font-bold text-base">{cpf}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500 font-semibold block text-xs uppercase tracking-wider">WhatsApp / Contato</span>
+                    <span className="text-white font-bold text-base">{contato}</span>
+                  </div>
+                </div>
+
+                <div className="border-t border-brand-dark-5/60 pt-4 flex items-center justify-between">
+                  <div>
+                    <span className="text-gray-500 font-semibold block text-xs uppercase tracking-wider">Plano Selecionado</span>
+                    <span className="text-brand-green font-extrabold text-lg">
+                      {plano === '.22LR' && 'Iniciante / Solo (.22LR)'}
+                      {plano === '.357mag' && 'Profissional (.357mag)'}
+                      {plano === '.308win' && 'Premium / VIP (.308win)'}
+                    </span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-gray-500 block text-xs uppercase tracking-wider">Investimento</span>
+                    <span className="text-white font-black text-xl">
+                      {plano === '.22LR' && 'R$ 30,00'}
+                      {plano === '.357mag' && 'R$ 50,00'}
+                      {plano === '.308win' && 'R$ 100,00'}
+                    </span>
+                    <span className="text-gray-500 text-xs">/mês</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── ETAPA 5: Sucesso ────────────────────────────────────────────── */}
+          {step === 5 && (
+            <div className="py-8 space-y-6 text-center animate-scale-up">
+              <div className="flex justify-center">
+                <div className="w-20 h-20 bg-brand-green/20 rounded-full flex items-center justify-center border-2 border-brand-green/30 animate-pulse">
+                  <CheckCircle2 className="text-brand-green w-12 h-12" />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <h2 className="text-2xl font-black text-white tracking-tight">Pré-Cadastro Enviado! 🎉</h2>
+                <p className="text-gray-300 text-sm max-w-md mx-auto leading-relaxed">
+                  Os dados do seu escritório foram registrados com sucesso. Nosso comercial já recebeu sua proposta de plano.
+                </p>
+                <p className="text-brand-green font-bold text-sm bg-brand-green/10 border border-brand-green/20 rounded-lg py-2 px-4 max-w-sm mx-auto mt-2">
+                  Plano Pré-Selecionado: {plano}
+                </p>
+              </div>
+
+              <div className="border-t border-brand-dark-5/50 pt-6 max-w-md mx-auto space-y-4">
+                <p className="text-xs text-gray-400 leading-normal">
+                  <strong>Acelere sua liberação:</strong> Como este é um sistema homologado e controlado para despachantes de armas, clique em um dos canais abaixo para validar seus dados com o suporte e liberar seu login imediato:
+                </p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <a
+                    href={`https://wa.me/5564999559865?text=${encodeURIComponent(`Olá! Fiz meu pré-cadastro no Portal G CAC (${nome}, CPF: ${cpf}) no plano ${plano}. Gostaria de validar meus dados e ativar minha conta.`)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-2 bg-[#25D366] hover:bg-[#20ba5a] text-black font-extrabold py-3 px-4 rounded-xl text-xs uppercase tracking-wider transition-all duration-200 shadow-lg active:scale-95"
+                  >
+                    Chamar Suporte 1
+                  </a>
+                  <a
+                    href={`https://wa.me/5564999681003?text=${encodeURIComponent(`Olá! Fiz meu pré-cadastro no Portal G CAC (${nome}, CPF: ${cpf}) no plano ${plano}. Gostaria de validar meus dados e ativar minha conta.`)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-2 bg-[#25D366] hover:bg-[#20ba5a] text-black font-extrabold py-3 px-4 rounded-xl text-xs uppercase tracking-wider transition-all duration-200 shadow-lg active:scale-95"
+                  >
+                    Chamar Suporte 2
+                  </a>
+                </div>
+
+                <div>
+                  <button
+                    onClick={() => navigate('/login')}
+                    className="text-xs text-gray-500 hover:text-white underline font-semibold transition-colors mt-2"
+                  >
+                    Voltar para tela de login
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* BOTOES DE NAVEGAÇÃO DO WIZARD (Etapas 1 a 4) */}
+          {step <= 4 && (
+            <div className="mt-8 pt-6 border-t border-brand-dark-5/50 flex justify-between gap-4">
+              {step > 1 ? (
+                <button
+                  type="button"
+                  onClick={voltar}
+                  disabled={carregando}
+                  className="btn-ghost flex items-center justify-center gap-2 w-1/3 py-3 rounded-xl text-sm"
+                >
+                  <ArrowLeft size={16} /> Voltar
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => navigate('/login')}
+                  className="btn-ghost flex items-center justify-center gap-2 w-1/3 py-3 rounded-xl text-sm"
+                >
+                  Cancelar
+                </button>
+              )}
+
+              {step < 4 ? (
+                <button
+                  type="button"
+                  onClick={avancar}
+                  className="btn-primary flex items-center justify-center gap-2 flex-grow py-3 rounded-xl text-sm"
+                >
+                  Continuar <ArrowRight size={16} />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={enviarCadastro}
+                  disabled={carregando}
+                  className="btn-success flex items-center justify-center gap-2 flex-grow py-3 rounded-xl text-sm font-bold uppercase tracking-wider"
+                >
+                  {carregando ? (
+                    <div className="w-5 h-5 border-2 border-brand-dark border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    'Concluir Pré-Cadastro'
+                  )}
+                </button>
+              )}
+            </div>
+          )}
+
+        </div>
+
+        {/* Rodapé da Página */}
+        <p className="text-center text-xs text-gray-600 mt-6">
+          Portal G CAC — Sistema Seguro de Gestão de Acervos e OS
+        </p>
+      </div>
+    </div>
+  );
+}

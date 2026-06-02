@@ -143,14 +143,20 @@ export function PaginaLogin() {
             <div className="flex-grow border-t border-brand-dark-5"></div>
           </div>
 
-          {/* Chamada Comercial / Suporte */}
+          {/* Pré-Cadastro para Despachante */}
           <div className="space-y-3 pt-1">
+            <Link
+              to="/cadastro"
+              className="w-full flex items-center justify-center gap-2 bg-brand-blue/10 hover:bg-brand-blue/20 text-brand-blue-light border border-brand-blue/30 font-bold py-3 px-4 rounded-xl text-xs uppercase tracking-wider transition-all duration-200 shadow-md hover:shadow-glow-blue active:scale-95 text-center"
+            >
+              Fazer Pré-Cadastro (Despachante)
+            </Link>
+
             <p className="text-[11px] text-gray-400 text-center leading-normal">
-              <strong>Despachante Bélico:</strong> Fale com nosso comercial para solicitar sua ativação.<br />
-              <strong>Atirador (CAC):</strong> Solicite seu convite direto com seu despachante parceiro.
+              <strong>Atirador (CAC):</strong> Solicite seu convite diretamente com seu despachante parceiro.
             </p>
 
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-2 pt-1">
               <a
                 href={`https://wa.me/5564999559865?text=${encodeURIComponent('Olá! Conheci o Portal G CAC e gostaria de solicitar uma demonstração comercial para meu escritório de despachante.')}`}
                 target="_blank"
