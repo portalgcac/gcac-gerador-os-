@@ -10,6 +10,7 @@ export function PaginaLogin() {
   const online = useStatusConexao();
   const [carregando, setCarregando] = React.useState(false);
   const [erro, setErro] = React.useState('');
+  const [aceitouTermos, setAceitouTermos] = React.useState(false);
 
   const handleLogin = useGoogleLogin({
     scope: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email',
@@ -93,11 +94,25 @@ export function PaginaLogin() {
             </div>
           )}
 
+          {/* Caixa de Termos de Uso e Política de Privacidade */}
+          <div className="flex items-start gap-2.5 text-xs text-gray-400 bg-brand-dark-4/50 border border-brand-dark-5/50 p-3 rounded-xl hover:border-brand-blue/30 transition-all">
+            <input 
+              type="checkbox" 
+              id="termos-aceite" 
+              checked={aceitouTermos} 
+              onChange={(e) => setAceitouTermos(e.target.checked)} 
+              className="mt-0.5 rounded border-brand-dark-5 text-brand-blue bg-brand-dark-3 focus:ring-brand-blue cursor-pointer h-4 w-4"
+            />
+            <label htmlFor="termos-aceite" className="leading-tight select-none cursor-pointer text-gray-400 text-[11px] sm:text-xs">
+              Declaro que li e concordo com os <Link to="/termos" className="text-brand-blue hover:text-brand-blue-light underline font-semibold">Termos de Uso</Link> e a <Link to="/privacidade" className="text-brand-blue hover:text-brand-blue-light underline font-semibold">Política de Privacidade</Link> do Portal GCAC.
+            </label>
+          </div>
+
           {/* Botão Google */}
           <button
             id="btn-login-google"
             onClick={() => { setErro(''); handleLogin(); }}
-            disabled={carregando || !online}
+            disabled={carregando || !online || !aceitouTermos}
             className="w-full flex items-center justify-center gap-3 bg-white hover:bg-gray-50 text-gray-800 font-semibold py-3 px-4 rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {carregando ? (
