@@ -775,7 +775,7 @@ export function PreCadastroPage() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <a
-                    href={`https://wa.me/5564999559865?text=${encodeURIComponent(
+                    href={`https://wa.me/5564999959865?text=${encodeURIComponent(
                       metodoPagamento === 'pix'
                         ? `Olá! Realizei o pagamento do pré-cadastro no Portal G CAC (${nome}, CPF: ${cpf}) como ${tipoUsuario === 'despachante' ? 'Despachante' : 'CAC Individual'} no plano ${plano} (${frequenciaPagamento}). Segue em anexo o meu comprovante para liberação.`
                         : `Olá! Realizei o pré-cadastro no Portal G CAC (${nome}, CPF: ${cpf}) como ${tipoUsuario === 'despachante' ? 'Despachante' : 'CAC Individual'} no plano ${plano} (${frequenciaPagamento}). Gostaria de solicitar o link de pagamento no cartão para liberação da conta.`
