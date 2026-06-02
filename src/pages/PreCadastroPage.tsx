@@ -31,16 +31,18 @@ export function PreCadastroPage() {
   const [contato, setContato] = useState('');
   const [plano, setPlano] = useState('.357mag');
   const [frequenciaPagamento, setFrequenciaPagamento] = useState<'mensal' | 'semestral' | 'anual'>('mensal');
+  const [pixCopiado, setPixCopiado] = useState(false);
+  const [metodoPagamento, setMetodoPagamento] = useState<'pix' | 'cartao'>('pix');
 
   const obterValorTotal = () => {
     if (plano === '.22LR') {
-      return frequenciaPagamento === 'mensal' ? 'R$ 30,00' : frequenciaPagamento === 'semestral' ? 'R$ 162,00' : 'R$ 288,00';
+      return frequenciaPagamento === 'mensal' ? 'R$ 30,00' : frequenciaPagamento === 'semestral' ? 'R$ 162,00' : 'R$ 316,80';
     }
     if (plano === '.357mag') {
-      return frequenciaPagamento === 'mensal' ? 'R$ 50,00' : frequenciaPagamento === 'semestral' ? 'R$ 270,00' : 'R$ 480,00';
+      return frequenciaPagamento === 'mensal' ? 'R$ 50,00' : frequenciaPagamento === 'semestral' ? 'R$ 270,00' : 'R$ 528,00';
     }
     if (plano === '.308win') {
-      return frequenciaPagamento === 'mensal' ? 'R$ 100,00' : frequenciaPagamento === 'semestral' ? 'R$ 540,00' : 'R$ 960,00';
+      return frequenciaPagamento === 'mensal' ? 'R$ 100,00' : frequenciaPagamento === 'semestral' ? 'R$ 540,00' : 'R$ 1.056,00';
     }
     return '';
   };
@@ -407,7 +409,7 @@ export function PreCadastroPage() {
                     >
                       {freq === 'mensal' && 'Mensal'}
                       {freq === 'semestral' && 'Semestral (10% Desc.)'}
-                      {freq === 'anual' && 'Anual (20% Desc.)'}
+                      {freq === 'anual' && 'Anual (12% Desc.)'}
                     </button>
                   ))}
                 </div>
@@ -457,12 +459,12 @@ export function PreCadastroPage() {
                   
                   <div className="border-t border-brand-dark-5/50 pt-3">
                     <span className="text-2xl font-black text-white">
-                      R$ {frequenciaPagamento === 'mensal' ? '30' : frequenciaPagamento === 'semestral' ? '27' : '24'}
+                      R$ {frequenciaPagamento === 'mensal' ? '30' : frequenciaPagamento === 'semestral' ? '27' : '26,40'}
                     </span>
                     <span className="text-xs text-gray-500"> /mês</span>
                     {frequenciaPagamento !== 'mensal' && (
                       <span className="text-[10px] text-gray-500 block leading-tight font-bold">
-                        Cobrado {frequenciaPagamento === 'semestral' ? 'R$ 162/semestre' : 'R$ 288/ano'}
+                        Cobrado {frequenciaPagamento === 'semestral' ? 'R$ 162/semestre' : 'R$ 316,80/ano'}
                       </span>
                     )}
                   </div>
@@ -506,12 +508,12 @@ export function PreCadastroPage() {
                   
                   <div className="border-t border-brand-dark-5/50 pt-3">
                     <span className="text-2xl font-black text-white">
-                      R$ {frequenciaPagamento === 'mensal' ? '50' : frequenciaPagamento === 'semestral' ? '45' : '40'}
+                      R$ {frequenciaPagamento === 'mensal' ? '50' : frequenciaPagamento === 'semestral' ? '45' : '44'}
                     </span>
                     <span className="text-xs text-gray-500"> /mês</span>
                     {frequenciaPagamento !== 'mensal' && (
                       <span className="text-[10px] text-gray-500 block leading-tight font-bold">
-                        Cobrado {frequenciaPagamento === 'semestral' ? 'R$ 270/semestre' : 'R$ 480/ano'}
+                        Cobrado {frequenciaPagamento === 'semestral' ? 'R$ 270/semestre' : 'R$ 528/ano'}
                       </span>
                     )}
                   </div>
@@ -549,12 +551,12 @@ export function PreCadastroPage() {
                   
                   <div className="border-t border-brand-dark-5/50 pt-3">
                     <span className="text-2xl font-black text-white">
-                      R$ {frequenciaPagamento === 'mensal' ? '100' : frequenciaPagamento === 'semestral' ? '90' : '80'}
+                      R$ {frequenciaPagamento === 'mensal' ? '100' : frequenciaPagamento === 'semestral' ? '90' : '88'}
                     </span>
                     <span className="text-xs text-gray-500"> /mês</span>
                     {frequenciaPagamento !== 'mensal' && (
                       <span className="text-[10px] text-gray-500 block leading-tight font-bold">
-                        Cobrado {frequenciaPagamento === 'semestral' ? 'R$ 540/semestre' : 'R$ 960/ano'}
+                        Cobrado {frequenciaPagamento === 'semestral' ? 'R$ 540/semestre' : 'R$ 1.056/ano'}
                       </span>
                     )}
                   </div>
@@ -625,16 +627,16 @@ export function PreCadastroPage() {
                   <div className="sm:text-right">
                     <span className="text-gray-500 block text-xs uppercase tracking-wider">Investimento</span>
                     <span className="text-white font-black text-xl">
-                      {plano === '.22LR' && (frequenciaPagamento === 'mensal' ? 'R$ 30,00' : frequenciaPagamento === 'semestral' ? 'R$ 162,00' : 'R$ 288,00')}
-                      {plano === '.357mag' && (frequenciaPagamento === 'mensal' ? 'R$ 50,00' : frequenciaPagamento === 'semestral' ? 'R$ 270,00' : 'R$ 480,00')}
-                      {plano === '.308win' && (frequenciaPagamento === 'mensal' ? 'R$ 100,00' : frequenciaPagamento === 'semestral' ? 'R$ 540,00' : 'R$ 960,00')}
+                      {plano === '.22LR' && (frequenciaPagamento === 'mensal' ? 'R$ 30,00' : frequenciaPagamento === 'semestral' ? 'R$ 162,00' : 'R$ 316,80')}
+                      {plano === '.357mag' && (frequenciaPagamento === 'mensal' ? 'R$ 50,00' : frequenciaPagamento === 'semestral' ? 'R$ 270,00' : 'R$ 528,00')}
+                      {plano === '.308win' && (frequenciaPagamento === 'mensal' ? 'R$ 100,00' : frequenciaPagamento === 'semestral' ? 'R$ 540,00' : 'R$ 1.056,00')}
                     </span>
                     <span className="text-gray-500 text-xs">
                       {frequenciaPagamento === 'mensal' ? ' /mês' : frequenciaPagamento === 'semestral' ? ' /semestre' : ' /ano'}
                     </span>
                     {frequenciaPagamento !== 'mensal' && (
                       <span className="text-[10px] text-gray-500 block font-semibold">
-                        Equivale a R$ {plano === '.22LR' ? (frequenciaPagamento === 'semestral' ? '27,00' : '24,00') : plano === '.357mag' ? (frequenciaPagamento === 'semestral' ? '45,00' : '40,00') : (frequenciaPagamento === 'semestral' ? '90,00' : '80,00')}/mês
+                        Equivale a R$ {plano === '.22LR' ? (frequenciaPagamento === 'semestral' ? '27,00' : '26,40') : plano === '.357mag' ? (frequenciaPagamento === 'semestral' ? '45,00' : '44,00') : (frequenciaPagamento === 'semestral' ? '90,00' : '88,00')}/mês
                       </span>
                     )}
                   </div>
@@ -668,47 +670,133 @@ export function PreCadastroPage() {
               </div>
 
               <div className="border-t border-brand-dark-5/50 pt-6 max-w-md mx-auto space-y-4">
-                <div className="bg-brand-dark-4 border border-brand-dark-5 rounded-2xl p-5 text-center mb-6 max-w-sm mx-auto">
-                  <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider mb-2">Chave PIX para Ativação</p>
-                  <div className="bg-brand-dark-3 border border-brand-dark-5 rounded-xl p-3 flex items-center justify-between gap-3">
-                    <span className="font-mono text-xs text-white font-black truncate select-all">gui.gomesassis@gmail.com</span>
-                    <button
-                      onClick={() => {
-                        navigator.clipboard.writeText('gui.gomesassis@gmail.com');
-                        alert('Chave PIX copiada com sucesso!');
-                      }}
-                      className="bg-brand-green/10 hover:bg-brand-green/20 text-brand-green border border-brand-green/30 text-[10px] font-black uppercase tracking-wider py-1.5 px-3 rounded-lg transition-all shrink-0"
-                    >
-                      Copiar
-                    </button>
-                  </div>
-                  <p className="text-[10px] text-gray-500 mt-2.5 leading-normal">
-                    Pague o valor de <strong>{obterValorTotal()}</strong> referente ao plano <strong>{plano} ({frequenciaPagamento})</strong> e envie o comprovante no WhatsApp abaixo para ativação imediata.
-                  </p>
+                {/* Seletor de Forma de Pagamento */}
+                <div className="flex justify-center max-w-sm mx-auto gap-2 bg-brand-dark-4 border border-brand-dark-5 p-1 rounded-xl">
+                  <button
+                    type="button"
+                    onClick={() => setMetodoPagamento('pix')}
+                    className={`flex-1 py-2 text-xs font-black rounded-lg uppercase tracking-wider transition-all duration-200 ${
+                      metodoPagamento === 'pix'
+                        ? 'bg-brand-green text-black shadow-md'
+                        : 'text-gray-400 hover:text-white hover:bg-brand-dark-3'
+                    }`}
+                  >
+                    💸 Pagar via PIX
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMetodoPagamento('cartao')}
+                    className={`flex-1 py-2 text-xs font-black rounded-lg uppercase tracking-wider transition-all duration-200 ${
+                      metodoPagamento === 'cartao'
+                        ? 'bg-brand-blue text-white shadow-md'
+                        : 'text-gray-400 hover:text-white hover:bg-brand-dark-3'
+                    }`}
+                  >
+                    💳 Pagar via Cartão
+                  </button>
                 </div>
+
+                {metodoPagamento === 'pix' ? (
+                  <div className="bg-brand-dark-4 border border-brand-dark-5 rounded-2xl p-5 text-center mb-6 max-w-sm mx-auto relative overflow-hidden shadow-2xl">
+                    {/* Decorative glow */}
+                    <div className="absolute -top-10 -right-10 w-24 h-24 bg-brand-green/10 rounded-full blur-xl pointer-events-none"></div>
+
+                    <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider mb-3">Chave PIX (CNPJ) para Ativação</p>
+                    
+                    <div className="bg-brand-dark-3 border border-brand-dark-5 rounded-xl p-3 flex items-center justify-between gap-3 shadow-inner">
+                      <div className="text-left min-w-0">
+                        <span className="font-mono text-sm text-white font-black tracking-wider block select-all">
+                          63.820.168/0001-63
+                        </span>
+                        <span className="text-[10px] text-gray-400 block mt-0.5">
+                          Beneficiário: <strong className="text-gray-200">Guilherme Gomes</strong>
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText('63820168000163');
+                          setPixCopiado(true);
+                          setTimeout(() => setPixCopiado(false), 2000);
+                        }}
+                        className={`flex items-center gap-1.5 border text-[10px] font-black uppercase tracking-wider py-2 px-3 rounded-lg transition-all duration-200 shrink-0 ${
+                          pixCopiado
+                            ? 'bg-brand-green/20 text-brand-green border-brand-green/40 shadow-sm'
+                            : 'bg-brand-green/10 hover:bg-brand-green/20 text-brand-green border-brand-green/30 active:scale-95'
+                        }`}
+                      >
+                        {pixCopiado ? (
+                          <>
+                            <Check className="w-3 h-3" />
+                            Copiado
+                          </>
+                        ) : (
+                          <>
+                            📋 Copiar
+                          </>
+                        )}
+                      </button>
+                    </div>
+                    
+                    <p className="text-[10px] text-gray-400 mt-3.5 leading-relaxed">
+                      Pague o valor de <strong className="text-white">{obterValorTotal()}</strong> referente ao plano <strong className="text-white">{plano} ({frequenciaPagamento})</strong> e envie o comprovante no WhatsApp abaixo para ativação imediata.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="bg-brand-dark-4 border border-brand-dark-5 rounded-2xl p-5 text-center mb-6 max-w-sm mx-auto relative overflow-hidden shadow-2xl">
+                    {/* Decorative glow */}
+                    <div className="absolute -top-10 -right-10 w-24 h-24 bg-brand-blue/10 rounded-full blur-xl pointer-events-none"></div>
+
+                    <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider mb-3">Pagamento via Cartão de Crédito</p>
+                    
+                    <div className="bg-brand-dark-3 border border-brand-dark-5 rounded-xl p-4 text-center">
+                      <p className="text-xs text-gray-300 font-semibold leading-relaxed">
+                        Aceitamos cartões de crédito via link de pagamento da <strong className="text-white">InfinityPay / Banco Inter</strong>.
+                      </p>
+                      <p className="text-[10px] text-gray-400 mt-2 leading-relaxed">
+                        Por ser gerado sob demanda para seu plano, clique em um dos botões abaixo para solicitar o link à nossa equipe.
+                      </p>
+                    </div>
+                    
+                    <p className="text-[10px] text-gray-400 mt-3.5 leading-relaxed">
+                      Valor do plano: <strong className="text-white">{obterValorTotal()}</strong> referente a <strong className="text-white">{plano} ({frequenciaPagamento})</strong>.
+                    </p>
+                  </div>
+                )}
+
                 <p className="text-xs text-gray-400 leading-normal">
-                  {tipoUsuario === 'cac_individual'
-                    ? 'Clique em um dos canais abaixo para enviar seu comprovante de pagamento e liberar sua conta CAC:'
-                    : 'Clique em um dos canais abaixo para enviar seu comprovante de pagamento e ativar seu painel de despachante:'
-                  }
+                  {metodoPagamento === 'pix' ? (
+                    tipoUsuario === 'cac_individual'
+                      ? 'Clique em um dos canais abaixo para enviar seu comprovante de pagamento e liberar sua conta CAC:'
+                      : 'Clique em um dos canais abaixo para enviar seu comprovante de pagamento e ativar seu painel de despachante:'
+                  ) : (
+                    'Clique em um dos canais abaixo para solicitar o link de pagamento do seu plano:'
+                  )}
                 </p>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <a
-                    href={`https://wa.me/5564999559865?text=${encodeURIComponent(`Olá! Realizei o pagamento do pré-cadastro no Portal G CAC (${nome}, CPF: ${cpf}) como ${tipoUsuario === 'despachante' ? 'Despachante' : 'CAC Individual'} no plano ${plano} (${frequenciaPagamento}). Segue em anexo o meu comprovante para liberação.`)}`}
+                    href={`https://wa.me/5564999559865?text=${encodeURIComponent(
+                      metodoPagamento === 'pix'
+                        ? `Olá! Realizei o pagamento do pré-cadastro no Portal G CAC (${nome}, CPF: ${cpf}) como ${tipoUsuario === 'despachante' ? 'Despachante' : 'CAC Individual'} no plano ${plano} (${frequenciaPagamento}). Segue em anexo o meu comprovante para liberação.`
+                        : `Olá! Realizei o pré-cadastro no Portal G CAC (${nome}, CPF: ${cpf}) como ${tipoUsuario === 'despachante' ? 'Despachante' : 'CAC Individual'} no plano ${plano} (${frequenciaPagamento}). Gostaria de solicitar o link de pagamento no cartão para liberação da conta.`
+                    )}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center justify-center gap-2 bg-[#25D366] hover:bg-[#20ba5a] text-black font-extrabold py-3 px-4 rounded-xl text-xs uppercase tracking-wider transition-all duration-200 shadow-lg active:scale-95"
                   >
-                    Enviar Comprovante 1
+                    {metodoPagamento === 'pix' ? 'Enviar Comprovante 1' : 'Solicitar Link Comercial 1'}
                   </a>
                   <a
-                    href={`https://wa.me/5564999681003?text=${encodeURIComponent(`Olá! Realizei o pagamento do pré-cadastro no Portal G CAC (${nome}, CPF: ${cpf}) como ${tipoUsuario === 'despachante' ? 'Despachante' : 'CAC Individual'} no plano ${plano} (${frequenciaPagamento}). Segue em anexo o meu comprovante para liberação.`)}`}
+                    href={`https://wa.me/5564999681003?text=${encodeURIComponent(
+                      metodoPagamento === 'pix'
+                        ? `Olá! Realizei o pagamento do pré-cadastro no Portal G CAC (${nome}, CPF: ${cpf}) como ${tipoUsuario === 'despachante' ? 'Despachante' : 'CAC Individual'} no plano ${plano} (${frequenciaPagamento}). Segue em anexo o meu comprovante para liberação.`
+                        : `Olá! Realizei o pré-cadastro no Portal G CAC (${nome}, CPF: ${cpf}) como ${tipoUsuario === 'despachante' ? 'Despachante' : 'CAC Individual'} no plano ${plano} (${frequenciaPagamento}). Gostaria de solicitar o link de pagamento no cartão para liberação da conta.`
+                    )}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center justify-center gap-2 bg-[#25D366] hover:bg-[#20ba5a] text-black font-extrabold py-3 px-4 rounded-xl text-xs uppercase tracking-wider transition-all duration-200 shadow-lg active:scale-95"
                   >
-                    Enviar Comprovante 2
+                    {metodoPagamento === 'pix' ? 'Enviar Comprovante 2' : 'Solicitar Link Comercial 2'}
                   </a>
                 </div>
 
