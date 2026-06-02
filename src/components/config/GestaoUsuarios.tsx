@@ -218,8 +218,15 @@ export function GestaoUsuarios({ abaInicial }: GestaoUsuariosProps = {}) {
             : (lead.plano === '.22LR' ? 1 : (lead.plano === '.357mag' ? 4 : 9999)),
           limite_cac_vinculados: isCac ? 1 : 20,
           plano_status: 'ativo',
-          frequencia_pagamento: 'mensal',
-          data_vencimento: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 dias grátis de teste
+          frequencia_pagamento: lead.frequencia_pagamento || 'mensal',
+          data_vencimento: new Date(
+            Date.now() + 
+            (lead.frequencia_pagamento === 'anual' 
+              ? 365 
+              : lead.frequencia_pagamento === 'semestral' 
+                ? 180 
+                : 30) * 24 * 60 * 60 * 1000
+          ).toISOString().split('T')[0],
           taxa_implementacao_paga: false,
           is_gratis: isCac // CAC individual pode ser isento de recorrência se desejar
         }])

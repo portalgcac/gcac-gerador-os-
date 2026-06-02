@@ -30,6 +30,20 @@ export function PreCadastroPage() {
   const [cpf, setCpf] = useState('');
   const [contato, setContato] = useState('');
   const [plano, setPlano] = useState('.357mag');
+  const [frequenciaPagamento, setFrequenciaPagamento] = useState<'mensal' | 'semestral' | 'anual'>('mensal');
+
+  const obterValorTotal = () => {
+    if (plano === '.22LR') {
+      return frequenciaPagamento === 'mensal' ? 'R$ 30,00' : frequenciaPagamento === 'semestral' ? 'R$ 162,00' : 'R$ 288,00';
+    }
+    if (plano === '.357mag') {
+      return frequenciaPagamento === 'mensal' ? 'R$ 50,00' : frequenciaPagamento === 'semestral' ? 'R$ 270,00' : 'R$ 480,00';
+    }
+    if (plano === '.308win') {
+      return frequenciaPagamento === 'mensal' ? 'R$ 100,00' : frequenciaPagamento === 'semestral' ? 'R$ 540,00' : 'R$ 960,00';
+    }
+    return '';
+  };
 
   // Máscaras de digitação
   const formatarCPF = (val: string) => {
@@ -125,6 +139,7 @@ export function PreCadastroPage() {
             contato: contato.replace(/\D/g, ''),
             plano,
             tipo_usuario: tipoUsuario,
+            frequencia_pagamento: frequenciaPagamento,
             status: 'pendente'
           }
         ]);
@@ -144,7 +159,7 @@ export function PreCadastroPage() {
         .from('notificacoes_sistema')
         .insert([{
           titulo: '🎯 Novo Pré-Cadastro Recebido',
-          mensagem: `O cliente ${nomeFormatado} se pré-cadastrou no plano ${planoFormatado} como ${tipoUsuarioFormatado}.`,
+          mensagem: `O cliente ${nomeFormatado} se pré-cadastrou no plano ${planoFormatado} (${frequenciaPagamento}) como ${tipoUsuarioFormatado}.`,
           tipo: 'info',
           link: '/portal-admin?tab=leads',
           empresa_id: '00000000-0000-0000-0000-000000000001'
@@ -156,7 +171,7 @@ export function PreCadastroPage() {
           body: {
             empresa_id: '00000000-0000-0000-0000-000000000001',
             titulo: '🎯 Novo Pré-Cadastro',
-            mensagem: `${nomeFormatado} se cadastrou no ${planoFormatado} como ${tipoUsuarioFormatado}.`,
+            mensagem: `${nomeFormatado} se cadastrou no ${planoFormatado} (${frequenciaPagamento}) como ${tipoUsuarioFormatado}.`,
             link: '/portal-admin?tab=leads'
           }
         });
@@ -376,6 +391,28 @@ export function PreCadastroPage() {
                 </p>
               </div>
 
+              {/* Seletor de Frequência de Pagamento */}
+              <div className="flex justify-center mb-6">
+                <div className="bg-brand-dark-4 border border-brand-dark-5 p-1 rounded-2xl flex gap-1">
+                  {(['mensal', 'semestral', 'anual'] as const).map(freq => (
+                    <button
+                      key={freq}
+                      type="button"
+                      onClick={() => setFrequenciaPagamento(freq)}
+                      className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${
+                        frequenciaPagamento === freq
+                          ? 'bg-brand-blue text-white shadow-lg font-bold'
+                          : 'text-gray-400 hover:text-white'
+                      }`}
+                    >
+                      {freq === 'mensal' && 'Mensal'}
+                      {freq === 'semestral' && 'Semestral (10% Desc.)'}
+                      {freq === 'anual' && 'Anual (20% Desc.)'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               {/* Informação visual / Alerta para CAC Individual */}
               {tipoUsuario === 'cac_individual' && (
                 <div className="bg-brand-green/10 border border-brand-green/20 text-brand-green-light rounded-xl p-4 text-xs font-semibold leading-relaxed">
@@ -419,8 +456,15 @@ export function PreCadastroPage() {
                   </div>
                   
                   <div className="border-t border-brand-dark-5/50 pt-3">
-                    <span className="text-2xl font-black text-white">R$ 30</span>
+                    <span className="text-2xl font-black text-white">
+                      R$ {frequenciaPagamento === 'mensal' ? '30' : frequenciaPagamento === 'semestral' ? '27' : '24'}
+                    </span>
                     <span className="text-xs text-gray-500"> /mês</span>
+                    {frequenciaPagamento !== 'mensal' && (
+                      <span className="text-[10px] text-gray-500 block leading-tight font-bold">
+                        Cobrado {frequenciaPagamento === 'semestral' ? 'R$ 162/semestre' : 'R$ 288/ano'}
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -461,8 +505,15 @@ export function PreCadastroPage() {
                   </div>
                   
                   <div className="border-t border-brand-dark-5/50 pt-3">
-                    <span className="text-2xl font-black text-white">R$ 50</span>
+                    <span className="text-2xl font-black text-white">
+                      R$ {frequenciaPagamento === 'mensal' ? '50' : frequenciaPagamento === 'semestral' ? '45' : '40'}
+                    </span>
                     <span className="text-xs text-gray-500"> /mês</span>
+                    {frequenciaPagamento !== 'mensal' && (
+                      <span className="text-[10px] text-gray-500 block leading-tight font-bold">
+                        Cobrado {frequenciaPagamento === 'semestral' ? 'R$ 270/semestre' : 'R$ 480/ano'}
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -497,8 +548,15 @@ export function PreCadastroPage() {
                   </div>
                   
                   <div className="border-t border-brand-dark-5/50 pt-3">
-                    <span className="text-2xl font-black text-white">R$ 100</span>
+                    <span className="text-2xl font-black text-white">
+                      R$ {frequenciaPagamento === 'mensal' ? '100' : frequenciaPagamento === 'semestral' ? '90' : '80'}
+                    </span>
                     <span className="text-xs text-gray-500"> /mês</span>
+                    {frequenciaPagamento !== 'mensal' && (
+                      <span className="text-[10px] text-gray-500 block leading-tight font-bold">
+                        Cobrado {frequenciaPagamento === 'semestral' ? 'R$ 540/semestre' : 'R$ 960/ano'}
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -552,23 +610,33 @@ export function PreCadastroPage() {
                   </div>
                 </div>
 
-                <div className="border-t border-brand-dark-5/60 pt-4 flex items-center justify-between">
+                <div className="border-t border-brand-dark-5/60 pt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                   <div>
                     <span className="text-gray-500 font-semibold block text-xs uppercase tracking-wider">Plano Selecionado</span>
-                    <span className="text-brand-green font-extrabold text-lg">
-                      {plano === '.22LR' && 'Plano .22LR (Iniciante / Solo)'}
-                      {plano === '.357mag' && 'Plano .357mag (Profissional)'}
-                      {plano === '.308win' && 'Plano .308win (Premium)'}
+                    <span className="text-brand-green font-extrabold text-base md:text-lg">
+                      {plano === '.22LR' && 'Plano .22LR'}
+                      {plano === '.357mag' && 'Plano .357mag'}
+                      {plano === '.308win' && 'Plano .308win'}
+                      <span className="text-xs text-gray-400 capitalize block font-bold">
+                        Frequência: {frequenciaPagamento}
+                      </span>
                     </span>
                   </div>
-                  <div className="text-right">
+                  <div className="sm:text-right">
                     <span className="text-gray-500 block text-xs uppercase tracking-wider">Investimento</span>
                     <span className="text-white font-black text-xl">
-                      {plano === '.22LR' && 'R$ 30,00'}
-                      {plano === '.357mag' && 'R$ 50,00'}
-                      {plano === '.308win' && 'R$ 100,00'}
+                      {plano === '.22LR' && (frequenciaPagamento === 'mensal' ? 'R$ 30,00' : frequenciaPagamento === 'semestral' ? 'R$ 162,00' : 'R$ 288,00')}
+                      {plano === '.357mag' && (frequenciaPagamento === 'mensal' ? 'R$ 50,00' : frequenciaPagamento === 'semestral' ? 'R$ 270,00' : 'R$ 480,00')}
+                      {plano === '.308win' && (frequenciaPagamento === 'mensal' ? 'R$ 100,00' : frequenciaPagamento === 'semestral' ? 'R$ 540,00' : 'R$ 960,00')}
                     </span>
-                    <span className="text-gray-500 text-xs">/mês</span>
+                    <span className="text-gray-500 text-xs">
+                      {frequenciaPagamento === 'mensal' ? ' /mês' : frequenciaPagamento === 'semestral' ? ' /semestre' : ' /ano'}
+                    </span>
+                    {frequenciaPagamento !== 'mensal' && (
+                      <span className="text-[10px] text-gray-500 block font-semibold">
+                        Equivale a R$ {plano === '.22LR' ? (frequenciaPagamento === 'semestral' ? '27,00' : '24,00') : plano === '.357mag' ? (frequenciaPagamento === 'semestral' ? '45,00' : '40,00') : (frequenciaPagamento === 'semestral' ? '90,00' : '80,00')}/mês
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -600,35 +668,47 @@ export function PreCadastroPage() {
               </div>
 
               <div className="border-t border-brand-dark-5/50 pt-6 max-w-md mx-auto space-y-4">
-                <div className="bg-brand-dark-4/65 border border-brand-dark-5 rounded-xl p-3.5 text-left mb-4">
-                  <p className="text-xs font-bold text-white mb-1">💳 Como ativar seu acesso:</p>
-                  <p className="text-[11px] text-gray-400 leading-relaxed">
-                    Entre em contato com o suporte abaixo para obter a <strong>Chave PIX (Banco Inter)</strong> ou o <strong>Link de Pagamento (InfinitePay)</strong> da primeira taxa do plano selecionado. Envie o comprovante e sua conta será ativada instantaneamente.
+                <div className="bg-brand-dark-4 border border-brand-dark-5 rounded-2xl p-5 text-center mb-6 max-w-sm mx-auto">
+                  <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider mb-2">Chave PIX para Ativação</p>
+                  <div className="bg-brand-dark-3 border border-brand-dark-5 rounded-xl p-3 flex items-center justify-between gap-3">
+                    <span className="font-mono text-xs text-white font-black truncate select-all">gui.gomesassis@gmail.com</span>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText('gui.gomesassis@gmail.com');
+                        alert('Chave PIX copiada com sucesso!');
+                      }}
+                      className="bg-brand-green/10 hover:bg-brand-green/20 text-brand-green border border-brand-green/30 text-[10px] font-black uppercase tracking-wider py-1.5 px-3 rounded-lg transition-all shrink-0"
+                    >
+                      Copiar
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-gray-500 mt-2.5 leading-normal">
+                    Pague o valor de <strong>{obterValorTotal()}</strong> referente ao plano <strong>{plano} ({frequenciaPagamento})</strong> e envie o comprovante no WhatsApp abaixo para ativação imediata.
                   </p>
                 </div>
                 <p className="text-xs text-gray-400 leading-normal">
                   {tipoUsuario === 'cac_individual'
-                    ? 'Clique em um dos canais abaixo para chamar o suporte, solicitar os dados de pagamento e ativar sua conta CAC:'
-                    : 'Clique em um dos canais abaixo para chamar o suporte, solicitar os dados de pagamento e liberar seu painel de despachante:'
+                    ? 'Clique em um dos canais abaixo para enviar seu comprovante de pagamento e liberar sua conta CAC:'
+                    : 'Clique em um dos canais abaixo para enviar seu comprovante de pagamento e ativar seu painel de despachante:'
                   }
                 </p>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <a
-                    href={`https://wa.me/5564999559865?text=${encodeURIComponent(`Olá! Fiz meu pré-cadastro no Portal G CAC (${nome}, CPF: ${cpf}) como ${tipoUsuario === 'despachante' ? 'Despachante' : 'CAC Individual'} no plano ${plano}. Gostaria de validar meus dados e ativar minha conta.`)}`}
+                    href={`https://wa.me/5564999559865?text=${encodeURIComponent(`Olá! Realizei o pagamento do pré-cadastro no Portal G CAC (${nome}, CPF: ${cpf}) como ${tipoUsuario === 'despachante' ? 'Despachante' : 'CAC Individual'} no plano ${plano} (${frequenciaPagamento}). Segue em anexo o meu comprovante para liberação.`)}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center justify-center gap-2 bg-[#25D366] hover:bg-[#20ba5a] text-black font-extrabold py-3 px-4 rounded-xl text-xs uppercase tracking-wider transition-all duration-200 shadow-lg active:scale-95"
                   >
-                    Chamar Suporte 1
+                    Enviar Comprovante 1
                   </a>
                   <a
-                    href={`https://wa.me/5564999681003?text=${encodeURIComponent(`Olá! Fiz meu pré-cadastro no Portal G CAC (${nome}, CPF: ${cpf}) como ${tipoUsuario === 'despachante' ? 'Despachante' : 'CAC Individual'} no plano ${plano}. Gostaria de validar meus dados e ativar minha conta.`)}`}
+                    href={`https://wa.me/5564999681003?text=${encodeURIComponent(`Olá! Realizei o pagamento do pré-cadastro no Portal G CAC (${nome}, CPF: ${cpf}) como ${tipoUsuario === 'despachante' ? 'Despachante' : 'CAC Individual'} no plano ${plano} (${frequenciaPagamento}). Segue em anexo o meu comprovante para liberação.`)}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center justify-center gap-2 bg-[#25D366] hover:bg-[#20ba5a] text-black font-extrabold py-3 px-4 rounded-xl text-xs uppercase tracking-wider transition-all duration-200 shadow-lg active:scale-95"
                   >
-                    Chamar Suporte 2
+                    Enviar Comprovante 2
                   </a>
                 </div>
 
