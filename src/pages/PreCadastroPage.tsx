@@ -236,7 +236,7 @@ export function PreCadastroPage() {
                 >
                   <UserCheck className={`w-12 h-12 mb-3 ${tipoUsuario === 'cac_individual' ? 'text-brand-green-light' : 'text-gray-500'}`} />
                   <div>
-                    <h3 className="text-lg font-extrabold text-white">Atirador (CAC Individual)</h3>
+                    <h3 className="text-sm font-extrabold text-white uppercase tracking-wider">CAÇADOR, ATIRADOR DESPORTIVO, COLECIONADOR (CAC INDIVIDUAL)</h3>
                     <p className="text-xs text-gray-400 mt-2 leading-relaxed">
                       Acesso individual para gerenciar seu próprio acervo de armas, guias (GTs) e alertas pessoais de vencimento.
                     </p>
@@ -339,7 +339,7 @@ export function PreCadastroPage() {
                 </h2>
                 <p className="text-gray-400 text-sm mt-1">
                   {tipoUsuario === 'cac_individual'
-                    ? 'Atiradores (CAC Individual) se enquadram exclusivamente no plano .22LR.'
+                    ? 'Atiradores, Caçadores e Colecionadores (CAC Individual) se enquadram exclusivamente no plano .22LR.'
                     : 'Selecione uma das opções abaixo baseada no calibre comercial de sua empresa.'
                   }
                 </p>
@@ -348,7 +348,7 @@ export function PreCadastroPage() {
               {/* Informação visual / Alerta para CAC Individual */}
               {tipoUsuario === 'cac_individual' && (
                 <div className="bg-brand-green/10 border border-brand-green/20 text-brand-green-light rounded-xl p-4 text-xs font-semibold leading-relaxed">
-                  📢 <strong>Importante:</strong> Como você se cadastrou como **Atirador (CAC Individual)**, seu plano é limitado apenas ao gerenciamento do seu acervo pessoal. Os outros planos comerciais de despachante estão bloqueados para este perfil.
+                  📢 <strong>Importante:</strong> Como você se cadastrou como **Caçador, Atirador Desportivo, Colecionador (CAC Individual)**, seu plano é limitado apenas ao gerenciamento do seu acervo pessoal. Os outros planos comerciais de despachante estão bloqueados para este perfil.
                 </div>
               )}
 
@@ -366,7 +366,7 @@ export function PreCadastroPage() {
                   }`}
                 >
                   <div className="flex justify-between items-start">
-                    <span className="bg-brand-dark bg-brand-green-dark text-black font-black text-xs px-2.5 py-1 rounded-full uppercase tracking-wider">
+                    <span className="bg-brand-green-dark text-black font-extrabold text-xs px-2.5 py-1 rounded-full uppercase tracking-wider">
                       .22LR
                     </span>
                     {plano === '.22LR' && (
@@ -375,16 +375,18 @@ export function PreCadastroPage() {
                       </span>
                     )}
                   </div>
-                  <div className="my-4">
-                    <h3 className="text-xl font-black text-white uppercase tracking-tight">Plano .22LR</h3>
-                    <p className="text-xs text-gray-400 mt-2 font-semibold">Iniciante / Solo</p>
-                    <p className="text-[11px] text-gray-400 mt-1 leading-snug">
+                  
+                  <div className="my-3 text-center">
+                    <img src="/ammo_22lr.png" alt="Munição .22LR" className="w-12 h-12 object-contain mx-auto mb-2" />
+                    <h3 className="text-lg font-black text-white uppercase tracking-tight">Plano .22LR</h3>
+                    <p className="text-[11px] text-gray-400 mt-2 leading-normal">
                       {tipoUsuario === 'cac_individual' 
-                        ? 'Plano exclusivo para Atirador (CAC Individual).' 
-                        : 'Ideal para 1 único operador/despachante.'
+                        ? 'cac individual, ideal para um unico usuario' 
+                        : 'cac individual, ideal para um unico usuario'
                       }
                     </p>
                   </div>
+                  
                   <div className="border-t border-brand-dark-5/50 pt-3">
                     <span className="text-2xl font-black text-white">R$ 30</span>
                     <span className="text-xs text-gray-500"> /mês</span>
@@ -409,7 +411,7 @@ export function PreCadastroPage() {
                   )}
 
                   <div className="flex justify-between items-start mt-1">
-                    <span className="bg-brand-blue text-white font-black text-xs px-2.5 py-1 rounded-full uppercase tracking-wider">
+                    <span className="bg-brand-blue text-white font-extrabold text-xs px-2.5 py-1 rounded-full uppercase tracking-wider">
                       .357mag
                     </span>
                     {plano === '.357mag' && (
@@ -418,11 +420,15 @@ export function PreCadastroPage() {
                       </span>
                     )}
                   </div>
-                  <div className="my-4">
-                    <h3 className="text-xl font-black text-white uppercase tracking-tight">Plano .357mag</h3>
-                    <p className="text-xs text-gray-400 mt-2 font-semibold">Profissional</p>
-                    <p className="text-[11px] text-gray-400 mt-1 leading-snug">Até 4 usuários da equipe + financeiro completo.</p>
+                  
+                  <div className="my-3 text-center">
+                    <img src="/ammo_357mag.png" alt="Munição .357mag" className="w-12 h-12 object-contain mx-auto mb-2" />
+                    <h3 className="text-lg font-black text-white uppercase tracking-tight">Plano .357mag</h3>
+                    <p className="text-[11px] text-gray-400 mt-2 leading-normal">
+                      Até 4 usuários da equipe + financeiro completo.
+                    </p>
                   </div>
+                  
                   <div className="border-t border-brand-dark-5/50 pt-3">
                     <span className="text-2xl font-black text-white">R$ 50</span>
                     <span className="text-xs text-gray-500"> /mês</span>
@@ -441,7 +447,7 @@ export function PreCadastroPage() {
                   }`}
                 >
                   <div className="flex justify-between items-start">
-                    <span className="bg-brand-blue-dark text-white font-black text-xs px-2.5 py-1 rounded-full uppercase tracking-wider">
+                    <span className="bg-brand-blue-dark text-white font-extrabold text-xs px-2.5 py-1 rounded-full uppercase tracking-wider">
                       .308win
                     </span>
                     {plano === '.308win' && (
@@ -450,11 +456,15 @@ export function PreCadastroPage() {
                       </span>
                     )}
                   </div>
-                  <div className="my-4">
-                    <h3 className="text-xl font-black text-white uppercase tracking-tight">Plano .308win</h3>
-                    <p className="text-xs text-gray-400 mt-2 font-semibold">Premium / VIP</p>
-                    <p className="text-[11px] text-gray-400 mt-1 leading-snug">Acessos ilimitados staff + Suporte prioritário.</p>
+                  
+                  <div className="my-3 text-center">
+                    <img src="/ammo_308win.png" alt="Munição .308win" className="w-12 h-12 object-contain mx-auto mb-2" />
+                    <h3 className="text-lg font-black text-white uppercase tracking-tight">Plano .308win</h3>
+                    <p className="text-[11px] text-gray-400 mt-2 leading-normal">
+                      Acessos ilimitados + Suporte prioritário.
+                    </p>
                   </div>
+                  
                   <div className="border-t border-brand-dark-5/50 pt-3">
                     <span className="text-2xl font-black text-white">R$ 100</span>
                     <span className="text-xs text-gray-500"> /mês</span>
@@ -466,7 +476,10 @@ export function PreCadastroPage() {
               <div className="bg-brand-dark-4/50 border border-brand-dark-5/50 rounded-xl p-4 flex gap-3 items-start">
                 <HelpCircle className="text-brand-blue flex-shrink-0 mt-0.5" />
                 <p className="text-xs text-gray-400 leading-normal">
-                  Todos os planos contam com taxa única de adesão e treinamento (Setup Fee) variando de R$ 150 a R$ 300, a ser acertada diretamente com o comercial no momento da ativação da sua chave de acesso.
+                  {tipoUsuario === 'cac_individual'
+                    ? 'Para o CAC Individual, pode haver cobrança para cadastro de todo o acervo e documentos do cliente.'
+                    : 'Todos os planos contam com taxa única de adesão e treinamento (Setup Fee) variando de R$ 150 a R$ 300, a ser acertada diretamente com o comercial no momento da ativação da sua chave de acesso.'
+                  }
                 </p>
               </div>
             </div>

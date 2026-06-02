@@ -63,7 +63,9 @@ export function GestaoUsuarios() {
   const isMasterAdmin = usuario?.email === 'gui.gomesassis@gmail.com';
 
   // Sub-painel ativo para Master Admin
-  const [subPainelAtivo, setSubPainelAtivo] = useState<'empresas' | 'cacs' | 'equipe_interna' | 'faturamento'>('empresas');
+  const [subPainelAtivo, setSubPainelAtivo] = useState<'empresas' | 'cacs' | 'equipe_interna' | 'faturamento' | 'leads'>('empresas');
+  const [leads, setLeads] = useState<any[]>([]);
+  const [carregandoLeads, setCarregandoLeads] = useState(false);
   
   // Empresa ativamente em edição/gestão pelo Master Admin
   const [empresaGerenciada, setEmpresaGerenciada] = useState<any | null>(null);
@@ -126,6 +128,150 @@ export function GestaoUsuarios() {
     setCarregandoEmpresas(false);
   };
 
+  const carregarLeads = async () => {
+    if (!isMasterAdmin) return;
+    setCarregandoLeads(true);
+    const { data, error } = await supabase
+      .from('leads_pre_cadastro')
+      .select('*')
+      .order('criado_em', { ascending: false });
+    if (error) {
+      console.error('Erro ao carregar leads:', error);
+      mostrar('erro', 'Erro ao carregar leads de pré-cadastro.');
+    } else if (data) {
+      setLeads(data);
+    }
+    setCarregandoLeads(false);
+  };
+
+  const handleMarcarContatado = async (leadId: string) => {
+    try {
+      const { error } = await supabase
+        .from('leads_pre_cadastro')
+        .update({ status: 'contatado', atualizado_em: new Date().toISOString() })
+        .eq('id', leadId);
+      if (error) throw error;
+      mostrar('sucesso', 'Lead marcado como contatado.');
+      carregarLeads();
+    } catch (err: any) {
+      mostrar('erro', err.message || 'Erro ao atualizar lead.');
+    }
+  };
+
+  const handleExcluirLead = async (leadId: string) => {
+    if (!window.confirm('Tem certeza que deseja excluir este pré-cadastro?')) return;
+    try {
+      const { error } = await supabase
+        .from('leads_pre_cadastro')
+        .delete()
+        .eq('id', leadId);
+      if (error) throw error;
+      mostrar('sucesso', 'Pré-cadastro excluído.');
+      carregarLeads();
+    } catch (err: any) {
+      mostrar('erro', err.message || 'Erro ao excluir.');
+    }
+  };
+
+  const handleAtivarLead = async (lead: any) => {
+    setCarregando(true);
+    try {
+      const isCac = lead.tipo_usuario === 'cac_individual';
+      const nomeEmpresa = isCac 
+        ? `CAC - ${lead.nome.toUpperCase()}`
+        : lead.nome.toUpperCase();
+
+      // 1. Criar a empresa/tenant no banco
+      const { data: novaEmp, error: errEmp } = await supabase
+        .from('empresas')
+        .insert([{
+          nome: nomeEmpresa,
+          tipo_conta: lead.tipo_usuario || 'despachante',
+          plano: lead.plano || '.22LR',
+          recursos_liberados: isCac 
+            ? [
+                'dash_atencao_diaria', 'dash_alertas_vencimento', 'dash_lembretes',
+                'modulo_clientes', 'acervo_anexos', 'acervo_gerenciador', 'config_manual'
+              ]
+            : [
+                'dash_atencao_diaria', 'dash_alertas_vencimento', 'dash_lembretes', 'dash_resumo_os',
+                'dash_margem_operacional', 'dash_resumo_operacional', 'dash_resumo_orcamentos',
+                'dash_ordens_recentes', 'fin_fluxo_caixa', 'fin_relatorio_equipe', 'fin_exportacao',
+                'modulo_ordens', 'modulo_orcamentos', 'modulo_recibos', 'modulo_agendamentos',
+                'modulo_clientes', 'modulo_clientes_cac', 'acervo_anexos', 'acervo_gerenciador',
+                'config_alertas_vencimento', 'config_notificacoes_push', 'config_servicos', 'config_manual'
+              ],
+          limite_usuarios_staff: isCac 
+            ? 1 
+            : (lead.plano === '.22LR' ? 1 : (lead.plano === '.357mag' ? 4 : 9999)),
+          limite_cac_vinculados: isCac ? 1 : 20,
+          plano_status: 'ativo',
+          frequencia_pagamento: 'mensal',
+          data_vencimento: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 dias grátis de teste
+          taxa_implementacao_paga: false,
+          is_gratis: isCac // CAC individual pode ser isento de recorrência se desejar
+        }])
+        .select()
+        .single();
+
+      if (errEmp || !novaEmp) throw new Error(errEmp?.message || 'Erro ao criar empresa/tenant no banco.');
+
+      // 2. Criar o usuário administrador no banco
+      const { error: errUser } = await supabase
+        .from('usuarios_autorizados')
+        .insert([{
+          nome: lead.nome,
+          email: lead.email,
+          cpf: lead.cpf,
+          contato: lead.contato,
+          role: 'admin',
+          ativo: true,
+          permissoes: isCac
+            ? ['painel', 'agenda', 'clientes', 'config']
+            : ['painel', 'rotina', 'agenda', 'financeiro', 'orcamentos', 'ordens', 'recibos', 'agendamentos', 'clientes', 'config'],
+          empresa_id: novaEmp.id
+        }]);
+
+      if (errUser) throw errUser;
+
+      // 3. Atualizar status do lead para 'ativado'
+      const { error: errLead } = await supabase
+        .from('leads_pre_cadastro')
+        .update({ status: 'ativado', atualizado_em: new Date().toISOString() })
+        .eq('id', lead.id);
+
+      if (errLead) throw errLead;
+
+      mostrar('sucesso', `Cadastro ativado com sucesso! Workspace "${nomeEmpresa}" criada.`);
+      carregarLeads();
+      carregarEmpresas();
+      carregarUsuarios();
+    } catch (err: any) {
+      mostrar('erro', err.message || 'Erro ao ativar cadastro.');
+    } finally {
+      setCarregando(false);
+    }
+  };
+
+  const formatarTelefoneExibicao = (val: string) => {
+    const limpo = val.replace(/\D/g, '');
+    if (limpo.length === 11) {
+      return `(${limpo.slice(0, 2)}) ${limpo.slice(2, 7)}-${limpo.slice(7)}`;
+    }
+    if (limpo.length === 10) {
+      return `(${limpo.slice(0, 2)}) ${limpo.slice(2, 6)}-${limpo.slice(6)}`;
+    }
+    return val;
+  };
+
+  const formatarCpfExibicao = (val: string) => {
+    const limpo = val.replace(/\D/g, '');
+    if (limpo.length === 11) {
+      return `${limpo.slice(0, 3)}.${limpo.slice(3, 6)}.${limpo.slice(6, 9)}-${limpo.slice(9)}`;
+    }
+    return val;
+  };
+
   const carregarUsuarios = async () => {
     if (!usuario) return;
     setCarregando(true);
@@ -153,9 +299,16 @@ export function GestaoUsuarios() {
       carregarUsuarios();
       if (isMasterAdmin) {
         carregarEmpresas();
+        carregarLeads();
       }
     }
   }, [usuario]);
+
+  useEffect(() => {
+    if (isMasterAdmin && subPainelAtivo === 'leads') {
+      carregarLeads();
+    }
+  }, [subPainelAtivo, isMasterAdmin]);
 
   // Se o master admin atualizou a lista de empresas, sincroniza o estado de empresaGerenciada
   useEffect(() => {
@@ -615,6 +768,18 @@ export function GestaoUsuarios() {
               >
                 <BadgeDollarSign size={14} />
                 Faturamento & Licenças
+              </button>
+              <button
+                type="button"
+                onClick={() => { setSubPainelAtivo('leads'); setBuscaUsuario(''); }}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all border ${
+                  subPainelAtivo === 'leads'
+                    ? 'bg-brand-blue/15 border-brand-blue/30 text-white font-bold'
+                    : 'bg-brand-dark-3 border-brand-dark-5 text-gray-400 hover:text-white'
+                }`}
+              >
+                <UserPlus size={14} />
+                Pré-Cadastros (Leads)
               </button>
             </div>
           )}
@@ -1356,6 +1521,116 @@ export function GestaoUsuarios() {
                   </table>
                 </div>
               </div>
+            </div>
+          )}
+          {/* ABA 5: SOLICITAÇÕES DE PRÉ-CADASTRO (LEADS) */}
+          {subPainelAtivo === 'leads' && (
+            <div className="card space-y-4 animate-fade-in">
+              <div>
+                <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                  <UserPlus size={16} className="text-brand-blue" />
+                  Solicitações de Pré-Cadastro (Leads)
+                </h3>
+                <p className="text-xs text-gray-500 mt-1">Gerencie os novos despachantes e clientes individuais que solicitaram acesso pelo site</p>
+              </div>
+
+              {carregandoLeads ? (
+                <div className="text-center py-8">
+                  <div className="w-6 h-6 border-2 border-brand-blue border-t-transparent rounded-full animate-spin mx-auto" />
+                </div>
+              ) : leads.length === 0 ? (
+                <p className="text-sm text-gray-500 italic py-4">Nenhuma solicitação de pré-cadastro encontrada.</p>
+              ) : (
+                <div className="overflow-x-auto rounded-2xl border border-brand-dark-5">
+                  <table className="w-full text-left border-collapse min-w-[800px]">
+                    <thead>
+                      <tr className="bg-brand-dark-3 border-b border-brand-dark-5">
+                        <th className="px-3 py-3 text-xs font-black text-gray-400 uppercase tracking-wider">Perfil Solicitante</th>
+                        <th className="px-3 py-3 text-xs font-black text-gray-400 uppercase tracking-wider">E-mail / Contato</th>
+                        <th className="px-3 py-3 text-xs font-black text-gray-400 uppercase tracking-wider">CPF / Documento</th>
+                        <th className="px-3 py-3 text-xs font-black text-gray-400 uppercase tracking-wider">Plano</th>
+                        <th className="px-3 py-3 text-xs font-black text-gray-400 uppercase tracking-wider">Data Cadastro</th>
+                        <th className="px-3 py-3 text-xs font-black text-gray-400 uppercase tracking-wider">Status</th>
+                        <th className="px-3 py-3 text-xs font-black text-gray-400 uppercase tracking-wider text-right">Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-brand-dark-5">
+                      {leads.map(lead => {
+                        const ehCac = lead.tipo_usuario === 'cac_individual';
+                        return (
+                          <tr key={lead.id} className="bg-brand-dark-4/40 hover:bg-brand-dark-4 transition-colors">
+                            <td className="px-3 py-3">
+                              <p className="font-bold text-white text-sm">{lead.nome}</p>
+                              <span className={`inline-block mt-0.5 text-[8px] font-black uppercase px-2 py-0.5 rounded-full tracking-wider ${
+                                ehCac 
+                                  ? 'bg-brand-green/20 text-brand-green border border-brand-green/30' 
+                                  : 'bg-brand-blue/20 text-brand-blue-light border border-brand-blue/30'
+                              }`}>
+                                {ehCac ? 'CAC Individual' : 'Despachante'}
+                              </span>
+                            </td>
+                            <td className="px-3 py-3 text-xs">
+                              <p className="text-white font-medium">{lead.email}</p>
+                              <p className="text-gray-400 font-mono mt-0.5">{lead.contato ? formatarTelefoneExibicao(lead.contato) : 'Sem contato'}</p>
+                            </td>
+                            <td className="px-3 py-3 text-xs font-mono text-gray-300">
+                              {lead.cpf ? formatarCpfExibicao(lead.cpf) : 'Sem CPF'}
+                            </td>
+                            <td className="px-3 py-3">
+                              <span className="text-xs font-bold text-white bg-brand-dark-5 px-2 py-1 rounded-md border border-brand-dark-5">
+                                {lead.plano}
+                              </span>
+                            </td>
+                            <td className="px-3 py-3 text-xs text-gray-400">
+                              {lead.criado_em ? formatarData(lead.criado_em) : 'Sem data'}
+                            </td>
+                            <td className="px-3 py-3">
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                                lead.status === 'ativado' ? 'bg-brand-green/20 text-brand-green border-brand-green/30' :
+                                lead.status === 'contatado' ? 'bg-brand-blue/20 text-brand-blue-light border-brand-blue/30' :
+                                lead.status === 'cancelado' ? 'bg-red-500/20 text-red-400 border-red-500/30' :
+                                'bg-yellow-500/20 text-yellow-400 border-yellow-500/30'
+                              }`}>
+                                {lead.status === 'ativado' ? 'Ativado' :
+                                 lead.status === 'contatado' ? 'Contatado' :
+                                 lead.status === 'cancelado' ? 'Cancelado' : 'Pendente'}
+                              </span>
+                            </td>
+                            <td className="px-3 py-3 text-right">
+                              <div className="flex items-center justify-end gap-1.5">
+                                {lead.status !== 'ativado' && (
+                                  <button
+                                    onClick={() => handleAtivarLead(lead)}
+                                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-brand-green hover:bg-brand-green-light text-black text-[10px] font-black uppercase tracking-wider transition-colors shadow-md"
+                                  >
+                                    <CheckCircle size={12} />
+                                    Ativar
+                                  </button>
+                                )}
+                                {lead.status === 'pendente' && (
+                                  <button
+                                    onClick={() => handleMarcarContatado(lead.id)}
+                                    className="flex items-center gap-1 px-2 py-1.5 rounded-xl bg-brand-dark-3 border border-brand-dark-5 hover:border-brand-blue text-brand-blue-light text-[10px] font-bold uppercase tracking-wider transition-colors"
+                                  >
+                                    Contatar
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => handleExcluirLead(lead.id)}
+                                  className="p-1.5 text-gray-500 hover:text-red-400 hover:bg-brand-dark-3 rounded-xl transition-all"
+                                  title="Excluir Pré-Cadastro"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           )}
         </div>
