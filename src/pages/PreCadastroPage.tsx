@@ -377,7 +377,7 @@ export function PreCadastroPage() {
                   </div>
                   
                   <div className="my-3 text-center">
-                    <img src="/ammo_22lr.png" alt="Munição .22LR" className="w-12 h-12 object-contain mx-auto mb-2" />
+                    <img src="/.22LR.png" alt="Munição .22LR" className="w-12 h-12 object-contain mx-auto mb-2" />
                     <h3 className="text-lg font-black text-white uppercase tracking-tight">Plano .22LR</h3>
                     <p className="text-[11px] text-gray-400 mt-2 leading-normal">
                       {tipoUsuario === 'cac_individual' 
@@ -422,7 +422,7 @@ export function PreCadastroPage() {
                   </div>
                   
                   <div className="my-3 text-center">
-                    <img src="/ammo_357mag.png" alt="Munição .357mag" className="w-12 h-12 object-contain mx-auto mb-2" />
+                    <img src="/.357 mag.png" alt="Munição .357mag" className="w-12 h-12 object-contain mx-auto mb-2" />
                     <h3 className="text-lg font-black text-white uppercase tracking-tight">Plano .357mag</h3>
                     <p className="text-[11px] text-gray-400 mt-2 leading-normal">
                       Até 4 usuários da equipe + financeiro completo.
@@ -458,7 +458,7 @@ export function PreCadastroPage() {
                   </div>
                   
                   <div className="my-3 text-center">
-                    <img src="/ammo_308win.png" alt="Munição .308win" className="w-12 h-12 object-contain mx-auto mb-2" />
+                    <img src="/.308win.png" alt="Munição .308win" className="w-12 h-12 object-contain mx-auto mb-2" />
                     <h3 className="text-lg font-black text-white uppercase tracking-tight">Plano .308win</h3>
                     <p className="text-[11px] text-gray-400 mt-2 leading-normal">
                       Acessos ilimitados + Suporte prioritário.
