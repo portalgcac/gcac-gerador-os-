@@ -86,9 +86,7 @@ export function TermosUso() {
             <p>
               O usuário (seja ele Despachante Bélico, Caçador, Atirador Desportivo ou Colecionador) é inteiramente responsável pela confidencialidade de suas credenciais de login e pela autenticidade dos dados 
               inseridos na plataforma. O preenchimento de cadastros de armas de fogo, Certificados de Registro (CR), CRAF, Guias de Tráfego 
-              (GT) e outras autorizações governamentais deve obedecer estritamente à legislação em vigor (Decretos Federais e Portarias 
-              do Exército Brasileiro - COLOG, bem como Instruções Normativas do IBAMA para Caçadores/Manejadores). O Portal GCAC não possui vínculo com órgãos governamentais e funciona apenas como um facilitador de 
-              organização de arquivos.
+              (GT) e outras autorizações governamentais deve obedecer estritamente à legislação em vigor, em especial às normas, portarias e fiscalizações do <strong>Exército Brasileiro (COLOG)</strong> e da <strong>Polícia Federal (PF)</strong> — atualmente a principal força policial responsável pela regulação, controle e fiscalização de CACs —, bem como Instruções Normativas do IBAMA para Caçadores/Manejadores. O Portal GCAC não possui vínculo com órgãos governamentais e funciona apenas como um facilitador de organização de arquivos.
             </p>
           </section>
 
