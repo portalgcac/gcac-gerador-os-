@@ -16,10 +16,14 @@ export function TermosUso() {
         </button>
 
         {/* Branding Logo Header */}
-        <div className="text-center mt-6 mb-8">
-          <div className="w-12 h-12 rounded-full bg-brand-blue/10 border border-brand-blue flex items-center justify-center mx-auto mb-3">
-            <span className="text-brand-blue font-bold text-xl">G</span>
-          </div>
+        <div className="text-center mt-6 mb-8 flex flex-col items-center">
+          <img 
+            src="/logo 2.png" 
+            alt="Portal GCAC Logo" 
+            className="w-24 h-24 object-contain mb-3 drop-shadow-2xl"
+            style={{ mixBlendMode: 'screen' }}
+            onError={(e) => { e.currentTarget.style.display = 'none'; }}
+          />
           <h1 className="text-2xl font-bold text-white tracking-wide">Portal GCAC</h1>
           <p className="text-slate-400 text-xs mt-1">Termos de Uso e Condições de Serviço</p>
         </div>
@@ -29,19 +33,28 @@ export function TermosUso() {
             <h2 className="text-base font-semibold text-white mb-2">1. Aceitação dos Termos</h2>
             <p>
               Ao acessar e utilizar a plataforma <strong>Portal GCAC</strong> (doravante denominada "Plataforma" ou "Sistema"), 
-              você declara que leu, compreendeu e concorda em estar vinculado a estes Termos de Uso. Este software é voltado 
-              para a otimização de serviços operacionais de despachantes bélicos e controle pessoal de acervos de atiradores.
+              você declara que leu, compreendeu e concorda em estar vinculado a estes Termos de Uso. Este software é um sistema 
+              integrado de gestão voltado especificamente para a otimização de rotinas administrativas e operacionais de 
+              <strong>Despachantes Bélicos</strong> e para o controle e guarda digital de acervos de <strong>CACs (Caçadores, Atiradores Desportivos e Colecionadores)</strong>.
             </p>
           </section>
 
           <section>
-            <h2 className="text-base font-semibold text-white mb-2">2. Descrição das Funcionalidades</h2>
+            <h2 className="text-base font-semibold text-white mb-2">2. Perfis de Conta e Escopos de Uso</h2>
             <p>
-              O Portal GCAC é uma ferramenta que permite aos usuários (despachantes bélicos autorizados e atiradores individuais) 
-              gerenciar Ordens de Serviço (OS), orçamentos, recibos, agendamentos, movimentações de fluxo de caixa e documentação 
-              cadastral. O sistema opera de forma autônoma ("offline-first") salvando dados localmente no navegador e sincronizando-os 
-              com nosso banco de dados em nuvem.
+              O Portal GCAC opera com duas modalidades principais de contas para atender propósitos distintos do mercado bélico:
             </p>
+            <ul className="list-disc pl-5 space-y-2 mt-2 text-slate-400">
+              <li>
+                <strong>Perfil Despachante Bélico (B2B):</strong> Destinado a escritórios de despachantes e assessores credenciados para a gestão e controle de Ordens de Serviço (OS), orçamentos, recibos, agendamentos presenciais ou de laudos, movimentações financeiras de caixa e controle de processos de seus clientes.
+              </li>
+              <li>
+                <strong>Perfil CAC Individual (B2C):</strong> Destinado a Caçadores, Atiradores Desportivos e Colecionadores gerenciarem e arquivarem digitalmente seus próprios Certificados de Registro (CR Exército/IBAMA), CRAFs de suas armas de fogo, Guias de Tráfego (GT), autorizações de manejo e certidões gerais.
+              </li>
+              <li>
+                <strong>Vínculo de Escolha Livre do CAC:</strong> O usuário do perfil **CAC Individual** tem total autonomia e liberdade para vincular (associar) sua conta a qualquer Despachante Bélico credenciado de sua livre escolha na plataforma, permitindo que este preste assessoria técnica e documental. O CAC pode, a qualquer momento e por livre vontade, revogar esse vínculo ou migrar para outro despachante diretamente pelo seu painel de controle.
+              </li>
+            </ul>
           </section>
 
           <section>
@@ -69,12 +82,12 @@ export function TermosUso() {
           </section>
 
           <section>
-            <h2 className="text-base font-semibold text-white mb-2">4. Responsabilidades do Usuário</h2>
+            <h2 className="text-base font-semibold text-white mb-2">4. Responsabilidades dos Usuários (Despachantes e CACs)</h2>
             <p>
-              O usuário é inteiramente responsável pela confidencialidade de suas credenciais de login e pela autenticidade dos dados 
+              O usuário (seja ele Despachante Bélico, Caçador, Atirador Desportivo ou Colecionador) é inteiramente responsável pela confidencialidade de suas credenciais de login e pela autenticidade dos dados 
               inseridos na plataforma. O preenchimento de cadastros de armas de fogo, Certificados de Registro (CR), CRAF, Guias de Tráfego 
               (GT) e outras autorizações governamentais deve obedecer estritamente à legislação em vigor (Decretos Federais e Portarias 
-              do Exército Brasileiro). O Portal GCAC não possui vínculo com órgãos governamentais e funciona apenas como um facilitador de 
+              do Exército Brasileiro - COLOG, bem como Instruções Normativas do IBAMA para Caçadores/Manejadores). O Portal GCAC não possui vínculo com órgãos governamentais e funciona apenas como um facilitador de 
               organização de arquivos.
             </p>
           </section>
@@ -83,8 +96,7 @@ export function TermosUso() {
             <h2 className="text-base font-semibold text-white mb-2">5. Segurança Jurídica e LGPD</h2>
             <p>
               Toda a custódia de dados inseridos na plataforma é regida pela Lei Geral de Proteção de Dados (Lei nº 13.709/2018). 
-              Para vincular cadastros entre despachantes e atiradores individuais (B2C), o atirador deve fornecer autorização de acesso 
-              explícita em seu próprio painel, respeitando o direito de consentimento, portabilidade e exclusão de seus registros a qualquer momento.
+              A vinculação de dados do CAC Individual com o despachante parceiro depende de aceite explícito de convite na plataforma, respeitando integralmente o direito de consentimento, portabilidade, revogação do vínculo e exclusão de seus registros a qualquer momento pelo CAC.
             </p>
           </section>
 
@@ -120,10 +132,14 @@ export function PoliticaPrivacidade() {
         </button>
 
         {/* Branding Logo Header */}
-        <div className="text-center mt-6 mb-8">
-          <div className="w-12 h-12 rounded-full bg-brand-blue/10 border border-brand-blue flex items-center justify-center mx-auto mb-3">
-            <span className="text-brand-blue font-bold text-xl">G</span>
-          </div>
+        <div className="text-center mt-6 mb-8 flex flex-col items-center">
+          <img 
+            src="/logo 2.png" 
+            alt="Portal GCAC Logo" 
+            className="w-24 h-24 object-contain mb-3 drop-shadow-2xl"
+            style={{ mixBlendMode: 'screen' }}
+            onError={(e) => { e.currentTarget.style.display = 'none'; }}
+          />
           <h1 className="text-2xl font-bold text-white tracking-wide">Portal GCAC</h1>
           <p className="text-slate-400 text-xs mt-1">Política de Privacidade e Proteção de Dados (LGPD)</p>
         </div>
@@ -141,15 +157,14 @@ export function PoliticaPrivacidade() {
           <section>
             <h2 className="text-base font-semibold text-white mb-2">2. Informações que Coletamos</h2>
             <p>
-              Para o funcionamento regular das ferramentas de despachante e atirador, o portal processa os seguintes tipos de informações:
+              Para o funcionamento regular das ferramentas de despachante e controle bélico individual dos atiradores, o portal processa os seguintes tipos de informações:
             </p>
             <ul className="list-disc pl-5 space-y-1 mt-2 text-slate-400">
               <li>
-                <strong>Dados Cadastrais Básicos:</strong> Nome completo, CPF, e-mail de contato, endereço residencial e telefone corporativo.
+                <strong>Dados Cadastrais Básicos:</strong> Nome completo, CPF, e-mail de contato, endereço residencial e telefone comercial de Despachantes e de CACs (Caçadores, Atiradores Desportivos e Colecionadores).
               </li>
               <li>
-                <strong>Dados de Acervo Técnico (opcional):</strong> Número de Certificado de Registro (CR), número do SIGMA, validade de CRAFs, 
-                marcas, calibres e números de série das armas de fogo cadastradas pelos próprios despachantes ou atiradores autorizados.
+                <strong>Dados de Acervo Técnico (opcional):</strong> Número de Certificado de Registro (CR Exército ou IBAMA), número do SIGMA/SINARM, validade de CRAFs, marcas, calibres, números de série e imagens/anexos de documentos das armas de fogo cadastradas para controle pessoal do CAC ou acompanhamento documental do despachante.
               </li>
               <li>
                 <strong>Metadados do Google Auth:</strong> E-mail e nome público da conta Google para fins de autenticação de login segura.
@@ -190,20 +205,16 @@ export function PoliticaPrivacidade() {
           </section>
 
           <section>
-            <h2 className="text-base font-semibold text-white mb-2">5. Compartilhamento e Exclusão de Dados</h2>
+            <h2 className="text-base font-semibold text-white mb-2">5. Compartilhamento e Vínculo de Dados</h2>
             <p>
-              <strong>Não comercializamos e não transferimos seus dados para terceiros.</strong> Os dados do acervo do atirador individual 
-              são compartilhados exclusivamente com o despachante parceiro do cliente caso haja autorização digital recíproca através de convite 
-              aceito na plataforma. O usuário tem o direito de solicitar a exclusão definitiva de seu cadastro e de todos os dados do banco a 
-              qualquer momento através do suporte ou exclusão direta.
+              <strong>Não comercializamos e não transferimos seus dados para terceiros.</strong> O compartilhamento de dados do acervo do CAC Individual com o Despachante Bélico ocorre de forma estritamente consentida através da aceitação do convite ou vinculação por escolha livre do CAC no painel. O CAC tem o direito de revogar o vínculo, migrar para outro profissional ou solicitar a exclusão definitiva de seu cadastro e de todos os dados do banco a qualquer momento.
             </p>
           </section>
 
           <section>
             <h2 className="text-base font-semibold text-white mb-2">6. Contato do Suporte</h2>
             <p>
-              Caso tenha dúvidas sobre esta política ou queira exercer seus direitos de privacidade sob a LGPD, envie um e-mail para o e-mail do 
-              administrador do portal em <strong>gui.gomesassis@gmail.com</strong>.
+              Caso tenha dúvidas sobre esta política ou queira exercer seus direitos de privacidade sob a LGPD, envie um e-mail para o administrador do portal em <strong>gui.gomesassis@gmail.com</strong>.
             </p>
           </section>
         </div>
