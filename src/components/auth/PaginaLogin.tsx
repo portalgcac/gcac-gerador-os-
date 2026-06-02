@@ -143,18 +143,14 @@ export function PaginaLogin() {
             <div className="flex-grow border-t border-brand-dark-5"></div>
           </div>
 
-          {/* Pré-Cadastro para Despachante */}
+          {/* Pré-Cadastro Único */}
           <div className="space-y-3 pt-1">
             <Link
               to="/cadastro"
               className="w-full flex items-center justify-center gap-2 bg-brand-blue/10 hover:bg-brand-blue/20 text-brand-blue-light border border-brand-blue/30 font-bold py-3 px-4 rounded-xl text-xs uppercase tracking-wider transition-all duration-200 shadow-md hover:shadow-glow-blue active:scale-95 text-center"
             >
-              Fazer Pré-Cadastro (Despachante)
+              Fazer Pré-Cadastro
             </Link>
-
-            <p className="text-[11px] text-gray-400 text-center leading-normal">
-              <strong>Atirador (CAC):</strong> Solicite seu convite diretamente com seu despachante parceiro.
-            </p>
 
             <div className="grid grid-cols-2 gap-2 pt-1">
               <a

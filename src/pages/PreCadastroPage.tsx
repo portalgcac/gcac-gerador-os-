@@ -12,7 +12,9 @@ import {
   ArrowRight, 
   ArrowLeft, 
   HelpCircle,
-  Check
+  Check,
+  Building2,
+  UserCheck
 } from 'lucide-react';
 
 export function PreCadastroPage() {
@@ -22,6 +24,7 @@ export function PreCadastroPage() {
   const [erro, setErro] = useState('');
 
   // Formulário
+  const [tipoUsuario, setTipoUsuario] = useState<'despachante' | 'cac_individual'>('despachante');
   const [nome, setNome] = useState('');
   const [email, setEmail] = useState('');
   const [cpf, setCpf] = useState('');
@@ -54,10 +57,25 @@ export function PreCadastroPage() {
     setContato(formatarTelefone(e.target.value));
   };
 
+  // Ao mudar tipo de usuário, ajustamos o plano automático
+  const handleTipoUsuarioSelection = (tipo: 'despachante' | 'cac_individual') => {
+    setTipoUsuario(tipo);
+    if (tipo === 'cac_individual') {
+      setPlano('.22LR'); // CAC individual só pode usar .22LR
+    } else {
+      setPlano('.357mag'); // Default para despachante
+    }
+  };
+
   // Validações por etapa
   const validarPasso = () => {
     setErro('');
     if (step === 1) {
+      if (!tipoUsuario) {
+        setErro('Por favor, selecione seu tipo de perfil.');
+        return false;
+      }
+    } else if (step === 2) {
       if (!nome.trim() || nome.trim().split(' ').length < 2) {
         setErro('Por favor, insira seu nome completo (nome e sobrenome).');
         return false;
@@ -66,7 +84,7 @@ export function PreCadastroPage() {
         setErro('Por favor, insira um e-mail válido.');
         return false;
       }
-    } else if (step === 2) {
+    } else if (step === 3) {
       const cpfLimpo = cpf.replace(/\D/g, '');
       if (cpfLimpo.length !== 11) {
         setErro('Por favor, insira um CPF válido com 11 dígitos.');
@@ -106,6 +124,7 @@ export function PreCadastroPage() {
             email: email.toLowerCase().trim(),
             contato: contato.replace(/\D/g, ''),
             plano,
+            tipo_usuario: tipoUsuario,
             status: 'pendente'
           }
         ]);
@@ -114,7 +133,7 @@ export function PreCadastroPage() {
         throw error;
       }
 
-      setStep(5); // Tela de sucesso
+      setStep(6); // Tela de sucesso
     } catch (err: any) {
       console.error('Erro ao salvar pré-cadastro:', err);
       setErro('Ocorreu um erro ao salvar seu cadastro. Por favor, tente novamente ou fale com o suporte.');
@@ -145,16 +164,17 @@ export function PreCadastroPage() {
         {/* Card Principal */}
         <div className="card border border-brand-dark-5 bg-brand-dark-3/90 backdrop-blur-md shadow-2xl relative">
           
-          {/* Barra de Progresso (Passos 1 a 4) */}
-          {step <= 4 && (
+          {/* Barra de Progresso (Passos 1 a 5) */}
+          {step <= 5 && (
             <div className="mb-8">
               <div className="flex justify-between items-center mb-2">
-                <span className="text-xs text-gray-500 font-bold uppercase tracking-wider">Etapa {step} de 4</span>
+                <span className="text-xs text-gray-500 font-bold uppercase tracking-wider">Etapa {step} de 5</span>
                 <span className="text-xs text-brand-green font-bold uppercase tracking-wider">
-                  {step === 1 && 'Identificação'}
-                  {step === 2 && 'Contato'}
-                  {step === 3 && 'Escolha de Plano'}
-                  {step === 4 && 'Confirmar Dados'}
+                  {step === 1 && 'Tipo de Perfil'}
+                  {step === 2 && 'Identificação'}
+                  {step === 3 && 'Contato'}
+                  {step === 4 && 'Escolha de Plano'}
+                  {step === 5 && 'Confirmar Dados'}
                 </span>
               </div>
               <div className="h-2 bg-brand-dark-4 rounded-full overflow-hidden flex gap-0.5">
@@ -162,6 +182,7 @@ export function PreCadastroPage() {
                 <div className={`h-full transition-all duration-300 ${step >= 2 ? 'bg-brand-blue' : 'bg-brand-dark-5'} flex-1`} />
                 <div className={`h-full transition-all duration-300 ${step >= 3 ? 'bg-brand-blue' : 'bg-brand-dark-5'} flex-1`} />
                 <div className={`h-full transition-all duration-300 ${step >= 4 ? 'bg-brand-blue' : 'bg-brand-dark-5'} flex-1`} />
+                <div className={`h-full transition-all duration-300 ${step >= 5 ? 'bg-brand-blue' : 'bg-brand-dark-5'} flex-1`} />
               </div>
             </div>
           )}
@@ -172,8 +193,66 @@ export function PreCadastroPage() {
             </div>
           )}
 
-          {/* ── ETAPA 1: Nome e E-mail ──────────────────────────────────────── */}
+          {/* ── ETAPA 1: Tipo de Perfil ────────────────────────────────────── */}
           {step === 1 && (
+            <div className="space-y-6 animate-slide-up">
+              <div className="text-center">
+                <h2 className="text-xl font-bold text-white">Selecione o seu perfil de acesso</h2>
+                <p className="text-gray-400 text-sm mt-1">Escolha a opção que melhor se enquadra na sua atividade.</p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                {/* Opção Despachante */}
+                <div 
+                  onClick={() => handleTipoUsuarioSelection('despachante')}
+                  className={`border rounded-xl p-6 cursor-pointer transition-all flex flex-col justify-between items-center text-center hover:border-brand-blue/60 ${
+                    tipoUsuario === 'despachante' 
+                      ? 'border-brand-blue bg-brand-blue/10 shadow-glow-blue' 
+                      : 'border-brand-dark-5 bg-brand-dark-4'
+                  }`}
+                >
+                  <Building2 className={`w-12 h-12 mb-3 ${tipoUsuario === 'despachante' ? 'text-brand-blue-light' : 'text-gray-500'}`} />
+                  <div>
+                    <h3 className="text-lg font-extrabold text-white">Despachante Bélico</h3>
+                    <p className="text-xs text-gray-400 mt-2 leading-relaxed">
+                      Gerencie múltiplos clientes, emita ordens de serviço, orçamentos, recibos e organize sua empresa.
+                    </p>
+                  </div>
+                  {tipoUsuario === 'despachante' && (
+                    <span className="mt-4 px-3 py-1 bg-brand-blue/20 text-brand-blue-light rounded-full text-xs font-bold">
+                      Selecionado
+                    </span>
+                  )}
+                </div>
+
+                {/* Opção CAC Individual */}
+                <div 
+                  onClick={() => handleTipoUsuarioSelection('cac_individual')}
+                  className={`border rounded-xl p-6 cursor-pointer transition-all flex flex-col justify-between items-center text-center hover:border-brand-green/60 ${
+                    tipoUsuario === 'cac_individual' 
+                      ? 'border-brand-green bg-brand-green/10 shadow-glow' 
+                      : 'border-brand-dark-5 bg-brand-dark-4'
+                  }`}
+                >
+                  <UserCheck className={`w-12 h-12 mb-3 ${tipoUsuario === 'cac_individual' ? 'text-brand-green-light' : 'text-gray-500'}`} />
+                  <div>
+                    <h3 className="text-lg font-extrabold text-white">Atirador (CAC Individual)</h3>
+                    <p className="text-xs text-gray-400 mt-2 leading-relaxed">
+                      Acesso individual para gerenciar seu próprio acervo de armas, guias (GTs) e alertas pessoais de vencimento.
+                    </p>
+                  </div>
+                  {tipoUsuario === 'cac_individual' && (
+                    <span className="mt-4 px-3 py-1 bg-brand-green/20 text-brand-green-light rounded-full text-xs font-bold">
+                      Selecionado
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── ETAPA 2: Nome e E-mail ──────────────────────────────────────── */}
+          {step === 2 && (
             <div className="space-y-6 animate-slide-up">
               <div className="text-center md:text-left">
                 <h2 className="text-xl font-bold text-white flex items-center gap-2 justify-center md:justify-start">
@@ -209,8 +288,8 @@ export function PreCadastroPage() {
             </div>
           )}
 
-          {/* ── ETAPA 2: CPF e Telefone ──────────────────────────────────────── */}
-          {step === 2 && (
+          {/* ── ETAPA 3: CPF e Telefone ──────────────────────────────────────── */}
+          {step === 3 && (
             <div className="space-y-6 animate-slide-up">
               <div className="text-center md:text-left">
                 <h2 className="text-xl font-bold text-white flex items-center gap-2 justify-center md:justify-start">
@@ -248,38 +327,63 @@ export function PreCadastroPage() {
             </div>
           )}
 
-          {/* ── ETAPA 3: Escolha do Plano ────────────────────────────────────── */}
-          {step === 3 && (
+          {/* ── ETAPA 4: Escolha do Plano ────────────────────────────────────── */}
+          {step === 4 && (
             <div className="space-y-6 animate-slide-up">
               <div className="text-center">
-                <h2 className="text-xl font-bold text-white">Qual plano melhor atende seu negócio?</h2>
-                <p className="text-gray-400 text-sm mt-1">Selecione uma das opções abaixo baseada no calibre comercial.</p>
+                <h2 className="text-xl font-bold text-white">
+                  {tipoUsuario === 'cac_individual' 
+                    ? 'Seu plano como CAC Individual' 
+                    : 'Qual plano melhor atende seu escritório?'
+                  }
+                </h2>
+                <p className="text-gray-400 text-sm mt-1">
+                  {tipoUsuario === 'cac_individual'
+                    ? 'Atiradores (CAC Individual) se enquadram exclusivamente no plano .22LR.'
+                    : 'Selecione uma das opções abaixo baseada no calibre comercial de sua empresa.'
+                  }
+                </p>
               </div>
+
+              {/* Informação visual / Alerta para CAC Individual */}
+              {tipoUsuario === 'cac_individual' && (
+                <div className="bg-brand-green/10 border border-brand-green/20 text-brand-green-light rounded-xl p-4 text-xs font-semibold leading-relaxed">
+                  📢 <strong>Importante:</strong> Como você se cadastrou como **Atirador (CAC Individual)**, seu plano é limitado apenas ao gerenciamento do seu acervo pessoal. Os outros planos comerciais de despachante estão bloqueados para este perfil.
+                </div>
+              )}
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
                 
                 {/* Plano .22LR */}
                 <div 
-                  onClick={() => setPlano('.22LR')}
-                  className={`border rounded-xl p-5 cursor-pointer transition-all flex flex-col justify-between relative hover:border-brand-blue/60 ${
+                  onClick={() => tipoUsuario === 'despachante' && setPlano('.22LR')}
+                  className={`border rounded-xl p-5 transition-all flex flex-col justify-between relative ${
+                    tipoUsuario === 'despachante' ? 'cursor-pointer hover:border-brand-blue/60' : 'cursor-default'
+                  } ${
                     plano === '.22LR' 
-                      ? 'border-brand-blue bg-brand-blue/10 shadow-glow-blue' 
-                      : 'border-brand-dark-5 bg-brand-dark-4'
+                      ? 'border-brand-green bg-brand-green/15 shadow-glow' 
+                      : 'border-brand-dark-5 bg-brand-dark-4 opacity-40'
                   }`}
                 >
                   <div className="flex justify-between items-start">
-                    <span className="bg-brand-dark-5 text-[11px] text-gray-300 font-bold px-2 py-0.5 rounded-full">
+                    <span className="bg-brand-dark bg-brand-green-dark text-black font-black text-xs px-2.5 py-1 rounded-full uppercase tracking-wider">
                       .22LR
                     </span>
                     {plano === '.22LR' && (
-                      <span className="w-5 h-5 bg-brand-blue rounded-full flex items-center justify-center text-white">
+                      <span className="w-5 h-5 bg-brand-green rounded-full flex items-center justify-center text-brand-dark">
                         <Check size={12} strokeWidth={3} />
                       </span>
                     )}
                   </div>
                   <div className="my-4">
-                    <h3 className="text-lg font-extrabold text-white">Iniciante / Solo</h3>
-                    <p className="text-xs text-gray-400 mt-1 leading-snug">Ideal para 1 único operador/gestor.</p>
+                    <h3 className="text-xl font-black text-white uppercase tracking-tight">Plano .22LR</h3>
+                    <p className="text-xs text-gray-400 mt-2 font-semibold">Iniciante / Solo</p>
+                    <p className="text-[11px] text-gray-400 mt-1 leading-snug">
+                      {tipoUsuario === 'cac_individual' 
+                        ? 'Plano exclusivo para Atirador (CAC Individual).' 
+                        : 'Ideal para 1 único operador/despachante.'
+                      }
+                    </p>
                   </div>
                   <div className="border-t border-brand-dark-5/50 pt-3">
                     <span className="text-2xl font-black text-white">R$ 30</span>
@@ -289,30 +393,35 @@ export function PreCadastroPage() {
 
                 {/* Plano .357mag - Recomendado */}
                 <div 
-                  onClick={() => setPlano('.357mag')}
-                  className={`border rounded-xl p-5 cursor-pointer transition-all flex flex-col justify-between relative hover:border-brand-green/60 ${
+                  onClick={() => tipoUsuario === 'despachante' && setPlano('.357mag')}
+                  className={`border rounded-xl p-5 transition-all flex flex-col justify-between relative ${
+                    tipoUsuario === 'despachante' ? 'cursor-pointer hover:border-brand-blue/60' : 'cursor-not-allowed'
+                  } ${
                     plano === '.357mag' 
-                      ? 'border-brand-green bg-brand-green/10 shadow-glow' 
-                      : 'border-brand-dark-5 bg-brand-dark-4'
+                      ? 'border-brand-blue bg-brand-blue/15 shadow-glow-blue' 
+                      : 'border-brand-dark-5 bg-brand-dark-4 ' + (tipoUsuario === 'cac_individual' ? 'opacity-20' : '')
                   }`}
                 >
-                  <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-brand-green text-brand-dark font-black text-[10px] uppercase tracking-widest px-3 py-1 rounded-full shadow-lg">
-                    Recomendado
-                  </span>
+                  {tipoUsuario === 'despachante' && (
+                    <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-brand-blue text-white font-black text-[10px] uppercase tracking-widest px-3 py-1 rounded-full shadow-lg">
+                      Recomendado
+                    </span>
+                  )}
 
                   <div className="flex justify-between items-start mt-1">
-                    <span className="bg-brand-green/20 text-brand-green text-[11px] font-bold px-2 py-0.5 rounded-full">
+                    <span className="bg-brand-blue text-white font-black text-xs px-2.5 py-1 rounded-full uppercase tracking-wider">
                       .357mag
                     </span>
                     {plano === '.357mag' && (
-                      <span className="w-5 h-5 bg-brand-green rounded-full flex items-center justify-center text-brand-dark">
+                      <span className="w-5 h-5 bg-brand-blue rounded-full flex items-center justify-center text-white">
                         <Check size={12} strokeWidth={3} />
                       </span>
                     )}
                   </div>
                   <div className="my-4">
-                    <h3 className="text-lg font-extrabold text-white">Profissional</h3>
-                    <p className="text-xs text-gray-300 mt-1 leading-snug">Até 4 usuários da equipe + financeiro completo.</p>
+                    <h3 className="text-xl font-black text-white uppercase tracking-tight">Plano .357mag</h3>
+                    <p className="text-xs text-gray-400 mt-2 font-semibold">Profissional</p>
+                    <p className="text-[11px] text-gray-400 mt-1 leading-snug">Até 4 usuários da equipe + financeiro completo.</p>
                   </div>
                   <div className="border-t border-brand-dark-5/50 pt-3">
                     <span className="text-2xl font-black text-white">R$ 50</span>
@@ -322,15 +431,17 @@ export function PreCadastroPage() {
 
                 {/* Plano .308win */}
                 <div 
-                  onClick={() => setPlano('.308win')}
-                  className={`border rounded-xl p-5 cursor-pointer transition-all flex flex-col justify-between relative hover:border-brand-blue/60 ${
+                  onClick={() => tipoUsuario === 'despachante' && setPlano('.308win')}
+                  className={`border rounded-xl p-5 transition-all flex flex-col justify-between relative ${
+                    tipoUsuario === 'despachante' ? 'cursor-pointer hover:border-brand-blue/60' : 'cursor-not-allowed'
+                  } ${
                     plano === '.308win' 
-                      ? 'border-brand-blue bg-brand-blue/10 shadow-glow-blue' 
-                      : 'border-brand-dark-5 bg-brand-dark-4'
+                      ? 'border-brand-blue bg-brand-blue/15 shadow-glow-blue' 
+                      : 'border-brand-dark-5 bg-brand-dark-4 ' + (tipoUsuario === 'cac_individual' ? 'opacity-20' : '')
                   }`}
                 >
                   <div className="flex justify-between items-start">
-                    <span className="bg-brand-dark-5 text-[11px] text-gray-300 font-bold px-2 py-0.5 rounded-full">
+                    <span className="bg-brand-blue-dark text-white font-black text-xs px-2.5 py-1 rounded-full uppercase tracking-wider">
                       .308win
                     </span>
                     {plano === '.308win' && (
@@ -340,8 +451,9 @@ export function PreCadastroPage() {
                     )}
                   </div>
                   <div className="my-4">
-                    <h3 className="text-lg font-extrabold text-white">Premium / VIP</h3>
-                    <p className="text-xs text-gray-400 mt-1 leading-snug">Acessos ilimitados + Suporte prioritário.</p>
+                    <h3 className="text-xl font-black text-white uppercase tracking-tight">Plano .308win</h3>
+                    <p className="text-xs text-gray-400 mt-2 font-semibold">Premium / VIP</p>
+                    <p className="text-[11px] text-gray-400 mt-1 leading-snug">Acessos ilimitados staff + Suporte prioritário.</p>
                   </div>
                   <div className="border-t border-brand-dark-5/50 pt-3">
                     <span className="text-2xl font-black text-white">R$ 100</span>
@@ -360,8 +472,8 @@ export function PreCadastroPage() {
             </div>
           )}
 
-          {/* ── ETAPA 4: Resumo dos Dados ────────────────────────────────────── */}
-          {step === 4 && (
+          {/* ── ETAPA 5: Resumo dos Dados ────────────────────────────────────── */}
+          {step === 5 && (
             <div className="space-y-6 animate-slide-up">
               <div className="text-center md:text-left">
                 <h2 className="text-xl font-bold text-white flex items-center gap-2 justify-center md:justify-start">
@@ -373,7 +485,13 @@ export function PreCadastroPage() {
               <div className="bg-brand-dark-4 border border-brand-dark-5/60 rounded-xl p-5 space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                   <div>
-                    <span className="text-gray-500 font-semibold block text-xs uppercase tracking-wider">Nome do Titular</span>
+                    <span className="text-gray-500 font-semibold block text-xs uppercase tracking-wider">Tipo de Perfil</span>
+                    <span className="text-brand-blue-light font-bold text-base">
+                      {tipoUsuario === 'despachante' ? '📋 Despachante Bélico / Escritório' : '🎯 Atirador / CAC Individual'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500 font-semibold block text-xs uppercase tracking-wider">Nome Completo</span>
                     <span className="text-white font-bold text-base">{nome}</span>
                   </div>
                   <div>
@@ -394,9 +512,9 @@ export function PreCadastroPage() {
                   <div>
                     <span className="text-gray-500 font-semibold block text-xs uppercase tracking-wider">Plano Selecionado</span>
                     <span className="text-brand-green font-extrabold text-lg">
-                      {plano === '.22LR' && 'Iniciante / Solo (.22LR)'}
-                      {plano === '.357mag' && 'Profissional (.357mag)'}
-                      {plano === '.308win' && 'Premium / VIP (.308win)'}
+                      {plano === '.22LR' && 'Plano .22LR (Iniciante / Solo)'}
+                      {plano === '.357mag' && 'Plano .357mag (Profissional)'}
+                      {plano === '.308win' && 'Plano .308win (Premium)'}
                     </span>
                   </div>
                   <div className="text-right">
@@ -413,8 +531,8 @@ export function PreCadastroPage() {
             </div>
           )}
 
-          {/* ── ETAPA 5: Sucesso ────────────────────────────────────────────── */}
-          {step === 5 && (
+          {/* ── ETAPA 6: Sucesso ────────────────────────────────────────────── */}
+          {step === 6 && (
             <div className="py-8 space-y-6 text-center animate-scale-up">
               <div className="flex justify-center">
                 <div className="w-20 h-20 bg-brand-green/20 rounded-full flex items-center justify-center border-2 border-brand-green/30 animate-pulse">
@@ -425,21 +543,29 @@ export function PreCadastroPage() {
               <div className="space-y-2">
                 <h2 className="text-2xl font-black text-white tracking-tight">Pré-Cadastro Enviado! 🎉</h2>
                 <p className="text-gray-300 text-sm max-w-md mx-auto leading-relaxed">
-                  Os dados do seu escritório foram registrados com sucesso. Nosso comercial já recebeu sua proposta de plano.
+                  Os dados do seu cadastro foram registrados com sucesso. Nosso comercial já recebeu sua proposta.
                 </p>
-                <p className="text-brand-green font-bold text-sm bg-brand-green/10 border border-brand-green/20 rounded-lg py-2 px-4 max-w-sm mx-auto mt-2">
-                  Plano Pré-Selecionado: {plano}
-                </p>
+                <div className="flex flex-col sm:flex-row gap-2 justify-center max-w-md mx-auto mt-2">
+                  <p className="text-brand-blue font-bold text-xs bg-brand-blue/10 border border-brand-blue/20 rounded-lg py-2 px-4 flex-1">
+                    Perfil: {tipoUsuario === 'despachante' ? 'Despachante' : 'CAC Individual'}
+                  </p>
+                  <p className="text-brand-green font-bold text-xs bg-brand-green/10 border border-brand-green/20 rounded-lg py-2 px-4 flex-1">
+                    Plano Selecionado: {plano}
+                  </p>
+                </div>
               </div>
 
               <div className="border-t border-brand-dark-5/50 pt-6 max-w-md mx-auto space-y-4">
                 <p className="text-xs text-gray-400 leading-normal">
-                  <strong>Acelere sua liberação:</strong> Como este é um sistema homologado e controlado para despachantes de armas, clique em um dos canais abaixo para validar seus dados com o suporte e liberar seu login imediato:
+                  {tipoUsuario === 'cac_individual'
+                    ? 'Como seu cadastro é individual, envie uma mensagem no WhatsApp do suporte do Portal GCAC para acelerar a liberação e vinculação da sua conta com o sistema:'
+                    : 'Como este é um sistema homologado para despachantes de armas, clique em um dos canais abaixo para validar seus dados com o suporte e liberar seu login comercial imediato:'
+                  }
                 </p>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <a
-                    href={`https://wa.me/5564999559865?text=${encodeURIComponent(`Olá! Fiz meu pré-cadastro no Portal G CAC (${nome}, CPF: ${cpf}) no plano ${plano}. Gostaria de validar meus dados e ativar minha conta.`)}`}
+                    href={`https://wa.me/5564999559865?text=${encodeURIComponent(`Olá! Fiz meu pré-cadastro no Portal G CAC (${nome}, CPF: ${cpf}) como ${tipoUsuario === 'despachante' ? 'Despachante' : 'CAC Individual'} no plano ${plano}. Gostaria de validar meus dados e ativar minha conta.`)}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center justify-center gap-2 bg-[#25D366] hover:bg-[#20ba5a] text-black font-extrabold py-3 px-4 rounded-xl text-xs uppercase tracking-wider transition-all duration-200 shadow-lg active:scale-95"
@@ -447,7 +573,7 @@ export function PreCadastroPage() {
                     Chamar Suporte 1
                   </a>
                   <a
-                    href={`https://wa.me/5564999681003?text=${encodeURIComponent(`Olá! Fiz meu pré-cadastro no Portal G CAC (${nome}, CPF: ${cpf}) no plano ${plano}. Gostaria de validar meus dados e ativar minha conta.`)}`}
+                    href={`https://wa.me/5564999681003?text=${encodeURIComponent(`Olá! Fiz meu pré-cadastro no Portal G CAC (${nome}, CPF: ${cpf}) como ${tipoUsuario === 'despachante' ? 'Despachante' : 'CAC Individual'} no plano ${plano}. Gostaria de validar meus dados e ativar minha conta.`)}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center justify-center gap-2 bg-[#25D366] hover:bg-[#20ba5a] text-black font-extrabold py-3 px-4 rounded-xl text-xs uppercase tracking-wider transition-all duration-200 shadow-lg active:scale-95"
@@ -468,8 +594,8 @@ export function PreCadastroPage() {
             </div>
           )}
 
-          {/* BOTOES DE NAVEGAÇÃO DO WIZARD (Etapas 1 a 4) */}
-          {step <= 4 && (
+          {/* BOTOES DE NAVEGAÇÃO DO WIZARD (Etapas 1 a 5) */}
+          {step <= 5 && (
             <div className="mt-8 pt-6 border-t border-brand-dark-5/50 flex justify-between gap-4">
               {step > 1 ? (
                 <button
@@ -490,7 +616,7 @@ export function PreCadastroPage() {
                 </button>
               )}
 
-              {step < 4 ? (
+              {step < 5 ? (
                 <button
                   type="button"
                   onClick={avancar}
