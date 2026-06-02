@@ -68,7 +68,7 @@ export async function exportarAcervoPdf(perfil: any, armas: any[], manejos: any[
     }
 
     if (!logoBase64) {
-      const logoRes = await fetch('/logo 2.png');
+      const logoRes = await fetch('/LOGO CORRETA.png');
       if (logoRes.ok) {
         const logoBlob = await logoRes.blob();
         logoBase64 = await blobParaBase64(logoBlob);

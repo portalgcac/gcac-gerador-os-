@@ -122,7 +122,7 @@ export function Sidebar() {
       <div className="p-5 border-b border-brand-dark-5 flex flex-col items-center text-center gap-3 relative">
         <div className="flex flex-col items-center w-full">
           <img 
-            src={usuario?.dadosEmpresa?.logoUrl || "/logo 2.png"} 
+            src={usuario?.dadosEmpresa?.logoUrl || "/LOGO CORRETA.png"} 
             alt="GCAC" 
             className="w-28 h-28 object-contain mb-2"
             style={usuario?.dadosEmpresa?.logoUrl ? undefined : { mixBlendMode: 'screen' }}

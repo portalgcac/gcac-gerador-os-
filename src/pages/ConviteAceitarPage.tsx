@@ -389,7 +389,7 @@ export function ConviteAceitarPage() {
         {/* Logo */}
         <div className="text-center">
           <img
-            src="/logo 2.png"
+            src="/LOGO CORRETA.png"
             alt="GCAC Logo"
             className="w-24 h-24 object-contain mx-auto drop-shadow-2xl"
             style={{ mixBlendMode: 'screen' }}

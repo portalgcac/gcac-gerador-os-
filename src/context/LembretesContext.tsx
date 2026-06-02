@@ -103,7 +103,7 @@ export function LembretesProvider({ children }: { children: React.ReactNode }) {
             if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
               new Notification(`Lembrete: ${lembrete.titulo}`, {
                 body: lembrete.descricao || 'Tarefa para hoje.',
-                icon: '/Logo oficial.png',
+                icon: '/LOGO CORRETA.png',
                 vibrate: [200, 100, 200]
               } as any);
             }

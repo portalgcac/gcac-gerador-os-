@@ -18,7 +18,7 @@ export function TermosUso() {
         {/* Branding Logo Header */}
         <div className="text-center mt-6 mb-8 flex flex-col items-center">
           <img 
-            src="/logo 2.png" 
+            src="/LOGO CORRETA.png" 
             alt="Portal GCAC Logo" 
             className="w-24 h-24 object-contain mb-3 drop-shadow-2xl"
             style={{ mixBlendMode: 'screen' }}
@@ -134,7 +134,7 @@ export function PoliticaPrivacidade() {
         {/* Branding Logo Header */}
         <div className="text-center mt-6 mb-8 flex flex-col items-center">
           <img 
-            src="/logo 2.png" 
+            src="/LOGO CORRETA.png" 
             alt="Portal GCAC Logo" 
             className="w-24 h-24 object-contain mb-3 drop-shadow-2xl"
             style={{ mixBlendMode: 'screen' }}

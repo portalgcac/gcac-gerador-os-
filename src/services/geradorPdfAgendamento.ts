@@ -39,7 +39,7 @@ export async function gerarPdfAgendamentoBlob(agendamento: Agendamento): Promise
     }
 
     if (!logoBase64) {
-      const logoRes = await fetch('/Logo oficial.png');
+      const logoRes = await fetch('/LOGO CORRETA.png');
       if (logoRes.ok) {
         const logoBlob = await logoRes.blob();
         logoBase64 = await blobParaBase64(logoBlob);

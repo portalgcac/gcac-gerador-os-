@@ -70,7 +70,7 @@ export function BriefingDiario() {
           <div className="mb-4 sm:mb-6 mt-4 sm:mt-0 relative">
             <div className="absolute inset-0 bg-brand-blue/20 blur-2xl rounded-full" />
             <img 
-              src={usuario?.dadosEmpresa?.logoUrl || "/Logo oficial.png"} 
+              src={usuario?.dadosEmpresa?.logoUrl || "/LOGO CORRETA.png"} 
               alt="Logo GCAC" 
               className="w-16 h-16 sm:w-20 sm:h-20 object-contain relative z-10"
               onError={(e) => (e.currentTarget.style.display = 'none')} 
