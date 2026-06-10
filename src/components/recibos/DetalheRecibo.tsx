@@ -22,6 +22,7 @@ export function DetalheRecibo({ recibo }: DetalheReciboProps) {
   const navigate = useNavigate();
   const { deletarRecibo } = useRecibos();
   const { usuario } = useAuth();
+  const ehEmpresaGuilherme = usuario?.email === 'gui.gomesassis@gmail.com' || usuario?.dadosEmpresa?.responsavelNome?.toUpperCase() === 'GUILHERME GOMES';
   const podeExcluir = usuario?.role === 'admin' || usuario?.permissoes?.includes('excluir_registros');
   const [gerandoPdf, setGerandoPdf] = React.useState(false);
   const [confirmandoDelete, setConfirmandoDelete] = React.useState(false);
@@ -238,18 +239,22 @@ export function DetalheRecibo({ recibo }: DetalheReciboProps) {
           {/* Assinaturas */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-12 pt-16 mt-16 border-t border-brand-dark-5 print:mt-12 print:pt-8 print:border-gray-200">
             <div className="text-center space-y-2 relative flex flex-col items-center">
-              <img 
-                src="/assinatura_guilherme.png" 
-                alt="Assinatura" 
-                className="absolute -top-24 left-1/2 -translate-x-1/2 h-40 w-auto object-contain pointer-events-none z-0"
-                onError={e => {
-                  console.error('Erro ao carregar assinatura');
-                  (e.target as HTMLImageElement).style.visibility = 'hidden';
-                }}
-              />
+              {ehEmpresaGuilherme && (
+                <img 
+                  src="/assinatura_guilherme.png" 
+                  alt="Assinatura" 
+                  className="absolute -top-24 left-1/2 -translate-x-1/2 h-40 w-auto object-contain pointer-events-none z-0"
+                  onError={e => {
+                    console.error('Erro ao carregar assinatura');
+                    (e.target as HTMLImageElement).style.visibility = 'hidden';
+                  }}
+                />
+              )}
               <div className="border-t border-brand-dark pt-2 mx-auto w-4/5 print:border-gray-900 relative z-10" />
               <p className="text-[10px] font-black uppercase tracking-wider text-gray-400 relative z-10">Pelo Responsável / Emitente</p>
-              <p className="text-sm font-bold uppercase relative z-10">Guilherme Gomes</p>
+              <p className="text-sm font-bold uppercase relative z-10">
+                {usuario?.dadosEmpresa?.responsavelNome || (ehEmpresaGuilherme ? 'Guilherme Gomes' : '')}
+              </p>
               <p className="text-[8px] text-gray-400 uppercase font-bold relative z-10">CNPJ: {recibo.emitenteCNPJ}</p>
             </div>
             <div className="text-center space-y-2">

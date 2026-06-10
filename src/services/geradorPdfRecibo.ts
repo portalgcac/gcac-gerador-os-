@@ -228,16 +228,33 @@ export async function gerarPdfReciboBlob(recibo: Recibo): Promise<Blob> {
   }
   const yAssIn = altura - 60;
 
-  // 5.1 Assinatura Guilherme (Rubrica Master) - Desenhar primeiro para ficar por baixo
+  // 5.1 Assinatura (Apenas para empresa do Guilherme) - Desenhar primeiro para ficar por baixo
+  let responsavelNome = '';
+  let ehEmpresaGuilherme = false;
   try {
-    const assRes = await fetch('/assinatura_guilherme.png');
-    if (assRes.ok) {
-      const assBlob = await assRes.blob();
-      const assBase64 = await blobParaBase64(assBlob);
-      // Maior: Width 80mm, Height 40mm. Centralizada (57.5 - 40 = 17.5) e sobrepondo a linha.
-      doc.addImage(assBase64, 'PNG', 17.5, yAssIn - 32, 80, 40);
+    const dadosUsuario = localStorage.getItem('gcac_usuario');
+    if (dadosUsuario) {
+      const u = JSON.parse(dadosUsuario);
+      responsavelNome = u.dadosEmpresa?.responsavelNome || '';
+      ehEmpresaGuilherme = u.email === 'gui.gomesassis@gmail.com' || responsavelNome.toUpperCase() === 'GUILHERME GOMES';
     }
-  } catch { /* erro na rubrica */ }
+  } catch { /* erro no parse */ }
+
+  if (!responsavelNome) {
+    responsavelNome = ehEmpresaGuilherme ? 'GUILHERME GOMES' : '';
+  }
+
+  if (ehEmpresaGuilherme) {
+    try {
+      const assRes = await fetch('/assinatura_guilherme.png');
+      if (assRes.ok) {
+        const assBlob = await assRes.blob();
+        const assBase64 = await blobParaBase64(assBlob);
+        // Maior: Width 80mm, Height 40mm. Centralizada (57.5 - 40 = 17.5) e sobrepondo a linha.
+        doc.addImage(assBase64, 'PNG', 17.5, yAssIn - 32, 80, 40);
+      }
+    } catch { /* erro na rubrica */ }
+  }
   
   // 5.2 Linha e Textos (Por cima)
   doc.setLineWidth(1);
@@ -250,7 +267,7 @@ export async function gerarPdfReciboBlob(recibo: Recibo): Promise<Blob> {
   doc.text('PELO RESPONSÁVEL / EMITENTE', (20 + (largura / 2 - 10)) / 2, yAssIn + 5, { align: 'center' });
   doc.setTextColor(ESCURO_BRAND);
   doc.setFontSize(11);
-  doc.text('GUILHERME GOMES', (20 + (largura / 2 - 10)) / 2, yAssIn + 12, { align: 'center' });
+  doc.text(responsavelNome.toUpperCase(), (20 + (largura / 2 - 10)) / 2, yAssIn + 12, { align: 'center' });
   doc.setFontSize(7);
   doc.text(`CNPJ: ${recibo.emitenteCNPJ}`, (20 + (largura / 2 - 10)) / 2, yAssIn + 17, { align: 'center' });
 

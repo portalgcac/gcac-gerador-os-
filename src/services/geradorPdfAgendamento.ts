@@ -24,18 +24,17 @@ export async function gerarPdfAgendamentoBlob(agendamento: Agendamento): Promise
   let y = 0;
 
   // 1. Header
-  let nomeEmpresa = 'GCAC DESPACHANTE BÉLICO';
+  let nomeEmpresa = '';
   try {
     let logoBase64 = '';
     const dadosUsuario = localStorage.getItem('gcac_usuario');
     if (dadosUsuario) {
       const u = JSON.parse(dadosUsuario);
+      const ehGuilherme = u.email === 'gui.gomesassis@gmail.com';
       if (u.dadosEmpresa?.logoUrl) {
         logoBase64 = u.dadosEmpresa.logoUrl;
       }
-      if (u.dadosEmpresa?.razaoSocialFantasia) {
-        nomeEmpresa = u.dadosEmpresa.razaoSocialFantasia.toUpperCase();
-      }
+      nomeEmpresa = u.dadosEmpresa?.razaoSocialFantasia?.toUpperCase() || u.dadosEmpresa?.nome?.toUpperCase() || (ehGuilherme ? 'GCAC DESPACHANTE BÉLICO' : '');
     }
 
     if (!logoBase64) {

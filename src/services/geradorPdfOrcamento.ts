@@ -15,21 +15,20 @@ export async function gerarPdfOrcamentoBlob(orcamento: Orcamento): Promise<Blob>
   let y = 0;
 
   // Obter dados da empresa logada para cabeçalho do PDF
-  let nomeEmpresa = 'GCAC Despachante Bélico';
-  let responsavel = 'Guilherme Gomes';
-  let telefone = '(64) 9.9995-9865';
-  let endereco = 'Av. Goias, n 1802, Sala 04 - Bairro Santa Maria - Jatai-GO';
+  let nomeEmpresa = '';
+  let responsavel = '';
+  let telefone = '';
+  let endereco = '';
 
   try {
     const dadosUsuario = localStorage.getItem('gcac_usuario');
     if (dadosUsuario) {
       const u = JSON.parse(dadosUsuario);
-      if (u.dadosEmpresa) {
-        nomeEmpresa = u.dadosEmpresa.razaoSocialFantasia || u.dadosEmpresa.nome || nomeEmpresa;
-        responsavel = u.dadosEmpresa.responsavelNome || responsavel;
-        telefone = u.dadosEmpresa.contatoTelefone || telefone;
-        endereco = u.dadosEmpresa.endereco || endereco;
-      }
+      const ehGuilherme = u.email === 'gui.gomesassis@gmail.com';
+      nomeEmpresa = u.dadosEmpresa?.razaoSocialFantasia || u.dadosEmpresa?.nome || (ehGuilherme ? 'GCAC Despachante Bélico' : '');
+      responsavel = u.dadosEmpresa?.responsavelNome || (ehGuilherme ? 'Guilherme Gomes' : '');
+      telefone = u.dadosEmpresa?.contatoTelefone || (ehGuilherme ? '(64) 9.9995-9865' : '');
+      endereco = u.dadosEmpresa?.endereco || (ehGuilherme ? 'Av. Goias, n 1802, Sala 04 - Bairro Santa Maria - Jatai-GO' : '');
     }
   } catch (err) {
     console.error('Erro ao ler dados da empresa do localStorage:', err);
