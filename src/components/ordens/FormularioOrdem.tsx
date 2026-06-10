@@ -221,6 +221,25 @@ export function FormularioOrdem({ ordemExistente }: FormularioOrdemProps) {
     }
   }, [location, ordemExistente, clubeParceiroNome]);
 
+  // Se estiver editando uma ordem existente, garantir que os dados do cliente reflitam o perfil atual do cadastro
+  useEffect(() => {
+    if (ordemExistente && clientes.length > 0) {
+      const c = clientes.find(cli => cli.cpf === ordemExistente.cpf);
+      if (c) {
+        setForm(f => ({
+          ...f,
+          nomeCliente: c.nome,
+          contato: c.contato,
+          senhaGov: c.senhaGov,
+          filiadoProTiro: c.filiadoProTiro,
+          clubeFiliado: c.clubeFiliado || '',
+          clubeFiliadoText: c.filiadoProTiro ? (clubeParceiroNome || 'CLUBE DE TIRO E CAÇA PRÓ TIRO') : (c.clubeFiliado || ''),
+          endereco: c.endereco || ''
+        }));
+      }
+    }
+  }, [ordemExistente, clientes, clubeParceiroNome]);
+
   const [erros, setErros] = useState<Record<string, string>>({});
 
   const atualizar = (campo: string, valor: any) => {

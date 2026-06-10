@@ -207,12 +207,50 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
     if (crUrl !== undefined) dadosComUrls.crUrl = crUrl;
     if (crIbamaUrl !== undefined) dadosComUrls.crIbamaUrl = crIbamaUrl;
 
+    // Buscar CPF atual do cliente antes de atualizar
+    const { data: clienteAtual } = await supabase
+      .from('clientes')
+      .select('cpf')
+      .eq('id', id)
+      .single();
+
     const { error } = await supabase
       .from('clientes')
       .update({ ...mapToDB(dadosComUrls), atualizado_em: new Date().toISOString() })
       .eq('id', id);
 
     if (error) throw error;
+
+    // Se encontramos o CPF, atualizar as ordens e orçamentos vinculados a este cliente
+    if (clienteAtual?.cpf) {
+      const payloadVinculados: any = {};
+      if (dados.nome !== undefined) payloadVinculados.nome_cliente = String(dados.nome).toUpperCase();
+      if (dados.contato !== undefined) payloadVinculados.contato = dados.contato;
+      if (dados.cpf !== undefined) payloadVinculados.cpf = dados.cpf;
+      if (dados.senhaGov !== undefined) payloadVinculados.senha_gov = dados.senhaGov;
+      if (dados.endereco !== undefined) payloadVinculados.endereco = String(dados.endereco).toUpperCase();
+      if (dados.filiadoProTiro !== undefined) payloadVinculados.filiado_pro_tiro = dados.filiadoProTiro;
+      if (dados.clubeFiliado !== undefined) payloadVinculados.clube_filiado = dados.clubeFiliado;
+
+      if (Object.keys(payloadVinculados).length > 0) {
+        payloadVinculados.atualizado_em = new Date().toISOString();
+        
+        // Atualiza ordens
+        await supabase
+          .from('ordens')
+          .update(payloadVinculados)
+          .eq('cpf', clienteAtual.cpf)
+          .eq('empresa_id', usuario.empresaId);
+
+        // Atualiza orçamentos
+        await supabase
+          .from('orcamentos')
+          .update(payloadVinculados)
+          .eq('cpf', clienteAtual.cpf)
+          .eq('empresa_id', usuario.empresaId);
+      }
+    }
+
     await carregarClientes();
   }, [carregarClientes, usuario]);
 

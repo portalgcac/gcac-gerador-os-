@@ -33,6 +33,27 @@ export function DetalheOrcamento({ orcamento }: DetalheOrcamentoProps) {
 
   const osVinculada = orcamento.convertidoOsId ? ordens.find(o => o.id === orcamento.convertidoOsId) : null;
   const temRenovacaoCRAF = orcamento.servicos.some(s => s.nome.toUpperCase().includes('RENOVAÇÃO DE CRAF'));
+  const clienteDoOrcamento = clientes.find(c => c.cpf === orcamento.cpf);
+
+  React.useEffect(() => {
+    if (clienteDoOrcamento && (
+      clienteDoOrcamento.senhaGov !== (orcamento.senhaGov || '') ||
+      clienteDoOrcamento.nome !== orcamento.nomeCliente ||
+      clienteDoOrcamento.contato !== orcamento.contato ||
+      clienteDoOrcamento.endereco !== (orcamento.endereco || '') ||
+      clienteDoOrcamento.filiadoProTiro !== orcamento.filiadoProTiro ||
+      (clienteDoOrcamento.clubeFiliado || '') !== (orcamento.clubeFiliado || '')
+    )) {
+      atualizarOrcamento(orcamento.id, {
+        nomeCliente: clienteDoOrcamento.nome,
+        contato: clienteDoOrcamento.contato,
+        senhaGov: clienteDoOrcamento.senhaGov,
+        endereco: clienteDoOrcamento.endereco,
+        filiadoProTiro: clienteDoOrcamento.filiadoProTiro,
+        clubeFiliado: clienteDoOrcamento.clubeFiliado || ''
+      }).catch(console.error);
+    }
+  }, [clienteDoOrcamento, orcamento.id, orcamento.senhaGov, orcamento.nomeCliente, orcamento.contato, orcamento.endereco, orcamento.filiadoProTiro, orcamento.clubeFiliado, atualizarOrcamento]);
 
   const handleDeletar = async () => {
     try {

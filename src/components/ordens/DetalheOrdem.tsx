@@ -52,6 +52,19 @@ export function DetalheOrdem({ ordem }: DetalheOrdemProps) {
     }
   }, [clienteDaOS, buscarCreditos, ordem.historicoPagamentos]);
 
+  React.useEffect(() => {
+    if (clienteDaOS && (
+      clienteDaOS.senhaGov !== (ordem.senhaGov || '') ||
+      clienteDaOS.nome !== ordem.nomeCliente ||
+      clienteDaOS.contato !== ordem.contato ||
+      clienteDaOS.endereco !== (ordem.endereco || '') ||
+      clienteDaOS.filiadoProTiro !== ordem.filiadoProTiro ||
+      (clienteDaOS.clubeFiliado || '') !== (ordem.clubeFiliado || '')
+    )) {
+      sincronizarComPerfil(ordem.id).catch(console.error);
+    }
+  }, [clienteDaOS, ordem.id, ordem.senhaGov, ordem.nomeCliente, ordem.contato, ordem.endereco, ordem.filiadoProTiro, ordem.clubeFiliado, sincronizarComPerfil]);
+
   const servicos = ordem.servicos || [];
   const totalServicos = servicos.length;
   const servicosConcluidos = servicos.filter(s => s.statusExecucao === 'Concluído').length;
