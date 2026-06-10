@@ -68,6 +68,7 @@ async function criarContaCacSeNecessario(
   await supabase.from('clientes').insert([{
     nome: googleInfo.name.toUpperCase(),
     cpf: convite.cliente_cpf || null,
+    email: emailLower,
     empresa_id: empresaId,
     observacoes: 'PERFIL INDIVIDUAL CAC (criado via convite despachante)',
   }]);

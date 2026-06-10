@@ -218,6 +218,12 @@ export function ListaClientes() {
               </div>
             </div>
 
+            {clienteVisualizando.email && (
+              <div className="bg-brand-dark-3 p-3 rounded-xl border border-brand-dark-5 mb-4">
+                <p className="text-[10px] text-gray-500 font-black uppercase mb-1">E-mail</p>
+                <p className="text-white font-medium text-sm mt-1 break-all">{clienteVisualizando.email}</p>
+              </div>
+            )}
             {clienteVisualizando.endereco && (
               <div className="bg-brand-dark-3 p-3 rounded-xl border border-brand-dark-5 mb-4">
                 <p className="text-[10px] text-gray-500 font-black uppercase mb-1">Endereço</p>

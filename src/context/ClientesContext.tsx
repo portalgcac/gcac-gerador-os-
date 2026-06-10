@@ -48,6 +48,7 @@ const mapFromDB = (row: any): Cliente => ({
   nome: row.nome,
   cpf: row.cpf,
   contato: row.contato,
+  email: row.email || '',
   senhaGov: row.senha_gov || '',
   filiadoProTiro: row.filiado_pro_tiro,
   clubeFiliado: row.clube_filiado || '',
@@ -69,6 +70,7 @@ const mapToDB = (dados: any) => {
   if (dados.nome !== undefined) payload.nome = String(dados.nome).toUpperCase();
   if (dados.cpf !== undefined) payload.cpf = dados.cpf;
   if (dados.contato !== undefined) payload.contato = dados.contato;
+  if (dados.email !== undefined) payload.email = dados.email;
   if (dados.senhaGov !== undefined) payload.senha_gov = dados.senhaGov;
   if (dados.filiadoProTiro !== undefined) payload.filiado_pro_tiro = dados.filiadoProTiro;
   if (dados.clubeFiliado !== undefined) payload.clube_filiado = dados.clubeFiliado;
@@ -567,6 +569,7 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
                 nome: usuario.nome.toUpperCase(),
                 cpf: usuario.cpf || '',
                 contato: usuario.contato || '',
+                email: usuario.email || '',
                 senhaGov: '',
                 filiadoProTiro: false,
                 clubeFiliado: '',

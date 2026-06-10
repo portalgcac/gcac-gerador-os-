@@ -25,6 +25,7 @@ export function FormularioCliente({ clienteEditando, onFechar }: Props) {
     nome: clienteEditando?.nome ?? '',
     cpf: clienteEditando?.cpf ?? '',
     contato: clienteEditando?.contato ?? '',
+    email: clienteEditando?.email ?? '',
     senhaGov: clienteEditando?.senhaGov ?? '',
     filiadoProTiro: clienteEditando 
       ? clienteEditando.filiadoProTiro 
@@ -87,6 +88,7 @@ export function FormularioCliente({ clienteEditando, onFechar }: Props) {
         nome: form.nome.trim().toUpperCase(),
         cpf: form.cpf.trim(),
         contato: form.contato.trim(),
+        email: form.email.trim().toLowerCase(),
         senhaGov: form.senhaGov.trim(),
         filiadoProTiro: form.filiadoProTiro,
         clubeFiliado: form.filiadoProTiro ? '' : form.clubeFiliado.trim().toUpperCase(),
@@ -147,6 +149,12 @@ export function FormularioCliente({ clienteEditando, onFechar }: Props) {
               <input type="tel" className="input"
                 value={form.contato} onChange={e => handleTelefone(e.target.value)} />
             </div>
+          </div>
+
+          <div>
+            <label className="label">E-mail</label>
+            <input type="email" className="input" placeholder="exemplo@gmail.com"
+              value={form.email} onChange={e => atualizar('email', e.target.value)} />
           </div>
 
           <div>
