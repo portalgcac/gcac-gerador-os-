@@ -214,8 +214,24 @@ export function AppShell() {
           </div>
         )}
 
-        <div className="p-4 sm:p-6 pb-24 sm:pb-6">
-          <Outlet />
+        <div className="p-4 sm:p-6 pb-24 sm:pb-6 min-h-[calc(100vh-4rem)] flex flex-col justify-between">
+          <div className="flex-grow">
+            <Outlet />
+          </div>
+          <footer className="mt-8 pt-4 border-t border-white/[0.04] flex flex-col sm:flex-row items-center justify-between gap-2 text-[9px] text-gray-500 font-bold uppercase tracking-wider">
+            <div>
+              Portal G CAC — Solução para Atiradores, Colecionadores, Caçadores e Despachantes
+            </div>
+            <div className="flex items-center gap-1.5 opacity-50 hover:opacity-100 transition-opacity duration-300">
+              <span>Desenvolvido por</span>
+              <img 
+                src="/LOGO PORTAL G CAC 2 SEM FRASE.png" 
+                alt="G CAC Logo" 
+                className="h-3.5 object-contain"
+                onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+              />
+            </div>
+          </footer>
         </div>
       </main>
 

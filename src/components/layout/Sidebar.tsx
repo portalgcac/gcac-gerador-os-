@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, FileText, Plus, Settings, LogOut, Cloud, CloudOff, Loader, X, Users, Receipt, Calendar, BarChart3, ListTodo, Bell, Shield, Link2
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { supabase } from '../../db/supabase';
 import { useOrdens } from '../../context/OrdensContext';
 import { useStatusConexao } from '../../hooks/useStatusConexao';
 import { useLembretes } from '../../context/LembretesContext';
@@ -92,6 +93,30 @@ export function Sidebar() {
   const online = useStatusConexao();
   const navigate = useNavigate();
 
+  const [despachanteVinculado, setDespachanteVinculado] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (usuario?.tipoConta === 'cac_individual' && usuario?.empresaId) {
+      const fetchVinculo = async () => {
+        try {
+          const { data } = await supabase
+            .from('vinculos_despachante_cac')
+            .select('despachante_nome')
+            .eq('cac_empresa_id', usuario.empresaId)
+            .eq('status', 'ativo')
+            .limit(1)
+            .maybeSingle();
+          if (data?.despachante_nome) {
+            setDespachanteVinculado(data.despachante_nome);
+          }
+        } catch (err) {
+          console.error('Erro ao buscar vinculo despachante:', err);
+        }
+      };
+      fetchVinculo();
+    }
+  }, [usuario]);
+
   // Cálculo de pendências para a Rotina Diária
   const totalRotina = ordens.reduce((acc, o) => {
     const temProtocolado = o.servicos?.some(s => s.statusExecucao === 'Protocolado — Ag. PF');
@@ -122,10 +147,9 @@ export function Sidebar() {
       <div className="p-5 border-b border-brand-dark-5 flex flex-col items-center text-center gap-3 relative">
         <div className="flex flex-col items-center w-full">
           <img 
-            src={usuario?.dadosEmpresa?.logoUrl || "/LOGO CORRETA.png"} 
+            src={usuario?.dadosEmpresa?.logoUrl || "/LOGO PORTAL G CAC 2 SEM FRASE.png"} 
             alt="GCAC" 
             className="w-28 h-28 object-contain mb-2"
-            style={usuario?.dadosEmpresa?.logoUrl ? undefined : { mixBlendMode: 'screen' }}
             onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} 
           />
           <div className="w-full">
@@ -267,29 +291,49 @@ export function Sidebar() {
       {/* Usuário */}
       <div className="p-3 border-t border-brand-dark-5">
         {usuario ? (
-          <div className="flex items-center gap-2">
-            <img
-              src={usuario.fotoPerfil}
-              alt={usuario.nome}
-              className="w-8 h-8 rounded-full border border-brand-dark-5 flex-shrink-0"
-              onError={e => { (e.target as HTMLImageElement).src = ''; }}
-            />
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold text-white truncate">{usuario.nome}</p>
-              {usuario.tipoConta === 'cac_individual' ? (
-                <p className="text-[10px] text-brand-blue-light uppercase font-bold tracking-tighter opacity-80">
-                  Atirador CAC
-                </p>
-              ) : (
-                <p className="text-[10px] text-brand-green uppercase font-bold tracking-tighter opacity-70">
-                  {usuario.role === 'admin' ? 'Administrador' : 'Colaborador'}
-                </p>
-              )}
-              <p className="text-[10px] text-gray-500 truncate">{usuario.email}</p>
+          <div className="flex flex-col gap-2">
+            {usuario?.tipoConta === 'cac_individual' && despachanteVinculado && (
+              <div className="mb-1 p-2 bg-brand-dark-3/40 border border-brand-dark-5/50 rounded-xl flex flex-col gap-0.5 text-left">
+                <span className="text-[8px] text-gray-500 font-black uppercase tracking-widest">Assessoria Bélica</span>
+                <span className="text-xs font-bold text-brand-blue-light truncate" title={despachanteVinculado}>
+                  {despachanteVinculado}
+                </span>
+              </div>
+            )}
+            {usuario?.dadosEmpresa?.logoUrl && (
+              <div className="mb-1 p-2 bg-brand-dark-3/30 border border-brand-dark-5/50 rounded-xl flex items-center justify-center gap-2">
+                <span className="text-[8px] text-gray-500 font-black uppercase tracking-widest">Plataforma</span>
+                <img 
+                  src="/LOGO PORTAL G CAC 2 SEM FRASE.png" 
+                  alt="G CAC Logo" 
+                  className="h-3.5 object-contain opacity-75"
+                />
+              </div>
+            )}
+            <div className="flex items-center gap-2">
+              <img
+                src={usuario.fotoPerfil}
+                alt={usuario.nome}
+                className="w-8 h-8 rounded-full border border-brand-dark-5 flex-shrink-0"
+                onError={e => { (e.target as HTMLImageElement).src = ''; }}
+              />
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-semibold text-white truncate">{usuario.nome}</p>
+                {usuario.tipoConta === 'cac_individual' ? (
+                  <p className="text-[10px] text-brand-blue-light uppercase font-bold tracking-tighter opacity-80">
+                    Atirador CAC
+                  </p>
+                ) : (
+                  <p className="text-[10px] text-brand-green uppercase font-bold tracking-tighter opacity-70">
+                    {usuario.role === 'admin' ? 'Administrador' : 'Colaborador'}
+                  </p>
+                )}
+                <p className="text-[10px] text-gray-500 truncate">{usuario.email}</p>
+              </div>
+              <button onClick={logout} title="Sair" className="text-gray-500 hover:text-red-400 transition-colors p-1">
+                <LogOut size={15} />
+              </button>
             </div>
-            <button onClick={logout} title="Sair" className="text-gray-500 hover:text-red-400 transition-colors p-1">
-              <LogOut size={15} />
-            </button>
           </div>
         ) : (
           <button onClick={() => navigate('/login')} className="btn-ghost btn-sm w-full justify-center">

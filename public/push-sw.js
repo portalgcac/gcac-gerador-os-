@@ -15,8 +15,8 @@ self.addEventListener('push', (event) => {
   const title = data.title || 'Portal G CAC';
   const options = {
     body: data.body || 'Você tem uma nova notificação no sistema.',
-    icon: data.icon || '/LOGO CORRETA.png',
-    badge: data.badge || '/LOGO CORRETA.png',
+    icon: data.icon || '/LOGO PORTAL G CAC 2 SEM FRASE.png',
+    badge: data.badge || '/LOGO PORTAL G CAC 2 SEM FRASE.png',
     tag: data.tag || 'notificacao-sistema',
     data: data.data || { url: '/' },
   };

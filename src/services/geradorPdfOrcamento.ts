@@ -51,7 +51,7 @@ export async function gerarPdfOrcamentoBlob(orcamento: Orcamento): Promise<Blob>
     }
 
     if (!logoBase64) {
-      const logoRes = await fetch('/LOGO CORRETA.png');
+      const logoRes = await fetch('/LOGO PORTAL G CAC 2 SEM FRASE.png');
       if (logoRes.ok) {
         const logoBlob = await logoRes.blob();
         logoBase64 = await blobParaBase64(logoBlob);

@@ -159,7 +159,7 @@ export function DetalheRecibo({ recibo }: DetalheReciboProps) {
         <div className="flex flex-col sm:flex-row justify-between items-start gap-8 border-b-2 border-brand-dark-5 pb-8 mb-8">
           <div className="flex items-center gap-4">
             <img 
-              src={usuario?.dadosEmpresa?.logoUrl || "/LOGO CORRETA.png"} 
+              src={usuario?.dadosEmpresa?.logoUrl || "/LOGO PORTAL G CAC 2 SEM FRASE.png"} 
               alt="Logo" 
               className="w-16 h-16 object-contain" 
               onError={e => (e.target as HTMLImageElement).style.display = 'none'}
@@ -257,6 +257,12 @@ export function DetalheRecibo({ recibo }: DetalheReciboProps) {
               <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">Pelo Cliente / Beneficiário</p>
               <p className="text-sm font-bold uppercase">{recibo.clienteNome}</p>
             </div>
+          </div>
+
+          {/* Rodapé de Co-branding do Documento */}
+          <div className="mt-8 pt-4 border-t border-gray-100 flex justify-between items-center text-[8px] text-gray-400 font-bold uppercase tracking-wider">
+            <span>Documento emitido eletronicamente via Portal G CAC — www.portalgcac.com.br</span>
+            <span>Página 1 de 1</span>
           </div>
         </div>
       </div>

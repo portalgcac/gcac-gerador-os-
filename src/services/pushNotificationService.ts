@@ -142,8 +142,8 @@ export async function enviarNotificacaoTeste(): Promise<void> {
   const registration = await navigator.serviceWorker.ready;
   await registration.showNotification('🔔 Portal G CAC — Teste', {
     body: 'Notificações push ativadas com sucesso! Você receberá alertas de vencimentos aqui.',
-    icon: '/LOGO CORRETA.png',
-    badge: '/LOGO CORRETA.png',
+    icon: '/LOGO PORTAL G CAC 2 SEM FRASE.png',
+    badge: '/LOGO PORTAL G CAC 2 SEM FRASE.png',
     tag: 'teste-push',
     data: { url: '/' },
   });

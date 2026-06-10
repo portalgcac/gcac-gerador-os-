@@ -389,10 +389,9 @@ export function ConviteAceitarPage() {
         {/* Logo */}
         <div className="text-center">
           <img
-            src="/LOGO CORRETA.png"
+            src="/LOGO 1 OFICIAL.png"
             alt="GCAC Logo"
             className="w-24 h-24 object-contain mx-auto drop-shadow-2xl"
-            style={{ mixBlendMode: 'screen' }}
             onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
           />
           <h1 className="text-2xl font-black text-white tracking-tight mt-2">PORTAL G CAC</h1>
