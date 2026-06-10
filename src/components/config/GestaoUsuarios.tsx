@@ -94,6 +94,7 @@ export function GestaoUsuarios({ abaInicial }: GestaoUsuariosProps = {}) {
   
   const [empresaEditando, setEmpresaEditando] = useState<any | null>(null);
   const [confirmandoDeleteEmpresa, setConfirmandoDeleteEmpresa] = useState<{ id: string; nome: string } | null>(null);
+  const [confirmandoDeleteUsuario, setConfirmandoDeleteUsuario] = useState<{ id: string; nome: string; empresa_id?: string } | null>(null);
 
   // Estados para Gestão de Faturamento & Mensalidades
   const [empresaFaturamentoSelecionada, setEmpresaFaturamentoSelecionada] = useState<any | null>(null);
@@ -548,6 +549,49 @@ export function GestaoUsuarios({ abaInicial }: GestaoUsuariosProps = {}) {
     } catch (err: any) {
       mostrar('erro', err.message || 'Erro ao excluir empresa. Verifique se existem outros registros vinculados.');
       setConfirmandoDeleteEmpresa(null);
+    }
+  };
+
+  const handleDeletarUsuario = async () => {
+    if (!confirmandoDeleteUsuario) return;
+    try {
+      // 1. Deletar o usuário da tabela usuarios_autorizados
+      const { error: errUser } = await supabase
+        .from('usuarios_autorizados')
+        .delete()
+        .eq('id', confirmandoDeleteUsuario.id);
+
+      if (errUser) throw errUser;
+
+      // 2. Se for um CAC Individual, deletar também a empresa/workspace dele
+      if (confirmandoDeleteUsuario.empresa_id) {
+        const { data: emp } = await supabase
+          .from('empresas')
+          .select('tipo_conta')
+          .eq('id', confirmandoDeleteUsuario.empresa_id)
+          .single();
+
+        if (emp?.tipo_conta === 'cac_individual') {
+          // Deleta a empresa
+          const { error: errEmp } = await supabase
+            .from('empresas')
+            .delete()
+            .eq('id', confirmandoDeleteUsuario.empresa_id);
+          if (errEmp) {
+            console.error('Erro ao deletar empresa associada ao CAC:', errEmp);
+          }
+        }
+      }
+
+      mostrar('sucesso', 'Usuário excluído com sucesso.');
+      setConfirmandoDeleteUsuario(null);
+      carregarUsuarios();
+      if (isMasterAdmin) {
+        carregarEmpresas();
+      }
+    } catch (err: any) {
+      mostrar('erro', err.message || 'Erro ao excluir usuário.');
+      setConfirmandoDeleteUsuario(null);
     }
   };
 
@@ -1272,14 +1316,24 @@ export function GestaoUsuarios({ abaInicial }: GestaoUsuariosProps = {}) {
                             </button>
                           </td>
                           <td className="p-3 text-right">
-                            <button
-                              type="button"
-                              onClick={() => handleAbrirModal(u)}
-                              className="p-1.5 text-gray-400 hover:text-brand-blue-light hover:bg-brand-dark-3 rounded-xl transition-all"
-                              title="Editar Atcessos"
-                            >
-                              <Edit2 size={14} />
-                            </button>
+                            <div className="flex items-center justify-end gap-1">
+                              <button
+                                type="button"
+                                onClick={() => handleAbrirModal(u)}
+                                className="p-1.5 text-gray-400 hover:text-brand-blue-light hover:bg-brand-dark-3 rounded-xl transition-all"
+                                title="Editar Acessos"
+                              >
+                                <Edit2 size={14} />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setConfirmandoDeleteUsuario({ id: u.id, nome: u.nome, empresa_id: u.empresa_id })}
+                                className="p-1.5 text-gray-400 hover:text-red-400 hover:bg-brand-dark-3 rounded-xl transition-all"
+                                title="Excluir Usuário"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -2215,6 +2269,16 @@ export function GestaoUsuarios({ abaInicial }: GestaoUsuariosProps = {}) {
         textoBotaoConfirmar="Sim, excluir"
         onConfirmar={handleDeletarEmpresa}
         onCancelar={() => setConfirmandoDeleteEmpresa(null)}
+      />
+
+      {/* Confirmação de Deletar Usuário */}
+      <DialogConfirmacao
+        aberto={!!confirmandoDeleteUsuario}
+        titulo="Excluir Usuário"
+        mensagem={`Tem certeza que deseja excluir permanentemente o usuário "${confirmandoDeleteUsuario?.nome}"? Se este usuário for um CAC Individual, seu acervo e workspace também serão excluídos. Esta ação não poderá ser desfeita.`}
+        textoBotaoConfirmar="Sim, excluir"
+        onConfirmar={handleDeletarUsuario}
+        onCancelar={() => setConfirmandoDeleteUsuario(null)}
       />
 
       {/* Modal de Registro de Pagamento Manual */}
