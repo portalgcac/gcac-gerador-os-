@@ -555,32 +555,81 @@ export function GestaoUsuarios({ abaInicial }: GestaoUsuariosProps = {}) {
   const handleDeletarUsuario = async () => {
     if (!confirmandoDeleteUsuario) return;
     try {
-      // 1. Deletar o usuário da tabela usuarios_autorizados
-      const { error: errUser } = await supabase
-        .from('usuarios_autorizados')
-        .delete()
-        .eq('id', confirmandoDeleteUsuario.id);
+      const empresaId = confirmandoDeleteUsuario.empresa_id;
+      let isCacIndividual = false;
 
-      if (errUser) throw errUser;
-
-      // 2. Se for um CAC Individual, deletar também a empresa/workspace dele
-      if (confirmandoDeleteUsuario.empresa_id) {
+      if (empresaId) {
         const { data: emp } = await supabase
           .from('empresas')
           .select('tipo_conta')
-          .eq('id', confirmandoDeleteUsuario.empresa_id)
-          .single();
+          .eq('id', empresaId)
+          .maybeSingle();
 
         if (emp?.tipo_conta === 'cac_individual') {
-          // Deleta a empresa
-          const { error: errEmp } = await supabase
-            .from('empresas')
-            .delete()
-            .eq('id', confirmandoDeleteUsuario.empresa_id);
-          if (errEmp) {
-            console.error('Erro ao deletar empresa associada ao CAC:', errEmp);
-          }
+          isCacIndividual = true;
         }
+      }
+
+      if (isCacIndividual && empresaId) {
+        // 1. Reseta os convites para este CAC
+        await supabase
+          .from('convites_cac')
+          .update({ cac_empresa_id: null, status: 'pendente', aceito_em: null })
+          .eq('cac_empresa_id', empresaId);
+
+        // 2. Deleta vínculos
+        await supabase
+          .from('vinculos_despachante_cac')
+          .delete()
+          .or(`despachante_empresa_id.eq.${empresaId},cac_empresa_id.eq.${empresaId}`);
+
+        // 3. Deleta autorizacoes_manejo
+        await supabase
+          .from('autorizacoes_manejo')
+          .delete()
+          .eq('empresa_id', empresaId);
+
+        // 4. Deleta guias_trafego
+        await supabase
+          .from('guias_trafego')
+          .delete()
+          .eq('empresa_id', empresaId);
+
+        // 5. Deleta armas
+        await supabase
+          .from('armas')
+          .delete()
+          .eq('empresa_id', empresaId);
+
+        // 6. Deleta clientes (perfil do CAC)
+        await supabase
+          .from('clientes')
+          .delete()
+          .eq('empresa_id', empresaId);
+
+        // 7. Deleta o usuário da tabela usuarios_autorizados
+        const { error: errUser } = await supabase
+          .from('usuarios_autorizados')
+          .delete()
+          .eq('id', confirmandoDeleteUsuario.id);
+
+        if (errUser) throw errUser;
+
+        // 8. Deleta a empresa
+        const { error: errEmp } = await supabase
+          .from('empresas')
+          .delete()
+          .eq('id', empresaId);
+
+        if (errEmp) throw errEmp;
+      } else {
+        // Comportamento normal para outros usuários (colaboradores/admins de despachante)
+        const { error: errUser } = await supabase
+          .from('usuarios_autorizados')
+          .delete()
+          .eq('id', confirmandoDeleteUsuario.id);
+
+        if (errUser) throw errUser;
       }
 
       mostrar('sucesso', 'Usuário excluído com sucesso.');

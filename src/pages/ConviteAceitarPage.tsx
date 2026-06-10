@@ -10,6 +10,19 @@ import { supabase } from '../db/supabase';
 // ─────────────────────────────────────────────────────────────────────────────
 // Criação automática de conta CAC Individual após login Google no fluxo de convite
 // ─────────────────────────────────────────────────────────────────────────────
+const generateUUID = () => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Criação automática de conta CAC Individual após login Google no fluxo de convite
+// ─────────────────────────────────────────────────────────────────────────────
 async function criarContaCacSeNecessario(
   googleInfo: { email: string; name: string; picture: string; sub: string },
   convite: ConviteCac,
@@ -64,14 +77,113 @@ async function criarContaCacSeNecessario(
     return { sucesso: false, erro: 'Erro ao criar usuário: ' + erroUsuario.message };
   }
 
-  // 4. Cria o cliente automático do CAC (perfil próprio)
-  await supabase.from('clientes').insert([{
+  // Buscar os dados do cliente de origem do despachante para clonagem
+  const { data: clienteOrigem } = await supabase
+    .from('clientes')
+    .select('*')
+    .eq('id', convite.cliente_id)
+    .maybeSingle();
+
+  const novoClienteId = generateUUID();
+
+  // 4. Cria o cliente automático do CAC (perfil próprio) copiando os dados do despachante
+  const { error: erroCliente } = await supabase.from('clientes').insert([{
+    id: novoClienteId,
     nome: googleInfo.name.toUpperCase(),
-    cpf: convite.cliente_cpf || null,
+    cpf: convite.cliente_cpf || clienteOrigem?.cpf || null,
     email: emailLower,
     empresa_id: empresaId,
-    observacoes: 'PERFIL INDIVIDUAL CAC (criado via convite despachante)',
+    contato: clienteOrigem?.contato || null,
+    senha_gov: clienteOrigem?.senha_gov || '',
+    filiado_pro_tiro: clienteOrigem?.filiado_pro_tiro || false,
+    clube_filiado: clienteOrigem?.clube_filiado || '',
+    observacoes: clienteOrigem?.observacoes || 'PERFIL INDIVIDUAL CAC (criado via convite despachante)',
+    endereco: clienteOrigem?.endereco || '',
+    numero_cr: clienteOrigem?.numero_cr || '',
+    vencimento_cr: clienteOrigem?.vencimento_cr || null,
+    numero_cr_ibama: clienteOrigem?.numero_cr_ibama || '',
+    vencimento_cr_ibama: clienteOrigem?.vencimento_cr_ibama || null,
+    foto_url: clienteOrigem?.foto_url || '',
+    cr_url: clienteOrigem?.cr_url || '',
+    cr_ibama_url: clienteOrigem?.cr_ibama_url || '',
   }]);
+
+  if (erroCliente) {
+    console.error('Erro ao criar perfil de cliente no novo workspace:', erroCliente);
+  }
+
+  // 5. Copia as armas do cliente de origem para a nova workspace
+  const { data: armasOrigem } = await supabase
+    .from('armas')
+    .select('*')
+    .eq('cliente_id', convite.cliente_id);
+
+  if (armasOrigem && armasOrigem.length > 0) {
+    for (const arma of armasOrigem) {
+      const novaArmaId = generateUUID();
+      const { error: erroArma } = await supabase
+        .from('armas')
+        .insert([{
+          id: novaArmaId,
+          cliente_id: novoClienteId,
+          tipo: arma.tipo || '',
+          modelo: arma.modelo,
+          calibre: arma.calibre,
+          fabricante: arma.fabricante,
+          numero_serie: arma.numero_serie,
+          numero_sigma: arma.numero_sigma,
+          acervo: arma.acervo,
+          vencimento_craf: arma.vencimento_craf || null,
+          craf_url: arma.craf_url || null,
+          empresa_id: empresaId,
+        }]);
+
+      if (!erroArma) {
+        // Copia as guias de tráfego associadas a esta arma
+        const { data: gtsOrigem } = await supabase
+          .from('guias_trafego')
+          .select('*')
+          .eq('arma_id', arma.id);
+
+        if (gtsOrigem && gtsOrigem.length > 0) {
+          const gtsParaInserir = gtsOrigem.map(gt => ({
+            id: generateUUID(),
+            arma_id: novaArmaId,
+            tipo: gt.tipo,
+            vencimento: gt.vencimento,
+            destino: gt.destino,
+            arquivo_url: gt.arquivo_url || null,
+            empresa_id: empresaId,
+          }));
+          await supabase.from('guias_trafego').insert(gtsParaInserir);
+        }
+      } else {
+        console.error('Erro ao clonar arma:', erroArma);
+      }
+    }
+  }
+
+  // 6. Copia as autorizações de manejo do cliente de origem para a nova workspace
+  const { data: manejosOrigem } = await supabase
+    .from('autorizacoes_manejo')
+    .select('*')
+    .eq('cliente_id', convite.cliente_id);
+
+  if (manejosOrigem && manejosOrigem.length > 0) {
+    const manejosParaInserir = manejosOrigem.map(manejo => ({
+      id: generateUUID(),
+      cliente_id: novoClienteId,
+      numero_car: manejo.numero_car,
+      nome_fazenda: manejo.nome_fazenda,
+      nome_proprietario: manejo.nome_proprietario,
+      cidade: manejo.cidade,
+      vencimento: manejo.vencimento,
+      status: manejo.status || 'Ativo',
+      arquivo_url: manejo.arquivo_url || null,
+      empresa_id: empresaId,
+    }));
+    await supabase.from('autorizacoes_manejo').insert(manejosParaInserir);
+  }
 
   return { sucesso: true, empresaId };
 }
