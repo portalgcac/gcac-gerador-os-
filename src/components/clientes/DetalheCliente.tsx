@@ -60,7 +60,7 @@ export function DetalheCliente({ cliente }: DetalheClienteProps) {
     { id: 'recibos', label: 'Recibos', slug: 'recibos', count: recibosCliente.length },
     { id: 'agendamentos', label: 'Agendamentos', slug: 'agendamentos', count: agendamentosCliente.length },
     { id: 'documentos', label: 'Acervo & Docs', slug: null, count: 0 },
-    { id: 'creditos', label: 'Haver', slug: 'financeiro', count: 0 },
+    { id: 'creditos', label: 'Haver', slug: null, count: 0 },
   ].filter(tab => {
     if (usuario?.tipoConta === 'cac_individual') {
       return tab.id === 'documentos';
