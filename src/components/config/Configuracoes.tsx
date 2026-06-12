@@ -296,7 +296,7 @@ export function Configuracoes() {
   const [alertaCraf, setAlertaCraf] = useState(() => localStorage.getItem('config_alerta_craf') || '60');
   const [alertaGt, setAlertaGt] = useState(() => localStorage.getItem('config_alerta_gt') || '20');
   const [alertaManejo, setAlertaManejo] = useState(() => localStorage.getItem('config_alerta_manejo') || '7');
-  const [alertaCrIbama, setAlertaCrIbama] = useState(() => localStorage.getItem('config_alerta_ibama_cr') || '-1');
+  const [alertaCrIbama, setAlertaCrIbama] = useState(() => localStorage.getItem('config_alerta_ibama_cr') || '30');
   const [ocultarIbama, setOcultarIbama] = useState(() => localStorage.getItem('config_ocultar_ibama') === 'true');
   const [exportando, setExportando] = useState(false);
 

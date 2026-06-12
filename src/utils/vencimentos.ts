@@ -43,13 +43,12 @@ export function calcularAlerta(tipo: string, dataVenc: string): { nivel: NivelAl
   else if (tipo === 'CRAF') { configChave = 'config_alerta_craf'; padraoAviso = 60; }
   else if (tipo === 'GT') { configChave = 'config_alerta_gt'; padraoAviso = 20; }
   else if (tipo === 'MANEJO') { configChave = 'config_alerta_manejo'; padraoAviso = 7; }
-  else if (tipo === 'IBAMA_CR') { configChave = 'config_alerta_ibama_cr'; padraoAviso = -1; }
+  else if (tipo === 'IBAMA_CR') { configChave = 'config_alerta_ibama_cr'; padraoAviso = 30; }
 
   const diasConfig = (configChave && typeof window !== 'undefined') ? localStorage.getItem(configChave) : null;
   const limiteAviso = diasConfig ? parseInt(diasConfig, 10) : padraoAviso;
 
   if (dias < 0) {
-    // Se o vencimento passou do limite de aviso negativo (ex: limite -1, dias -2)
     if (dias <= limiteAviso) return { nivel: 'VENCIDO', dias };
     return { nivel: 'CRITICO', dias };
   }
