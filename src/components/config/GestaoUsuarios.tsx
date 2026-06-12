@@ -110,6 +110,13 @@ export function GestaoUsuarios({ abaInicial }: GestaoUsuariosProps = {}) {
   const [todosPagamentos, setTodosPagamentos] = useState<any[]>([]);
   const [buscaFaturamento, setBuscaFaturamento] = useState('');
   const [abaFaturamento, setAbaFaturamento] = useState<'empresas' | 'cacs'>('empresas');
+  const [selectedCacDetails, setSelectedCacDetails] = useState<{
+    e: any;
+    cacUser: any;
+    despachantesNomes: string;
+    ultimoPagamento: any;
+    lead: any;
+  } | null>(null);
   
   // Modal State
   const [modalAberto, setModalAberto] = useState(false);
@@ -154,7 +161,7 @@ export function GestaoUsuarios({ abaInicial }: GestaoUsuariosProps = {}) {
       // Buscar todos os pagamentos para exibir a data de último pagamento
       const { data: pData } = await supabase
         .from('historico_pagamentos_empresa')
-        .select('empresa_id, data_pagamento')
+        .select('id, empresa_id, data_pagamento, valor_pago, plano, frequencia, referencia_vencimento, meio_pagamento, observacoes')
         .order('data_pagamento', { ascending: false });
       if (pData) setTodosPagamentos(pData);
     } catch (err) {
@@ -876,6 +883,24 @@ export function GestaoUsuarios({ abaInicial }: GestaoUsuariosProps = {}) {
 
       return !buscaFaturamento.trim() || nomeMatch || userMatch || despachanteMatch;
     });
+  };
+
+  const abrirDetalhesCac = (e: any) => {
+    const cacUser = usuarios.find(u => u.empresa_id === e.id);
+    const vinculados = vinculosAtivos.filter(v => v.cac_empresa_id === e.id);
+    const despachantesNomes = vinculados.length > 0 
+      ? vinculados.map(v => v.despachante_nome).join(', ') 
+      : 'Nenhum despachante vinculado';
+
+    const pagamentosCac = todosPagamentos.filter(p => p.empresa_id === e.id);
+    const ultimoPagamento = pagamentosCac.length > 0 ? pagamentosCac[0] : null;
+
+    const lead = leads.find(l => 
+      (l.email && cacUser?.email && l.email.toLowerCase() === cacUser.email.toLowerCase()) || 
+      (l.cpf && cacUser?.cpf && l.cpf.replace(/\D/g, '') === cacUser.cpf.replace(/\D/g, ''))
+    );
+
+    setSelectedCacDetails({ e, cacUser, despachantesNomes, ultimoPagamento, lead });
   };
   
   const cacsUsuarios = usuarios.filter(u => {
@@ -1781,21 +1806,17 @@ export function GestaoUsuarios({ abaInicial }: GestaoUsuariosProps = {}) {
                       </tbody>
                     </table>
                   ) : (
-                    <table className="w-full text-left border-collapse min-w-[950px]">
-                      <thead>
-                        <tr className="bg-brand-dark-3 border-b border-brand-dark-5">
-                          <th className="px-3 py-3 text-xs font-black text-gray-400 uppercase tracking-wider">Cliente (Atirador)</th>
-                          <th className="px-3 py-3 text-xs font-black text-gray-400 uppercase tracking-wider">Empresa Vinculada</th>
-                          <th className="px-3 py-3 text-xs font-black text-gray-400 uppercase tracking-wider">Plano</th>
-                          <th className="px-3 py-3 text-xs font-black text-gray-400 uppercase tracking-wider">Preço Custom / Período</th>
-                          <th className="px-3 py-3 text-xs font-black text-gray-400 uppercase tracking-wider">Situação</th>
-                          <th className="px-3 py-3 text-xs font-black text-gray-400 uppercase tracking-wider">Data Ativação</th>
-                          <th className="px-3 py-3 text-xs font-black text-gray-400 uppercase tracking-wider">Último Pagamento</th>
-                          <th className="px-3 py-3 text-xs font-black text-gray-400 uppercase tracking-wider">Vencimento</th>
-                          <th className="px-3 py-3 text-xs font-black text-gray-400 uppercase tracking-wider text-right">Ações Rápidas</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-brand-dark-5">
+                    <div className="w-full">
+                      {/* Cabeçalho Grid - visível apenas em telas médias ou maiores */}
+                      <div className="hidden md:grid grid-cols-12 bg-brand-dark-3 border-b border-brand-dark-5 px-4 py-3 text-xs font-black text-gray-400 uppercase tracking-wider">
+                        <div className="col-span-5">Cliente (Atirador)</div>
+                        <div className="col-span-2">Situação</div>
+                        <div className="col-span-2">Vencimento</div>
+                        <div className="col-span-3 text-right">Ações Rápidas</div>
+                      </div>
+
+                      {/* Lista de Registros */}
+                      <div className="divide-y divide-brand-dark-5">
                         {obterCacsClientesExibidos().map(e => {
                           const hoje = new Date();
                           hoje.setHours(0,0,0,0);
@@ -1804,28 +1825,6 @@ export function GestaoUsuarios({ abaInicial }: GestaoUsuariosProps = {}) {
                           const diasAteVencer = dataVenc ? Math.ceil((dataVenc.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24)) : null;
                           
                           const cacUser = usuarios.find(u => u.empresa_id === e.id);
-                          const vinculados = vinculosAtivos.filter(v => v.cac_empresa_id === e.id);
-                          const despachantesNomes = vinculados.length > 0 
-                            ? vinculados.map(v => v.despachante_nome).join(', ') 
-                            : 'Nenhum despachante';
-
-                          const pagamentosCac = todosPagamentos.filter(p => p.empresa_id === e.id);
-                          const ultimoPagamento = pagamentosCac.length > 0 ? pagamentosCac[0] : null;
-
-                          const obterPrecoEstilizado = () => {
-                            if (e.is_gratis) return 'Isento';
-                            if (e.valor_assinatura_personalizado != null) return `R$ ${parseFloat(e.valor_assinatura_personalizado).toFixed(2)}`;
-                            if (e.plano === '.22LR') return 'R$ 30,00';
-                            if (e.plano === '.357mag') return 'R$ 50,00';
-                            if (e.plano === '.308win') return 'R$ 100,00';
-                            return 'R$ 30,00';
-                          };
-
-                          const obterFrequenciaLabel = () => {
-                            if (e.frequencia_pagamento === 'semestral') return 'Semestral';
-                            if (e.frequencia_pagamento === 'anual') return 'Anual';
-                            return 'Mensal';
-                          };
 
                           const obterStatusBadge = () => {
                             if (e.is_gratis) {
@@ -1844,98 +1843,78 @@ export function GestaoUsuarios({ abaInicial }: GestaoUsuariosProps = {}) {
                           };
 
                           return (
-                            <tr key={e.id} className="bg-brand-dark-4/40 hover:bg-brand-dark-4 transition-colors">
-                              <td className="px-3 py-3">
-                                <p className="font-bold text-white text-sm truncate max-w-[200px]" title={cacUser?.nome || e.nome}>
+                            <div key={e.id} className="grid grid-cols-1 md:grid-cols-12 items-center gap-3 md:gap-0 bg-brand-dark-4/40 hover:bg-brand-dark-4 transition-colors px-4 py-4 md:py-3">
+                              {/* Nome e CPF (uma linha abaixo da outra) */}
+                              <div className="col-span-1 md:col-span-5 flex flex-col justify-center text-left">
+                                <button
+                                  type="button"
+                                  onClick={() => abrirDetalhesCac(e)}
+                                  className="font-bold text-brand-blue-light hover:text-white hover:underline transition-colors text-sm text-left block w-fit"
+                                >
                                   {cacUser?.nome || e.nome.replace('CAC - ', '')}
+                                </button>
+                                <p className="text-[10px] text-gray-400 mt-0.5 font-mono select-all">
+                                  {cacUser?.cpf ? formatarCpfExibicao(cacUser.cpf) : 'CPF não informado'}
                                 </p>
-                                {cacUser && (
-                                  <p className="text-[10px] text-gray-400 mt-0.5 select-all" title={cacUser.email}>
-                                    {cacUser.email} {cacUser.cpf ? `• CPF: ${cacUser.cpf}` : ''}
-                                  </p>
-                                )}
-                              </td>
-                              <td className="px-3 py-3 text-xs text-gray-300">
-                                <p className="font-semibold text-brand-blue-light truncate max-w-[150px]" title={despachantesNomes}>
-                                  {despachantesNomes}
-                                </p>
-                              </td>
-                              <td className="px-3 py-3">
-                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
-                                  e.plano === '.308win' ? 'bg-brand-blue/15 text-brand-blue-light border-brand-blue/30' :
-                                  e.plano === '.357mag' ? 'bg-brand-green/10 text-brand-green-light border-brand-green/20' :
-                                  'bg-gray-600/20 text-gray-400 border-gray-500/20'
-                                }`}>
-                                  {e.plano || '.22LR'}
-                                </span>
-                              </td>
-                              <td className="px-3 py-3 text-xs text-gray-300">
-                                <p className="font-bold text-white">{obterPrecoEstilizado()}</p>
-                                <p className="text-gray-500 text-[10px] uppercase font-semibold">{obterFrequenciaLabel()}</p>
-                              </td>
-                              <td className="px-3 py-3">
-                                {obterStatusBadge()}
-                              </td>
-                              <td className="px-3 py-3 text-xs text-gray-300">
-                                {e.criado_em ? formatarData(e.criado_em) : <span className="text-gray-500 italic">—</span>}
-                              </td>
-                              <td className="px-3 py-3 text-xs text-gray-300">
-                                {ultimoPagamento ? (
-                                  <div>
-                                    <p className="font-bold text-white">{new Date(ultimoPagamento.data_pagamento).toLocaleDateString('pt-BR')}</p>
-                                    <p className="text-[10px] text-gray-500">{new Date(ultimoPagamento.data_pagamento).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</p>
-                                  </div>
-                                ) : (
-                                  <span className="text-gray-500 italic">Nunca registrado</span>
-                                )}
-                              </td>
-                              <td className="px-3 py-3 text-xs text-gray-300">
-                                {e.data_vencimento ? formatarData(e.data_vencimento) : <span className="text-gray-500 italic">Sem vencimento</span>}
-                              </td>
-                              <td className="px-3 py-3 text-right">
-                                <div className="flex items-center justify-end gap-1">
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setEmpresaFaturamentoSelecionada(e);
-                                      let precoPadrao = '30';
-                                      if (e.plano === '.357mag') precoPadrao = '50';
-                                      else if (e.plano === '.308win') precoPadrao = '100';
-                                      
-                                      const valorAssinatura = e.valor_assinatura_personalizado != null 
-                                        ? e.valor_assinatura_personalizado.toString()
-                                        : precoPadrao;
+                              </div>
 
-                                      setFormDataPagamento({
-                                        valor_pago: valorAssinatura,
-                                        meio_pagamento: 'PIX',
-                                        observacoes: `Renovação de plano CAC ${e.plano || '.22LR'}`
-                                      });
-                                      setModalPagamentoManualAberto(true);
-                                    }}
-                                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-brand-green/10 border border-brand-green/20 hover:bg-brand-green/20 text-brand-green-light text-[10px] font-bold uppercase tracking-wider transition-colors"
-                                  >
-                                    <BadgeDollarSign size={12} />
-                                    Confirmar Pago
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={async () => {
-                                      setEmpresaFaturamentoSelecionada(e);
-                                      buscarHistoricoPagamentos(e.id);
-                                    }}
-                                    className="flex items-center gap-1 px-2 py-1.5 rounded-xl bg-brand-dark-3 border border-brand-dark-5 hover:border-gray-600 text-gray-300 hover:text-white text-[10px] font-bold uppercase tracking-wider transition-colors"
-                                  >
-                                    <Calendar size={12} />
-                                    Histórico
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
+                              {/* Situação */}
+                              <div className="col-span-1 md:col-span-2 flex items-center md:block">
+                                <span className="text-gray-500 text-[10px] md:hidden font-bold uppercase tracking-wider mr-2">Situação:</span>
+                                {obterStatusBadge()}
+                              </div>
+
+                              {/* Vencimento */}
+                              <div className="col-span-1 md:col-span-2 flex items-center md:block text-xs text-gray-300">
+                                <span className="text-gray-500 text-[10px] md:hidden font-bold uppercase tracking-wider mr-2">Vencimento:</span>
+                                {e.data_vencimento ? formatarData(e.data_vencimento) : <span className="text-gray-500 italic">Sem vencimento</span>}
+                              </div>
+
+                              {/* Ações */}
+                              <div className="col-span-1 md:col-span-3 flex items-center justify-start md:justify-end gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setEmpresaFaturamentoSelecionada(e);
+                                    let precoPadrao = '30';
+                                    if (e.plano === '.357mag') precoPadrao = '50';
+                                    else if (e.plano === '.308win') precoPadrao = '100';
+                                    
+                                    const valorAssinatura = e.valor_assinatura_personalizado != null 
+                                      ? e.valor_assinatura_personalizado.toString()
+                                      : precoPadrao;
+
+                                    setFormDataPagamento({
+                                      valor_pago: valorAssinatura,
+                                      meio_pagamento: 'PIX',
+                                      observacoes: `Renovação de plano CAC ${e.plano || '.22LR'}`
+                                    });
+                                    setModalPagamentoManualAberto(true);
+                                  }}
+                                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-brand-green/10 border border-brand-green/20 hover:bg-brand-green/20 text-brand-green-light text-[10px] font-bold uppercase tracking-wider transition-colors"
+                                  title="Confirmar pagamento Pix"
+                                >
+                                  <BadgeDollarSign size={12} />
+                                  Confirmar Pago
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    setEmpresaFaturamentoSelecionada(e);
+                                    buscarHistoricoPagamentos(e.id);
+                                  }}
+                                  className="flex items-center gap-1 px-2 py-1.5 rounded-xl bg-brand-dark-3 border border-brand-dark-5 hover:border-gray-600 text-gray-300 hover:text-white text-[10px] font-bold uppercase tracking-wider transition-colors"
+                                  title="Ver Histórico de Pagamentos"
+                                >
+                                  <Calendar size={12} />
+                                  Histórico
+                                </button>
+                              </div>
+                            </div>
                           );
                         })}
-                      </tbody>
-                    </table>
+                      </div>
+                    </div>
                   )}
                 </div>
               </div>
@@ -2376,6 +2355,248 @@ export function GestaoUsuarios({ abaInicial }: GestaoUsuariosProps = {}) {
           </div>
         </div>
       )}
+
+      {/* Modal de Detalhes de Faturamento CAC (B2C) */}
+      {selectedCacDetails && (() => {
+        const { e, cacUser, despachantesNomes, ultimoPagamento, lead } = selectedCacDetails;
+        
+        const obterPrecoEstilizado = () => {
+          if (e.is_gratis) return 'Isento';
+          if (e.valor_assinatura_personalizado != null) return `R$ ${parseFloat(e.valor_assinatura_personalizado).toFixed(2)}`;
+          if (e.plano === '.22LR') return 'R$ 30,00';
+          if (e.plano === '.357mag') return 'R$ 50,00';
+          if (e.plano === '.308win') return 'R$ 100,00';
+          return 'R$ 30,00';
+        };
+
+        const obterFrequenciaLabel = () => {
+          if (e.frequencia_pagamento === 'semestral') return 'Semestral';
+          if (e.frequencia_pagamento === 'anual') return 'Anual';
+          return 'Mensal';
+        };
+
+        const obterStatusBadge = () => {
+          const hoje = new Date();
+          hoje.setHours(0,0,0,0);
+          const dataVenc = e.data_vencimento ? new Date(e.data_vencimento + 'T00:00:00') : null;
+          const ehExpirado = dataVenc && dataVenc < hoje && !e.is_gratis;
+          
+          if (e.is_gratis) {
+            return <span className="px-2.5 py-1 rounded bg-brand-green/10 text-brand-green border border-brand-green/20 font-bold text-xs uppercase tracking-wider">Isento</span>;
+          }
+          if (e.plano_status === 'suspenso') {
+            return <span className="px-2.5 py-1 rounded bg-red-500/10 text-red-400 border border-red-500/20 font-bold text-xs uppercase tracking-wider">Suspenso</span>;
+          }
+          if (ehExpirado) {
+            return <span className="px-2.5 py-1 rounded bg-red-500/10 text-red-400 border border-red-500/20 font-bold text-xs uppercase tracking-wider">Atrasado</span>;
+          }
+          return <span className="px-2.5 py-1 rounded bg-brand-green/10 text-brand-green border border-brand-green/20 font-bold text-xs uppercase tracking-wider">Em dia</span>;
+        };
+
+        return (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm border border-brand-dark-5">
+            <div className="bg-brand-dark-3 border border-brand-dark-5 rounded-2xl w-full max-w-xl overflow-hidden shadow-2xl animate-scale-in">
+              <div className="bg-brand-dark-2 px-6 py-4 border-b border-brand-dark-5 flex items-center justify-between">
+                <h3 className="font-bold text-white flex items-center gap-2 text-base">
+                  <User size={18} className="text-brand-blue" />
+                  Informações de Faturamento: {cacUser?.nome || e.nome.replace('CAC - ', '')}
+                </h3>
+                <button onClick={() => setSelectedCacDetails(null)} className="text-gray-500 hover:text-white">
+                  <XCircle size={20} />
+                </button>
+              </div>
+
+              <div className="p-6 space-y-6 max-h-[75vh] overflow-y-auto custom-scrollbar">
+                
+                {/* 1. Status Geral */}
+                <div className="flex items-center justify-between bg-brand-dark-4 p-4 rounded-xl border border-brand-dark-5">
+                  <div>
+                    <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">Situação Atual da Conta</span>
+                    <div className="mt-1 flex items-center gap-2">
+                      {obterStatusBadge()}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">Plano Contratado</span>
+                    <p className="text-sm font-black text-white mt-0.5">
+                      <span className="bg-brand-blue/15 text-brand-blue-light border border-brand-blue/20 text-[11px] font-bold px-2 py-0.5 rounded mr-1">
+                        {e.plano || '.22LR'}
+                      </span>
+                      ({obterFrequenciaLabel()})
+                    </p>
+                  </div>
+                </div>
+
+                {/* 2. Informações Cadastrais */}
+                <div className="space-y-2">
+                  <h4 className="text-xs font-bold text-brand-blue-light uppercase tracking-wider border-b border-brand-dark-5 pb-1">
+                    Dados Cadastrais do Cliente
+                  </h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                    <div>
+                      <span className="text-gray-500">Nome:</span>
+                      <p className="font-bold text-white mt-0.5">{cacUser?.nome || e.nome}</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">CPF:</span>
+                      <p className="font-bold text-white mt-0.5 font-mono">{cacUser?.cpf || 'Não cadastrado'}</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">E-mail:</span>
+                      <p className="font-bold text-white mt-0.5 select-all">{cacUser?.email || 'Não cadastrado'}</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Contato:</span>
+                      <p className="font-bold text-white mt-0.5 font-mono">{cacUser?.contato || 'Não cadastrado'}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3. Vínculo despachante */}
+                <div className="space-y-2">
+                  <h4 className="text-xs font-bold text-brand-blue-light uppercase tracking-wider border-b border-brand-dark-5 pb-1">
+                    Vínculos com Despachantes
+                  </h4>
+                  <div className="text-xs">
+                    <span className="text-gray-500">Despachante Parceiro:</span>
+                    <p className="font-bold text-white mt-0.5">{despachantesNomes}</p>
+                  </div>
+                </div>
+
+                {/* 4. Valores & Prazos */}
+                <div className="space-y-2">
+                  <h4 className="text-xs font-bold text-brand-blue-light uppercase tracking-wider border-b border-brand-dark-5 pb-1">
+                    Informações de Cobrança & Prazos
+                  </h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                    <div>
+                      <span className="text-gray-500">Valor da Assinatura:</span>
+                      <p className="font-bold text-white mt-0.5">{obterPrecoEstilizado()}</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Frequência de Pagamento:</span>
+                      <p className="font-bold text-white mt-0.5 capitalize">{obterFrequenciaLabel()}</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Solicitação do Pré-Cadastro (Site):</span>
+                      <p className="font-bold text-white mt-0.5">
+                        {lead?.criado_em ? new Date(lead.criado_em).toLocaleString('pt-BR') : '—'}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Data de Ativação no Sistema:</span>
+                      <p className="font-bold text-white mt-0.5">
+                        {e.criado_em ? new Date(e.criado_em).toLocaleString('pt-BR') : '—'}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Último Pagamento Registrado:</span>
+                      <p className="font-bold text-white mt-0.5">
+                        {ultimoPagamento 
+                          ? `${new Date(ultimoPagamento.data_pagamento).toLocaleDateString('pt-BR')} ${new Date(ultimoPagamento.data_pagamento).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
+                          : 'Nenhum pagamento registrado'}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Forma de Pagamento (Plano):</span>
+                      <p className="font-bold text-white mt-0.5">
+                        {ultimoPagamento?.meio_pagamento || 'PIX (Recomendado)'}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Próximo Vencimento:</span>
+                      <p className="font-bold text-brand-green mt-0.5 font-mono">
+                        {e.data_vencimento ? formatarData(e.data_vencimento) : 'Sem data de vencimento'}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Taxa de Setup/Implementação:</span>
+                      <p className="font-bold text-white mt-0.5">
+                        R$ {parseFloat(e.valor_implementacao || 0).toFixed(2)} • {' '}
+                        <span className={e.taxa_implementacao_paga ? 'text-brand-green font-bold' : 'text-yellow-500 font-bold'}>
+                          {e.taxa_implementacao_paga ? 'Pago' : 'Pendente'}
+                        </span>
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 5. Histórico Completo de Pagamentos */}
+                <div className="space-y-2">
+                  <h4 className="text-xs font-bold text-brand-blue-light uppercase tracking-wider border-b border-brand-dark-5 pb-1 flex items-center gap-1.5">
+                    <Calendar size={14} />
+                    Histórico de Pagamentos Recentes
+                  </h4>
+                  {todosPagamentos.filter(p => p.empresa_id === e.id).length === 0 ? (
+                    <p className="text-xs text-gray-500 italic">Nenhum pagamento registrado para esta conta.</p>
+                  ) : (
+                    <div className="overflow-x-auto rounded-xl border border-brand-dark-5">
+                      <table className="w-full text-left border-collapse text-xs">
+                        <thead>
+                          <tr className="bg-brand-dark-4 text-gray-400 border-b border-brand-dark-5">
+                            <th className="px-2 py-1.5 font-bold">Data</th>
+                            <th className="px-2 py-1.5 font-bold">Valor</th>
+                            <th className="px-2 py-1.5 font-bold">Meio</th>
+                            <th className="px-2 py-1.5 font-bold">Ref. Vencimento</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-brand-dark-5 text-gray-300">
+                          {todosPagamentos.filter(p => p.empresa_id === e.id).map(p => (
+                            <tr key={p.id} className="hover:bg-brand-dark-4/50">
+                              <td className="px-2 py-1.5">
+                                {new Date(p.data_pagamento).toLocaleDateString('pt-BR')} {new Date(p.data_pagamento).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                              </td>
+                              <td className="px-2 py-1.5">R$ {parseFloat(p.valor_pago).toFixed(2)}</td>
+                              <td className="px-2 py-1.5">{p.meio_pagamento || 'PIX'}</td>
+                              <td className="px-2 py-1.5">{p.referencia_vencimento ? formatarData(p.referencia_vencimento) : '—'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+
+              </div>
+
+              <div className="bg-brand-dark-2 px-6 py-4 border-t border-brand-dark-5 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEmpresaFaturamentoSelecionada(e);
+                    let precoPadrao = '30';
+                    if (e.plano === '.357mag') precoPadrao = '50';
+                    else if (e.plano === '.308win') precoPadrao = '100';
+                    
+                    const valorAssinatura = e.valor_assinatura_personalizado != null 
+                      ? e.valor_assinatura_personalizado.toString()
+                      : precoPadrao;
+
+                    setFormDataPagamento({
+                      valor_pago: valorAssinatura,
+                      meio_pagamento: 'PIX',
+                      observacoes: `Renovação de plano CAC ${e.plano || '.22LR'}`
+                    });
+                    setSelectedCacDetails(null);
+                    setModalPagamentoManualAberto(true);
+                  }}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-brand-green text-white hover:bg-brand-green/80 text-xs font-bold uppercase tracking-wider transition-colors"
+                >
+                  <BadgeDollarSign size={14} />
+                  Lançar Pagamento
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedCacDetails(null)}
+                  className="btn-ghost py-2 px-4 text-xs font-bold uppercase tracking-wider"
+                >
+                  Fechar
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Modal de Editar Empresa */}
       {empresaEditando && (
