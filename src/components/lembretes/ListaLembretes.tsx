@@ -123,7 +123,7 @@ export function ListaLembretes() {
             ) : alertasVencimento.length === 0 ? (
               <div className="card py-16 text-center text-gray-500 text-sm italic border-dashed border-2 flex flex-col items-center justify-center gap-3">
                 <Shield size={40} className="text-brand-green opacity-60 mb-2" />
-                <span>Excelente! Todos os seus documentos (CR, CRAF, GT, Manejo) estão válidos e seguros. 🛡️</span>
+                <span>Excelente! Todos os seus documentos (CR, CR IBAMA, CRAF, GT, Manejo) estão válidos e seguros. 🛡️</span>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

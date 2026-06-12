@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ShieldAlert, ChevronRight, Calendar, User, Target, MapPin, ExternalLink, Info, X, Link2 } from 'lucide-react';
+import { ShieldAlert, Shield, ChevronRight, Calendar, User, Target, MapPin, ExternalLink, Info, X, Link2 } from 'lucide-react';
 import { buscarAlertasGlobais, buscarAlertasCacsVinculados } from '../../services/vencimentosService';
 import { AlertaDocumento, obterClasseAlerta } from '../../utils/vencimentos';
 import { formatarData } from '../../utils/formatters';
@@ -56,6 +56,7 @@ export function WidgetVencimentos() {
             {alerta.tipo === 'CRAF' ? <Target size={14} /> : 
              alerta.tipo === 'GT' ? <MapPin size={14} /> :
              alerta.tipo === 'MANEJO' ? <Calendar size={14} /> :
+             alerta.tipo === 'CR' || alerta.tipo === 'IBAMA_CR' ? <Shield size={14} /> :
              <User size={14} />}
           </div>
           <div className="min-w-0 flex-1">

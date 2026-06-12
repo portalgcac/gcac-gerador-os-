@@ -296,6 +296,7 @@ export function Configuracoes() {
   const [alertaCraf, setAlertaCraf] = useState(() => localStorage.getItem('config_alerta_craf') || '60');
   const [alertaGt, setAlertaGt] = useState(() => localStorage.getItem('config_alerta_gt') || '20');
   const [alertaManejo, setAlertaManejo] = useState(() => localStorage.getItem('config_alerta_manejo') || '7');
+  const [alertaCrIbama, setAlertaCrIbama] = useState(() => localStorage.getItem('config_alerta_ibama_cr') || '-1');
   const [ocultarIbama, setOcultarIbama] = useState(() => localStorage.getItem('config_ocultar_ibama') === 'true');
   const [exportando, setExportando] = useState(false);
 
@@ -657,6 +658,37 @@ export function Configuracoes() {
                   <option value="15">Alertar com 15 dias de antecedência</option>
                   <option value="30">Alertar com 30 dias de antecedência</option>
                 </select>
+              </div>
+            )}
+
+            {/* Alerta CR IBAMA */}
+            {!ocultarIbama && (
+              <div className="space-y-1.5 animate-fade-in">
+                <label className="text-xs font-bold text-gray-400 uppercase">CR IBAMA</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min={-1}
+                    max={60}
+                    value={alertaCrIbama}
+                    onChange={e => {
+                      let val = e.target.value;
+                      if (val !== '') {
+                        const num = parseInt(val, 10);
+                        if (num < -1) val = '-1';
+                        if (num > 60) val = '60';
+                      }
+                      setAlertaCrIbama(val);
+                      salvarConfiguracoesCac('config_alerta_ibama_cr', val);
+                    }}
+                    className="input font-bold text-sm w-20 text-center"
+                    placeholder="Ex: -1"
+                  />
+                  <span className="text-xs text-gray-400">dias de antecedência</span>
+                </div>
+                <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider leading-normal">
+                  Use -1 para alertar 1 dia após vencimento, 0 no dia, ou 1 a 60 para dias antes.
+                </p>
               </div>
             )}
           </div>
@@ -1195,6 +1227,29 @@ export function Configuracoes() {
                       className="btn-primary btn-sm ml-auto px-3"
                     >Salvar</button>
                   </div>
+                </div>
+                {/* CR IBAMA */}
+                <div className="bg-brand-dark-4 border border-brand-dark-5 rounded-xl p-3 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Shield size={14} className="text-teal-400" />
+                    <span className="text-xs font-bold text-white uppercase tracking-wider">CR IBAMA</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number" min={-1} max={60}
+                      value={alertaCrIbama}
+                      onChange={e => setAlertaCrIbama(e.target.value)}
+                      className="input text-center font-bold w-20 text-sm"
+                    />
+                    <span className="text-xs text-gray-400">dias antes (-1 a 60)</span>
+                    <button
+                      onClick={() => salvarAlertaEmpresa('config_alerta_ibama_cr', alertaCrIbama)}
+                      className="btn-primary btn-sm ml-auto px-3"
+                    >Salvar</button>
+                  </div>
+                  <p className="text-[9px] text-gray-500 font-bold uppercase leading-tight">
+                    Use -1 para alertar 1 dia pós-vencimento, 0 no dia, ou 1 a 60 para dias antes.
+                  </p>
                 </div>
               </div>
             </div>

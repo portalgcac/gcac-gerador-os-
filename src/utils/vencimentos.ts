@@ -36,10 +36,24 @@ export function calcularAlerta(tipo: string, dataVenc: string): { nivel: NivelAl
   
   const dias = differenceInDays(venc, hoje);
 
-  // Regra CR IBAMA: 1 dia DEPOIS de vencido
+  // Regra CR IBAMA: 1 dia DEPOIS de vencido (-1) a até 60 dias de antecedência
   if (tipo === 'IBAMA_CR') {
-    if (isAfter(hoje, addDays(venc, 1))) return { nivel: 'VENCIDO', dias };
-    if (isAfter(hoje, venc)) return { nivel: 'CRITICO', dias };
+    const configChave = 'config_alerta_ibama_cr';
+    const diasConfig = typeof window !== 'undefined' ? localStorage.getItem(configChave) : null;
+    const limiteAviso = diasConfig ? parseInt(diasConfig, 10) : -1; // padrão: -1 (1 dia após vencimento)
+
+    if (dias < 0) {
+      if (dias <= limiteAviso) return { nivel: 'VENCIDO', dias };
+      return { nivel: 'CRITICO', dias };
+    }
+
+    if (limiteAviso < 0) {
+      return { nivel: 'OK', dias };
+    }
+
+    const limiteCritico = Math.max(1, Math.floor(limiteAviso / 2));
+    if (dias <= limiteCritico) return { nivel: 'CRITICO', dias };
+    if (dias <= limiteAviso) return { nivel: 'AVISO', dias };
     return { nivel: 'OK', dias };
   }
 
