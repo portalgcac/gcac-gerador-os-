@@ -106,6 +106,10 @@ export function GestaoUsuarios({ abaInicial }: GestaoUsuariosProps = {}) {
     meio_pagamento: 'PIX',
     observacoes: ''
   });
+  const [vinculosAtivos, setVinculosAtivos] = useState<any[]>([]);
+  const [todosPagamentos, setTodosPagamentos] = useState<any[]>([]);
+  const [buscaFaturamento, setBuscaFaturamento] = useState('');
+  const [abaFaturamento, setAbaFaturamento] = useState<'empresas' | 'cacs'>('empresas');
   
   // Modal State
   const [modalAberto, setModalAberto] = useState(false);
@@ -128,17 +132,36 @@ export function GestaoUsuarios({ abaInicial }: GestaoUsuariosProps = {}) {
   const carregarEmpresas = async () => {
     if (!isMasterAdmin) return;
     setCarregandoEmpresas(true);
-    const { data, error } = await supabase
-      .from('empresas')
-      .select('id, nome, tipo_conta, limite_cac_vinculados, recursos_liberados, plano, plano_status, frequencia_pagamento, data_vencimento, taxa_implementacao_paga, valor_implementacao, valor_assinatura_personalizado, is_gratis, limite_usuarios_staff')
-      .order('nome');
-    if (error) {
-      console.error('Erro ao carregar empresas:', error);
-      mostrar('erro', `Erro ao carregar empresas: ${error.message}. Por favor, certifique-se de executar a migração SQL de faturamento no painel do Supabase.`);
-    } else if (data) {
-      setEmpresas(data);
+    try {
+      const { data, error } = await supabase
+        .from('empresas')
+        .select('id, nome, tipo_conta, limite_cac_vinculados, recursos_liberados, plano, plano_status, frequencia_pagamento, data_vencimento, taxa_implementacao_paga, valor_implementacao, valor_assinatura_personalizado, is_gratis, limite_usuarios_staff, criado_em')
+        .order('nome');
+      if (error) {
+        console.error('Erro ao carregar empresas:', error);
+        mostrar('erro', `Erro ao carregar empresas: ${error.message}. Por favor, certifique-se de executar a migração SQL de faturamento no painel do Supabase.`);
+      } else if (data) {
+        setEmpresas(data);
+      }
+
+      // Buscar vínculos ativos de despachantes com CACs
+      const { data: vData } = await supabase
+        .from('vinculos_despachante_cac')
+        .select('cac_empresa_id, despachante_nome, status')
+        .eq('status', 'ativo');
+      if (vData) setVinculosAtivos(vData);
+
+      // Buscar todos os pagamentos para exibir a data de último pagamento
+      const { data: pData } = await supabase
+        .from('historico_pagamentos_empresa')
+        .select('empresa_id, data_pagamento')
+        .order('data_pagamento', { ascending: false });
+      if (pData) setTodosPagamentos(pData);
+    } catch (err) {
+      console.error('Erro no fluxo de carregarEmpresas:', err);
+    } finally {
+      setCarregandoEmpresas(false);
     }
-    setCarregandoEmpresas(false);
   };
 
   const carregarLeads = async () => {
@@ -229,7 +252,7 @@ export function GestaoUsuarios({ abaInicial }: GestaoUsuariosProps = {}) {
                 : 30) * 24 * 60 * 60 * 1000
           ).toISOString().split('T')[0],
           taxa_implementacao_paga: false,
-          is_gratis: isCac // CAC individual pode ser isento de recorrência se desejar
+          is_gratis: false // Fica sujeito a cobrança e vencimento por padrão
         }])
         .select()
         .single();
@@ -763,9 +786,32 @@ export function GestaoUsuarios({ abaInicial }: GestaoUsuariosProps = {}) {
 
   // Filtros de dados com base na aba ou empresa ativa
   const empresasClientes = empresas.filter(e => e.tipo_conta === 'empresa' && e.id !== '00000000-0000-0000-0000-000000000001');
+  const cacsClientes = empresas.filter(e => e.tipo_conta === 'cac_individual');
 
   const calcularMRR = () => {
     return empresasClientes
+      .filter(e => e.plano_status === 'ativo' && !e.is_gratis)
+      .reduce((soma, e) => {
+        let preco = 30.00;
+        if (e.valor_assinatura_personalizado != null) {
+          preco = parseFloat(e.valor_assinatura_personalizado);
+        } else if (e.plano === '.357mag') {
+          preco = 50.00;
+        } else if (e.plano === '.308win') {
+          preco = 100.00;
+        }
+        
+        if (e.frequencia_pagamento === 'semestral') {
+          preco = preco / 6;
+        } else if (e.frequencia_pagamento === 'anual') {
+          preco = preco / 12;
+        }
+        return soma + (isNaN(preco) ? 0 : preco);
+      }, 0);
+  };
+
+  const calcularMRRCac = () => {
+    return cacsClientes
       .filter(e => e.plano_status === 'ativo' && !e.is_gratis)
       .reduce((soma, e) => {
         let preco = 30.00;
@@ -793,6 +839,43 @@ export function GestaoUsuarios({ abaInicial }: GestaoUsuariosProps = {}) {
       const dataVenc = e.data_vencimento ? new Date(e.data_vencimento + 'T00:00:00') : null;
       return dataVenc && dataVenc < hoje && !e.is_gratis && e.plano_status !== 'suspenso';
     }).length;
+  };
+
+  const calcularCacsEmAtraso = () => {
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+    return cacsClientes.filter(e => {
+      const dataVenc = e.data_vencimento ? new Date(e.data_vencimento + 'T00:00:00') : null;
+      return dataVenc && dataVenc < hoje && !e.is_gratis && e.plano_status !== 'suspenso';
+    }).length;
+  };
+
+  const obterEmpresasClientesExibidos = () => {
+    if (!buscaFaturamento.trim()) return empresasClientes;
+    const q = buscaFaturamento.toLowerCase();
+    return empresasClientes.filter(e => 
+      e.nome.toLowerCase().includes(q) ||
+      e.id.toLowerCase().includes(q)
+    );
+  };
+
+  const obterCacsClientesExibidos = () => {
+    const q = buscaFaturamento.toLowerCase();
+    return cacsClientes.filter(e => {
+      const cacUser = usuarios.find(u => u.empresa_id === e.id);
+      const vinculados = vinculosAtivos.filter(v => v.cac_empresa_id === e.id);
+      const despachantesNomes = vinculados.map(v => v.despachante_nome).join(' ');
+      
+      const nomeMatch = e.nome.toLowerCase().includes(q);
+      const userMatch = cacUser ? (
+        cacUser.nome.toLowerCase().includes(q) ||
+        cacUser.email.toLowerCase().includes(q) ||
+        (cacUser.cpf && cacUser.cpf.includes(q))
+      ) : false;
+      const despachanteMatch = despachantesNomes.toLowerCase().includes(q);
+
+      return !buscaFaturamento.trim() || nomeMatch || userMatch || despachanteMatch;
+    });
   };
   
   const cacsUsuarios = usuarios.filter(u => {
@@ -1494,7 +1577,7 @@ export function GestaoUsuarios({ abaInicial }: GestaoUsuariosProps = {}) {
                   <div>
                     <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">MRR Previsto (Recorrência)</p>
                     <p className="text-xl font-black text-brand-blue-light mt-1">
-                      R$ {calcularMRR().toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      R$ {(abaFaturamento === 'empresas' ? calcularMRR() : calcularMRRCac()).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </p>
                   </div>
                   <div className="p-3 bg-brand-blue/10 rounded-xl text-brand-blue-light">
@@ -1504,8 +1587,12 @@ export function GestaoUsuarios({ abaInicial }: GestaoUsuariosProps = {}) {
 
                 <div className="bg-brand-dark-4 border border-brand-dark-5 rounded-2xl p-4 flex items-center justify-between">
                   <div>
-                    <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Empresas em Atraso</p>
-                    <p className="text-xl font-black text-red-400 mt-1">{calcularEmpresasEmAtraso()}</p>
+                    <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">
+                      {abaFaturamento === 'empresas' ? 'Empresas em Atraso' : 'Atiradores em Atraso'}
+                    </p>
+                    <p className="text-xl font-black text-red-400 mt-1 font-mono">
+                      {abaFaturamento === 'empresas' ? calcularEmpresasEmAtraso() : calcularCacsEmAtraso()}
+                    </p>
                   </div>
                   <div className="p-3 bg-red-500/10 rounded-xl text-red-400">
                     <XCircle size={20} />
@@ -1514,145 +1601,342 @@ export function GestaoUsuarios({ abaInicial }: GestaoUsuariosProps = {}) {
 
                 <div className="bg-brand-dark-4 border border-brand-dark-5 rounded-2xl p-4 flex items-center justify-between">
                   <div>
-                    <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Total de Empresas B2B</p>
-                    <p className="text-xl font-black text-white mt-1">{empresasClientes.length}</p>
+                    <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">
+                      {abaFaturamento === 'empresas' ? 'Total de Empresas B2B' : 'Total de Atiradores B2C'}
+                    </p>
+                    <p className="text-xl font-black text-white mt-1">
+                      {abaFaturamento === 'empresas' ? empresasClientes.length : cacsClientes.length}
+                    </p>
                   </div>
                   <div className="p-3 bg-brand-dark-3 rounded-xl text-gray-400">
-                    <Building size={20} />
+                    {abaFaturamento === 'empresas' ? <Building size={20} /> : <User size={20} />}
                   </div>
                 </div>
               </div>
 
-              {/* Lista de Empresas para Faturamento */}
+              {/* Lista de Empresas/Atiradores para Faturamento */}
               <div className="card space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-brand-dark-5">
+                  <div className="flex border-b border-transparent gap-4">
+                    <button
+                      type="button"
+                      onClick={() => { setAbaFaturamento('empresas'); setBuscaFaturamento(''); }}
+                      className={`pb-2 text-xs font-bold uppercase tracking-wider transition-all border-b-2 ${
+                        abaFaturamento === 'empresas' 
+                          ? 'border-brand-blue text-white font-extrabold' 
+                          : 'border-transparent text-gray-400 hover:text-white'
+                      }`}
+                    >
+                      Empresas Despachantes (B2B)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setAbaFaturamento('cacs'); setBuscaFaturamento(''); }}
+                      className={`pb-2 text-xs font-bold uppercase tracking-wider transition-all border-b-2 ${
+                        abaFaturamento === 'cacs' 
+                          ? 'border-brand-blue text-white font-extrabold' 
+                          : 'border-transparent text-gray-400 hover:text-white'
+                      }`}
+                    >
+                      Atiradores CAC (B2C)
+                    </button>
+                  </div>
+
+                  <input
+                    type="text"
+                    value={buscaFaturamento}
+                    onChange={e => setBuscaFaturamento(e.target.value)}
+                    placeholder={abaFaturamento === 'empresas' ? "Buscar empresa..." : "Buscar atirador, email, CPF ou despachante..."}
+                    className="input text-xs w-full sm:max-w-xs"
+                  />
+                </div>
+
                 <div>
-                  <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
-                    <CreditCard size={16} className="text-brand-blue" />
-                    Controle de Mensalidades & Licenciamento
-                  </h3>
-                  <p className="text-xs text-gray-400 mt-0.5">Registre pagamentos manuais, controle vencimentos e suspenda workspaces</p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    {abaFaturamento === 'empresas' 
+                      ? 'Registre pagamentos manuais, controle vencimentos e suspenda workspaces de despachantes.' 
+                      : 'Monitore pagamentos, vencimentos e despachantes parceiros dos atiradores individuais (B2C).'}
+                  </p>
                 </div>
 
                 <div className="overflow-x-auto rounded-2xl border border-brand-dark-5">
-                  <table className="w-full text-left border-collapse min-w-[700px]">
-                    <thead>
-                      <tr className="bg-brand-dark-3 border-b border-brand-dark-5">
-                        <th className="px-3 py-3 text-xs font-black text-gray-400 uppercase tracking-wider">Empresa</th>
-                        <th className="px-3 py-3 text-xs font-black text-gray-400 uppercase tracking-wider">Plano</th>
-                        <th className="px-3 py-3 text-xs font-black text-gray-400 uppercase tracking-wider">Preço Custom / Período</th>
-                        <th className="px-3 py-3 text-xs font-black text-gray-400 uppercase tracking-wider">Situação</th>
-                        <th className="px-3 py-3 text-xs font-black text-gray-400 uppercase tracking-wider">Vencimento</th>
-                        <th className="px-3 py-3 text-xs font-black text-gray-400 uppercase tracking-wider text-right">Ações Rápidas</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-brand-dark-5">
-                      {empresasClientes.map(e => {
-                        const hoje = new Date();
-                        hoje.setHours(0,0,0,0);
-                        const dataVenc = e.data_vencimento ? new Date(e.data_vencimento + 'T00:00:00') : null;
-                        const ehExpirado = dataVenc && dataVenc < hoje && !e.is_gratis;
-                        const diasAteVencer = dataVenc ? Math.ceil((dataVenc.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24)) : null;
-                        
-                        const obterPrecoEstilizado = () => {
-                          if (e.is_gratis) return 'Isento';
-                          if (e.valor_assinatura_personalizado != null) return `R$ ${parseFloat(e.valor_assinatura_personalizado).toFixed(2)}`;
-                          if (e.plano === '.22LR') return 'R$ 30,00';
-                          if (e.plano === '.357mag') return 'R$ 50,00';
-                          if (e.plano === '.308win') return 'R$ 100,00';
-                          return 'R$ 30,00';
-                        };
+                  {abaFaturamento === 'empresas' ? (
+                    <table className="w-full text-left border-collapse min-w-[700px]">
+                      <thead>
+                        <tr className="bg-brand-dark-3 border-b border-brand-dark-5">
+                          <th className="px-3 py-3 text-xs font-black text-gray-400 uppercase tracking-wider">Empresa</th>
+                          <th className="px-3 py-3 text-xs font-black text-gray-400 uppercase tracking-wider">Plano</th>
+                          <th className="px-3 py-3 text-xs font-black text-gray-400 uppercase tracking-wider">Preço Custom / Período</th>
+                          <th className="px-3 py-3 text-xs font-black text-gray-400 uppercase tracking-wider">Situação</th>
+                          <th className="px-3 py-3 text-xs font-black text-gray-400 uppercase tracking-wider">Vencimento</th>
+                          <th className="px-3 py-3 text-xs font-black text-gray-400 uppercase tracking-wider text-right">Ações Rápidas</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-brand-dark-5">
+                        {obterEmpresasClientesExibidos().map(e => {
+                          const hoje = new Date();
+                          hoje.setHours(0,0,0,0);
+                          const dataVenc = e.data_vencimento ? new Date(e.data_vencimento + 'T00:00:00') : null;
+                          const ehExpirado = dataVenc && dataVenc < hoje && !e.is_gratis;
+                          const diasAteVencer = dataVenc ? Math.ceil((dataVenc.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24)) : null;
+                          
+                          const obterPrecoEstilizado = () => {
+                            if (e.is_gratis) return 'Isento';
+                            if (e.valor_assinatura_personalizado != null) return `R$ ${parseFloat(e.valor_assinatura_personalizado).toFixed(2)}`;
+                            if (e.plano === '.22LR') return 'R$ 30,00';
+                            if (e.plano === '.357mag') return 'R$ 50,00';
+                            if (e.plano === '.308win') return 'R$ 100,00';
+                            return 'R$ 30,00';
+                          };
 
-                        const obterFrequenciaLabel = () => {
-                          if (e.frequencia_pagamento === 'semestral') return 'Semestral';
-                          if (e.frequencia_pagamento === 'anual') return 'Anual';
-                          return 'Mensal';
-                        };
+                          const obterFrequenciaLabel = () => {
+                            if (e.frequencia_pagamento === 'semestral') return 'Semestral';
+                            if (e.frequencia_pagamento === 'anual') return 'Anual';
+                            return 'Mensal';
+                          };
 
-                        const obterStatusBadge = () => {
-                          if (e.is_gratis) {
-                            return <span className="px-2 py-0.5 rounded bg-brand-green/10 text-brand-green border border-brand-green/20 font-bold text-[9px] uppercase tracking-wider">Isento</span>;
-                          }
-                          if (e.plano_status === 'suspenso') {
-                            return <span className="px-2 py-0.5 rounded bg-red-500/10 text-red-400 border border-red-500/20 font-bold text-[9px] uppercase tracking-wider">Suspenso</span>;
-                          }
-                          if (ehExpirado) {
-                            return <span className="px-2 py-0.5 rounded bg-red-500/10 text-red-400 border border-red-500/20 font-bold text-[9px] uppercase tracking-wider">Atrasado</span>;
-                          }
-                          if (diasAteVencer !== null && diasAteVencer <= 5) {
-                            return <span className="px-2 py-0.5 rounded bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 font-bold text-[9px] uppercase tracking-wider">Expira em {diasAteVencer}d</span>;
-                          }
-                          return <span className="px-2 py-0.5 rounded bg-brand-green/10 text-brand-green border border-brand-green/20 font-bold text-[9px] uppercase tracking-wider">Em dia</span>;
-                        };
+                          const obterStatusBadge = () => {
+                            if (e.is_gratis) {
+                              return <span className="px-2 py-0.5 rounded bg-brand-green/10 text-brand-green border border-brand-green/20 font-bold text-[9px] uppercase tracking-wider">Isento</span>;
+                            }
+                            if (e.plano_status === 'suspenso') {
+                              return <span className="px-2 py-0.5 rounded bg-red-500/10 text-red-400 border border-red-500/20 font-bold text-[9px] uppercase tracking-wider">Suspenso</span>;
+                            }
+                            if (ehExpirado) {
+                              return <span className="px-2 py-0.5 rounded bg-red-500/10 text-red-400 border border-red-500/20 font-bold text-[9px] uppercase tracking-wider">Atrasado</span>;
+                            }
+                            if (diasAteVencer !== null && diasAteVencer <= 5) {
+                              return <span className="px-2 py-0.5 rounded bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 font-bold text-[9px] uppercase tracking-wider">Expira em {diasAteVencer}d</span>;
+                            }
+                            return <span className="px-2 py-0.5 rounded bg-brand-green/10 text-brand-green border border-brand-green/20 font-bold text-[9px] uppercase tracking-wider">Em dia</span>;
+                          };
 
-                        return (
-                          <tr key={e.id} className="bg-brand-dark-4/40 hover:bg-brand-dark-4 transition-colors">
-                            <td className="px-3 py-3">
-                              <p className="font-bold text-white text-sm truncate max-w-[150px]" title={e.nome}>{e.nome}</p>
-                              <p className="text-[10px] text-gray-500 font-mono mt-0.5 select-all truncate max-w-[120px]" title={e.id}>{e.id.substring(0, 8)}...</p>
-                            </td>
-                            <td className="px-3 py-3">
-                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
-                                e.plano === '.308win' ? 'bg-brand-blue/15 text-brand-blue-light border-brand-blue/30' :
-                                e.plano === '.357mag' ? 'bg-brand-green/10 text-brand-green-light border-brand-green/20' :
-                                'bg-gray-600/20 text-gray-400 border-gray-500/20'
-                              }`}>
-                                {e.plano || '.22LR'}
-                              </span>
-                            </td>
-                            <td className="px-3 py-3 text-xs text-gray-300">
-                              <p className="font-bold text-white">{obterPrecoEstilizado()}</p>
-                              <p className="text-gray-500 text-[10px] uppercase font-semibold">{obterFrequenciaLabel()}</p>
-                            </td>
-                            <td className="px-3 py-3">
-                              {obterStatusBadge()}
-                            </td>
-                            <td className="px-3 py-3 text-xs text-gray-300">
-                              {e.data_vencimento ? formatarData(e.data_vencimento) : <span className="text-gray-500 italic">Sem vencimento</span>}
-                            </td>
-                            <td className="px-3 py-3 text-right">
-                              <div className="flex items-center justify-end gap-1">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setEmpresaFaturamentoSelecionada(e);
-                                    let precoPadrao = '30';
-                                    if (e.plano === '.357mag') precoPadrao = '50';
-                                    else if (e.plano === '.308win') precoPadrao = '100';
-                                    
-                                    const valorAssinatura = e.valor_assinatura_personalizado != null 
-                                      ? e.valor_assinatura_personalizado.toString()
-                                      : precoPadrao;
+                          return (
+                            <tr key={e.id} className="bg-brand-dark-4/40 hover:bg-brand-dark-4 transition-colors">
+                              <td className="px-3 py-3">
+                                <p className="font-bold text-white text-sm truncate max-w-[150px]" title={e.nome}>{e.nome}</p>
+                                <p className="text-[10px] text-gray-500 font-mono mt-0.5 select-all truncate max-w-[120px]" title={e.id}>{e.id.substring(0, 8)}...</p>
+                              </td>
+                              <td className="px-3 py-3">
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
+                                  e.plano === '.308win' ? 'bg-brand-blue/15 text-brand-blue-light border-brand-blue/30' :
+                                  e.plano === '.357mag' ? 'bg-brand-green/10 text-brand-green-light border-brand-green/20' :
+                                  'bg-gray-600/20 text-gray-400 border-gray-500/20'
+                                }`}>
+                                  {e.plano || '.22LR'}
+                                </span>
+                              </td>
+                              <td className="px-3 py-3 text-xs text-gray-300">
+                                <p className="font-bold text-white">{obterPrecoEstilizado()}</p>
+                                <p className="text-gray-500 text-[10px] uppercase font-semibold">{obterFrequenciaLabel()}</p>
+                              </td>
+                              <td className="px-3 py-3">
+                                {obterStatusBadge()}
+                              </td>
+                              <td className="px-3 py-3 text-xs text-gray-300">
+                                {e.data_vencimento ? formatarData(e.data_vencimento) : <span className="text-gray-500 italic">Sem vencimento</span>}
+                              </td>
+                              <td className="px-3 py-3 text-right">
+                                <div className="flex items-center justify-end gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setEmpresaFaturamentoSelecionada(e);
+                                      let precoPadrao = '30';
+                                      if (e.plano === '.357mag') precoPadrao = '50';
+                                      else if (e.plano === '.308win') precoPadrao = '100';
+                                      
+                                      const valorAssinatura = e.valor_assinatura_personalizado != null 
+                                        ? e.valor_assinatura_personalizado.toString()
+                                        : precoPadrao;
 
-                                    setFormDataPagamento({
-                                      valor_pago: valorAssinatura,
-                                      meio_pagamento: 'PIX',
-                                      observacoes: `Renovação de plano ${e.plano || '.22LR'}`
-                                    });
-                                    setModalPagamentoManualAberto(true);
-                                  }}
-                                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-brand-green/10 border border-brand-green/20 hover:bg-brand-green/20 text-brand-green-light text-[10px] font-bold uppercase tracking-wider transition-colors"
-                                >
-                                  <BadgeDollarSign size={12} />
-                                  Confirmar Pago
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={async () => {
-                                    setEmpresaFaturamentoSelecionada(e);
-                                    buscarHistoricoPagamentos(e.id);
-                                  }}
-                                  className="flex items-center gap-1 px-2 py-1.5 rounded-xl bg-brand-dark-3 border border-brand-dark-5 hover:border-gray-600 text-gray-300 hover:text-white text-[10px] font-bold uppercase tracking-wider transition-colors"
-                                >
-                                  <Calendar size={12} />
-                                  Histórico
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+                                      setFormDataPagamento({
+                                        valor_pago: valorAssinatura,
+                                        meio_pagamento: 'PIX',
+                                        observacoes: `Renovação de plano ${e.plano || '.22LR'}`
+                                      });
+                                      setModalPagamentoManualAberto(true);
+                                    }}
+                                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-brand-green/10 border border-brand-green/20 hover:bg-brand-green/20 text-brand-green-light text-[10px] font-bold uppercase tracking-wider transition-colors"
+                                  >
+                                    <BadgeDollarSign size={12} />
+                                    Confirmar Pago
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={async () => {
+                                      setEmpresaFaturamentoSelecionada(e);
+                                      buscarHistoricoPagamentos(e.id);
+                                    }}
+                                    className="flex items-center gap-1 px-2 py-1.5 rounded-xl bg-brand-dark-3 border border-brand-dark-5 hover:border-gray-600 text-gray-300 hover:text-white text-[10px] font-bold uppercase tracking-wider transition-colors"
+                                  >
+                                    <Calendar size={12} />
+                                    Histórico
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <table className="w-full text-left border-collapse min-w-[950px]">
+                      <thead>
+                        <tr className="bg-brand-dark-3 border-b border-brand-dark-5">
+                          <th className="px-3 py-3 text-xs font-black text-gray-400 uppercase tracking-wider">Cliente (Atirador)</th>
+                          <th className="px-3 py-3 text-xs font-black text-gray-400 uppercase tracking-wider">Empresa Vinculada</th>
+                          <th className="px-3 py-3 text-xs font-black text-gray-400 uppercase tracking-wider">Plano</th>
+                          <th className="px-3 py-3 text-xs font-black text-gray-400 uppercase tracking-wider">Preço Custom / Período</th>
+                          <th className="px-3 py-3 text-xs font-black text-gray-400 uppercase tracking-wider">Situação</th>
+                          <th className="px-3 py-3 text-xs font-black text-gray-400 uppercase tracking-wider">Data Ativação</th>
+                          <th className="px-3 py-3 text-xs font-black text-gray-400 uppercase tracking-wider">Último Pagamento</th>
+                          <th className="px-3 py-3 text-xs font-black text-gray-400 uppercase tracking-wider">Vencimento</th>
+                          <th className="px-3 py-3 text-xs font-black text-gray-400 uppercase tracking-wider text-right">Ações Rápidas</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-brand-dark-5">
+                        {obterCacsClientesExibidos().map(e => {
+                          const hoje = new Date();
+                          hoje.setHours(0,0,0,0);
+                          const dataVenc = e.data_vencimento ? new Date(e.data_vencimento + 'T00:00:00') : null;
+                          const ehExpirado = dataVenc && dataVenc < hoje && !e.is_gratis;
+                          const diasAteVencer = dataVenc ? Math.ceil((dataVenc.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24)) : null;
+                          
+                          const cacUser = usuarios.find(u => u.empresa_id === e.id);
+                          const vinculados = vinculosAtivos.filter(v => v.cac_empresa_id === e.id);
+                          const despachantesNomes = vinculados.length > 0 
+                            ? vinculados.map(v => v.despachante_nome).join(', ') 
+                            : 'Nenhum despachante';
+
+                          const pagamentosCac = todosPagamentos.filter(p => p.empresa_id === e.id);
+                          const ultimoPagamento = pagamentosCac.length > 0 ? pagamentosCac[0] : null;
+
+                          const obterPrecoEstilizado = () => {
+                            if (e.is_gratis) return 'Isento';
+                            if (e.valor_assinatura_personalizado != null) return `R$ ${parseFloat(e.valor_assinatura_personalizado).toFixed(2)}`;
+                            if (e.plano === '.22LR') return 'R$ 30,00';
+                            if (e.plano === '.357mag') return 'R$ 50,00';
+                            if (e.plano === '.308win') return 'R$ 100,00';
+                            return 'R$ 30,00';
+                          };
+
+                          const obterFrequenciaLabel = () => {
+                            if (e.frequencia_pagamento === 'semestral') return 'Semestral';
+                            if (e.frequencia_pagamento === 'anual') return 'Anual';
+                            return 'Mensal';
+                          };
+
+                          const obterStatusBadge = () => {
+                            if (e.is_gratis) {
+                              return <span className="px-2 py-0.5 rounded bg-brand-green/10 text-brand-green border border-brand-green/20 font-bold text-[9px] uppercase tracking-wider">Isento</span>;
+                            }
+                            if (e.plano_status === 'suspenso') {
+                              return <span className="px-2 py-0.5 rounded bg-red-500/10 text-red-400 border border-red-500/20 font-bold text-[9px] uppercase tracking-wider">Suspenso</span>;
+                            }
+                            if (ehExpirado) {
+                              return <span className="px-2 py-0.5 rounded bg-red-500/10 text-red-400 border border-red-500/20 font-bold text-[9px] uppercase tracking-wider">Atrasado</span>;
+                            }
+                            if (diasAteVencer !== null && diasAteVencer <= 5) {
+                              return <span className="px-2 py-0.5 rounded bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 font-bold text-[9px] uppercase tracking-wider">Expira em {diasAteVencer}d</span>;
+                            }
+                            return <span className="px-2 py-0.5 rounded bg-brand-green/10 text-brand-green border border-brand-green/20 font-bold text-[9px] uppercase tracking-wider">Em dia</span>;
+                          };
+
+                          return (
+                            <tr key={e.id} className="bg-brand-dark-4/40 hover:bg-brand-dark-4 transition-colors">
+                              <td className="px-3 py-3">
+                                <p className="font-bold text-white text-sm truncate max-w-[200px]" title={cacUser?.nome || e.nome}>
+                                  {cacUser?.nome || e.nome.replace('CAC - ', '')}
+                                </p>
+                                {cacUser && (
+                                  <p className="text-[10px] text-gray-400 mt-0.5 select-all" title={cacUser.email}>
+                                    {cacUser.email} {cacUser.cpf ? `• CPF: ${cacUser.cpf}` : ''}
+                                  </p>
+                                )}
+                              </td>
+                              <td className="px-3 py-3 text-xs text-gray-300">
+                                <p className="font-semibold text-brand-blue-light truncate max-w-[150px]" title={despachantesNomes}>
+                                  {despachantesNomes}
+                                </p>
+                              </td>
+                              <td className="px-3 py-3">
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
+                                  e.plano === '.308win' ? 'bg-brand-blue/15 text-brand-blue-light border-brand-blue/30' :
+                                  e.plano === '.357mag' ? 'bg-brand-green/10 text-brand-green-light border-brand-green/20' :
+                                  'bg-gray-600/20 text-gray-400 border-gray-500/20'
+                                }`}>
+                                  {e.plano || '.22LR'}
+                                </span>
+                              </td>
+                              <td className="px-3 py-3 text-xs text-gray-300">
+                                <p className="font-bold text-white">{obterPrecoEstilizado()}</p>
+                                <p className="text-gray-500 text-[10px] uppercase font-semibold">{obterFrequenciaLabel()}</p>
+                              </td>
+                              <td className="px-3 py-3">
+                                {obterStatusBadge()}
+                              </td>
+                              <td className="px-3 py-3 text-xs text-gray-300">
+                                {e.criado_em ? formatarData(e.criado_em) : <span className="text-gray-500 italic">—</span>}
+                              </td>
+                              <td className="px-3 py-3 text-xs text-gray-300">
+                                {ultimoPagamento ? (
+                                  <div>
+                                    <p className="font-bold text-white">{new Date(ultimoPagamento.data_pagamento).toLocaleDateString('pt-BR')}</p>
+                                    <p className="text-[10px] text-gray-500">{new Date(ultimoPagamento.data_pagamento).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</p>
+                                  </div>
+                                ) : (
+                                  <span className="text-gray-500 italic">Nunca registrado</span>
+                                )}
+                              </td>
+                              <td className="px-3 py-3 text-xs text-gray-300">
+                                {e.data_vencimento ? formatarData(e.data_vencimento) : <span className="text-gray-500 italic">Sem vencimento</span>}
+                              </td>
+                              <td className="px-3 py-3 text-right">
+                                <div className="flex items-center justify-end gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setEmpresaFaturamentoSelecionada(e);
+                                      let precoPadrao = '30';
+                                      if (e.plano === '.357mag') precoPadrao = '50';
+                                      else if (e.plano === '.308win') precoPadrao = '100';
+                                      
+                                      const valorAssinatura = e.valor_assinatura_personalizado != null 
+                                        ? e.valor_assinatura_personalizado.toString()
+                                        : precoPadrao;
+
+                                      setFormDataPagamento({
+                                        valor_pago: valorAssinatura,
+                                        meio_pagamento: 'PIX',
+                                        observacoes: `Renovação de plano CAC ${e.plano || '.22LR'}`
+                                      });
+                                      setModalPagamentoManualAberto(true);
+                                    }}
+                                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-brand-green/10 border border-brand-green/20 hover:bg-brand-green/20 text-brand-green-light text-[10px] font-bold uppercase tracking-wider transition-colors"
+                                  >
+                                    <BadgeDollarSign size={12} />
+                                    Confirmar Pago
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={async () => {
+                                      setEmpresaFaturamentoSelecionada(e);
+                                      buscarHistoricoPagamentos(e.id);
+                                    }}
+                                    className="flex items-center gap-1 px-2 py-1.5 rounded-xl bg-brand-dark-3 border border-brand-dark-5 hover:border-gray-600 text-gray-300 hover:text-white text-[10px] font-bold uppercase tracking-wider transition-colors"
+                                  >
+                                    <Calendar size={12} />
+                                    Histórico
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  )}
                 </div>
               </div>
             </div>
@@ -2131,7 +2415,7 @@ export function GestaoUsuarios({ abaInicial }: GestaoUsuariosProps = {}) {
                 </select>
               </div>
 
-              {empresaEditando.tipo_conta === 'empresa' && (
+              {(empresaEditando.tipo_conta === 'empresa' || empresaEditando.tipo_conta === 'cac_individual') && (
                 <>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1">
@@ -2140,25 +2424,34 @@ export function GestaoUsuarios({ abaInicial }: GestaoUsuariosProps = {}) {
                         value={empresaEditando.plano || '.22LR'}
                         onChange={e => {
                           const val = e.target.value;
-                          let staff = 1;
-                          let cac = 20;
-                          let recs = [...(empresaEditando.recursos_liberados || [])];
-                          if (val === '.22LR') {
-                            staff = 1;
-                            cac = 15;
-                            recs = [
-                              'dash_alertas_vencimento', 'dash_ordens_recentes', 'dash_atencao_diaria',
-                              'modulo_clientes', 'modulo_ordens', 'acervo_anexos', 
-                              'config_alertas_vencimento', 'config_notificacoes_push'
-                            ];
-                          } else if (val === '.357mag') {
-                            staff = 4;
-                            cac = 20;
-                            recs = RECURSOS_SISTEMA.map(r => r.key);
-                          } else if (val === '.308win') {
-                            staff = 9999;
-                            cac = 9999;
-                            recs = RECURSOS_SISTEMA.map(r => r.key);
+                          const isCac = empresaEditando.tipo_conta === 'cac_individual';
+                          let staff = isCac ? 1 : 1;
+                          let cac = isCac ? 1 : 20;
+                          let recs = isCac 
+                            ? [
+                                'dash_atencao_diaria', 'dash_alertas_vencimento', 'dash_lembretes',
+                                'modulo_clientes', 'acervo_anexos', 'acervo_gerenciador', 'config_manual'
+                              ]
+                            : [...(empresaEditando.recursos_liberados || [])];
+                          
+                          if (!isCac) {
+                            if (val === '.22LR') {
+                              staff = 1;
+                              cac = 15;
+                              recs = [
+                                'dash_alertas_vencimento', 'dash_ordens_recentes', 'dash_atencao_diaria',
+                                'modulo_clientes', 'modulo_ordens', 'acervo_anexos', 
+                                'config_alertas_vencimento', 'config_notificacoes_push'
+                              ];
+                            } else if (val === '.357mag') {
+                              staff = 4;
+                              cac = 20;
+                              recs = RECURSOS_SISTEMA.map(r => r.key);
+                            } else if (val === '.308win') {
+                              staff = 9999;
+                              cac = 9999;
+                              recs = RECURSOS_SISTEMA.map(r => r.key);
+                            }
                           }
                           setEmpresaEditando({
                             ...empresaEditando,
@@ -2264,29 +2557,31 @@ export function GestaoUsuarios({ abaInicial }: GestaoUsuariosProps = {}) {
                     </label>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1">
-                      <label className="text-xs font-bold text-gray-500 uppercase">Limite Staff (Equipe)</label>
-                      <input
-                        type="number"
-                        min={1}
-                        value={empresaEditando.limite_usuarios_staff ?? 1}
-                        onChange={e => setEmpresaEditando({ ...empresaEditando, limite_usuarios_staff: parseInt(e.target.value) || 1 })}
-                        className="input w-full"
-                      />
-                    </div>
+                  {empresaEditando.tipo_conta === 'empresa' && (
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-gray-500 uppercase">Limite Staff (Equipe)</label>
+                        <input
+                          type="number"
+                          min={1}
+                          value={empresaEditando.limite_usuarios_staff ?? 1}
+                          onChange={e => setEmpresaEditando({ ...empresaEditando, limite_usuarios_staff: parseInt(e.target.value) || 1 })}
+                          className="input w-full"
+                        />
+                      </div>
 
-                    <div className="space-y-1">
-                      <label className="text-xs font-bold text-gray-500 uppercase">Limite CACs Vinculados</label>
-                      <input
-                        type="number"
-                        min={1}
-                        value={empresaEditando.limite_cac_vinculados ?? 20}
-                        onChange={e => setEmpresaEditando({ ...empresaEditando, limite_cac_vinculados: parseInt(e.target.value) || 1 })}
-                        className="input w-full"
-                      />
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-gray-500 uppercase">Limite CACs Vinculados</label>
+                        <input
+                          type="number"
+                          min={1}
+                          value={empresaEditando.limite_cac_vinculados ?? 20}
+                          onChange={e => setEmpresaEditando({ ...empresaEditando, limite_cac_vinculados: parseInt(e.target.value) || 1 })}
+                          className="input w-full"
+                        />
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </>
               )}
 

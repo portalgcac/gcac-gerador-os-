@@ -42,11 +42,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (error) {
         console.error('[DEBUG Auth] refreshUsuario error fetching user auth:', error);
+        // Não desloga o usuário em caso de erros transitórios de rede ou banco de dados
+        return;
       } else {
         console.log('[DEBUG Auth] refreshUsuario user auth success:', data);
       }
 
-      if (error || !data || !data.ativo) {
+      if (!data || !data.ativo) {
         if (!ehMasterAdmin) {
           logout();
           return;
