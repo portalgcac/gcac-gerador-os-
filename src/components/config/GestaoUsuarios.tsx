@@ -117,6 +117,16 @@ export function GestaoUsuarios({ abaInicial }: GestaoUsuariosProps = {}) {
     ultimoPagamento: any;
     lead: any;
   } | null>(null);
+
+  // Estados para edição inline de cobrança do CAC no modal de detalhes
+  const [editandoCobranca, setEditandoCobranca] = useState(false);
+  const [editPlano, setEditPlano] = useState('.22LR');
+  const [editIsGratis, setEditIsGratis] = useState(false);
+  const [editValorAssinaturaPersonalizado, setEditValorAssinaturaPersonalizado] = useState('');
+  const [editFrequenciaPagamento, setEditFrequenciaPagamento] = useState('mensal');
+  const [editDataVencimento, setEditDataVencimento] = useState('');
+  const [editValorImplementacao, setEditValorImplementacao] = useState('150.00');
+  const [editTaxaSetupPaga, setEditTaxaSetupPaga] = useState(false);
   
   // Modal State
   const [modalAberto, setModalAberto] = useState(false);
@@ -900,7 +910,65 @@ export function GestaoUsuarios({ abaInicial }: GestaoUsuariosProps = {}) {
       (l.cpf && cacUser?.cpf && l.cpf.replace(/\D/g, '') === cacUser.cpf.replace(/\D/g, ''))
     );
 
+    // Inicializar estados de edição inline
+    setEditPlano(e.plano || '.22LR');
+    setEditIsGratis(!!e.is_gratis);
+    setEditValorAssinaturaPersonalizado(e.valor_assinatura_personalizado != null ? e.valor_assinatura_personalizado.toString() : '');
+    setEditFrequenciaPagamento(e.frequencia_pagamento || 'mensal');
+    setEditDataVencimento(e.data_vencimento || '');
+    setEditValorImplementacao(e.valor_implementacao != null ? e.valor_implementacao.toString() : '150.00');
+    setEditTaxaSetupPaga(!!e.taxa_implementacao_paga);
+    setEditandoCobranca(false); // Abre o modal em modo de visualização
+
     setSelectedCacDetails({ e, cacUser, despachantesNomes, ultimoPagamento, lead });
+  };
+
+  const handleSalvarCobranca = async () => {
+    if (!selectedCacDetails) return;
+    const { e } = selectedCacDetails;
+    try {
+      const valorPersonalizado = editValorAssinaturaPersonalizado.trim() === '' 
+        ? null 
+        : parseFloat(editValorAssinaturaPersonalizado);
+
+      if (valorPersonalizado != null && isNaN(valorPersonalizado)) {
+        throw new Error('Por favor, informe um valor de assinatura válido.');
+      }
+
+      const valorSetup = parseFloat(editValorImplementacao);
+      if (isNaN(valorSetup)) {
+        throw new Error('Por favor, informe um valor de taxa de setup válido.');
+      }
+
+      const payload = {
+        plano: editPlano,
+        frequencia_pagamento: editFrequenciaPagamento,
+        is_gratis: editIsGratis,
+        valor_assinatura_personalizado: valorPersonalizado,
+        data_vencimento: editDataVencimento || null,
+        valor_implementacao: valorSetup,
+        taxa_implementacao_paga: editTaxaSetupPaga
+      };
+
+      const { error } = await supabase
+        .from('empresas')
+        .update(payload)
+        .eq('id', e.id);
+
+      if (error) throw error;
+
+      mostrar('sucesso', 'Dados de faturamento salvos com sucesso.');
+      setEditandoCobranca(false);
+      
+      // Recarregar a lista de empresas
+      await carregarEmpresas();
+
+      // Atualizar o estado local do modal
+      const updatedEmp = { ...e, ...payload };
+      setSelectedCacDetails(prev => prev ? { ...prev, e: updatedEmp } : null);
+    } catch (err: any) {
+      mostrar('erro', err.message || 'Erro ao salvar dados de faturamento.');
+    }
   };
   
   const cacsUsuarios = usuarios.filter(u => {
@@ -2464,61 +2532,197 @@ export function GestaoUsuarios({ abaInicial }: GestaoUsuariosProps = {}) {
                 </div>
 
                 {/* 4. Valores & Prazos */}
-                <div className="space-y-2">
-                  <h4 className="text-xs font-bold text-brand-blue-light uppercase tracking-wider border-b border-brand-dark-5 pb-1">
-                    Informações de Cobrança & Prazos
-                  </h4>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                    <div>
-                      <span className="text-gray-500">Valor da Assinatura:</span>
-                      <p className="font-bold text-white mt-0.5">{obterPrecoEstilizado()}</p>
-                    </div>
-                    <div>
-                      <span className="text-gray-500">Frequência de Pagamento:</span>
-                      <p className="font-bold text-white mt-0.5 capitalize">{obterFrequenciaLabel()}</p>
-                    </div>
-                    <div>
-                      <span className="text-gray-500">Solicitação do Pré-Cadastro (Site):</span>
-                      <p className="font-bold text-white mt-0.5">
-                        {lead?.criado_em ? new Date(lead.criado_em).toLocaleString('pt-BR') : '—'}
-                      </p>
-                    </div>
-                    <div>
-                      <span className="text-gray-500">Data de Ativação no Sistema:</span>
-                      <p className="font-bold text-white mt-0.5">
-                        {e.criado_em ? new Date(e.criado_em).toLocaleString('pt-BR') : '—'}
-                      </p>
-                    </div>
-                    <div>
-                      <span className="text-gray-500">Último Pagamento Registrado:</span>
-                      <p className="font-bold text-white mt-0.5">
-                        {ultimoPagamento 
-                          ? `${new Date(ultimoPagamento.data_pagamento).toLocaleDateString('pt-BR')} ${new Date(ultimoPagamento.data_pagamento).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
-                          : 'Nenhum pagamento registrado'}
-                      </p>
-                    </div>
-                    <div>
-                      <span className="text-gray-500">Forma de Pagamento (Plano):</span>
-                      <p className="font-bold text-white mt-0.5">
-                        {ultimoPagamento?.meio_pagamento || 'PIX (Recomendado)'}
-                      </p>
-                    </div>
-                    <div>
-                      <span className="text-gray-500">Próximo Vencimento:</span>
-                      <p className="font-bold text-brand-green mt-0.5 font-mono">
-                        {e.data_vencimento ? formatarData(e.data_vencimento) : 'Sem data de vencimento'}
-                      </p>
-                    </div>
-                    <div>
-                      <span className="text-gray-500">Taxa de Setup/Implementação:</span>
-                      <p className="font-bold text-white mt-0.5">
-                        R$ {parseFloat(e.valor_implementacao || 0).toFixed(2)} • {' '}
-                        <span className={e.taxa_implementacao_paga ? 'text-brand-green font-bold' : 'text-yellow-500 font-bold'}>
-                          {e.taxa_implementacao_paga ? 'Pago' : 'Pendente'}
-                        </span>
-                      </p>
-                    </div>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between border-b border-brand-dark-5 pb-1">
+                    <h4 className="text-xs font-bold text-brand-blue-light uppercase tracking-wider">
+                      Informações de Cobrança & Prazos
+                    </h4>
+                    {editandoCobranca ? (
+                      <div className="flex gap-1.5">
+                        <button
+                          type="button"
+                          onClick={handleSalvarCobranca}
+                          className="px-2 py-1 rounded-xl bg-brand-green hover:bg-brand-green/80 text-black text-[10px] font-black uppercase tracking-wider transition-colors flex items-center gap-1 shadow-sm"
+                        >
+                          <CheckCircle size={10} />
+                          Salvar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditandoCobranca(false)}
+                          className="px-2 py-1 rounded-xl bg-brand-dark-5 hover:bg-brand-dark-4 text-gray-300 text-[10px] font-bold uppercase tracking-wider transition-colors"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setEditandoCobranca(true)}
+                        className="px-2 py-1 rounded-xl bg-brand-blue/20 hover:bg-brand-blue/35 text-brand-blue-light text-[10px] font-bold uppercase tracking-wider transition-colors flex items-center gap-1 border border-brand-blue/20"
+                      >
+                        <Edit2 size={10} />
+                        Editar Cobrança
+                      </button>
+                    )}
                   </div>
+
+                  {editandoCobranca ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs bg-brand-dark-4 p-4 rounded-xl border border-brand-dark-5 animate-fade-in">
+                      {/* Plano */}
+                      <div className="space-y-1">
+                        <label className="text-gray-500 font-bold uppercase text-[9px] block">Plano</label>
+                        <select
+                          value={editPlano}
+                          onChange={e => setEditPlano(e.target.value)}
+                          className="input py-1.5 text-xs bg-brand-dark-3 w-full border-brand-dark-5"
+                        >
+                          <option value=".22LR">.22LR (R$ 30,00)</option>
+                          <option value=".357mag">.357mag (R$ 50,00)</option>
+                          <option value=".308win">.308win (R$ 100,00)</option>
+                        </select>
+                      </div>
+
+                      {/* Frequência */}
+                      <div className="space-y-1">
+                        <label className="text-gray-500 font-bold uppercase text-[9px] block">Frequência de Pagamento</label>
+                        <select
+                          value={editFrequenciaPagamento}
+                          onChange={e => setEditFrequenciaPagamento(e.target.value)}
+                          className="input py-1.5 text-xs bg-brand-dark-3 w-full border-brand-dark-5"
+                        >
+                          <option value="mensal">Mensal</option>
+                          <option value="semestral">Semestral</option>
+                          <option value="anual">Anual</option>
+                        </select>
+                      </div>
+
+                      {/* Valor Assinatura (Isento / Personalizado) */}
+                      <div className="space-y-2 col-span-1 sm:col-span-2 border-t border-brand-dark-5/50 pt-3">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            id="editIsGratis"
+                            checked={editIsGratis}
+                            onChange={e => setEditIsGratis(e.target.checked)}
+                            className="rounded bg-brand-dark-3 border-brand-dark-5 text-brand-blue focus:ring-0"
+                          />
+                          <label htmlFor="editIsGratis" className="text-white font-bold cursor-pointer select-none text-[11px]">
+                            Isento de mensalidade (Conta Grátis)
+                          </label>
+                        </div>
+                        
+                        {!editIsGratis && (
+                          <div className="space-y-1 max-w-[200px]">
+                            <label className="text-gray-500 font-bold uppercase text-[9px] block">Valor Personalizado (opcional)</label>
+                            <div className="relative">
+                              <span className="absolute left-2.5 top-1.5 text-gray-500 font-mono">R$</span>
+                              <input
+                                type="number"
+                                step="0.01"
+                                placeholder="Valor padrão do plano"
+                                value={editValorAssinaturaPersonalizado}
+                                onChange={e => setEditValorAssinaturaPersonalizado(e.target.value)}
+                                className="input py-1.5 pl-8 text-xs bg-brand-dark-3 w-full border-brand-dark-5 font-mono"
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Vencimento */}
+                      <div className="space-y-1 border-t border-brand-dark-5/50 pt-3">
+                        <label className="text-gray-500 font-bold uppercase text-[9px] block">Próximo Vencimento</label>
+                        <input
+                          type="date"
+                          value={editDataVencimento}
+                          onChange={e => setEditDataVencimento(e.target.value)}
+                          className="input py-1.5 text-xs bg-brand-dark-3 w-full border-brand-dark-5 font-mono"
+                        />
+                      </div>
+
+                      {/* Taxa de Setup */}
+                      <div className="space-y-2 border-t border-brand-dark-5/50 pt-3">
+                        <label className="text-gray-500 font-bold uppercase text-[9px] block">Taxa de Setup / Implementação</label>
+                        <div className="flex items-center gap-3">
+                          <div className="relative w-28">
+                            <span className="absolute left-2.5 top-1.5 text-gray-500 font-mono">R$</span>
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={editValorImplementacao}
+                              onChange={e => setEditValorImplementacao(e.target.value)}
+                              className="input py-1.5 pl-8 text-xs bg-brand-dark-3 w-full border-brand-dark-5 font-mono"
+                            />
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <input
+                              type="checkbox"
+                              id="editTaxaSetupPaga"
+                              checked={editTaxaSetupPaga}
+                              onChange={e => setEditTaxaSetupPaga(e.target.checked)}
+                              className="rounded bg-brand-dark-3 border-brand-dark-5 text-brand-blue focus:ring-0"
+                            />
+                            <label htmlFor="editTaxaSetupPaga" className="text-white cursor-pointer select-none text-[11px]">
+                              Paga
+                            </label>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                      <div>
+                        <span className="text-gray-500">Valor da Assinatura:</span>
+                        <p className="font-bold text-white mt-0.5">{obterPrecoEstilizado()}</p>
+                      </div>
+                      <div>
+                        <span className="text-gray-500">Frequência de Pagamento:</span>
+                        <p className="font-bold text-white mt-0.5 capitalize">{obterFrequenciaLabel()}</p>
+                      </div>
+                      <div>
+                        <span className="text-gray-500">Solicitação do Pré-Cadastro (Site):</span>
+                        <p className="font-bold text-white mt-0.5">
+                          {lead?.criado_em ? new Date(lead.criado_em).toLocaleString('pt-BR') : '—'}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-gray-500">Data de Ativação no Sistema:</span>
+                        <p className="font-bold text-white mt-0.5">
+                          {e.criado_em ? new Date(e.criado_em).toLocaleString('pt-BR') : '—'}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-gray-500">Último Pagamento Registrado:</span>
+                        <p className="font-bold text-white mt-0.5">
+                          {ultimoPagamento 
+                            ? `${new Date(ultimoPagamento.data_pagamento).toLocaleDateString('pt-BR')} ${new Date(ultimoPagamento.data_pagamento).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
+                            : 'Nenhum pagamento registrado'}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-gray-500">Forma de Pagamento (Plano):</span>
+                        <p className="font-bold text-white mt-0.5">
+                          {ultimoPagamento?.meio_pagamento || 'PIX (Recomendado)'}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-gray-500">Próximo Vencimento:</span>
+                        <p className="font-bold text-brand-green mt-0.5 font-mono">
+                          {e.data_vencimento ? formatarData(e.data_vencimento) : 'Sem data de vencimento'}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-gray-500">Taxa de Setup/Implementação:</span>
+                        <p className="font-bold text-white mt-0.5">
+                          R$ {parseFloat(e.valor_implementacao || 0).toFixed(2)} • {' '}
+                          <span className={e.taxa_implementacao_paga ? 'text-brand-green font-bold' : 'text-yellow-500 font-bold'}>
+                            {e.taxa_implementacao_paga ? 'Pago' : 'Pendente'}
+                          </span>
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* 5. Histórico Completo de Pagamentos */}
