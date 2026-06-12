@@ -590,74 +590,106 @@ export function Configuracoes() {
             {/* Alerta CR */}
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-gray-400 uppercase">CR (Exército/PF)</label>
-              <select 
-                className="select" 
-                value={alertaCr}
-                onChange={e => {
-                  setAlertaCr(e.target.value);
-                  salvarConfiguracoesCac('config_alerta_cr', e.target.value);
-                }}
-              >
-                <option value="30">Alertar com 30 dias de antecedência</option>
-                <option value="60">Alertar com 60 dias de antecedência</option>
-                <option value="90">Alertar com 90 dias de antecedência</option>
-                <option value="120">Alertar com 120 dias de antecedência</option>
-              </select>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min={7}
+                  max={365}
+                  value={alertaCr}
+                  onChange={e => {
+                    let val = e.target.value;
+                    if (val !== '') {
+                      const num = parseInt(val, 10);
+                      if (num < 7) val = '7';
+                      if (num > 365) val = '365';
+                    }
+                    setAlertaCr(val);
+                    salvarConfiguracoesCac('config_alerta_cr', val);
+                  }}
+                  className="input font-bold text-sm w-20 text-center"
+                  placeholder="Ex: 60"
+                />
+                <span className="text-xs text-gray-400">dias de antecedência</span>
+              </div>
             </div>
 
             {/* Alerta CRAF */}
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-gray-400 uppercase">CRAF (Armas)</label>
-              <select 
-                className="select" 
-                value={alertaCraf}
-                onChange={e => {
-                  setAlertaCraf(e.target.value);
-                  salvarConfiguracoesCac('config_alerta_craf', e.target.value);
-                }}
-              >
-                <option value="30">Alertar com 30 dias de antecedência</option>
-                <option value="60">Alertar com 60 dias de antecedência</option>
-                <option value="90">Alertar com 90 dias de antecedência</option>
-                <option value="120">Alertar com 120 dias de antecedência</option>
-              </select>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min={7}
+                  max={365}
+                  value={alertaCraf}
+                  onChange={e => {
+                    let val = e.target.value;
+                    if (val !== '') {
+                      const num = parseInt(val, 10);
+                      if (num < 7) val = '7';
+                      if (num > 365) val = '365';
+                    }
+                    setAlertaCraf(val);
+                    salvarConfiguracoesCac('config_alerta_craf', val);
+                  }}
+                  className="input font-bold text-sm w-20 text-center"
+                  placeholder="Ex: 60"
+                />
+                <span className="text-xs text-gray-400">dias de antecedência</span>
+              </div>
             </div>
 
             {/* Alerta GT */}
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-gray-400 uppercase">Guia de Tráfego (GT)</label>
-              <select 
-                className="select" 
-                value={alertaGt}
-                onChange={e => {
-                  setAlertaGt(e.target.value);
-                  salvarConfiguracoesCac('config_alerta_gt', e.target.value);
-                }}
-              >
-                <option value="10">Alertar com 10 dias de antecedência</option>
-                <option value="20">Alertar com 20 dias de antecedência</option>
-                <option value="30">Alertar com 30 dias de antecedência</option>
-                <option value="45">Alertar com 45 dias de antecedência</option>
-              </select>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min={1}
+                  max={90}
+                  value={alertaGt}
+                  onChange={e => {
+                    let val = e.target.value;
+                    if (val !== '') {
+                      const num = parseInt(val, 10);
+                      if (num < 1) val = '1';
+                      if (num > 90) val = '90';
+                    }
+                    setAlertaGt(val);
+                    salvarConfiguracoesCac('config_alerta_gt', val);
+                  }}
+                  className="input font-bold text-sm w-20 text-center"
+                  placeholder="Ex: 20"
+                />
+                <span className="text-xs text-gray-400">dias de antecedência</span>
+              </div>
             </div>
 
             {/* Alerta Manejo */}
             {!ocultarIbama && (
               <div className="space-y-1.5 animate-fade-in">
                 <label className="text-xs font-bold text-gray-400 uppercase">SIMAF / Manejo</label>
-                <select 
-                  className="select" 
-                  value={alertaManejo}
-                  onChange={e => {
-                    setAlertaManejo(e.target.value);
-                    salvarConfiguracoesCac('config_alerta_manejo', e.target.value);
-                  }}
-                >
-                  <option value="5">Alertar com 5 dias de antecedência</option>
-                  <option value="7">Alertar com 7 dias de antecedência</option>
-                  <option value="15">Alertar com 15 dias de antecedência</option>
-                  <option value="30">Alertar com 30 dias de antecedência</option>
-                </select>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min={1}
+                    max={60}
+                    value={alertaManejo}
+                    onChange={e => {
+                      let val = e.target.value;
+                      if (val !== '') {
+                        const num = parseInt(val, 10);
+                        if (num < 1) val = '1';
+                        if (num > 60) val = '60';
+                      }
+                      setAlertaManejo(val);
+                      salvarConfiguracoesCac('config_alerta_manejo', val);
+                    }}
+                    className="input font-bold text-sm w-20 text-center"
+                    placeholder="Ex: 7"
+                  />
+                  <span className="text-xs text-gray-400">dias de antecedência</span>
+                </div>
               </div>
             )}
 
