@@ -127,57 +127,75 @@ export function ListaLembretes() {
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {alertasVencimento.map((alerta) => (
-                  <div 
-                    key={alerta.id}
-                    className={`flex items-center justify-between p-4 rounded-xl border transition-all hover:border-white/10 ${obterClasseAlerta(alerta.nivel)}`}
-                  >
-                    <div className="flex items-start gap-3 min-w-0">
-                      <div className="mt-1 p-2 rounded-lg bg-black/20 text-white flex-shrink-0">
-                        {alerta.tipo === 'CRAF' ? <Target size={18} /> : 
-                         alerta.tipo === 'GT' ? <MapPin size={18} /> :
-                         alerta.tipo === 'MANEJO' ? <Calendar size={18} /> :
-                         <Shield size={18} />}
-                      </div>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                           <p className="text-sm font-bold text-white truncate">{alerta.label}</p>
-                           <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-black/30 font-black uppercase tracking-tighter text-white">
-                             {alerta.nivel === 'VENCIDO' ? 'VENCIDO' : 
-                              alerta.nivel === 'CRITICO' ? 'URGENTE' : 'AVISO'}
-                           </span>
-                        </div>
-                        <div className="flex items-center gap-2 mt-2">
-                           <Calendar size={12} className="opacity-60 text-white" />
-                           <p className="text-xs font-semibold text-gray-300">
-                             Vencimento: {formatarData(alerta.dataVencimento)}
-                           </p>
-                           <span className="text-gray-500">•</span>
-                           <p className="text-xs font-black italic text-gray-300">
-                            {alerta.diasRestantes < 0 
-                              ? `${Math.abs(alerta.diasRestantes)} dia(s) atrasado` 
-                              : `Faltam ${alerta.diasRestantes} dia(s)`}
-                           </p>
-                        </div>
-                      </div>
-                    </div>
+                {alertasVencimento.map((alerta) => {
+                  const isIbamaCrVencido = alerta.tipo === 'IBAMA_CR' && alerta.diasRestantes < 0;
+                  const isIbamaCrHoje = alerta.tipo === 'IBAMA_CR' && alerta.diasRestantes === 0;
 
-                    <button 
-                      onClick={() => {
-                        navigate('/clientes', { 
-                          state: { 
-                            aba: 'documentos',
-                            armaId: alerta.armaId 
-                          } 
-                        });
-                      }}
-                      className="p-2.5 hover:bg-white/10 rounded-xl transition-all flex-shrink-0 text-white"
-                      title="Ver no Meu Acervo"
+                  const classeAlerta = isIbamaCrVencido
+                    ? 'text-orange-500 bg-orange-500/10 border-orange-500/20'
+                    : obterClasseAlerta(alerta.nivel);
+
+                  const textoBadge = isIbamaCrVencido
+                    ? 'RENOVÁVEL'
+                    : alerta.nivel === 'VENCIDO' ? 'VENCIDO' : alerta.nivel === 'CRITICO' ? 'URGENTE' : 'AVISO';
+
+                  const textoDescricaoVenc = isIbamaCrVencido
+                    ? `Liberado para Renovação (venceu há ${Math.abs(alerta.diasRestantes)} dia(s))`
+                    : isIbamaCrHoje
+                    ? `Vence hoje (Renovável a partir de amanhã)`
+                    : alerta.diasRestantes < 0
+                    ? `${Math.abs(alerta.diasRestantes)} dia(s) atrasado`
+                    : `Faltam ${alerta.diasRestantes} dia(s)`;
+
+                  return (
+                    <div 
+                      key={alerta.id}
+                      className={`flex items-center justify-between p-4 rounded-xl border transition-all hover:border-white/10 ${classeAlerta}`}
                     >
-                      <ExternalLink size={18} />
-                    </button>
-                  </div>
-                ))}
+                      <div className="flex items-start gap-3 min-w-0">
+                        <div className="mt-1 p-2 rounded-lg bg-black/20 text-white flex-shrink-0">
+                          {alerta.tipo === 'CRAF' ? <Target size={18} /> : 
+                           alerta.tipo === 'GT' ? <MapPin size={18} /> :
+                           alerta.tipo === 'MANEJO' ? <Calendar size={18} /> :
+                           <Shield size={18} />}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                             <p className="text-sm font-bold text-white truncate">{alerta.label}</p>
+                             <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-black/30 font-black uppercase tracking-tighter text-white">
+                               {textoBadge}
+                             </span>
+                          </div>
+                          <div className="flex items-center gap-2 mt-2">
+                             <Calendar size={12} className="opacity-60 text-white" />
+                             <p className="text-xs font-semibold text-gray-300">
+                               Vencimento: {formatarData(alerta.dataVencimento)}
+                             </p>
+                             <span className="text-gray-500">•</span>
+                             <p className="text-xs font-black italic text-gray-300">
+                               {textoDescricaoVenc}
+                             </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <button 
+                        onClick={() => {
+                          navigate('/clientes', { 
+                            state: { 
+                              aba: 'documentos',
+                              armaId: alerta.armaId 
+                            } 
+                          });
+                        }}
+                        className="p-2.5 hover:bg-white/10 rounded-xl transition-all flex-shrink-0 text-white"
+                        title="Ver no Meu Acervo"
+                      >
+                        <ExternalLink size={18} />
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
             )}
             

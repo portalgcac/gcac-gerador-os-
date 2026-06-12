@@ -46,16 +46,10 @@ export function calcularAlerta(tipo: string, dataVenc: string): { nivel: NivelAl
   else if (tipo === 'IBAMA_CR') { configChave = 'config_alerta_ibama_cr'; padraoAviso = 30; }
 
   const diasConfig = (configChave && typeof window !== 'undefined') ? localStorage.getItem(configChave) : null;
-  const limiteAviso = diasConfig ? parseInt(diasConfig, 10) : padraoAviso;
+  let limiteAviso = diasConfig ? parseInt(diasConfig, 10) : padraoAviso;
+  if (limiteAviso < 1) limiteAviso = padraoAviso;
 
-  if (dias < 0) {
-    if (dias <= limiteAviso) return { nivel: 'VENCIDO', dias };
-    return { nivel: 'CRITICO', dias };
-  }
-
-  if (limiteAviso < 0) {
-    return { nivel: 'OK', dias };
-  }
+  if (dias < 0) return { nivel: 'VENCIDO', dias };
 
   const limiteCritico = Math.max(1, Math.floor(limiteAviso / 2));
   if (dias <= limiteCritico) return { nivel: 'CRITICO', dias };

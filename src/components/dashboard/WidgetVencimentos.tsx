@@ -46,10 +46,29 @@ export function WidgetVencimentos() {
   if (totalAlertas === 0) return null;
 
   const renderCardAlerta = (alerta: AlertaDocumento) => {
+    const isIbamaCrVencido = alerta.tipo === 'IBAMA_CR' && alerta.diasRestantes < 0;
+    const isIbamaCrHoje = alerta.tipo === 'IBAMA_CR' && alerta.diasRestantes === 0;
+
+    const classeAlerta = isIbamaCrVencido
+      ? 'text-orange-500 bg-orange-500/10 border-orange-500/20'
+      : obterClasseAlerta(alerta.nivel);
+
+    const textoBadge = isIbamaCrVencido
+      ? 'RENOVÁVEL'
+      : alerta.nivel === 'VENCIDO' ? 'VENCIDO' : alerta.nivel === 'CRITICO' ? 'URGENTE' : 'AVISO';
+
+    const textoDescricaoVenc = isIbamaCrVencido
+      ? `Liberado para Renovação (venceu há ${Math.abs(alerta.diasRestantes)} dia(s))`
+      : isIbamaCrHoje
+      ? `Vence hoje (Renovável a partir de amanhã)`
+      : alerta.diasRestantes < 0
+      ? `${Math.abs(alerta.diasRestantes)} dia(s) atrasado`
+      : `Faltam ${alerta.diasRestantes} dia(s)`;
+
     return (
       <div 
         key={alerta.id}
-        className={`flex items-center justify-between p-3 rounded-xl border transition-all hover:brightness-110 ${obterClasseAlerta(alerta.nivel)}`}
+        className={`flex items-center justify-between p-3 rounded-xl border transition-all hover:brightness-110 ${classeAlerta}`}
       >
         <div className="flex items-start gap-3 min-w-0">
           <div className="mt-1 flex-shrink-0">
@@ -63,8 +82,7 @@ export function WidgetVencimentos() {
             <div className="flex items-center gap-2 flex-wrap">
                <p className="text-xs font-bold truncate">{alerta.label}</p>
                <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-black/20 font-black uppercase tracking-tighter">
-                 {alerta.nivel === 'VENCIDO' ? 'VENCIDO' : 
-                  alerta.nivel === 'CRITICO' ? 'URGENTE' : 'AVISO'}
+                 {textoBadge}
                </span>
             </div>
             <p className="text-[10px] opacity-70 font-bold uppercase truncate flex items-center gap-1 mt-0.5">
@@ -78,9 +96,7 @@ export function WidgetVencimentos() {
                </div>
                <span className="text-[10px] font-black opacity-30">•</span>
                <p className="text-[10px] font-black italic">
-                {alerta.diasRestantes < 0 
-                  ? `${Math.abs(alerta.diasRestantes)} dia(s) atrasado` 
-                  : `Faltam ${alerta.diasRestantes} dia(s)`}
+                 {textoDescricaoVenc}
                </p>
             </div>
           </div>
