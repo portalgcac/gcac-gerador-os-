@@ -36,68 +36,31 @@ export function calcularAlerta(tipo: string, dataVenc: string): { nivel: NivelAl
   
   const dias = differenceInDays(venc, hoje);
 
-  // Regra CR IBAMA: 1 dia DEPOIS de vencido (-1) a até 60 dias de antecedência
-  if (tipo === 'IBAMA_CR') {
-    const configChave = 'config_alerta_ibama_cr';
-    const diasConfig = typeof window !== 'undefined' ? localStorage.getItem(configChave) : null;
-    const limiteAviso = diasConfig ? parseInt(diasConfig, 10) : -1; // padrão: -1 (1 dia após vencimento)
+  // Determinar os padrões e chaves de configuração do localStorage
+  let configChave = '';
+  let padraoAviso = 30; // fallback padrão
+  if (tipo === 'CR') { configChave = 'config_alerta_cr'; padraoAviso = 60; }
+  else if (tipo === 'CRAF') { configChave = 'config_alerta_craf'; padraoAviso = 60; }
+  else if (tipo === 'GT') { configChave = 'config_alerta_gt'; padraoAviso = 20; }
+  else if (tipo === 'MANEJO') { configChave = 'config_alerta_manejo'; padraoAviso = 7; }
+  else if (tipo === 'IBAMA_CR') { configChave = 'config_alerta_ibama_cr'; padraoAviso = -1; }
 
-    if (dias < 0) {
-      if (dias <= limiteAviso) return { nivel: 'VENCIDO', dias };
-      return { nivel: 'CRITICO', dias };
-    }
+  const diasConfig = (configChave && typeof window !== 'undefined') ? localStorage.getItem(configChave) : null;
+  const limiteAviso = diasConfig ? parseInt(diasConfig, 10) : padraoAviso;
 
-    if (limiteAviso < 0) {
-      return { nivel: 'OK', dias };
-    }
+  if (dias < 0) {
+    // Se o vencimento passou do limite de aviso negativo (ex: limite -1, dias -2)
+    if (dias <= limiteAviso) return { nivel: 'VENCIDO', dias };
+    return { nivel: 'CRITICO', dias };
+  }
 
-    const limiteCritico = Math.max(1, Math.floor(limiteAviso / 2));
-    if (dias <= limiteCritico) return { nivel: 'CRITICO', dias };
-    if (dias <= limiteAviso) return { nivel: 'AVISO', dias };
+  if (limiteAviso < 0) {
     return { nivel: 'OK', dias };
   }
 
-  // Regra CR (PF/EB) e CRAF: 2 meses ANTES por padrão ou customizado
-  if (tipo === 'CR' || tipo === 'CRAF') {
-    const configChave = `config_alerta_${tipo.toLowerCase()}`;
-    const diasConfig = typeof window !== 'undefined' ? localStorage.getItem(configChave) : null;
-    const limiteAviso = diasConfig ? parseInt(diasConfig, 10) : 60;
-    const limiteCritico = Math.max(15, Math.floor(limiteAviso / 2));
-
-    if (dias < 0) return { nivel: 'VENCIDO', dias };
-    if (dias <= limiteCritico) return { nivel: 'CRITICO', dias };
-    if (dias <= limiteAviso) return { nivel: 'AVISO', dias };
-    return { nivel: 'OK', dias };
-  }
-
-  // Regra GT: 20 dias ANTES por padrão ou customizado
-  if (tipo === 'GT') {
-    const diasConfig = typeof window !== 'undefined' ? localStorage.getItem('config_alerta_gt') : null;
-    const limiteAviso = diasConfig ? parseInt(diasConfig, 10) : 20;
-    const limiteCritico = Math.max(5, Math.floor(limiteAviso / 3));
-
-    if (dias < 0) return { nivel: 'VENCIDO', dias };
-    if (dias <= limiteCritico) return { nivel: 'CRITICO', dias };
-    if (dias <= limiteAviso) return { nivel: 'AVISO', dias };
-    return { nivel: 'OK', dias };
-  }
-
-  // Regra Manejo: 7 dias ANTES por padrão ou customizado
-  if (tipo === 'MANEJO') {
-    const diasConfig = typeof window !== 'undefined' ? localStorage.getItem('config_alerta_manejo') : null;
-    const limiteAviso = diasConfig ? parseInt(diasConfig, 10) : 7;
-    const limiteCritico = Math.max(2, Math.floor(limiteAviso / 3));
-
-    if (dias < 0) return { nivel: 'VENCIDO', dias };
-    if (dias <= limiteCritico) return { nivel: 'CRITICO', dias };
-    if (dias <= limiteAviso) return { nivel: 'AVISO', dias };
-    return { nivel: 'OK', dias };
-  }
-
-  // Fallback padrão
-  if (dias < 0) return { nivel: 'VENCIDO', dias };
-  if (dias <= 15) return { nivel: 'CRITICO', dias };
-  if (dias <= 30) return { nivel: 'AVISO', dias };
+  const limiteCritico = Math.max(1, Math.floor(limiteAviso / 2));
+  if (dias <= limiteCritico) return { nivel: 'CRITICO', dias };
+  if (dias <= limiteAviso) return { nivel: 'AVISO', dias };
   return { nivel: 'OK', dias };
 }
 

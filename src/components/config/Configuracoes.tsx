@@ -593,15 +593,15 @@ export function Configuracoes() {
               <div className="flex items-center gap-2">
                 <input
                   type="number"
-                  min={7}
-                  max={365}
+                  min={-1}
+                  max={60}
                   value={alertaCr}
                   onChange={e => {
                     let val = e.target.value;
                     if (val !== '') {
                       const num = parseInt(val, 10);
-                      if (num < 7) val = '7';
-                      if (num > 365) val = '365';
+                      if (num < -1) val = '-1';
+                      if (num > 60) val = '60';
                     }
                     setAlertaCr(val);
                     salvarConfiguracoesCac('config_alerta_cr', val);
@@ -611,6 +611,9 @@ export function Configuracoes() {
                 />
                 <span className="text-xs text-gray-400">dias de antecedência</span>
               </div>
+              <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider leading-normal">
+                Use -1 para alertar 1 dia pós-vencimento, 0 no dia, ou 1 a 60 para dias antes.
+              </p>
             </div>
 
             {/* Alerta CRAF */}
@@ -619,15 +622,15 @@ export function Configuracoes() {
               <div className="flex items-center gap-2">
                 <input
                   type="number"
-                  min={7}
-                  max={365}
+                  min={-1}
+                  max={60}
                   value={alertaCraf}
                   onChange={e => {
                     let val = e.target.value;
                     if (val !== '') {
                       const num = parseInt(val, 10);
-                      if (num < 7) val = '7';
-                      if (num > 365) val = '365';
+                      if (num < -1) val = '-1';
+                      if (num > 60) val = '60';
                     }
                     setAlertaCraf(val);
                     salvarConfiguracoesCac('config_alerta_craf', val);
@@ -637,6 +640,9 @@ export function Configuracoes() {
                 />
                 <span className="text-xs text-gray-400">dias de antecedência</span>
               </div>
+              <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider leading-normal">
+                Use -1 para alertar 1 dia pós-vencimento, 0 no dia, ou 1 a 60 para dias antes.
+              </p>
             </div>
 
             {/* Alerta GT */}
@@ -645,15 +651,15 @@ export function Configuracoes() {
               <div className="flex items-center gap-2">
                 <input
                   type="number"
-                  min={1}
-                  max={90}
+                  min={-1}
+                  max={60}
                   value={alertaGt}
                   onChange={e => {
                     let val = e.target.value;
                     if (val !== '') {
                       const num = parseInt(val, 10);
-                      if (num < 1) val = '1';
-                      if (num > 90) val = '90';
+                      if (num < -1) val = '-1';
+                      if (num > 60) val = '60';
                     }
                     setAlertaGt(val);
                     salvarConfiguracoesCac('config_alerta_gt', val);
@@ -663,6 +669,9 @@ export function Configuracoes() {
                 />
                 <span className="text-xs text-gray-400">dias de antecedência</span>
               </div>
+              <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider leading-normal">
+                Use -1 para alertar 1 dia pós-vencimento, 0 no dia, ou 1 a 60 para dias antes.
+              </p>
             </div>
 
             {/* Alerta Manejo */}
@@ -672,14 +681,14 @@ export function Configuracoes() {
                 <div className="flex items-center gap-2">
                   <input
                     type="number"
-                    min={1}
+                    min={-1}
                     max={60}
                     value={alertaManejo}
                     onChange={e => {
                       let val = e.target.value;
                       if (val !== '') {
                         const num = parseInt(val, 10);
-                        if (num < 1) val = '1';
+                        if (num < -1) val = '-1';
                         if (num > 60) val = '60';
                       }
                       setAlertaManejo(val);
@@ -690,6 +699,9 @@ export function Configuracoes() {
                   />
                   <span className="text-xs text-gray-400">dias de antecedência</span>
                 </div>
+                <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider leading-normal">
+                  Use -1 para alertar 1 dia pós-vencimento, 0 no dia, ou 1 a 60 para dias antes.
+                </p>
               </div>
             )}
 
@@ -1188,17 +1200,20 @@ export function Configuracoes() {
                   </div>
                   <div className="flex items-center gap-2">
                     <input
-                      type="number" min={7} max={365}
+                      type="number" min={-1} max={60}
                       value={alertaCr}
                       onChange={e => setAlertaCr(e.target.value)}
                       className="input text-center font-bold w-20 text-sm"
                     />
-                    <span className="text-xs text-gray-400">dias antes</span>
+                    <span className="text-xs text-gray-400">dias antes (-1 a 60)</span>
                     <button
                       onClick={() => salvarAlertaEmpresa('config_alerta_cr', alertaCr)}
                       className="btn-primary btn-sm ml-auto px-3"
                     >Salvar</button>
                   </div>
+                  <p className="text-[9px] text-gray-500 font-bold uppercase leading-tight">
+                    Use -1 para alertar 1 dia pós-vencimento, 0 no dia, ou 1 a 60 para dias antes.
+                  </p>
                 </div>
                 {/* CRAF */}
                 <div className="bg-brand-dark-4 border border-brand-dark-5 rounded-xl p-3 space-y-2">
@@ -1208,17 +1223,20 @@ export function Configuracoes() {
                   </div>
                   <div className="flex items-center gap-2">
                     <input
-                      type="number" min={7} max={365}
+                      type="number" min={-1} max={60}
                       value={alertaCraf}
                       onChange={e => setAlertaCraf(e.target.value)}
                       className="input text-center font-bold w-20 text-sm"
                     />
-                    <span className="text-xs text-gray-400">dias antes</span>
+                    <span className="text-xs text-gray-400">dias antes (-1 a 60)</span>
                     <button
                       onClick={() => salvarAlertaEmpresa('config_alerta_craf', alertaCraf)}
                       className="btn-primary btn-sm ml-auto px-3"
                     >Salvar</button>
                   </div>
+                  <p className="text-[9px] text-gray-500 font-bold uppercase leading-tight">
+                    Use -1 para alertar 1 dia pós-vencimento, 0 no dia, ou 1 a 60 para dias antes.
+                  </p>
                 </div>
                 {/* GT */}
                 <div className="bg-brand-dark-4 border border-brand-dark-5 rounded-xl p-3 space-y-2">
@@ -1228,17 +1246,20 @@ export function Configuracoes() {
                   </div>
                   <div className="flex items-center gap-2">
                     <input
-                      type="number" min={1} max={90}
+                      type="number" min={-1} max={60}
                       value={alertaGt}
                       onChange={e => setAlertaGt(e.target.value)}
                       className="input text-center font-bold w-20 text-sm"
                     />
-                    <span className="text-xs text-gray-400">dias antes</span>
+                    <span className="text-xs text-gray-400">dias antes (-1 a 60)</span>
                     <button
                       onClick={() => salvarAlertaEmpresa('config_alerta_gt', alertaGt)}
                       className="btn-primary btn-sm ml-auto px-3"
                     >Salvar</button>
                   </div>
+                  <p className="text-[9px] text-gray-500 font-bold uppercase leading-tight">
+                    Use -1 para alertar 1 dia pós-vencimento, 0 no dia, ou 1 a 60 para dias antes.
+                  </p>
                 </div>
                 {/* Manejo */}
                 <div className="bg-brand-dark-4 border border-brand-dark-5 rounded-xl p-3 space-y-2">
@@ -1248,17 +1269,20 @@ export function Configuracoes() {
                   </div>
                   <div className="flex items-center gap-2">
                     <input
-                      type="number" min={1} max={60}
+                      type="number" min={-1} max={60}
                       value={alertaManejo}
                       onChange={e => setAlertaManejo(e.target.value)}
                       className="input text-center font-bold w-20 text-sm"
                     />
-                    <span className="text-xs text-gray-400">dias antes</span>
+                    <span className="text-xs text-gray-400">dias antes (-1 a 60)</span>
                     <button
                       onClick={() => salvarAlertaEmpresa('config_alerta_manejo', alertaManejo)}
                       className="btn-primary btn-sm ml-auto px-3"
                     >Salvar</button>
                   </div>
+                  <p className="text-[9px] text-gray-500 font-bold uppercase leading-tight">
+                    Use -1 para alertar 1 dia pós-vencimento, 0 no dia, ou 1 a 60 para dias antes.
+                  </p>
                 </div>
                 {/* CR IBAMA */}
                 <div className="bg-brand-dark-4 border border-brand-dark-5 rounded-xl p-3 space-y-2">
