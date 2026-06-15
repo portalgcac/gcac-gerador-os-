@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { UserPlus, Shield, Mail, User, Trash2, Edit2, CheckCircle, XCircle, ChevronDown, ChevronUp, Lock, Building, ArrowLeft, Settings2, BadgeDollarSign, Calendar, CreditCard, Crosshair } from 'lucide-react';
+import { UserPlus, Shield, Mail, User, Trash2, Edit2, CheckCircle, XCircle, ChevronDown, ChevronUp, Lock, Building, ArrowLeft, Settings2, BadgeDollarSign, Calendar, CreditCard, Crosshair, ShieldAlert } from 'lucide-react';
 import { supabase } from '../../db/supabase';
 import { Notificacao, useNotificacao } from '../common/Notificacao';
 import { useAuth } from '../../context/AuthContext';
@@ -110,6 +110,11 @@ export function GestaoUsuarios({ abaInicial }: GestaoUsuariosProps = {}) {
   const [todosPagamentos, setTodosPagamentos] = useState<any[]>([]);
   const [buscaFaturamento, setBuscaFaturamento] = useState('');
   const [abaFaturamento, setAbaFaturamento] = useState<'empresas' | 'cacs'>('empresas');
+  const [filtroFaturamentoStatus, setFiltroFaturamentoStatus] = useState('todos');
+  const [filtroFaturamentoPlano, setFiltroFaturamentoPlano] = useState('todos');
+  const [filtroFaturamentoFrequencia, setFiltroFaturamentoFrequencia] = useState('todos');
+  const [filtroFaturamentoMes, setFiltroFaturamentoMes] = useState('todos');
+  const [filtroFaturamentoAno, setFiltroFaturamentoAno] = useState('todos');
   const [selectedCacDetails, setSelectedCacDetails] = useState<{
     e: any;
     cacUser: any;
@@ -995,30 +1000,190 @@ export function GestaoUsuarios({ abaInicial }: GestaoUsuariosProps = {}) {
   };
 
   const obterEmpresasClientesExibidos = () => {
-    if (!buscaFaturamento.trim()) return empresasClientes;
-    const q = buscaFaturamento.toLowerCase();
-    return empresasClientes.filter(e => 
-      e.nome.toLowerCase().includes(q) ||
-      e.id.toLowerCase().includes(q)
-    );
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+
+    return empresasClientes.filter(e => {
+      // 1. Text Search Filter
+      if (buscaFaturamento.trim()) {
+        const q = buscaFaturamento.toLowerCase();
+        const matchesSearch = e.nome.toLowerCase().includes(q) || e.id.toLowerCase().includes(q);
+        if (!matchesSearch) return false;
+      }
+
+      // 2. Status Filter
+      const dataVenc = e.data_vencimento ? new Date(e.data_vencimento + 'T00:00:00') : null;
+      const ehExpirado = dataVenc && dataVenc < hoje && !e.is_gratis;
+      const diasAteVencer = dataVenc ? Math.ceil((dataVenc.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24)) : null;
+
+      if (filtroFaturamentoStatus !== 'todos') {
+        if (filtroFaturamentoStatus === 'isento' && !e.is_gratis) return false;
+        if (filtroFaturamentoStatus === 'suspenso' && (e.plano_status !== 'suspenso' || e.is_gratis)) return false;
+        if (filtroFaturamentoStatus === 'atrasado' && (!ehExpirado || e.plano_status === 'suspenso')) return false;
+        if (filtroFaturamentoStatus === 'expira_breve' && (diasAteVencer === null || diasAteVencer < 0 || diasAteVencer > 5 || e.plano_status === 'suspenso')) return false;
+        if (filtroFaturamentoStatus === 'em_dia' && (e.is_gratis || e.plano_status === 'suspenso' || ehExpirado || (diasAteVencer !== null && diasAteVencer <= 5))) return false;
+      }
+
+      // 3. Plan Filter
+      if (filtroFaturamentoPlano !== 'todos') {
+        const planoAtual = e.plano || '.22LR';
+        if (planoAtual !== filtroFaturamentoPlano) return false;
+      }
+
+      // 4. Frequency Filter
+      if (filtroFaturamentoFrequencia !== 'todos') {
+        const freqAtual = e.frequencia_pagamento || 'mensal';
+        if (freqAtual !== filtroFaturamentoFrequencia) return false;
+      }
+
+      // 5. Month Filter
+      if (filtroFaturamentoMes !== 'todos') {
+        if (!e.data_vencimento) return false;
+        const mes = e.data_vencimento.split('-')[1];
+        if (mes !== filtroFaturamentoMes) return false;
+      }
+
+      // 6. Year Filter
+      if (filtroFaturamentoAno !== 'todos') {
+        if (!e.data_vencimento) return false;
+        const ano = e.data_vencimento.split('-')[0];
+        if (ano !== filtroFaturamentoAno) return false;
+      }
+
+      return true;
+    });
   };
 
   const obterCacsClientesExibidos = () => {
-    const q = buscaFaturamento.toLowerCase();
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+
     return cacsClientes.filter(e => {
       const cacUser = usuarios.find(u => u.empresa_id === e.id);
       const vinculados = vinculosAtivos.filter(v => v.cac_empresa_id === e.id);
       const despachantesNomes = vinculados.map(v => v.despachante_nome).join(' ');
-      
-      const nomeMatch = e.nome.toLowerCase().includes(q);
-      const userMatch = cacUser ? (
-        cacUser.nome.toLowerCase().includes(q) ||
-        cacUser.email.toLowerCase().includes(q) ||
-        (cacUser.cpf && cacUser.cpf.includes(q))
-      ) : false;
-      const despachanteMatch = despachantesNomes.toLowerCase().includes(q);
 
-      return !buscaFaturamento.trim() || nomeMatch || userMatch || despachanteMatch;
+      // 1. Text Search Filter
+      if (buscaFaturamento.trim()) {
+        const q = buscaFaturamento.toLowerCase();
+        const nomeMatch = e.nome.toLowerCase().includes(q);
+        const userMatch = cacUser ? (
+          cacUser.nome.toLowerCase().includes(q) ||
+          cacUser.email.toLowerCase().includes(q) ||
+          (cacUser.cpf && cacUser.cpf.includes(q))
+        ) : false;
+        const despachanteMatch = despachantesNomes.toLowerCase().includes(q);
+
+        if (!nomeMatch && !userMatch && !despachanteMatch) return false;
+      }
+
+      // 2. Status Filter
+      const dataVenc = e.data_vencimento ? new Date(e.data_vencimento + 'T00:00:00') : null;
+      const ehExpirado = dataVenc && dataVenc < hoje && !e.is_gratis;
+      const diasAteVencer = dataVenc ? Math.ceil((dataVenc.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24)) : null;
+
+      if (filtroFaturamentoStatus !== 'todos') {
+        if (filtroFaturamentoStatus === 'isento' && !e.is_gratis) return false;
+        if (filtroFaturamentoStatus === 'suspenso' && (e.plano_status !== 'suspenso' || e.is_gratis)) return false;
+        if (filtroFaturamentoStatus === 'atrasado' && (!ehExpirado || e.plano_status === 'suspenso')) return false;
+        if (filtroFaturamentoStatus === 'expira_breve' && (diasAteVencer === null || diasAteVencer < 0 || diasAteVencer > 5 || e.plano_status === 'suspenso')) return false;
+        if (filtroFaturamentoStatus === 'em_dia' && (e.is_gratis || e.plano_status === 'suspenso' || ehExpirado || (diasAteVencer !== null && diasAteVencer <= 5))) return false;
+      }
+
+      // 3. Plan Filter
+      if (filtroFaturamentoPlano !== 'todos') {
+        const planoAtual = e.plano || '.22LR';
+        if (planoAtual !== filtroFaturamentoPlano) return false;
+      }
+
+      // 4. Frequency Filter
+      if (filtroFaturamentoFrequencia !== 'todos') {
+        const freqAtual = e.frequencia_pagamento || 'mensal';
+        if (freqAtual !== filtroFaturamentoFrequencia) return false;
+      }
+
+      // 5. Month Filter
+      if (filtroFaturamentoMes !== 'todos') {
+        if (!e.data_vencimento) return false;
+        const mes = e.data_vencimento.split('-')[1];
+        if (mes !== filtroFaturamentoMes) return false;
+      }
+
+      // 6. Year Filter
+      if (filtroFaturamentoAno !== 'todos') {
+        if (!e.data_vencimento) return false;
+        const ano = e.data_vencimento.split('-')[0];
+        if (ano !== filtroFaturamentoAno) return false;
+      }
+
+      return true;
+    });
+  };
+
+  const contarPlano = (plano: string) => {
+    const lista = abaFaturamento === 'empresas' ? obterEmpresasClientesExibidos() : obterCacsClientesExibidos();
+    return lista.filter(e => {
+      const p = e.plano || '.22LR';
+      return p === plano;
+    }).length;
+  };
+
+  const calcularPorcentagemPlano = (plano: string) => {
+    const total = abaFaturamento === 'empresas' ? obterEmpresasClientesExibidos().length : obterCacsClientesExibidos().length;
+    if (total === 0) return 0;
+    return Math.round((contarPlano(plano) / total) * 100);
+  };
+
+  const contarFrequencia = (freq: string) => {
+    const lista = abaFaturamento === 'empresas' ? obterEmpresasClientesExibidos() : obterCacsClientesExibidos();
+    return lista.filter(e => {
+      const f = e.frequencia_pagamento || 'mensal';
+      return f === freq;
+    }).length;
+  };
+
+  const calcularPorcentagemFrequencia = (freq: string) => {
+    const total = abaFaturamento === 'empresas' ? obterEmpresasClientesExibidos().length : obterCacsClientesExibidos().length;
+    if (total === 0) return 0;
+    return Math.round((contarFrequencia(freq) / total) * 100);
+  };
+
+  const contarStatus = (status: string) => {
+    const lista = abaFaturamento === 'empresas' ? obterEmpresasClientesExibidos() : obterCacsClientesExibidos();
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+    return lista.filter(e => {
+      const dataVenc = e.data_vencimento ? new Date(e.data_vencimento + 'T00:00:00') : null;
+      const ehExpirado = dataVenc && dataVenc < hoje && !e.is_gratis;
+      const diasAteVencer = dataVenc ? Math.ceil((dataVenc.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24)) : null;
+
+      if (status === 'isento') return e.is_gratis;
+      if (status === 'suspenso') return e.plano_status === 'suspenso' && !e.is_gratis;
+      if (status === 'atrasado') return ehExpirado && e.plano_status !== 'suspenso';
+      if (status === 'expira_breve') return diasAteVencer !== null && diasAteVencer >= 0 && diasAteVencer <= 5 && !ehExpirado && e.plano_status !== 'suspenso';
+      if (status === 'em_dia') return !e.is_gratis && e.plano_status !== 'suspenso' && !ehExpirado && (diasAteVencer === null || diasAteVencer > 5);
+      return false;
+    }).length;
+  };
+
+  const obterVencimentosProximos = () => {
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+    const limite = new Date();
+    limite.setDate(hoje.getDate() + 10);
+    limite.setHours(23, 59, 59, 999);
+
+    const lista = abaFaturamento === 'empresas' ? empresasClientes : cacsClientes;
+
+    return lista.filter(e => {
+      if (e.is_gratis || e.plano_status === 'suspenso') return false;
+      if (!e.data_vencimento) return false;
+      const dataVenc = new Date(e.data_vencimento + 'T00:00:00');
+      return dataVenc >= hoje && dataVenc <= limite;
+    }).sort((a, b) => {
+      const dateA = new Date(a.data_vencimento + 'T00:00:00').getTime();
+      const dateB = new Date(b.data_vencimento + 'T00:00:00').getTime();
+      return dateA - dateB;
     });
   };
 
@@ -1950,41 +2115,306 @@ export function GestaoUsuarios({ abaInicial }: GestaoUsuariosProps = {}) {
                 </div>
               </div>
 
-              {/* Lista de Empresas/Atiradores para Faturamento */}
-              <div className="card space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-brand-dark-5">
-                  <div className="flex border-b border-transparent gap-4">
-                    <button
-                      type="button"
-                      onClick={() => { setAbaFaturamento('empresas'); setBuscaFaturamento(''); }}
-                      className={`pb-2 text-xs font-bold uppercase tracking-wider transition-all border-b-2 ${
-                        abaFaturamento === 'empresas' 
-                          ? 'border-brand-blue text-white font-extrabold' 
-                          : 'border-transparent text-gray-400 hover:text-white'
-                      }`}
-                    >
-                      Empresas Despachantes (B2B)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => { setAbaFaturamento('cacs'); setBuscaFaturamento(''); }}
-                      className={`pb-2 text-xs font-bold uppercase tracking-wider transition-all border-b-2 ${
-                        abaFaturamento === 'cacs' 
-                          ? 'border-brand-blue text-white font-extrabold' 
-                          : 'border-transparent text-gray-400 hover:text-white'
-                      }`}
-                    >
-                      Atiradores CAC (B2C)
-                    </button>
+              {/* Painel de Estatísticas / Relatórios */}
+              <div className="bg-brand-dark-4 border border-brand-dark-5 rounded-2xl p-5 space-y-4">
+                <div className="flex items-center justify-between border-b border-brand-dark-5 pb-3">
+                  <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                    <BadgeDollarSign size={16} className="text-brand-blue" />
+                    Métricas e Distribuição de Assinaturas ({abaFaturamento === 'empresas' ? 'B2B' : 'B2C'})
+                  </h4>
+                  <span className="text-[10px] bg-brand-dark-3 text-gray-400 font-mono px-2.5 py-0.5 rounded-full border border-brand-dark-5">
+                    Tempo real
+                  </span>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {/* Distribuição por Plano */}
+                  <div className="space-y-2.5">
+                    <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Distribuição por Plano</p>
+                    <div className="space-y-2">
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-xs font-bold">
+                          <span className="text-gray-300">.22LR (Básico)</span>
+                          <span className="text-white font-mono">{contarPlano('.22LR')} ({calcularPorcentagemPlano('.22LR')}%)</span>
+                        </div>
+                        <div className="w-full bg-brand-dark-5 h-2 rounded-full overflow-hidden">
+                          <div className="bg-gray-500 h-full rounded-full" style={{ width: `${calcularPorcentagemPlano('.22LR')}%` }}></div>
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-xs font-bold">
+                          <span className="text-brand-green-light">.357mag (Intermediário)</span>
+                          <span className="text-white font-mono">{contarPlano('.357mag')} ({calcularPorcentagemPlano('.357mag')}%)</span>
+                        </div>
+                        <div className="w-full bg-brand-dark-5 h-2 rounded-full overflow-hidden">
+                          <div className="bg-brand-green h-full rounded-full" style={{ width: `${calcularPorcentagemPlano('.357mag')}%` }}></div>
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-xs font-bold">
+                          <span className="text-brand-blue-light">.308win (Premium)</span>
+                          <span className="text-white font-mono">{contarPlano('.308win')} ({calcularPorcentagemPlano('.308win')}%)</span>
+                        </div>
+                        <div className="w-full bg-brand-dark-5 h-2 rounded-full overflow-hidden">
+                          <div className="bg-brand-blue h-full rounded-full" style={{ width: `${calcularPorcentagemPlano('.308win')}%` }}></div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
 
-                  <input
-                    type="text"
-                    value={buscaFaturamento}
-                    onChange={e => setBuscaFaturamento(e.target.value)}
-                    placeholder={abaFaturamento === 'empresas' ? "Buscar empresa..." : "Buscar atirador, email, CPF ou despachante..."}
-                    className="input text-xs w-full sm:max-w-xs"
-                  />
+                  {/* Distribuição por Frequência */}
+                  <div className="space-y-2.5">
+                    <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Recorrência / Ciclos</p>
+                    <div className="space-y-2">
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-xs font-bold">
+                          <span className="text-gray-300">Mensal</span>
+                          <span className="text-white font-mono">{contarFrequencia('mensal')} ({calcularPorcentagemFrequencia('mensal')}%)</span>
+                        </div>
+                        <div className="w-full bg-brand-dark-5 h-2 rounded-full overflow-hidden">
+                          <div className="bg-brand-blue-light h-full rounded-full" style={{ width: `${calcularPorcentagemFrequencia('mensal')}%` }}></div>
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-xs font-bold">
+                          <span className="text-gray-300">Semestral</span>
+                          <span className="text-white font-mono">{contarFrequencia('semestral')} ({calcularPorcentagemFrequencia('semestral')}%)</span>
+                        </div>
+                        <div className="w-full bg-brand-dark-5 h-2 rounded-full overflow-hidden">
+                          <div className="bg-indigo-500 h-full rounded-full" style={{ width: `${calcularPorcentagemFrequencia('semestral')}%` }}></div>
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-xs font-bold">
+                          <span className="text-gray-300">Anual</span>
+                          <span className="text-white font-mono">{contarFrequencia('anual')} ({calcularPorcentagemFrequencia('anual')}%)</span>
+                        </div>
+                        <div className="w-full bg-brand-dark-5 h-2 rounded-full overflow-hidden">
+                          <div className="bg-purple-500 h-full rounded-full" style={{ width: `${calcularPorcentagemFrequencia('anual')}%` }}></div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Saúde Geral da Carteira */}
+                  <div className="space-y-2.5">
+                    <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Situação da Carteira</p>
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div className="bg-brand-dark-5 border border-brand-dark-5 rounded-xl p-2 text-center">
+                        <span className="text-[9px] text-gray-500 font-bold uppercase block">Em Dia</span>
+                        <span className="text-sm font-black text-brand-green font-mono">{contarStatus('em_dia')}</span>
+                      </div>
+                      <div className="bg-brand-dark-5 border border-brand-dark-5 rounded-xl p-2 text-center">
+                        <span className="text-[9px] text-gray-500 font-bold uppercase block">Em Atraso</span>
+                        <span className="text-sm font-black text-red-400 font-mono">{contarStatus('atrasado')}</span>
+                      </div>
+                      <div className="bg-brand-dark-5 border border-brand-dark-5 rounded-xl p-2 text-center">
+                        <span className="text-[9px] text-gray-500 font-bold uppercase block">Suspensos</span>
+                        <span className="text-sm font-black text-orange-400 font-mono">{contarStatus('suspenso')}</span>
+                      </div>
+                      <div className="bg-brand-dark-5 border border-brand-dark-5 rounded-xl p-2 text-center">
+                        <span className="text-[9px] text-gray-500 font-bold uppercase block">Isentos</span>
+                        <span className="text-sm font-black text-gray-300 font-mono">{contarStatus('isento')}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Seção de Alertas de Vencimento Crítico */}
+              <div className="bg-brand-dark-4 border border-brand-dark-5 rounded-2xl p-5 space-y-3">
+                <h4 className="text-xs font-bold text-yellow-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <ShieldAlert size={14} className="text-yellow-400" />
+                  Alertas de Vencimento (Próximos 10 dias)
+                </h4>
+                
+                {obterVencimentosProximos().length === 0 ? (
+                  <div className="p-3 bg-brand-green/5 border border-brand-green/10 rounded-xl text-center">
+                    <p className="text-xs text-brand-green font-medium">✅ Excelente! Todas as assinaturas estão com vencimento superior a 10 dias ou regularizadas.</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {obterVencimentosProximos().map(item => {
+                      const dataVenc = new Date(item.data_vencimento + 'T00:00:00');
+                      const hoje = new Date();
+                      hoje.setHours(0,0,0,0);
+                      const restam = Math.ceil((dataVenc.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24));
+                      
+                      return (
+                        <div key={item.id} className="bg-brand-dark-5 border border-brand-dark-5 rounded-xl p-3 flex items-center justify-between hover:border-yellow-500/30 transition-all">
+                          <div>
+                            <p className="text-xs font-bold text-white truncate max-w-[180px]">{item.nome}</p>
+                            <p className="text-[10px] text-gray-400 mt-0.5">Vence em: <span className="font-bold text-yellow-400">{formatarData(item.data_vencimento)}</span> ({restam}d restantes)</p>
+                          </div>
+                          
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEmpresaFaturamentoSelecionada(item);
+                              let precoPadrao = '30';
+                              if (item.plano === '.357mag') precoPadrao = '50';
+                              else if (item.plano === '.308win') precoPadrao = '100';
+                              
+                              const valorAssinatura = item.valor_assinatura_personalizado != null 
+                                ? item.valor_assinatura_personalizado.toString()
+                                : precoPadrao;
+
+                              setFormDataPagamento({
+                                valor_pago: valorAssinatura,
+                                meio_pagamento: 'PIX',
+                                observacoes: `Renovação preventiva do plano ${item.plano || '.22LR'}`
+                              });
+                              setModalPagamentoManualAberto(true);
+                            }}
+                            className="bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-400 text-[9px] font-black uppercase px-2.5 py-1.5 rounded-lg border border-yellow-500/20 transition-all"
+                          >
+                            Baixar
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Lista de Empresas/Atiradores para Faturamento */}
+              <div className="card space-y-4">
+                <div className="flex flex-col gap-4 pb-2 border-b border-brand-dark-5">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    <div className="flex border-b border-transparent gap-4">
+                      <button
+                        type="button"
+                        onClick={() => { 
+                          setAbaFaturamento('empresas'); 
+                          setBuscaFaturamento('');
+                          setFiltroFaturamentoStatus('todos');
+                          setFiltroFaturamentoPlano('todos');
+                          setFiltroFaturamentoFrequencia('todos');
+                          setFiltroFaturamentoMes('todos');
+                          setFiltroFaturamentoAno('todos');
+                        }}
+                        className={`pb-2 text-xs font-bold uppercase tracking-wider transition-all border-b-2 ${
+                          abaFaturamento === 'empresas' 
+                            ? 'border-brand-blue text-white font-extrabold' 
+                            : 'border-transparent text-gray-400 hover:text-white'
+                        }`}
+                      >
+                        Empresas Despachantes (B2B)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { 
+                          setAbaFaturamento('cacs'); 
+                          setBuscaFaturamento('');
+                          setFiltroFaturamentoStatus('todos');
+                          setFiltroFaturamentoPlano('todos');
+                          setFiltroFaturamentoFrequencia('todos');
+                          setFiltroFaturamentoMes('todos');
+                          setFiltroFaturamentoAno('todos');
+                        }}
+                        className={`pb-2 text-xs font-bold uppercase tracking-wider transition-all border-b-2 ${
+                          abaFaturamento === 'cacs' 
+                            ? 'border-brand-blue text-white font-extrabold' 
+                            : 'border-transparent text-gray-400 hover:text-white'
+                        }`}
+                      >
+                        Atiradores CAC (B2C)
+                      </button>
+                    </div>
+
+                    <input
+                      type="text"
+                      value={buscaFaturamento}
+                      onChange={e => setBuscaFaturamento(e.target.value)}
+                      placeholder={abaFaturamento === 'empresas' ? "Buscar empresa..." : "Buscar atirador, email, CPF ou despachante..."}
+                      className="input text-xs w-full sm:max-w-xs"
+                    />
+                  </div>
+
+                  {/* Painel de Filtros Avançados */}
+                  <div className="bg-brand-dark-3/40 border border-brand-dark-5 rounded-2xl p-4 grid grid-cols-2 sm:grid-cols-5 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Situação</label>
+                      <select
+                        value={filtroFaturamentoStatus}
+                        onChange={e => setFiltroFaturamentoStatus(e.target.value)}
+                        className="input w-full text-[11px] py-1 bg-brand-dark-3 text-white border-brand-dark-5"
+                      >
+                        <option value="todos">Todos</option>
+                        <option value="em_dia">Em Dia</option>
+                        <option value="atrasado">Atrasados</option>
+                        <option value="expira_breve">Expira breve (≤ 5 dias)</option>
+                        <option value="suspenso">Suspensos</option>
+                        <option value="isento">Isentos</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Plano</label>
+                      <select
+                        value={filtroFaturamentoPlano}
+                        onChange={e => setFiltroFaturamentoPlano(e.target.value)}
+                        className="input w-full text-[11px] py-1 bg-brand-dark-3 text-white border-brand-dark-5"
+                      >
+                        <option value="todos">Todos os Planos</option>
+                        <option value=".22LR">.22LR (Básico)</option>
+                        <option value=".357mag">.357mag (Intermediário)</option>
+                        <option value=".308win">.308win (Premium)</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Ciclo</label>
+                      <select
+                        value={filtroFaturamentoFrequencia}
+                        onChange={e => setFiltroFaturamentoFrequencia(e.target.value)}
+                        className="input w-full text-[11px] py-1 bg-brand-dark-3 text-white border-brand-dark-5"
+                      >
+                        <option value="todos">Todos</option>
+                        <option value="mensal">Mensal</option>
+                        <option value="semestral">Semestral</option>
+                        <option value="anual">Anual</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Mês Venc.</label>
+                      <select
+                        value={filtroFaturamentoMes}
+                        onChange={e => setFiltroFaturamentoMes(e.target.value)}
+                        className="input w-full text-[11px] py-1 bg-brand-dark-3 text-white border-brand-dark-5"
+                      >
+                        <option value="todos">Qualquer Mês</option>
+                        <option value="01">Janeiro</option>
+                        <option value="02">Fevereiro</option>
+                        <option value="03">Março</option>
+                        <option value="04">Abril</option>
+                        <option value="05">Maio</option>
+                        <option value="06">Junho</option>
+                        <option value="07">Julho</option>
+                        <option value="08">Agosto</option>
+                        <option value="09">Setembro</option>
+                        <option value="10">Outubro</option>
+                        <option value="11">Novembro</option>
+                        <option value="12">Dezembro</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Ano Venc.</label>
+                      <select
+                        value={filtroFaturamentoAno}
+                        onChange={e => setFiltroFaturamentoAno(e.target.value)}
+                        className="input w-full text-[11px] py-1 bg-brand-dark-3 text-white border-brand-dark-5"
+                      >
+                        <option value="todos">Qualquer Ano</option>
+                        <option value="2025">2025</option>
+                        <option value="2026">2026</option>
+                        <option value="2027">2027</option>
+                        <option value="2028">2028</option>
+                      </select>
+                    </div>
+                  </div>
                 </div>
 
                 <div>

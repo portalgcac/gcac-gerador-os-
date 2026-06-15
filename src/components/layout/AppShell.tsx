@@ -106,6 +106,65 @@ export function AppShell() {
     }
   }
 
+  // Verificação e criação automática de notificação de vencimento próximo (≤ 5 dias)
+  React.useEffect(() => {
+    const empresaId = usuario?.dadosEmpresa?.id;
+    const empresaNome = usuario?.dadosEmpresa?.nome || usuario?.empresaNome || '';
+    if (!estaAutenticado || !empresaId || isMasterAdmin || isGratis) return;
+    if (diasAteVencer === null || diasAteVencer > 5 || diasAteVencer < 0) return;
+
+    const verificarECriarNotificacao = async () => {
+      try {
+        const dataVencStr = dataVencimento; // Formato yyyy-MM-dd
+        const tituloAlerta = `Assinatura próxima do vencimento (${dataVencStr})`;
+
+        // Verificar se já existe uma notificação recente para este vencimento específico
+        const { data, error } = await supabase
+          .from('notificacoes_sistema')
+          .select('id')
+          .eq('empresa_id', empresaId)
+          .eq('titulo', tituloAlerta)
+          .limit(1);
+
+        if (error) throw error;
+
+        // Se não existir, criar a notificação
+        if (!data || data.length === 0) {
+          const msg = `Sua licença do Portal GCAC vence em ${diasAteVencer} ${diasAteVencer === 1 ? 'dia' : 'dias'} (${new Date(dataVencStr + 'T00:00:00').toLocaleDateString('pt-BR')}). Por favor, regularize o pagamento para evitar a suspensão de acesso aos recursos.`;
+          
+          // 1. Notificar o cliente (para o seu próprio workspace)
+          await supabase
+            .from('notificacoes_sistema')
+            .insert([{
+              empresa_id: empresaId,
+              titulo: tituloAlerta,
+              mensagem: msg,
+              tipo: 'alerta',
+              link: '/portal-admin/configuracoes'
+            }]);
+
+          // 2. Notificar o Gestor / Administrador Master (empresa_id da administradora '00000000-0000-0000-0000-000000000001')
+          const tituloAlertaGestor = `Vencimento Próximo: ${empresaNome}`;
+          const msgGestor = `A empresa "${empresaNome}" (ID: ${empresaId.substring(0, 8)}...) está a ${diasAteVencer} dias do vencimento de sua assinatura (${new Date(dataVencStr + 'T00:00:00').toLocaleDateString('pt-BR')}).`;
+          
+          await supabase
+            .from('notificacoes_sistema')
+            .insert([{
+              empresa_id: '00000000-0000-0000-0000-000000000001',
+              titulo: tituloAlertaGestor,
+              mensagem: msgGestor,
+              tipo: 'alerta',
+              link: '/portal-admin/configuracoes'
+            }]);
+        }
+      } catch (err) {
+        console.error('Erro ao registrar alerta automático de vencimento:', err);
+      }
+    };
+
+    verificarECriarNotificacao();
+  }, [estaAutenticado, usuario?.dadosEmpresa?.id, usuario?.dadosEmpresa?.nome, usuario?.empresaNome, diasAteVencer, dataVencimento, isMasterAdmin, isGratis]);
+
   if (estaBloqueado) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-brand-dark overflow-hidden p-4">
