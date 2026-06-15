@@ -146,6 +146,16 @@ export function GestaoUsuarios({ abaInicial }: GestaoUsuariosProps = {}) {
   const [ativacaoObservacoesPagamento, setAtivacaoObservacoesPagamento] = useState('');
   const [ativacaoDataVencimento, setAtivacaoDataVencimento] = useState('');
   const [ativacaoDataPagamento, setAtivacaoDataPagamento] = useState('');
+
+  // Estados para Edição de Pagamento Existente no Histórico
+  const [pagamentoEditando, setPagamentoEditando] = useState<any | null>(null);
+  const [formDataEdicaoPagamento, setFormDataEdicaoPagamento] = useState({
+    valor_pago: '',
+    meio_pagamento: 'PIX',
+    data_pagamento: '',
+    referencia_vencimento: '',
+    observacoes: ''
+  });
   
   // Modal State
   const [modalAberto, setModalAberto] = useState(false);
@@ -1095,6 +1105,112 @@ export function GestaoUsuarios({ abaInicial }: GestaoUsuariosProps = {}) {
       setSelectedCacDetails(prev => prev ? { ...prev, e: updatedEmp } : null);
     } catch (err: any) {
       mostrar('erro', err.message || 'Erro ao salvar dados de faturamento.');
+    }
+  };
+
+  const handleExcluirPagamento = async (pagamentoId: string, empresaId: string) => {
+    if (!window.confirm('Tem certeza que deseja excluir este registro de pagamento do histórico?')) return;
+    try {
+      const { error } = await supabase
+        .from('historico_pagamentos_empresa')
+        .delete()
+        .eq('id', pagamentoId);
+
+      if (error) throw error;
+
+      mostrar('sucesso', 'Registro de pagamento excluído com sucesso.');
+      
+      // Recarregar os dados das empresas
+      await carregarEmpresas();
+
+      // Recarregar histórico de mensalidades
+      if (empresaFaturamentoSelecionada && empresaFaturamentoSelecionada.id === empresaId) {
+        buscarHistoricoPagamentos(empresaId);
+      }
+
+      // Atualizar o estado local do modal do CAC
+      if (selectedCacDetails && selectedCacDetails.e.id === empresaId) {
+        const { data: latestPagamentos } = await supabase
+          .from('historico_pagamentos_empresa')
+          .select('id, empresa_id, data_pagamento, valor_pago, plano, frequencia, referencia_vencimento, meio_pagamento, observacoes')
+          .eq('empresa_id', empresaId)
+          .order('data_pagamento', { ascending: false });
+        
+        const ultimoPagamento = latestPagamentos && latestPagamentos.length > 0 ? latestPagamentos[0] : null;
+        setSelectedCacDetails(prev => prev ? { ...prev, ultimoPagamento } : null);
+      }
+    } catch (err: any) {
+      mostrar('erro', err.message || 'Erro ao excluir registro de pagamento.');
+    }
+  };
+
+  const abrirEdicaoPagamento = (p: any) => {
+    setPagamentoEditando(p);
+    
+    // Converter data_pagamento para formato input date yyyy-MM-dd
+    const dataObj = new Date(p.data_pagamento);
+    const dataStr = dataObj.toISOString().split('T')[0];
+
+    setFormDataEdicaoPagamento({
+      valor_pago: p.valor_pago.toString(),
+      meio_pagamento: p.meio_pagamento || 'PIX',
+      data_pagamento: dataStr,
+      referencia_vencimento: p.referencia_vencimento || '',
+      observacoes: p.observacoes || ''
+    });
+  };
+
+  const handleSalvarEdicaoPagamento = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!pagamentoEditando) return;
+    
+    try {
+      const valor = parseFloat(formDataEdicaoPagamento.valor_pago);
+      if (isNaN(valor) || valor <= 0) {
+        throw new Error('Por favor, informe um valor de pagamento válido.');
+      }
+
+      const payload = {
+        valor_pago: valor,
+        meio_pagamento: formDataEdicaoPagamento.meio_pagamento,
+        data_pagamento: new Date(formDataEdicaoPagamento.data_pagamento + 'T12:00:00').toISOString(),
+        referencia_vencimento: formDataEdicaoPagamento.referencia_vencimento || null,
+        observacoes: formDataEdicaoPagamento.observacoes || null
+      };
+
+      const { error } = await supabase
+        .from('historico_pagamentos_empresa')
+        .update(payload)
+        .eq('id', pagamentoEditando.id);
+
+      if (error) throw error;
+
+      mostrar('sucesso', 'Registro de pagamento atualizado com sucesso.');
+      
+      const empresaId = pagamentoEditando.empresa_id;
+      setPagamentoEditando(null);
+
+      // Recarregar os dados das empresas
+      await carregarEmpresas();
+
+      // Recarregar histórico de mensalidades
+      if (empresaFaturamentoSelecionada && empresaFaturamentoSelecionada.id === empresaId) {
+        buscarHistoricoPagamentos(empresaId);
+      }
+
+      // Atualizar o estado local do modal do CAC
+      if (selectedCacDetails && selectedCacDetails.e.id === empresaId) {
+        const { data: latestPagamentos } = await supabase
+          .from('historico_pagamentos_empresa')
+          .select('id, empresa_id, data_pagamento, valor_pago, plano, frequencia, referencia_vencimento, meio_pagamento, observacoes')
+          .eq('empresa_id', empresaId)
+          .order('data_pagamento', { ascending: false });
+        
+        const ultimoPagamento = latestPagamentos && latestPagamentos.length > 0 ? latestPagamentos[0] : null;
+        setSelectedCacDetails(prev => prev ? { ...prev, ultimoPagamento } : null);
+      }
+    } catch (err: any) {
+      mostrar('erro', err.message || 'Erro ao atualizar pagamento.');
     }
   };
   
@@ -2896,6 +3012,7 @@ export function GestaoUsuarios({ abaInicial }: GestaoUsuariosProps = {}) {
                             <th className="px-2 py-1.5 font-bold">Valor</th>
                             <th className="px-2 py-1.5 font-bold">Meio</th>
                             <th className="px-2 py-1.5 font-bold">Ref. Vencimento</th>
+                            <th className="px-2 py-1.5 font-bold text-center">Ações</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-brand-dark-5 text-gray-300">
@@ -2907,6 +3024,24 @@ export function GestaoUsuarios({ abaInicial }: GestaoUsuariosProps = {}) {
                               <td className="px-2 py-1.5">R$ {parseFloat(p.valor_pago).toFixed(2)}</td>
                               <td className="px-2 py-1.5">{p.meio_pagamento || 'PIX'}</td>
                               <td className="px-2 py-1.5">{p.referencia_vencimento ? formatarData(p.referencia_vencimento) : '—'}</td>
+                              <td className="px-2 py-1.5 text-center">
+                                <div className="flex items-center justify-center gap-1.5">
+                                  <button
+                                    onClick={() => abrirEdicaoPagamento(p)}
+                                    className="p-1 hover:bg-brand-dark-5 text-gray-400 hover:text-brand-blue rounded transition-colors"
+                                    title="Editar Pagamento"
+                                  >
+                                    <Edit2 size={13} />
+                                  </button>
+                                  <button
+                                    onClick={() => handleExcluirPagamento(p.id, p.empresa_id)}
+                                    className="p-1 hover:bg-brand-dark-5 text-gray-400 hover:text-red-500 rounded transition-colors"
+                                    title="Excluir Pagamento"
+                                  >
+                                    <Trash2 size={13} />
+                                  </button>
+                                </div>
+                              </td>
                             </tr>
                           ))}
                         </tbody>
@@ -3550,6 +3685,7 @@ export function GestaoUsuarios({ abaInicial }: GestaoUsuariosProps = {}) {
                         <th className="p-3 text-[10px] font-black text-gray-400 uppercase tracking-wider">Referência / Venc</th>
                         <th className="p-3 text-[10px] font-black text-gray-400 uppercase tracking-wider">Meio</th>
                         <th className="p-3 text-[10px] font-black text-gray-400 uppercase tracking-wider">Observações</th>
+                        <th className="p-3 text-[10px] font-black text-gray-400 uppercase tracking-wider text-center">Ações</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-brand-dark-5 text-[11px] text-gray-300">
@@ -3561,6 +3697,24 @@ export function GestaoUsuarios({ abaInicial }: GestaoUsuariosProps = {}) {
                           <td className="p-3 font-bold text-brand-green">{formatarData(h.referencia_vencimento)}</td>
                           <td className="p-3 text-white font-bold">{h.meio_pagamento}</td>
                           <td className="p-3 text-gray-400 max-w-[150px] truncate" title={h.observacoes}>{h.observacoes || '-'}</td>
+                          <td className="p-3 text-center">
+                            <div className="flex items-center justify-center gap-1.5">
+                              <button
+                                onClick={() => abrirEdicaoPagamento(h)}
+                                className="p-1 hover:bg-brand-dark-5 text-gray-400 hover:text-brand-blue rounded transition-colors"
+                                title="Editar Pagamento"
+                              >
+                                <Edit2 size={13} />
+                              </button>
+                              <button
+                                onClick={() => handleExcluirPagamento(h.id, h.empresa_id)}
+                                className="p-1 hover:bg-brand-dark-5 text-gray-400 hover:text-red-500 rounded transition-colors"
+                                title="Excluir Pagamento"
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            </div>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -3577,6 +3731,99 @@ export function GestaoUsuarios({ abaInicial }: GestaoUsuariosProps = {}) {
                 Fechar Painel
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Edição de Pagamento */}
+      {pagamentoEditando && (
+        <div className="fixed inset-0 z-[130] flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm animate-fade-in">
+          <div className="bg-brand-dark-3 border border-brand-dark-5 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl animate-scale-in">
+            <div className="bg-brand-dark-2 px-6 py-4 border-b border-brand-dark-5 flex items-center justify-between">
+              <h3 className="font-bold text-white flex items-center gap-2">
+                <Edit2 size={18} className="text-brand-blue" />
+                Editar Registro de Pagamento
+              </h3>
+              <button onClick={() => setPagamentoEditando(null)} className="text-gray-500 hover:text-white">
+                <XCircle size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSalvarEdicaoPagamento} className="p-6 space-y-4">
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-gray-500 uppercase">Valor Pago (R$)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  required
+                  value={formDataEdicaoPagamento.valor_pago}
+                  onChange={e => setFormDataEdicaoPagamento({ ...formDataEdicaoPagamento, valor_pago: e.target.value })}
+                  className="input font-bold text-white text-base"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-gray-500 uppercase">Forma de Pagamento</label>
+                <select
+                  value={formDataEdicaoPagamento.meio_pagamento}
+                  onChange={e => setFormDataEdicaoPagamento({ ...formDataEdicaoPagamento, meio_pagamento: e.target.value })}
+                  className="input w-full text-sm"
+                >
+                  <option value="PIX" className="bg-brand-dark-2 text-white">PIX / Transferência</option>
+                  <option value="BOLETO" className="bg-brand-dark-2 text-white">Boleto Bancário</option>
+                  <option value="DINHEIRO" className="bg-brand-dark-2 text-white">Dinheiro</option>
+                  <option value="CARTAO" className="bg-brand-dark-2 text-white">Cartão de Crédito</option>
+                  <option value="OUTRO" className="bg-brand-dark-2 text-white">Outro</option>
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-gray-500 uppercase">Data do Pagamento</label>
+                <input
+                  type="date"
+                  required
+                  value={formDataEdicaoPagamento.data_pagamento}
+                  onChange={e => setFormDataEdicaoPagamento({ ...formDataEdicaoPagamento, data_pagamento: e.target.value })}
+                  className="input w-full text-sm"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-gray-500 uppercase">Referência de Vencimento</label>
+                <input
+                  type="date"
+                  value={formDataEdicaoPagamento.referencia_vencimento}
+                  onChange={e => setFormDataEdicaoPagamento({ ...formDataEdicaoPagamento, referencia_vencimento: e.target.value })}
+                  className="input w-full text-sm text-white font-bold"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-gray-500 uppercase">Observações</label>
+                <textarea
+                  value={formDataEdicaoPagamento.observacoes}
+                  onChange={e => setFormDataEdicaoPagamento({ ...formDataEdicaoPagamento, observacoes: e.target.value })}
+                  className="input w-full min-h-[70px] text-xs py-2"
+                  placeholder="Observações ou detalhes adicionais sobre o pagamento"
+                />
+              </div>
+
+              <div className="pt-4 flex gap-3 border-t border-brand-dark-5">
+                <button
+                  type="button"
+                  onClick={() => setPagamentoEditando(null)}
+                  className="btn-ghost flex-1 justify-center py-2.5 text-xs font-bold uppercase tracking-wider"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="btn-primary flex-1 justify-center py-2.5 text-xs font-bold uppercase tracking-wider"
+                >
+                  Salvar Alterações
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
