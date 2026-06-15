@@ -50,10 +50,18 @@ export function PreCadastroPage() {
   // Máscaras de digitação
   const formatarCPF = (val: string) => {
     const limpo = val.replace(/\D/g, '');
-    if (limpo.length <= 3) return limpo;
-    if (limpo.length <= 6) return `${limpo.slice(0, 3)}.${limpo.slice(3)}`;
-    if (limpo.length <= 9) return `${limpo.slice(0, 3)}.${limpo.slice(3, 6)}.${limpo.slice(6)}`;
-    return `${limpo.slice(0, 3)}.${limpo.slice(3, 6)}.${limpo.slice(6, 9)}-${limpo.slice(9, 11)}`;
+    if (limpo.length <= 11) {
+      if (limpo.length <= 3) return limpo;
+      if (limpo.length <= 6) return `${limpo.slice(0, 3)}.${limpo.slice(3)}`;
+      if (limpo.length <= 9) return `${limpo.slice(0, 3)}.${limpo.slice(3, 6)}.${limpo.slice(6)}`;
+      return `${limpo.slice(0, 3)}.${limpo.slice(3, 6)}.${limpo.slice(6, 9)}-${limpo.slice(9, 11)}`;
+    } else {
+      // CNPJ Mask: 00.000.000/0000-00
+      if (limpo.length <= 12) {
+        return `${limpo.slice(0, 2)}.${limpo.slice(2, 5)}.${limpo.slice(5, 8)}/${limpo.slice(8)}`;
+      }
+      return `${limpo.slice(0, 2)}.${limpo.slice(2, 5)}.${limpo.slice(5, 8)}/${limpo.slice(8, 12)}-${limpo.slice(12, 14)}`;
+    }
   };
 
   const formatarTelefone = (val: string) => {
@@ -100,11 +108,22 @@ export function PreCadastroPage() {
         setErro('Por favor, insira um e-mail válido.');
         return false;
       }
-    } else if (step === 3) {
-      const cpfLimpo = cpf.replace(/\D/g, '');
-      if (cpfLimpo.length !== 11) {
-        setErro('Por favor, insira um CPF válido com 11 dígitos.');
+      if (!email.toLowerCase().trim().endsWith('@gmail.com')) {
+        setErro('Atenção: O e-mail cadastrado deve ser obrigatoriamente uma conta do Gmail (@gmail.com).');
         return false;
+      }
+    } else if (step === 3) {
+      const docLimpo = cpf.replace(/\D/g, '');
+      if (tipoUsuario === 'cac_individual') {
+        if (docLimpo.length !== 11) {
+          setErro('Por favor, insira um CPF válido com 11 dígitos.');
+          return false;
+        }
+      } else {
+        if (docLimpo.length !== 11 && docLimpo.length !== 14) {
+          setErro('Por favor, insira um CPF (11 dígitos) ou CNPJ (14 dígitos) válido.');
+          return false;
+        }
       }
       const telefoneLimpo = contato.replace(/\D/g, '');
       if (telefoneLimpo.length < 10 || telefoneLimpo.length > 11) {
@@ -348,13 +367,15 @@ export function PreCadastroPage() {
 
               <div className="space-y-4">
                 <div>
-                  <label className="label label-required text-lg md:text-sm">CPF</label>
+                  <label className="label label-required text-lg md:text-sm">
+                    {tipoUsuario === 'cac_individual' ? 'CPF' : 'CPF ou CNPJ'}
+                  </label>
                   <input
                     type="text"
                     value={cpf}
                     onChange={handleCpfChange}
-                    maxLength={14}
-                    placeholder="000.000.000-00"
+                    maxLength={tipoUsuario === 'cac_individual' ? 14 : 18}
+                    placeholder={tipoUsuario === 'cac_individual' ? "000.000.000-00" : "000.000.000-00 ou 00.000.000/0000-00"}
                     className="input py-3 text-base md:text-sm"
                     autoFocus
                   />
