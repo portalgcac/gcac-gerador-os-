@@ -924,6 +924,29 @@ export function GestaoUsuarios({ abaInicial }: GestaoUsuariosProps = {}) {
     }
   };
 
+  const handleAlterarStatusLicenca = async (empresaId: string, novoStatus: 'ativo' | 'suspenso') => {
+    try {
+      const { error } = await supabase
+        .from('empresas')
+        .update({ plano_status: novoStatus })
+        .eq('id', empresaId);
+      
+      if (error) throw error;
+      
+      mostrar('sucesso', `Status da licença alterado para ${novoStatus === 'ativo' ? 'Ativo' : 'Suspenso'} com sucesso.`);
+      
+      // Recarregar os dados das empresas
+      await carregarEmpresas();
+
+      // Se o modal de detalhes do CAC estiver aberto para essa empresa, atualiza o status também
+      if (selectedCacDetails && selectedCacDetails.e.id === empresaId) {
+        setSelectedCacDetails(prev => prev ? { ...prev, e: { ...prev.e, plano_status: novoStatus } } : null);
+      }
+    } catch (err: any) {
+      mostrar('erro', err.message || 'Erro ao alterar status da licença.');
+    }
+  };
+
   const togglePermissao = (slug: string) => {
     setFormData(prev => ({
       ...prev,
@@ -2503,7 +2526,7 @@ export function GestaoUsuarios({ abaInicial }: GestaoUsuariosProps = {}) {
                                 {e.data_vencimento ? formatarData(e.data_vencimento) : <span className="text-gray-500 italic">Sem vencimento</span>}
                               </td>
                               <td className="px-3 py-3 text-right">
-                                <div className="flex items-center justify-end gap-1">
+                                <div className="flex items-center justify-end gap-1.5">
                                   <button
                                     type="button"
                                     onClick={() => {
@@ -2538,6 +2561,26 @@ export function GestaoUsuarios({ abaInicial }: GestaoUsuariosProps = {}) {
                                   >
                                     <Calendar size={12} />
                                     Histórico
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleAlterarStatusLicenca(e.id, e.plano_status === 'suspenso' ? 'ativo' : 'suspenso')}
+                                    className={`p-1.5 rounded-xl border transition-colors flex items-center justify-center ${
+                                      e.plano_status === 'suspenso'
+                                        ? 'bg-brand-blue/10 border-brand-blue/20 hover:bg-brand-blue/20 text-brand-blue-light'
+                                        : 'bg-yellow-500/10 border-yellow-500/20 hover:bg-yellow-500/20 text-yellow-400'
+                                    }`}
+                                    title={e.plano_status === 'suspenso' ? 'Ativar Licença' : 'Suspender/Desativar Licença'}
+                                  >
+                                    {e.plano_status === 'suspenso' ? <CheckCircle size={12} /> : <XCircle size={12} />}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setConfirmandoDeleteEmpresa({ id: e.id, nome: e.nome })}
+                                    className="p-1.5 rounded-xl bg-red-500/10 border border-red-500/20 hover:bg-red-500/20 text-red-400 flex items-center justify-center transition-colors"
+                                    title="Excluir Empresa"
+                                  >
+                                    <Trash2 size={12} />
                                   </button>
                                 </div>
                               </td>
@@ -2649,6 +2692,32 @@ export function GestaoUsuarios({ abaInicial }: GestaoUsuariosProps = {}) {
                                 >
                                   <Calendar size={12} />
                                   Histórico
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleAlterarStatusLicenca(e.id, e.plano_status === 'suspenso' ? 'ativo' : 'suspenso')}
+                                  className={`p-1.5 rounded-xl border transition-colors flex items-center justify-center ${
+                                    e.plano_status === 'suspenso'
+                                      ? 'bg-brand-blue/10 border-brand-blue/20 hover:bg-brand-blue/20 text-brand-blue-light'
+                                      : 'bg-yellow-500/10 border-yellow-500/20 hover:bg-yellow-500/20 text-yellow-400'
+                                  }`}
+                                  title={e.plano_status === 'suspenso' ? 'Ativar Acesso' : 'Suspender/Desativar Acesso'}
+                                >
+                                  {e.plano_status === 'suspenso' ? <CheckCircle size={12} /> : <XCircle size={12} />}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (cacUser) {
+                                      setConfirmandoDeleteUsuario({ id: cacUser.id, nome: cacUser.nome, empresa_id: cacUser.empresa_id });
+                                    } else {
+                                      setConfirmandoDeleteEmpresa({ id: e.id, nome: e.nome });
+                                    }
+                                  }}
+                                  className="p-1.5 rounded-xl bg-red-500/10 border border-red-500/20 hover:bg-red-500/20 text-red-400 flex items-center justify-center transition-colors"
+                                  title="Excluir Atirador/CAC"
+                                >
+                                  <Trash2 size={12} />
                                 </button>
                               </div>
                             </div>
