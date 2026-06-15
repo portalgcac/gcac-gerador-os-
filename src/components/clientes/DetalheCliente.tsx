@@ -45,6 +45,7 @@ export function DetalheCliente({ cliente }: DetalheClienteProps) {
   const [confirmandoDelete, setConfirmandoDelete] = useState(false);
   const [modalWhatsAppAberto, setModalWhatsAppAberto] = useState(false);
   const [mostrarTodasOrdens, setMostrarTodasOrdens] = useState(false);
+  const [cacEmpresaId, setCacEmpresaId] = useState<string | undefined>(undefined);
 
   // Filtros de histórico
   const todasOrdensCliente = ordens.filter(o => o.cpf === cliente.cpf);
@@ -86,16 +87,26 @@ export function DetalheCliente({ cliente }: DetalheClienteProps) {
 
     async function sincronizarComPortal() {
       try {
+        const cpfLimpo = cliente.cpf.replace(/\D/g, '');
+        const cpfFormatado = cpfLimpo.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+
         // 1. Busca vínculo ativo para esse cliente
         const { data: vinculo } = await supabase
           .from('vinculos_despachante_cac')
           .select('cac_empresa_id')
           .eq('despachante_empresa_id', despachanteEmpresaId)
-          .eq('cac_cpf', cliente.cpf)
+          .or(`cac_cpf.eq.${cpfLimpo},cac_cpf.eq.${cpfFormatado}`)
           .eq('status', 'ativo')
           .maybeSingle();
 
-        if (cancelado || !vinculo?.cac_empresa_id) return;
+        if (cancelado) return;
+
+        if (!vinculo?.cac_empresa_id) {
+          setCacEmpresaId(undefined);
+          return;
+        }
+
+        setCacEmpresaId(vinculo.cac_empresa_id);
 
         // 2. Busca o perfil do cliente no workspace dele
         const { data: clienteCac } = await supabase
@@ -571,6 +582,7 @@ export function DetalheCliente({ cliente }: DetalheClienteProps) {
                 <AbaDocumentacao 
                   cliente={cliente} 
                   armaIdInicial={(location.state as any)?.armaId}
+                  cacEmpresaId={cacEmpresaId}
                 />
               )}
               {abaAtiva === 'creditos' && (

@@ -10,6 +10,8 @@ import { Cliente, Arma, GuiaTrafego, AutorizacaoManejo } from '../../types';
 import { formatarData } from '../../utils/formatters';
 import { calcularAlerta, obterClasseAlerta } from '../../utils/vencimentos';
 import { fileToBase64, visualizarDocumentoBase64 } from '../../utils/fileUtils';
+import { useAuth } from '../../context/AuthContext';
+import { buscarAcervoVinculado } from '../../services/vinculosService';
 
 const TIPOS_ARMA = ['Pistola', 'Revólver', 'Carabina / Fuzil', 'Espingarda', 'Rifle'];
 const CALIBRES = [
@@ -72,14 +74,18 @@ const ESTADOS_BRASIL = [
 interface Props {
   cliente: Cliente;
   armaIdInicial?: string;
+  cacEmpresaId?: string;
 }
 
-export function AbaDocumentacao({ cliente, armaIdInicial }: Props) {
+export function AbaDocumentacao({ cliente, armaIdInicial, cacEmpresaId }: Props) {
+  const { usuario } = useAuth();
   const { 
     buscarArmas, salvarArma, deletarArma,
     buscarGts, salvarGt, deletarGt,
     buscarManejos, salvarManejo, deletarManejo
   } = useClientes();
+
+  const podeEditar = !cacEmpresaId;
 
   const [armas, setArmas] = useState<Arma[]>([]);
   const [manejos, setManejos] = useState<AutorizacaoManejo[]>([]);
@@ -96,6 +102,54 @@ export function AbaDocumentacao({ cliente, armaIdInicial }: Props) {
   const carregarDados = async () => {
     setCarregando(true);
     try {
+      if (cacEmpresaId && usuario?.empresaId) {
+        const acervo = await buscarAcervoVinculado(cacEmpresaId, usuario.empresaId);
+        if (acervo) {
+          setArmas(acervo.armas.map(a => ({
+            id: a.id,
+            clienteId: acervo.cliente.id,
+            tipo: a.tipo || '',
+            modelo: a.modelo,
+            calibre: a.calibre,
+            fabricante: a.fabricante,
+            numeroSerie: a.numeroSerie,
+            numeroSigma: a.numeroSigma,
+            acervo: a.acervo as any,
+            vencimentoCraf: a.vencimentoCraf || '',
+            crafUrl: a.crafUrl,
+            criadoEm: new Date().toISOString()
+          })));
+          setManejos(acervo.manejos.map(m => ({
+            id: m.id,
+            clienteId: acervo.cliente.id,
+            numeroCar: m.numeroCar,
+            nomeFazenda: m.nomeFazenda,
+            nomeProprietario: m.nomeProprietario,
+            cidade: m.cidade,
+            vencimento: m.vencimento,
+            status: m.status as any,
+            arquivoUrl: m.arquivoUrl,
+            criadoEm: new Date().toISOString()
+          })));
+          
+          const gtsMap: Record<string, GuiaTrafego[]> = {};
+          acervo.armas.forEach(a => {
+            gtsMap[a.id] = a.gts.map(g => ({
+              id: g.id,
+              armaId: a.id,
+              tipo: g.tipo as any,
+              vencimento: g.vencimento,
+              destino: g.destino,
+              arquivoUrl: g.arquivoUrl,
+              criadoEm: new Date().toISOString()
+            }));
+          });
+          setGtsPorArma(gtsMap);
+          setCarregando(false);
+          return;
+        }
+      }
+
       const [armasData, manejosData] = await Promise.all([
         buscarArmas(cliente.id),
         buscarManejos(cliente.id)
@@ -118,7 +172,7 @@ export function AbaDocumentacao({ cliente, armaIdInicial }: Props) {
 
   useEffect(() => {
     carregarDados();
-  }, [cliente.id]);
+  }, [cliente.id, cacEmpresaId]);
 
   if (carregando) {
     return (
@@ -159,9 +213,11 @@ export function AbaDocumentacao({ cliente, armaIdInicial }: Props) {
               </span>
             </h3>
           </div>
-          <button onClick={() => setModalArma(true)} className="btn-primary py-1.5 px-3 text-xs">
-            <Plus size={14} /> Adicionar Arma
-          </button>
+          {podeEditar && (
+            <button onClick={() => setModalArma(true)} className="btn-primary py-1.5 px-3 text-xs">
+              <Plus size={14} /> Adicionar Arma
+            </button>
+          )}
         </div>
 
         {armas.length === 0 ? (
@@ -211,17 +267,19 @@ export function AbaDocumentacao({ cliente, armaIdInicial }: Props) {
                           <FileText size={16} />
                         </button>
                       )}
-                      <button 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setArmaParaEditar(arma);
-                          setModalArma(true);
-                        }}
-                        className="p-2 rounded-lg bg-brand-dark-2 text-gray-400 hover:text-brand-blue transition-colors"
-                        title="Editar Arma"
-                      >
-                        <Pencil size={16} />
-                      </button>
+                      {podeEditar && (
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setArmaParaEditar(arma);
+                            setModalArma(true);
+                          }}
+                          className="p-2 rounded-lg bg-brand-dark-2 text-gray-400 hover:text-brand-blue transition-colors"
+                          title="Editar Arma"
+                        >
+                          <Pencil size={16} />
+                        </button>
+                      )}
                       <div className="p-1 text-gray-400">
                         {expandirArma === arma.id ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
                       </div>
@@ -238,12 +296,14 @@ export function AbaDocumentacao({ cliente, armaIdInicial }: Props) {
                            {gtsPorArma[arma.id]?.length || 0}
                          </span>
                        </h4>
-                       <button 
-                         onClick={() => setModalGt({armaId: arma.id})} 
-                         className="text-[10px] font-bold text-brand-blue-light hover:underline flex items-center gap-1"
-                       >
-                         <Plus size={12} /> Nova Guia
-                       </button>
+                       {podeEditar && (
+                         <button 
+                           onClick={() => setModalGt({armaId: arma.id})} 
+                           className="text-[10px] font-bold text-brand-blue-light hover:underline flex items-center gap-1"
+                         >
+                           <Plus size={12} /> Nova Guia
+                         </button>
+                       )}
                     </div>
 
                     <div className="space-y-2">
@@ -272,31 +332,37 @@ export function AbaDocumentacao({ cliente, armaIdInicial }: Props) {
                                   <FileText size={14} />
                                 </button>
                               )}
-                              <button onClick={() => setModalGt({armaId: arma.id, gt})} className="text-gray-600 hover:text-brand-blue p-1" title="Editar Guia">
-                                <Pencil size={14} />
-                              </button>
-                              <button onClick={() => {
-                                if(confirm('Excluir esta guia?')) {
-                                  deletarGt(gt.id).then(carregarDados);
-                                }
-                              }} className="text-gray-600 hover:text-red-400 p-1" title="Excluir Guia">
-                                <Trash2 size={14} />
-                              </button>
+                              {podeEditar && (
+                                <>
+                                  <button onClick={() => setModalGt({armaId: arma.id, gt})} className="text-gray-600 hover:text-brand-blue p-1" title="Editar Guia">
+                                    <Pencil size={14} />
+                                  </button>
+                                  <button onClick={() => {
+                                    if(confirm('Excluir esta guia?')) {
+                                      deletarGt(gt.id).then(carregarDados);
+                                    }
+                                  }} className="text-gray-600 hover:text-red-400 p-1" title="Excluir Guia">
+                                    <Trash2 size={14} />
+                                  </button>
+                                </>
+                              )}
                             </div>
                           </div>
                         ))
                       )}
                     </div>
 
-                    <div className="mt-4 pt-3 border-t border-brand-dark-5 flex justify-end">
-                      <button onClick={() => {
-                        if(confirm('Excluir esta arma e todas as suas guias?')) {
-                          deletarArma(arma.id).then(carregarDados);
-                        }
-                      }} className="flex items-center gap-1.5 text-[10px] font-bold text-red-500/60 hover:text-red-500 transition-colors uppercase">
-                        <Trash2 size={12} /> Remover Arma
-                      </button>
-                    </div>
+                    {podeEditar && (
+                      <div className="mt-4 pt-3 border-t border-brand-dark-5 flex justify-end">
+                        <button onClick={() => {
+                          if(confirm('Excluir esta arma e todas as suas guias?')) {
+                            deletarArma(arma.id).then(carregarDados);
+                          }
+                        }} className="flex items-center gap-1.5 text-[10px] font-bold text-red-500/60 hover:text-red-500 transition-colors uppercase">
+                          <Trash2 size={12} /> Remover Arma
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -317,9 +383,11 @@ export function AbaDocumentacao({ cliente, armaIdInicial }: Props) {
               </span>
             </h3>
           </div>
-          <button onClick={() => setModalManejo(true)} className="btn-primary py-1.5 px-3 text-xs">
-            <Plus size={14} /> Novo Manejo
-          </button>
+          {podeEditar && (
+            <button onClick={() => setModalManejo(true)} className="btn-primary py-1.5 px-3 text-xs">
+              <Plus size={14} /> Novo Manejo
+            </button>
+          )}
         </div>
 
         {manejos.length === 0 ? (
@@ -365,27 +433,31 @@ export function AbaDocumentacao({ cliente, armaIdInicial }: Props) {
                           <FileText size={16} />
                         </button>
                       )}
-                      <button 
-                        onClick={() => {
-                          setManejoParaEditar(m);
-                          setModalManejo(true);
-                        }} 
-                        className="p-2 rounded-lg bg-brand-dark-2 text-gray-400 hover:text-brand-blue transition-colors"
-                        title="Editar Manejo"
-                      >
-                        <Pencil size={16} />
-                      </button>
-                      <button 
-                        onClick={() => {
-                          if(confirm('Excluir esta autorização?')) {
-                            deletarManejo(m.id).then(carregarDados);
-                          }
-                        }} 
-                        className="p-2 rounded-lg bg-brand-dark-2 text-gray-400 hover:text-red-400 transition-colors"
-                        title="Excluir Manejo"
-                      >
-                        <Trash2 size={16} />
-                      </button>
+                      {podeEditar && (
+                        <>
+                          <button 
+                            onClick={() => {
+                              setManejoParaEditar(m);
+                              setModalManejo(true);
+                            }} 
+                            className="p-2 rounded-lg bg-brand-dark-2 text-gray-400 hover:text-brand-blue transition-colors"
+                            title="Editar Manejo"
+                          >
+                            <Pencil size={16} />
+                          </button>
+                          <button 
+                            onClick={() => {
+                              if(confirm('Excluir esta autorização?')) {
+                                deletarManejo(m.id).then(carregarDados);
+                              }
+                            }} 
+                            className="p-2 rounded-lg bg-brand-dark-2 text-gray-400 hover:text-red-400 transition-colors"
+                            title="Excluir Manejo"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>
