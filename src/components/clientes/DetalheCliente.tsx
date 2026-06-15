@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   User, Mail, Phone, MapPin, Shield, Copy, Check, 
@@ -20,6 +20,7 @@ import { DialogConfirmacao } from '../common/DialogConfirmacao';
 import { useAuth } from '../../context/AuthContext';
 import { visualizarDocumentoBase64 } from '../../utils/fileUtils';
 import { BotaoConvidarCac } from './BotaoConvidarCac';
+import { supabase } from '../../db/supabase';
 
 interface DetalheClienteProps {
   cliente: Cliente;
@@ -75,6 +76,63 @@ export function DetalheCliente({ cliente }: DetalheClienteProps) {
     }
     return (tabsDisponiveis[0]?.id || 'documentos') as any;
   });
+
+  // Sincroniza dados do cliente com o perfil do Portal CAC se houver vínculo ativo
+  useEffect(() => {
+    const despachanteEmpresaId = usuario?.empresaId;
+    if (usuario?.tipoConta === 'cac_individual' || !despachanteEmpresaId || !cliente.cpf) return;
+
+    let cancelado = false;
+
+    async function sincronizarComPortal() {
+      try {
+        // 1. Busca vínculo ativo para esse cliente
+        const { data: vinculo } = await supabase
+          .from('vinculos_despachante_cac')
+          .select('cac_empresa_id')
+          .eq('despachante_empresa_id', despachanteEmpresaId)
+          .eq('cac_cpf', cliente.cpf)
+          .eq('status', 'ativo')
+          .maybeSingle();
+
+        if (cancelado || !vinculo?.cac_empresa_id) return;
+
+        // 2. Busca o perfil do cliente no workspace dele
+        const { data: clienteCac } = await supabase
+          .from('clientes')
+          .select('numero_cr, vencimento_cr, numero_cr_ibama, vencimento_cr_ibama, foto_url, cr_url, cr_ibama_url, endereco, contato')
+          .eq('empresa_id', vinculo.cac_empresa_id)
+          .maybeSingle();
+
+        if (cancelado || !clienteCac) return;
+
+        // 3. Compara e monta as atualizações
+        const mudancas: Partial<Cliente> = {};
+        if (clienteCac.numero_cr && clienteCac.numero_cr !== cliente.numeroCr) mudancas.numeroCr = clienteCac.numero_cr;
+        if (clienteCac.vencimento_cr && clienteCac.vencimento_cr !== cliente.vencimentoCr) mudancas.vencimentoCr = clienteCac.vencimento_cr;
+        if (clienteCac.numero_cr_ibama && clienteCac.numero_cr_ibama !== cliente.numeroCrIbama) mudancas.numeroCrIbama = clienteCac.numero_cr_ibama;
+        if (clienteCac.vencimento_cr_ibama && clienteCac.vencimento_cr_ibama !== cliente.vencimentoCrIbama) mudancas.vencimentoCrIbama = clienteCac.vencimento_cr_ibama;
+        if (clienteCac.foto_url && clienteCac.foto_url !== cliente.fotoUrl) mudancas.fotoUrl = clienteCac.foto_url;
+        if (clienteCac.cr_url && clienteCac.cr_url !== cliente.crUrl) mudancas.crUrl = clienteCac.cr_url;
+        if (clienteCac.cr_ibama_url && clienteCac.cr_ibama_url !== cliente.crIbamaUrl) mudancas.crIbamaUrl = clienteCac.cr_ibama_url;
+        if (clienteCac.endereco && clienteCac.endereco !== cliente.endereco) mudancas.endereco = clienteCac.endereco;
+        if (clienteCac.contato && clienteCac.contato !== cliente.contato) mudancas.contato = clienteCac.contato;
+
+        if (Object.keys(mudancas).length > 0) {
+          console.log('Sincronizando dados com o Portal GCAC:', mudancas);
+          await atualizarCliente(cliente.id, mudancas);
+        }
+      } catch (err) {
+        console.error('Erro ao sincronizar dados do cliente:', err);
+      }
+    }
+
+    sincronizarComPortal();
+
+    return () => {
+      cancelado = true;
+    };
+  }, [cliente, usuario, atualizarCliente]);
 
   const handleCopiarSenha = (senha: string) => {
     navigator.clipboard.writeText(senha);
