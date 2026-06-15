@@ -127,6 +127,25 @@ export function GestaoUsuarios({ abaInicial }: GestaoUsuariosProps = {}) {
   const [editDataVencimento, setEditDataVencimento] = useState('');
   const [editValorImplementacao, setEditValorImplementacao] = useState('150.00');
   const [editTaxaSetupPaga, setEditTaxaSetupPaga] = useState(false);
+
+  // Sub-aba para a seção de Pré-Cadastro (Leads)
+  const [subAbaLeads, setSubAbaLeads] = useState<'pendentes' | 'historico'>('pendentes');
+
+  // Estados para o Modal de Liberação/Ativação de Acesso de Lead
+  const [modalAtivacaoAberto, setModalAtivacaoAberto] = useState(false);
+  const [leadSelecionadoAtivacao, setLeadSelecionadoAtivacao] = useState<any | null>(null);
+  const [ativacaoPlano, setAtivacaoPlano] = useState('.22LR');
+  const [ativacaoFrequencia, setAtivacaoFrequencia] = useState('mensal');
+  const [ativacaoIsento, setAtivacaoIsento] = useState(false);
+  const [ativacaoValorAssinatura, setAtivacaoValorAssinatura] = useState('30.00');
+  const [ativacaoValorSetup, setAtivacaoValorSetup] = useState('150.00');
+  const [ativacaoSetupPaga, setAtivacaoSetupPaga] = useState(false);
+  const [ativacaoRegistrarPagamento, setAtivacaoRegistrarPagamento] = useState(true);
+  const [ativacaoValorPagamento, setAtivacaoValorPagamento] = useState('30.00');
+  const [ativacaoMeioPagamento, setAtivacaoMeioPagamento] = useState('PIX');
+  const [ativacaoObservacoesPagamento, setAtivacaoObservacoesPagamento] = useState('');
+  const [ativacaoDataVencimento, setAtivacaoDataVencimento] = useState('');
+  const [ativacaoDataPagamento, setAtivacaoDataPagamento] = useState('');
   
   // Modal State
   const [modalAberto, setModalAberto] = useState(false);
@@ -226,13 +245,24 @@ export function GestaoUsuarios({ abaInicial }: GestaoUsuariosProps = {}) {
     }
   };
 
-  const handleAtivarLead = async (lead: any) => {
+  const handleConfirmarAtivacaoLead = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!leadSelecionadoAtivacao) return;
+    
     setCarregando(true);
     try {
+      const lead = leadSelecionadoAtivacao;
       const isCac = lead.tipo_usuario === 'cac_individual';
       const nomeEmpresa = isCac 
         ? `CAC - ${lead.nome.toUpperCase()}`
         : lead.nome.toUpperCase();
+
+      const valorAssinatura = parseFloat(ativacaoValorAssinatura);
+      const valorSetup = parseFloat(ativacaoValorSetup);
+
+      if (isNaN(valorAssinatura) || isNaN(valorSetup)) {
+        throw new Error('Por favor, informe valores de cobrança válidos.');
+      }
 
       // 1. Criar a empresa/tenant no banco
       const { data: novaEmp, error: errEmp } = await supabase
@@ -240,7 +270,7 @@ export function GestaoUsuarios({ abaInicial }: GestaoUsuariosProps = {}) {
         .insert([{
           nome: nomeEmpresa,
           tipo_conta: lead.tipo_usuario || 'despachante',
-          plano: lead.plano || '.22LR',
+          plano: ativacaoPlano,
           recursos_liberados: isCac 
             ? [
                 'dash_atencao_diaria', 'dash_alertas_vencimento', 'dash_lembretes',
@@ -256,20 +286,15 @@ export function GestaoUsuarios({ abaInicial }: GestaoUsuariosProps = {}) {
               ],
           limite_usuarios_staff: isCac 
             ? 1 
-            : (lead.plano === '.22LR' ? 1 : (lead.plano === '.357mag' ? 4 : 9999)),
+            : (ativacaoPlano === '.22LR' ? 1 : (ativacaoPlano === '.357mag' ? 4 : 9999)),
           limite_cac_vinculados: isCac ? 1 : 20,
           plano_status: 'ativo',
-          frequencia_pagamento: lead.frequencia_pagamento || 'mensal',
-          data_vencimento: new Date(
-            Date.now() + 
-            (lead.frequencia_pagamento === 'anual' 
-              ? 365 
-              : lead.frequencia_pagamento === 'semestral' 
-                ? 180 
-                : 30) * 24 * 60 * 60 * 1000
-          ).toISOString().split('T')[0],
-          taxa_implementacao_paga: false,
-          is_gratis: false // Fica sujeito a cobrança e vencimento por padrão
+          frequencia_pagamento: ativacaoFrequencia,
+          data_vencimento: ativacaoIsento ? null : ativacaoDataVencimento,
+          taxa_implementacao_paga: ativacaoSetupPaga,
+          valor_implementacao: valorSetup,
+          valor_assinatura_personalizado: valorAssinatura,
+          is_gratis: ativacaoIsento
         }])
         .select()
         .single();
@@ -294,7 +319,30 @@ export function GestaoUsuarios({ abaInicial }: GestaoUsuariosProps = {}) {
 
       if (errUser) throw errUser;
 
-      // 3. Atualizar status do lead para 'ativado'
+      // 3. Registrar o pagamento inicial se solicitado e não for isento
+      if (ativacaoRegistrarPagamento && !ativacaoIsento) {
+        const valorPagamento = parseFloat(ativacaoValorPagamento);
+        if (isNaN(valorPagamento) || valorPagamento <= 0) {
+          throw new Error('Por favor, insira um valor de pagamento inicial válido.');
+        }
+
+        const { error: errHist } = await supabase
+          .from('historico_pagamentos_empresa')
+          .insert([{
+            empresa_id: novaEmp.id,
+            valor_pago: valorPagamento,
+            plano: ativacaoPlano,
+            frequencia: ativacaoFrequencia,
+            referencia_vencimento: ativacaoDataVencimento,
+            meio_pagamento: ativacaoMeioPagamento,
+            observacoes: ativacaoObservacoesPagamento || null,
+            data_pagamento: new Date(ativacaoDataPagamento + 'T12:00:00').toISOString()
+          }]);
+
+        if (errHist) throw errHist;
+      }
+
+      // 4. Atualizar status do lead para 'ativado'
       const { error: errLead } = await supabase
         .from('leads_pre_cadastro')
         .update({ status: 'ativado', atualizado_em: new Date().toISOString() })
@@ -302,7 +350,9 @@ export function GestaoUsuarios({ abaInicial }: GestaoUsuariosProps = {}) {
 
       if (errLead) throw errLead;
 
-      mostrar('sucesso', `Cadastro ativado com sucesso! Workspace "${nomeEmpresa}" criada.`);
+      mostrar('sucesso', `Cadastro ativado e acesso liberado com sucesso! Workspace "${nomeEmpresa}" criada.`);
+      setModalAtivacaoAberto(false);
+      setLeadSelecionadoAtivacao(null);
       carregarLeads();
       carregarEmpresas();
       carregarUsuarios();
@@ -369,6 +419,72 @@ export function GestaoUsuarios({ abaInicial }: GestaoUsuariosProps = {}) {
       carregarLeads();
     }
   }, [subPainelAtivo, isMasterAdmin]);
+
+  const calcularProxVencimento = (dataPartida: string, frequencia: string) => {
+    if (!dataPartida) return '';
+    try {
+      const data = new Date(dataPartida + 'T00:00:00');
+      if (frequencia === 'semestral') {
+        data.setMonth(data.getMonth() + 6);
+      } else if (frequencia === 'anual') {
+        data.setFullYear(data.getFullYear() + 1);
+      } else {
+        data.setMonth(data.getMonth() + 1);
+      }
+      return data.toISOString().split('T')[0];
+    } catch (e) {
+      return '';
+    }
+  };
+
+  const abrirModalAtivacao = (lead: any) => {
+    setLeadSelecionadoAtivacao(lead);
+    setAtivacaoPlano(lead.plano || '.22LR');
+    setAtivacaoFrequencia(lead.frequencia_pagamento || 'mensal');
+    setAtivacaoIsento(false);
+    
+    let precoPlano = 30.00;
+    if (lead.plano === '.357mag') precoPlano = 50.00;
+    else if (lead.plano === '.308win') precoPlano = 100.00;
+    
+    setAtivacaoValorAssinatura(precoPlano.toFixed(2));
+    setAtivacaoValorSetup('150.00');
+    setAtivacaoSetupPaga(false);
+    setAtivacaoRegistrarPagamento(true);
+    
+    let mult = 1;
+    if (lead.frequencia_pagamento === 'semestral') mult = 6;
+    else if (lead.frequencia_pagamento === 'anual') mult = 12;
+    setAtivacaoValorPagamento((precoPlano * mult).toFixed(2));
+    
+    setAtivacaoMeioPagamento('PIX');
+    setAtivacaoObservacoesPagamento(`Pagamento inicial de ativação do plano ${lead.plano || '.22LR'}`);
+    
+    const hojeStr = new Date().toISOString().split('T')[0];
+    setAtivacaoDataPagamento(hojeStr);
+    setAtivacaoDataVencimento(calcularProxVencimento(hojeStr, lead.frequencia_pagamento || 'mensal'));
+    
+    setModalAtivacaoAberto(true);
+  };
+
+  useEffect(() => {
+    if (!leadSelecionadoAtivacao) return;
+
+    let precoBase = 30.00;
+    if (ativacaoPlano === '.357mag') precoBase = 50.00;
+    else if (ativacaoPlano === '.308win') precoBase = 100.00;
+
+    setAtivacaoValorAssinatura(precoBase.toFixed(2));
+
+    let mult = 1;
+    if (ativacaoFrequencia === 'semestral') mult = 6;
+    else if (ativacaoFrequencia === 'anual') mult = 12;
+
+    setAtivacaoValorPagamento((precoBase * mult).toFixed(2));
+
+    const prox = calcularProxVencimento(ativacaoDataPagamento, ativacaoFrequencia);
+    setAtivacaoDataVencimento(prox);
+  }, [ativacaoPlano, ativacaoFrequencia, ativacaoDataPagamento, leadSelecionadoAtivacao]);
 
   // Se o master admin atualizou a lista de empresas, sincroniza o estado de empresaGerenciada
   useEffect(() => {
@@ -754,7 +870,8 @@ export function GestaoUsuarios({ abaInicial }: GestaoUsuariosProps = {}) {
         .from('empresas')
         .update({
           data_vencimento: dataVencString,
-          plano_status: 'ativo'
+          plano_status: 'ativo',
+          is_gratis: false
         })
         .eq('id', empresaFaturamentoSelecionada.id);
 
@@ -892,6 +1009,16 @@ export function GestaoUsuarios({ abaInicial }: GestaoUsuariosProps = {}) {
       const despachanteMatch = despachantesNomes.toLowerCase().includes(q);
 
       return !buscaFaturamento.trim() || nomeMatch || userMatch || despachanteMatch;
+    });
+  };
+
+  const obterLeadsExibidos = () => {
+    return leads.filter(lead => {
+      const ehHistorico = lead.status === 'ativado' || lead.status === 'cancelado';
+      if (subAbaLeads === 'historico') {
+        return ehHistorico;
+      }
+      return !ehHistorico;
     });
   };
 
@@ -1999,12 +2126,38 @@ export function GestaoUsuarios({ abaInicial }: GestaoUsuariosProps = {}) {
                 <p className="text-xs text-gray-500 mt-1">Gerencie os novos despachantes e clientes individuais que solicitaram acesso pelo site</p>
               </div>
 
+              {/* Abas secundárias de Leads */}
+              <div className="flex border-b border-brand-dark-5 gap-4 pb-1">
+                <button
+                  type="button"
+                  onClick={() => setSubAbaLeads('pendentes')}
+                  className={`pb-2 text-xs font-bold uppercase tracking-wider transition-all border-b-2 ${
+                    subAbaLeads === 'pendentes' 
+                      ? 'border-brand-blue text-white font-extrabold' 
+                      : 'border-transparent text-gray-400 hover:text-white'
+                  }`}
+                >
+                  Novos / Em Contato ({leads.filter(l => l.status !== 'ativado' && l.status !== 'cancelado').length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSubAbaLeads('historico')}
+                  className={`pb-2 text-xs font-bold uppercase tracking-wider transition-all border-b-2 ${
+                    subAbaLeads === 'historico' 
+                      ? 'border-brand-blue text-white font-extrabold' 
+                      : 'border-transparent text-gray-400 hover:text-white'
+                  }`}
+                >
+                  Histórico ({leads.filter(l => l.status === 'ativado' || l.status === 'cancelado').length})
+                </button>
+              </div>
+
               {carregandoLeads ? (
                 <div className="text-center py-8">
                   <div className="w-6 h-6 border-2 border-brand-blue border-t-transparent rounded-full animate-spin mx-auto" />
                 </div>
-              ) : leads.length === 0 ? (
-                <p className="text-sm text-gray-500 italic py-4">Nenhuma solicitação de pré-cadastro encontrada.</p>
+              ) : obterLeadsExibidos().length === 0 ? (
+                <p className="text-sm text-gray-500 italic py-4">Nenhuma solicitação de pré-cadastro encontrada nesta aba.</p>
               ) : (
                 <div className="overflow-x-auto rounded-2xl border border-brand-dark-5">
                   <table className="w-full text-left border-collapse min-w-[800px]">
@@ -2020,7 +2173,7 @@ export function GestaoUsuarios({ abaInicial }: GestaoUsuariosProps = {}) {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-brand-dark-5">
-                      {leads.map(lead => {
+                      {obterLeadsExibidos().map(lead => {
                         const ehCac = lead.tipo_usuario === 'cac_individual';
                         return (
                           <tr key={lead.id} className="bg-brand-dark-4/40 hover:bg-brand-dark-4 transition-colors">
@@ -2065,8 +2218,9 @@ export function GestaoUsuarios({ abaInicial }: GestaoUsuariosProps = {}) {
                               <div className="flex items-center justify-end gap-1.5">
                                 {lead.status !== 'ativado' && (
                                   <button
-                                    onClick={() => handleAtivarLead(lead)}
-                                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-brand-green hover:bg-brand-green-light text-black text-[10px] font-black uppercase tracking-wider transition-colors shadow-md"
+                                    onClick={() => abrirModalAtivacao(lead)}
+                                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-brand-green hover:bg-brand-green-light text-black text-[10px] font-black uppercase tracking-wider transition-colors shadow-md animate-pulse"
+                                    title="Configurar liberação comercial e ativar acesso"
                                   >
                                     <CheckCircle size={12} />
                                     Ativar
@@ -2801,6 +2955,240 @@ export function GestaoUsuarios({ abaInicial }: GestaoUsuariosProps = {}) {
           </div>
         );
       })()}
+
+      {/* Modal de Liberação de Acesso / Ativação de Lead */}
+      {modalAtivacaoAberto && leadSelecionadoAtivacao && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm">
+          <div className="bg-brand-dark-3 border border-brand-dark-5 rounded-2xl w-full max-w-xl overflow-hidden shadow-2xl animate-scale-in">
+            <div className="bg-brand-dark-2 px-6 py-4 border-b border-brand-dark-5 flex items-center justify-between">
+              <h3 className="font-bold text-white flex items-center gap-2 text-base">
+                <Shield size={18} className="text-brand-blue" />
+                Liberação de Acesso: {leadSelecionadoAtivacao.nome}
+              </h3>
+              <button
+                onClick={() => {
+                  setModalAtivacaoAberto(false);
+                  setLeadSelecionadoAtivacao(null);
+                }}
+                className="text-gray-500 hover:text-white"
+              >
+                <XCircle size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleConfirmarAtivacaoLead} className="p-6 space-y-5 max-h-[80vh] overflow-y-auto custom-scrollbar">
+              
+              {/* 1. Resumo do Pré-Cadastro */}
+              <div className="bg-brand-dark-4 p-4 rounded-xl border border-brand-dark-5/60 space-y-2 text-xs">
+                <span className="text-[9px] text-gray-500 font-bold uppercase tracking-wider block border-b border-brand-dark-5 pb-1">Resumo da Solicitação</span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-gray-300">
+                  <div><span className="text-gray-500">Perfil:</span> <span className="font-bold text-white">{leadSelecionadoAtivacao.tipo_usuario === 'cac_individual' ? 'CAC Individual' : 'Despachante'}</span></div>
+                  <div><span className="text-gray-500">Data Solicitação:</span> <span className="font-bold text-white">{leadSelecionadoAtivacao.criado_em ? new Date(leadSelecionadoAtivacao.criado_em).toLocaleString('pt-BR') : '—'}</span></div>
+                  <div><span className="text-gray-500">Email:</span> <span className="font-bold text-white">{leadSelecionadoAtivacao.email}</span></div>
+                  <div><span className="text-gray-500">CPF:</span> <span className="font-bold text-white font-mono">{leadSelecionadoAtivacao.cpf ? formatarCpfExibicao(leadSelecionadoAtivacao.cpf) : '—'}</span></div>
+                </div>
+              </div>
+
+              {/* 2. Configurações Comerciais */}
+              <div className="space-y-3">
+                <h4 className="text-xs font-bold text-brand-blue-light uppercase tracking-wider border-b border-brand-dark-5 pb-1">
+                  Configurações Comerciais de Cobrança
+                </h4>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  {/* Plano */}
+                  <div className="space-y-1">
+                    <label className="text-gray-500 font-bold uppercase text-[9px] block">Plano Contratado</label>
+                    <select
+                      value={ativacaoPlano}
+                      onChange={e => setAtivacaoPlano(e.target.value)}
+                      className="input py-1.5 text-xs bg-brand-dark-3 w-full border-brand-dark-5"
+                    >
+                      <option value=".22LR">.22LR (R$ 30,00/mês)</option>
+                      <option value=".357mag">.357mag (R$ 50,00/mês)</option>
+                      <option value=".308win">.308win (R$ 100,00/mês)</option>
+                    </select>
+                  </div>
+
+                  {/* Frequência */}
+                  <div className="space-y-1">
+                    <label className="text-gray-500 font-bold uppercase text-[9px] block">Frequência</label>
+                    <select
+                      value={ativacaoFrequencia}
+                      onChange={e => setAtivacaoFrequencia(e.target.value)}
+                      className="input py-1.5 text-xs bg-brand-dark-3 w-full border-brand-dark-5"
+                    >
+                      <option value="mensal">Mensal</option>
+                      <option value="semestral">Semestral</option>
+                      <option value="anual">Anual</option>
+                    </select>
+                  </div>
+
+                  {/* Isenção */}
+                  <div className="col-span-1 sm:col-span-2 pt-1">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="ativacaoIsento"
+                        checked={ativacaoIsento}
+                        onChange={e => setAtivacaoIsento(e.target.checked)}
+                        className="rounded bg-brand-dark-3 border-brand-dark-5 text-brand-blue focus:ring-0"
+                      />
+                      <label htmlFor="ativacaoIsento" className="text-white font-bold cursor-pointer select-none text-[11px]">
+                        Isento de mensalidade (Conta Grátis / Parceria)
+                      </label>
+                    </div>
+                  </div>
+
+                  {/* Valor Assinatura (se não for isento) */}
+                  {!ativacaoIsento && (
+                    <div className="space-y-1">
+                      <label className="text-gray-500 font-bold uppercase text-[9px] block">Valor da Mensalidade (R$)</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={ativacaoValorAssinatura}
+                        onChange={e => setAtivacaoValorAssinatura(e.target.value)}
+                        className="input py-1.5 text-xs bg-brand-dark-3 w-full border-brand-dark-5 font-mono"
+                      />
+                    </div>
+                  )}
+
+                  {/* Vencimento (se não for isento) */}
+                  {!ativacaoIsento && (
+                    <div className="space-y-1">
+                      <label className="text-gray-500 font-bold uppercase text-[9px] block">Data do Próximo Vencimento</label>
+                      <input
+                        type="date"
+                        value={ativacaoDataVencimento}
+                        onChange={e => setAtivacaoDataVencimento(e.target.value)}
+                        className="input py-1.5 text-xs bg-brand-dark-3 w-full border-brand-dark-5 font-mono"
+                      />
+                    </div>
+                  )}
+
+                  {/* Taxa de Setup */}
+                  <div className="space-y-1">
+                    <label className="text-gray-500 font-bold uppercase text-[9px] block">Taxa de Setup/Implementação (R$)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={ativacaoValorSetup}
+                      onChange={e => setAtivacaoValorSetup(e.target.value)}
+                      className="input py-1.5 text-xs bg-brand-dark-3 w-full border-brand-dark-5 font-mono"
+                    />
+                  </div>
+
+                  <div className="flex items-end pb-2">
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="checkbox"
+                        id="ativacaoSetupPaga"
+                        checked={ativacaoSetupPaga}
+                        onChange={e => setAtivacaoSetupPaga(e.target.checked)}
+                        className="rounded bg-brand-dark-3 border-brand-dark-5 text-brand-blue focus:ring-0"
+                      />
+                      <label htmlFor="ativacaoSetupPaga" className="text-white cursor-pointer select-none text-[11px]">
+                        Taxa de Setup paga?
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 3. Pagamento de Ativação (se não for isento) */}
+              {!ativacaoIsento && (
+                <div className="space-y-3 border-t border-brand-dark-5/50 pt-3">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="ativacaoRegistrarPagamento"
+                      checked={ativacaoRegistrarPagamento}
+                      onChange={e => setAtivacaoRegistrarPagamento(e.target.checked)}
+                      className="rounded bg-brand-dark-3 border-brand-dark-5 text-brand-blue focus:ring-0"
+                    />
+                    <label htmlFor="ativacaoRegistrarPagamento" className="text-white font-bold cursor-pointer select-none text-[11px] flex items-center gap-1">
+                      <BadgeDollarSign size={14} className="text-brand-green" />
+                      Registrar Pagamento Inicial Imediato?
+                    </label>
+                  </div>
+
+                  {ativacaoRegistrarPagamento && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs bg-brand-dark-4 p-4 rounded-xl border border-brand-dark-5 animate-fade-in">
+                      <div className="space-y-1">
+                        <label className="text-gray-500 font-bold uppercase text-[9px] block">Valor Pago (R$)</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={ativacaoValorPagamento}
+                          onChange={e => setAtivacaoValorPagamento(e.target.value)}
+                          className="input py-1.5 text-xs bg-brand-dark-3 w-full border-brand-dark-5 font-mono"
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-gray-500 font-bold uppercase text-[9px] block">Forma de Pagamento</label>
+                        <select
+                          value={ativacaoMeioPagamento}
+                          onChange={e => setAtivacaoMeioPagamento(e.target.value)}
+                          className="input py-1.5 text-xs bg-brand-dark-3 w-full border-brand-dark-5"
+                        >
+                          <option value="PIX">PIX / Transferência</option>
+                          <option value="CARTÃO">Cartão de Crédito</option>
+                          <option value="BOLETO">Boleto Bancário</option>
+                          <option value="DINHEIRO">Dinheiro</option>
+                        </select>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-gray-500 font-bold uppercase text-[9px] block">Data do Pagamento</label>
+                        <input
+                          type="date"
+                          value={ativacaoDataPagamento}
+                          onChange={e => setAtivacaoDataPagamento(e.target.value)}
+                          className="input py-1.5 text-xs bg-brand-dark-3 w-full border-brand-dark-5 font-mono"
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-gray-500 font-bold uppercase text-[9px] block">Referência / Observações</label>
+                        <input
+                          type="text"
+                          value={ativacaoObservacoesPagamento}
+                          onChange={e => setAtivacaoObservacoesPagamento(e.target.value)}
+                          className="input py-1.5 text-xs bg-brand-dark-3 w-full border-brand-dark-5"
+                          placeholder="Ex: Assinatura plano inicial"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="bg-brand-dark-2 px-6 py-4 -mx-6 -mb-6 border-t border-brand-dark-5 flex justify-end gap-2 text-right">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setModalAtivacaoAberto(false);
+                    setLeadSelecionadoAtivacao(null);
+                  }}
+                  className="btn-ghost py-2 px-4 text-xs font-bold uppercase tracking-wider"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={carregando}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-brand-green text-black hover:bg-brand-green/80 text-xs font-black uppercase tracking-wider transition-colors shadow-md"
+                >
+                  <CheckCircle size={14} />
+                  Confirmar Ativação
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Modal de Editar Empresa */}
       {empresaEditando && (
