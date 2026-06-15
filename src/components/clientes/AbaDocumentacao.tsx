@@ -13,7 +13,7 @@ import { fileToBase64, visualizarDocumentoBase64 } from '../../utils/fileUtils';
 import { useAuth } from '../../context/AuthContext';
 import { buscarAcervoVinculado } from '../../services/vinculosService';
 
-const TIPOS_ARMA = ['Pistola', 'Revólver', 'Carabina / Fuzil', 'Espingarda', 'Rifle'];
+const TIPOS_ARMA = ['Pistola', 'Revólver', 'Carabina / Fuzil', 'Espingarda'];
 const CALIBRES = [
   '.22 LR', '.223 REM / 5.56 NATO', '.30-06 SPRG', '.308 WIN / 7.62 NATO', 
   '.357 MAG', '.38 SPL', '.380 ACP', '9mm Luger', '.40 S&W', '.44 MAG', 
@@ -634,16 +634,23 @@ export function ModalArma({ armaParaEditar, onFechar, onSalvar }: { armaParaEdit
         <div className="flex-1 overflow-y-auto pr-1 space-y-4 scrollbar-thin scrollbar-thumb-slate-800">
           <div>
             <label className="label">Tipo de Arma</label>
-            <input 
-              list="tipos-arma"
-              className="input uppercase" 
+            <select
+              className="input uppercase font-bold" 
               value={form.tipo} 
-              onChange={e => setForm({...form, tipo: e.target.value})} 
-              placeholder="Selecione ou digite..."
-            />
-            <datalist id="tipos-arma">
-              {TIPOS_ARMA.map(t => <option key={t} value={t} />)}
-            </datalist>
+              onChange={e => setForm({...form, tipo: e.target.value})}
+            >
+              <option value="" disabled>SELECIONE...</option>
+              {TIPOS_ARMA.map(t => (
+                <option key={t} value={t} className="bg-brand-dark-4 text-white">
+                  {t.toUpperCase()}
+                </option>
+              ))}
+              {form.tipo && !TIPOS_ARMA.includes(form.tipo) && (
+                <option value={form.tipo} className="bg-brand-dark-4 text-white">
+                  {form.tipo.toUpperCase()}
+                </option>
+              )}
+            </select>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
