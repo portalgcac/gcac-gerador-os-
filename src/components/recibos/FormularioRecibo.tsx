@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   Save, X, Receipt, CheckCircle, ChevronDown, List, 
-  Trash2, User, FileText, Search, CreditCard 
+  Trash2, User, FileText, Search, CreditCard, AlertTriangle
 } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { useRecibos } from '../../context/RecibosContext';
@@ -42,6 +42,11 @@ export function FormularioRecibo() {
     formaPagamento: 'PIX' as FormaPagamento,
     observacoes: ''
   });
+
+  const clienteEncontrado = clientes.find(c => 
+    (c.cpf && form.clienteCPF && c.cpf.replace(/\D/g, '') === form.clienteCPF.replace(/\D/g, '')) ||
+    (c.nome && form.clienteNome && c.nome.trim().toUpperCase() === form.clienteNome.trim().toUpperCase())
+  );
 
   // Preenchimento automático vindo do perfil do cliente
   useEffect(() => {
@@ -194,6 +199,21 @@ export function FormularioRecibo() {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
+
+        {clienteEncontrado?.acordoComercial && (
+          <div className="card bg-amber-500/10 border-amber-500/30 p-4 rounded-xl flex gap-3 items-start animate-pulse-subtle">
+            <div className="p-2 bg-amber-500/20 text-amber-500 rounded-lg shrink-0 mt-0.5">
+              <AlertTriangle size={18} />
+            </div>
+            <div>
+              <h4 className="text-xs font-black uppercase text-amber-400 tracking-wider">Combinado Comercial Ativo</h4>
+              <p className="text-sm text-amber-100/90 font-bold mt-1 whitespace-pre-wrap leading-relaxed">
+                {clienteEncontrado.acordoComercial}
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Dados do Cliente */}
         <div className="card">
           <h3 className="text-base font-bold text-white mb-4 flex items-center gap-2">

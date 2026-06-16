@@ -53,6 +53,7 @@ const mapFromDB = (row: any): Cliente => ({
   filiadoProTiro: row.filiado_pro_tiro,
   clubeFiliado: row.clube_filiado || '',
   observacoes: row.observacoes || '',
+  acordoComercial: row.acordo_comercial || '',
   endereco: row.endereco || '',
   numeroCr: row.numero_cr || '',
   vencimentoCr: row.vencimento_cr || '',
@@ -75,6 +76,7 @@ const mapToDB = (dados: any) => {
   if (dados.filiadoProTiro !== undefined) payload.filiado_pro_tiro = dados.filiadoProTiro;
   if (dados.clubeFiliado !== undefined) payload.clube_filiado = dados.clubeFiliado;
   if (dados.observacoes !== undefined) payload.observacoes = dados.observacoes;
+  if (dados.acordoComercial !== undefined) payload.acordo_comercial = dados.acordoComercial;
   if (dados.endereco !== undefined) payload.endereco = dados.endereco;
   if (dados.numeroCr !== undefined) payload.numero_cr = dados.numeroCr;
   if (dados.vencimentoCr !== undefined) payload.vencimento_cr = dados.vencimentoCr || null;

@@ -35,6 +35,7 @@ export function FormularioCliente({ clienteEditando, onFechar }: Props) {
       ? (clienteEditando.filiadoProTiro ? (clubeParceiroNome || 'CLUBE DE TIRO E CAÇA PRÓ TIRO') : (clienteEditando.clubeFiliado ?? ''))
       : (temClubeParceiro ? clubeParceiroNome : ''),
     observacoes: clienteEditando?.observacoes ?? '',
+    acordoComercial: clienteEditando?.acordoComercial ?? '',
     endereco: clienteEditando?.endereco ?? '',
     numeroCr: clienteEditando?.numeroCr ?? '',
     vencimentoCr: clienteEditando?.vencimentoCr ?? '',
@@ -93,6 +94,7 @@ export function FormularioCliente({ clienteEditando, onFechar }: Props) {
         filiadoProTiro: form.filiadoProTiro,
         clubeFiliado: form.filiadoProTiro ? '' : form.clubeFiliado.trim().toUpperCase(),
         observacoes: form.observacoes.trim(),
+        acordoComercial: form.acordoComercial.trim(),
         endereco: form.endereco.trim().toUpperCase(),
         numeroCr: form.numeroCr.trim().toUpperCase(),
         vencimentoCr: form.vencimentoCr,
@@ -304,6 +306,16 @@ export function FormularioCliente({ clienteEditando, onFechar }: Props) {
               placeholder="Rua, número, bairro, CEP, cidade-UF..."
               value={form.endereco}
               onChange={e => atualizar('endereco', e.target.value)}
+            />
+          </div>
+          
+          <div>
+            <label className="label">Acordo Comercial / Combinados Financeiros</label>
+            <textarea 
+              className="input min-h-[80px] py-3 resize-none border-amber-500/30 focus:border-amber-500"
+              placeholder="Ex: Não cobrar por Autorização de Manejo, apenas por guias e taxas..."
+              value={form.acordoComercial}
+              onChange={e => atualizar('acordoComercial', e.target.value)}
             />
           </div>
           

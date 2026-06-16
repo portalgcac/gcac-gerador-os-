@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   User, Mail, Phone, MapPin, Shield, Copy, Check, 
   FileText, Receipt, Clock, Calendar, Plus, 
-  ArrowLeft, ChevronRight, ExternalLink, MessageCircle, Trash2, Pencil
+  ArrowLeft, ChevronRight, ExternalLink, MessageCircle, Trash2, Pencil, AlertTriangle
 } from 'lucide-react';
 import { ModalEscolhaWhatsApp } from '../common/ModalEscolhaWhatsApp';
 import { FormularioCliente } from './FormularioCliente';
@@ -447,6 +447,18 @@ export function DetalheCliente({ cliente }: DetalheClienteProps) {
               )}
               </div>
             </div>
+
+            {cliente.acordoComercial && (
+              <div className="card bg-amber-500/5 border-amber-500/20 shadow-amber-500/5 shadow-md">
+                <div className="flex items-center gap-2 mb-3">
+                  <AlertTriangle size={16} className="text-amber-500" />
+                  <p className="text-xs text-amber-400 font-black uppercase tracking-wider">Acordo Comercial / Combinado Financeiro</p>
+                </div>
+                <p className="text-sm text-amber-200/90 font-medium whitespace-pre-wrap leading-relaxed">
+                  {cliente.acordoComercial}
+                </p>
+              </div>
+            )}
 
             {cliente.observacoes && (
               <div className="card bg-brand-dark-3/50 border-brand-dark-5">

@@ -61,6 +61,7 @@ export interface Cliente {
   filiadoProTiro: boolean;
   clubeFiliado: string;
   observacoes: string;
+  acordoComercial?: string;
   endereco: string;
   numeroCr?: string;
   vencimentoCr?: string;

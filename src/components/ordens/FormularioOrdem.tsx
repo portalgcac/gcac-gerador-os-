@@ -2,7 +2,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Save, X, Eye, EyeOff, MessageCircle, Users, Phone, Search,
-  Mail, HelpCircle, CheckCircle, ChevronDown, List, Trash2, DollarSign
+  Mail, HelpCircle, CheckCircle, ChevronDown, List, Trash2, DollarSign,
+  AlertTriangle
 } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import {
@@ -199,6 +200,11 @@ export function FormularioOrdem({ ordemExistente }: FormularioOrdemProps) {
     valorPago:         ordemExistente?.valorPago ?? 0,
     historicoPagamentos: ordemExistente?.historicoPagamentos ?? [] as PagamentoItem[],
   });
+
+  const clienteEncontrado = clientes.find(c => 
+    (c.cpf && form.cpf && c.cpf.replace(/\D/g, '') === form.cpf.replace(/\D/g, '')) ||
+    (c.nome && form.nomeCliente && c.nome.trim().toUpperCase() === form.nomeCliente.trim().toUpperCase())
+  );
 
   // Preenchimento automático vindo do perfil do cliente
   useEffect(() => {
@@ -490,6 +496,20 @@ export function FormularioOrdem({ ordemExistente }: FormularioOrdemProps) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6 max-w-2xl mx-auto">
+
+      {clienteEncontrado?.acordoComercial && (
+        <div className="card bg-amber-500/10 border-amber-500/30 p-4 rounded-xl flex gap-3 items-start animate-pulse-subtle">
+          <div className="p-2 bg-amber-500/20 text-amber-500 rounded-lg shrink-0 mt-0.5">
+            <AlertTriangle size={18} />
+          </div>
+          <div>
+            <h4 className="text-xs font-black uppercase text-amber-400 tracking-wider">Combinado Comercial Ativo</h4>
+            <p className="text-sm text-amber-100/90 font-bold mt-1 whitespace-pre-wrap leading-relaxed">
+              {clienteEncontrado.acordoComercial}
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* ── 1. Dados do Cliente ── */}
       <div className="card">
