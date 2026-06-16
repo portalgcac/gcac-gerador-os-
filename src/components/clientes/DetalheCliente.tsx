@@ -46,6 +46,7 @@ export function DetalheCliente({ cliente }: DetalheClienteProps) {
   const [modalWhatsAppAberto, setModalWhatsAppAberto] = useState(false);
   const [mostrarTodasOrdens, setMostrarTodasOrdens] = useState(false);
   const [cacEmpresaId, setCacEmpresaId] = useState<string | undefined>(undefined);
+  const [podeEditarVinculo, setPodeEditarVinculo] = useState<boolean>(false);
 
   // Filtros de histórico
   const todasOrdensCliente = ordens.filter(o => o.cpf === cliente.cpf);
@@ -93,7 +94,7 @@ export function DetalheCliente({ cliente }: DetalheClienteProps) {
         // 1. Busca vínculo ativo para esse cliente
         const { data: vinculo } = await supabase
           .from('vinculos_despachante_cac')
-          .select('cac_empresa_id')
+          .select('cac_empresa_id, permite_edicao')
           .eq('despachante_empresa_id', despachanteEmpresaId)
           .or(`cac_cpf.eq.${cpfLimpo},cac_cpf.eq.${cpfFormatado}`)
           .eq('status', 'ativo')
@@ -103,10 +104,12 @@ export function DetalheCliente({ cliente }: DetalheClienteProps) {
 
         if (!vinculo?.cac_empresa_id) {
           setCacEmpresaId(undefined);
+          setPodeEditarVinculo(false);
           return;
         }
 
         setCacEmpresaId(vinculo.cac_empresa_id);
+        setPodeEditarVinculo(!!vinculo.permite_edicao);
 
         // 2. Busca o perfil do cliente no workspace dele
         const { data: clienteCac } = await supabase
@@ -583,6 +586,7 @@ export function DetalheCliente({ cliente }: DetalheClienteProps) {
                   cliente={cliente} 
                   armaIdInicial={(location.state as any)?.armaId}
                   cacEmpresaId={cacEmpresaId}
+                  podeEditarVinculo={podeEditarVinculo}
                 />
               )}
               {abaAtiva === 'creditos' && (

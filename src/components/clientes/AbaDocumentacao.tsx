@@ -75,9 +75,10 @@ interface Props {
   cliente: Cliente;
   armaIdInicial?: string;
   cacEmpresaId?: string;
+  podeEditarVinculo?: boolean;
 }
 
-export function AbaDocumentacao({ cliente, armaIdInicial, cacEmpresaId }: Props) {
+export function AbaDocumentacao({ cliente, armaIdInicial, cacEmpresaId, podeEditarVinculo }: Props) {
   const { usuario } = useAuth();
   const { 
     buscarArmas, salvarArma, deletarArma,
@@ -85,7 +86,7 @@ export function AbaDocumentacao({ cliente, armaIdInicial, cacEmpresaId }: Props)
     buscarManejos, salvarManejo, deletarManejo
   } = useClientes();
 
-  const podeEditar = !cacEmpresaId;
+  const podeEditar = !cacEmpresaId || podeEditarVinculo;
 
   const [armas, setArmas] = useState<Arma[]>([]);
   const [manejos, setManejos] = useState<AutorizacaoManejo[]>([]);
@@ -487,7 +488,7 @@ export function AbaDocumentacao({ cliente, armaIdInicial, cacEmpresaId }: Props)
                 numeroSigma: d.numeroSigma?.trim().toUpperCase(),
                 clienteId: cliente.id
               };
-              await salvarArma(armaFormatada);
+              await salvarArma(armaFormatada, cacEmpresaId);
               await carregarDados();
               setModalArma(false);
             } catch (err: any) {
@@ -509,7 +510,7 @@ export function AbaDocumentacao({ cliente, armaIdInicial, cacEmpresaId }: Props)
               ...d, 
               destino: d.destino?.trim().toUpperCase(),
               armaId: modalGt.armaId 
-            })
+            }, cacEmpresaId)
               .then(() => { 
                 carregarDados(); 
                 setModalGt(null); 
@@ -537,7 +538,7 @@ export function AbaDocumentacao({ cliente, armaIdInicial, cacEmpresaId }: Props)
             cidade: d.cidade?.trim().toUpperCase(),
             clienteId: cliente.id,
             id: manejoParaEditar?.id
-          })
+          }, cacEmpresaId)
             .then(() => { 
               carregarDados(); 
               setModalManejo(false);
