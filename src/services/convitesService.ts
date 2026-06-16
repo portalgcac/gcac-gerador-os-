@@ -190,9 +190,9 @@ export async function aceitarConvite(
         status: 'ativo',
         mensagem_solicitacao: `Convite aceito via link de convite em ${new Date().toLocaleDateString('pt-BR')}`,
         respondido_em: new Date().toISOString(),
-        permite_edicao: false,
-        termo_aceito_texto: `Aceito via link de convite do Portal G CAC em ${new Date().toLocaleString('pt-BR')}`,
-        autorizado_edicao_em: null,
+        permite_edicao: true,
+        termo_aceito_texto: `Aceito via link de convite do Portal G CAC em ${new Date().toLocaleString('pt-BR')}. Autorizo este despachante a gerenciar, atualizar e editar os dados do meu acervo.`,
+        autorizado_edicao_em: new Date().toISOString(),
       }])
       .select('id')
       .single();
