@@ -355,6 +355,30 @@ export function Configuracoes() {
     }
   };
 
+  const handleTogglePermissaoEdicao = async (vinculoId: string, permitir: boolean) => {
+    try {
+      const termoTexto = permitir 
+        ? 'Estou ciente e autorizo este despachante a gerenciar, atualizar e editar os dados do meu acervo.' 
+        : null;
+      
+      const { error } = await supabase
+        .from('vinculos_despachante_cac')
+        .update({ 
+          permite_edicao: permitir,
+          autorizado_edicao_em: permitir ? new Date().toISOString() : null,
+          termo_aceito_texto: termoTexto
+        })
+        .eq('id', vinculoId);
+
+      if (error) throw error;
+      mostrar('sucesso', permitir ? 'Permissão de edição concedida!' : 'Permissão de edição removida.');
+      carregarVinculosCac();
+    } catch (err: any) {
+      console.error(err);
+      mostrar('erro', 'Erro ao alterar permissão de edição.');
+    }
+  };
+
   const salvarConfiguracoesCac = (chave: string, valor: string) => {
     localStorage.setItem(chave, valor);
     mostrar('sucesso', 'Configuração de prazo atualizada!');
@@ -946,17 +970,28 @@ export function Configuracoes() {
           ) : (
             <div className="space-y-2">
               {vinculosCac.map(v => (
-                <div key={v.id} className="flex items-center justify-between bg-brand-dark-4 border border-brand-dark-5 rounded-xl p-3">
+                <div key={v.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-brand-dark-4 border border-brand-dark-5 rounded-xl p-4">
                   <div className="min-w-0">
                     <p className="text-xs font-bold text-white truncate">{v.despachante_nome}</p>
                     <p className="text-[10px] text-gray-500">Autorizado em {formatarData(v.respondido_em || v.solicitado_em)}</p>
                   </div>
-                  <button
-                    onClick={() => handleRevogarVinculoCac(v.id, v.despachante_nome)}
-                    className="btn-ghost py-1 px-2.5 text-[10px] border border-red-500/20 hover:border-red-500/40 text-red-400 font-bold hover:bg-red-500/10 flex items-center gap-1"
-                  >
-                    <Unlink size={10} /> Revogar
-                  </button>
+                  <div className="flex items-center gap-4 shrink-0 justify-between sm:justify-end">
+                    <label className="flex items-center gap-2 cursor-pointer select-none">
+                      <input 
+                        type="checkbox" 
+                        checked={!!v.permite_edicao} 
+                        onChange={(e) => handleTogglePermissaoEdicao(v.id, e.target.checked)}
+                        className="rounded border-brand-dark-5 text-brand-blue bg-brand-dark-3 focus:ring-0 w-3.5 h-3.5"
+                      />
+                      <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Permitir Edição</span>
+                    </label>
+                    <button
+                      onClick={() => handleRevogarVinculoCac(v.id, v.despachante_nome)}
+                      className="btn-ghost py-1 px-2.5 text-[10px] border border-red-500/20 hover:border-red-500/40 text-red-400 font-bold hover:bg-red-500/10 flex items-center gap-1"
+                    >
+                      <Unlink size={10} /> Revogar
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
