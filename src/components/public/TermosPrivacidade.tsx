@@ -17,11 +17,11 @@ export function TermosUso() {
 
         {/* Branding Logo Header */}
         <div className="text-center mt-6 mb-8 flex flex-col items-center">
-          <div className="relative w-36 h-36 rounded-full overflow-hidden border border-slate-800/80 shadow-[0_0_15px_rgba(27,111,191,0.2)] bg-black/20 mb-3 flex items-center justify-center">
+          <div className="relative w-48 h-48 rounded-full overflow-hidden border border-slate-800/80 shadow-[0_0_15px_rgba(27,111,191,0.2)] bg-brand-dark mb-3 flex items-center justify-center">
             <img 
               src="/usar no site/1.jpg" 
               alt="Portal GCAC Logo" 
-              className="w-full h-full object-cover rounded-full"
+              className="w-full h-full object-contain p-2"
               onError={(e) => { e.currentTarget.style.display = 'none'; }}
             />
             {/* Vignete de suavização de borda */}
@@ -134,11 +134,11 @@ export function PoliticaPrivacidade() {
 
         {/* Branding Logo Header */}
         <div className="text-center mt-6 mb-8 flex flex-col items-center">
-          <div className="relative w-36 h-36 rounded-full overflow-hidden border border-slate-800/80 shadow-[0_0_15px_rgba(27,111,191,0.2)] bg-black/20 mb-3 flex items-center justify-center">
+          <div className="relative w-48 h-48 rounded-full overflow-hidden border border-slate-800/80 shadow-[0_0_15px_rgba(27,111,191,0.2)] bg-brand-dark mb-3 flex items-center justify-center">
             <img 
               src="/usar no site/1.jpg" 
               alt="Portal GCAC Logo" 
-              className="w-full h-full object-cover rounded-full"
+              className="w-full h-full object-contain p-2"
               onError={(e) => { e.currentTarget.style.display = 'none'; }}
             />
             {/* Vignete de suavização de borda */}

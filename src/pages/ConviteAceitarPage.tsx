@@ -501,11 +501,11 @@ export function ConviteAceitarPage() {
       <div className="w-full max-w-sm animate-slide-up space-y-6">
         {/* Logo */}
         <div className="text-center">
-          <div className="relative w-40 h-40 rounded-full overflow-hidden border border-brand-dark-5/40 shadow-glow-blue bg-black/20 mx-auto flex items-center justify-center">
+          <div className="relative w-56 h-56 rounded-full overflow-hidden border border-brand-dark-5/40 shadow-glow-blue bg-brand-dark mx-auto flex items-center justify-center">
             <img
               src="/usar no site/1.jpg"
               alt="GCAC Logo"
-              className="w-full h-full object-cover rounded-full"
+              className="w-full h-full object-contain p-2"
               onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
             />
             {/* Vignete de suavização de borda */}
