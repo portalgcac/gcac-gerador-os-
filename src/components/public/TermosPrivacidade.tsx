@@ -20,7 +20,7 @@ export function TermosUso() {
           <img 
             src="/usar no site/1.jpg" 
             alt="Portal GCAC Logo" 
-            className="w-28 h-28 object-contain mb-3 drop-shadow-2xl"
+            className="w-48 h-48 object-contain mb-3 drop-shadow-2xl"
             onError={(e) => { e.currentTarget.style.display = 'none'; }}
           />
           <h1 className="text-2xl font-bold text-white tracking-wide">Portal GCAC</h1>
@@ -133,7 +133,7 @@ export function PoliticaPrivacidade() {
           <img 
             src="/usar no site/1.jpg" 
             alt="Portal GCAC Logo" 
-            className="w-28 h-28 object-contain mb-3 drop-shadow-2xl"
+            className="w-48 h-48 object-contain mb-3 drop-shadow-2xl"
             onError={(e) => { e.currentTarget.style.display = 'none'; }}
           />
           <h1 className="text-2xl font-bold text-white tracking-wide">Portal GCAC</h1>

@@ -139,7 +139,7 @@ export function PaginaLogin() {
               <img
                 src="/usar no site/1.jpg"
                 alt="GCAC Logo"
-                className="w-32 h-32 sm:w-36 sm:h-36 object-contain drop-shadow-2xl"
+                className="w-56 h-56 sm:w-64 sm:h-64 object-contain drop-shadow-2xl"
                 onError={(e) => {
                   (e.target as HTMLImageElement).style.display = 'none';
                 }}
