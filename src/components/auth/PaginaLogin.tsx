@@ -8,57 +8,57 @@ import { useStatusConexao } from '../../hooks/useStatusConexao';
 const SLIDES = [
   {
     image: '/usar no site/1.png',
-    badge: 'APLICATIVO',
+    badge: 'LOGO OFICIAL',
     title: 'Portal G CAC',
-    description: 'O sistema mais completo e integrado para gestão de atiradores (CAC) e despachantes bélicos. Controle total de sua operação com segurança.'
+    description: 'A marca oficial do Portal G CAC, a plataforma de gestão inteligente e controle de documentos integrada para atiradores e despachantes.'
   },
   {
     image: '/usar no site/2.png',
-    badge: 'DASHBOARD',
-    title: 'Painel de Controle Inteligente',
-    description: 'Acompanhe atendimentos, prazos de vencimentos, alertas operacionais e indicadores de desempenho do seu negócio em tempo real.'
+    badge: 'PERFIL DO CLIENTE',
+    title: 'Informações Pessoais',
+    description: 'Painel de perfil do cliente, onde o usuário registra e cadastra de forma organizada todas as suas informações pessoais.'
   },
   {
     image: '/usar no site/3.png',
-    badge: 'ORDENS DE SERVIÇO',
-    title: 'Emissão Rápida de OS',
-    description: 'Crie, edite e acompanhe ordens de serviço com controle rígido de status, histórico completo e automatização de etapas.'
+    badge: 'ACERVO E MANEJO',
+    title: 'Cadastro Sem Limites',
+    description: 'Painel para cadastro de suas armas, guias de tráfego e autorizações de manejo do Ibama, sem limites de cadastro de itens.'
   },
   {
     image: '/usar no site/4.png',
-    badge: 'CLIENTES CAC',
-    title: 'Cadastro Detalhado de Atiradores',
-    description: 'Gerencie fichas cadastrais com dados pessoais, acervo de armas, números de CR, validades de CRAF, GT e muito mais.'
+    badge: 'PAINEL DE ALERTAS',
+    title: 'Controle de Vencimentos',
+    description: 'Painel centralizado de alertas, onde aparecem de forma clara todos os avisos de vencimento dos seus documentos cadastrados.'
   },
   {
     image: '/usar no site/5.png',
-    badge: 'ORÇAMENTOS',
-    title: 'Emissão de Propostas & Recibos',
-    description: 'Gere propostas comerciais e emita recibos de pagamento em segundos. Imprima ou salve em PDF para enviar diretamente ao cliente.'
+    badge: 'NOTIFICAÇÕES MOBILE',
+    title: 'Alertas Direto no Celular',
+    description: 'Exemplo da notificação automática que você receberá na tela do seu celular quando algum documento estiver se aproximando do vencimento.'
   },
   {
     image: '/usar no site/6.png',
-    badge: 'AGENDAMENTOS',
-    title: 'Controle de Prazos e Lembretes',
-    description: 'Evite multas e atrasos. O sistema monitora automaticamente datas importantes de vencimento de documentos e avisa sua equipe.'
+    badge: 'CONFIGURAÇÕES',
+    title: 'Preferências de Alerta',
+    description: 'Painel de configurações no qual você define exatamente quando e como deseja receber os avisos e sinais de alerta dos seus documentos.'
   },
   {
     image: '/usar no site/7.png',
-    badge: 'FINANCEIRO',
-    title: 'Fluxo de Caixa e Relatórios',
-    description: 'Lance receitas e despesas com categorização e acesse relatórios financeiros de forma simples para uma gestão assertiva.'
+    badge: 'EXPORTAÇÃO E ALERTAS',
+    title: 'Ativação e Exportação',
+    description: 'Configure e ative as notificações do sistema, com a facilidade de exportar todo o seu acervo e dados para formatos PDF ou Excel.'
   },
   {
     image: '/usar no site/8.png',
-    badge: 'ADMINISTRATIVO',
-    title: 'Multiempresa & Controle de Acesso',
-    description: 'Gerencie múltiplos estabelecimentos e personalize as permissões de acesso específicas para cada colaborador da sua equipe.'
+    badge: 'VÍNCULO DESPACHANTE',
+    title: 'Integração com Escritório (Opcional)',
+    description: 'Vincule sua conta opcionalmente ao escritório Gcac Despachante Bélico, permitindo que eles acompanhem seus prazos e ajudem no controle de vencimentos.'
   },
   {
     image: '/usar no site/9.png',
-    badge: 'ANÚNCIO COMERCIAL',
-    title: 'Eleve o Nível do seu Escritório',
-    description: 'Uma solução profissional pensada sob medida para facilitar sua rotina. Fale com nossa equipe comercial e comece a usar agora!'
+    badge: 'LICENÇA DO PORTAL',
+    title: 'Adquira seu Acesso',
+    description: 'Imagem de anunciação e oferta especial do aplicativo Portal G CAC. Garanta sua licença e eleve o nível da sua organização operacional.'
   }
 ];
 
@@ -303,7 +303,7 @@ export function PaginaLogin() {
               <img
                 src={SLIDES[currentSlide].image}
                 alt={SLIDES[currentSlide].title}
-                className="w-full h-full object-cover transition-all duration-700 ease-in-out transform group-hover:scale-[1.02] animate-fade-in"
+                className="w-full h-full object-contain p-2 transition-all duration-700 ease-in-out transform group-hover:scale-[1.02] animate-fade-in"
                 key={currentSlide}
               />
               
