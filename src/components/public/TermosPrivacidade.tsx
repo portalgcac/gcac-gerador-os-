@@ -18,9 +18,9 @@ export function TermosUso() {
         {/* Branding Logo Header */}
         <div className="text-center mt-6 mb-8 flex flex-col items-center">
           <img 
-            src="/LOGO 1 OFICIAL.png" 
+            src="/usar no site/1.jpg" 
             alt="Portal GCAC Logo" 
-            className="w-24 h-24 object-contain mb-3 drop-shadow-2xl"
+            className="w-28 h-28 object-contain mb-3 drop-shadow-2xl"
             onError={(e) => { e.currentTarget.style.display = 'none'; }}
           />
           <h1 className="text-2xl font-bold text-white tracking-wide">Portal GCAC</h1>
@@ -131,9 +131,9 @@ export function PoliticaPrivacidade() {
         {/* Branding Logo Header */}
         <div className="text-center mt-6 mb-8 flex flex-col items-center">
           <img 
-            src="/LOGO 1 OFICIAL.png" 
+            src="/usar no site/1.jpg" 
             alt="Portal GCAC Logo" 
-            className="w-24 h-24 object-contain mb-3 drop-shadow-2xl"
+            className="w-28 h-28 object-contain mb-3 drop-shadow-2xl"
             onError={(e) => { e.currentTarget.style.display = 'none'; }}
           />
           <h1 className="text-2xl font-bold text-white tracking-wide">Portal GCAC</h1>

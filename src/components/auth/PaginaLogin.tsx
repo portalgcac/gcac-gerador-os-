@@ -137,9 +137,9 @@ export function PaginaLogin() {
           <div className="text-center mb-6">
             <div className="flex justify-center mb-3">
               <img
-                src="/LOGO 1 OFICIAL.png"
+                src="/usar no site/1.jpg"
                 alt="GCAC Logo"
-                className="w-24 h-24 sm:w-28 sm:h-28 object-contain drop-shadow-2xl"
+                className="w-32 h-32 sm:w-36 sm:h-36 object-contain drop-shadow-2xl"
                 onError={(e) => {
                   (e.target as HTMLImageElement).style.display = 'none';
                 }}
