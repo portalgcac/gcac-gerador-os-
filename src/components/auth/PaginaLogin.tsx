@@ -7,55 +7,55 @@ import { useStatusConexao } from '../../hooks/useStatusConexao';
 
 const SLIDES = [
   {
-    image: '/usar no site/1.png',
+    image: '/usar no site/1.jpg',
     badge: 'LOGO OFICIAL',
     title: 'Portal G CAC',
     description: 'A marca oficial do Portal G CAC, a plataforma de gestão inteligente e controle de documentos integrada para atiradores e despachantes.'
   },
   {
-    image: '/usar no site/2.png',
+    image: '/usar no site/2.jpg',
     badge: 'PERFIL DO CLIENTE',
     title: 'Informações Pessoais',
     description: 'Painel de perfil do cliente, onde o usuário registra e cadastra de forma organizada todas as suas informações pessoais.'
   },
   {
-    image: '/usar no site/3.png',
+    image: '/usar no site/3.jpg',
     badge: 'ACERVO E MANEJO',
     title: 'Cadastro Sem Limites',
     description: 'Painel para cadastro de suas armas, guias de tráfego e autorizações de manejo do Ibama, sem limites de cadastro de itens.'
   },
   {
-    image: '/usar no site/4.png',
+    image: '/usar no site/4.jpg',
     badge: 'PAINEL DE ALERTAS',
     title: 'Controle de Vencimentos',
     description: 'Painel centralizado de alertas, onde aparecem de forma clara todos os avisos de vencimento dos seus documentos cadastrados.'
   },
   {
-    image: '/usar no site/5.png',
+    image: '/usar no site/5.jpg',
     badge: 'NOTIFICAÇÕES MOBILE',
     title: 'Alertas Direto no Celular',
     description: 'Exemplo da notificação automática que você receberá na tela do seu celular quando algum documento estiver se aproximando do vencimento.'
   },
   {
-    image: '/usar no site/6.png',
+    image: '/usar no site/6.jpg',
     badge: 'CONFIGURAÇÕES',
     title: 'Preferências de Alerta',
     description: 'Painel de configurações no qual você define exatamente quando e como deseja receber os avisos e sinais de alerta dos seus documentos.'
   },
   {
-    image: '/usar no site/7.png',
+    image: '/usar no site/7.jpg',
     badge: 'EXPORTAÇÃO E ALERTAS',
     title: 'Ativação e Exportação',
     description: 'Configure e ative as notificações do sistema, com a facilidade de exportar todo o seu acervo e dados para formatos PDF ou Excel.'
   },
   {
-    image: '/usar no site/8.png',
+    image: '/usar no site/8.jpg',
     badge: 'VÍNCULO DESPACHANTE',
     title: 'Integração com Escritório (Opcional)',
     description: 'Vincule sua conta opcionalmente ao escritório Gcac Despachante Bélico, permitindo que eles acompanhem seus prazos e ajudem no controle de vencimentos.'
   },
   {
-    image: '/usar no site/9.png',
+    image: '/usar no site/9.jpg',
     badge: 'LICENÇA DO PORTAL',
     title: 'Adquira seu Acesso',
     description: 'Oferta especial do aplicativo Portal G CAC na palma da sua mão. Garanta sua licença e eleve o nível da sua organização operacional.'
