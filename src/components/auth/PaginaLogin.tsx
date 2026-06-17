@@ -136,14 +136,18 @@ export function PaginaLogin() {
           {/* Logo */}
           <div className="text-center mb-6">
             <div className="flex justify-center mb-3">
-              <img
-                src="/usar no site/1.jpg"
-                alt="GCAC Logo"
-                className="w-56 h-56 sm:w-64 sm:h-64 object-contain drop-shadow-2xl"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).style.display = 'none';
-                }}
-              />
+              <div className="relative w-56 h-56 sm:w-64 sm:h-64 rounded-full overflow-hidden border border-brand-dark-5/40 shadow-glow-blue bg-black/20 flex items-center justify-center">
+                <img
+                  src="/usar no site/1.jpg"
+                  alt="GCAC Logo"
+                  className="w-full h-full object-cover rounded-full transition-all duration-300"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = 'none';
+                  }}
+                />
+                {/* Vignete de suavização de borda */}
+                <div className="absolute inset-0 rounded-full shadow-[inset_0_0_25px_rgba(13,13,13,0.95)] pointer-events-none" />
+              </div>
             </div>
             <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">PORTAL G CAC</h1>
             <p className="text-brand-green font-bold text-base sm:text-lg tracking-widest uppercase">Gestão & Documentos</p>

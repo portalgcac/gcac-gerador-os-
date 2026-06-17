@@ -17,12 +17,16 @@ export function TermosUso() {
 
         {/* Branding Logo Header */}
         <div className="text-center mt-6 mb-8 flex flex-col items-center">
-          <img 
-            src="/usar no site/1.jpg" 
-            alt="Portal GCAC Logo" 
-            className="w-48 h-48 object-contain mb-3 drop-shadow-2xl"
-            onError={(e) => { e.currentTarget.style.display = 'none'; }}
-          />
+          <div className="relative w-36 h-36 rounded-full overflow-hidden border border-slate-800/80 shadow-[0_0_15px_rgba(27,111,191,0.2)] bg-black/20 mb-3 flex items-center justify-center">
+            <img 
+              src="/usar no site/1.jpg" 
+              alt="Portal GCAC Logo" 
+              className="w-full h-full object-cover rounded-full"
+              onError={(e) => { e.currentTarget.style.display = 'none'; }}
+            />
+            {/* Vignete de suavização de borda */}
+            <div className="absolute inset-0 rounded-full shadow-[inset_0_0_15px_rgba(13,13,13,0.8)] pointer-events-none" />
+          </div>
           <h1 className="text-2xl font-bold text-white tracking-wide">Portal GCAC</h1>
           <p className="text-slate-400 text-xs mt-1">Termos de Uso e Condições de Serviço</p>
         </div>
@@ -130,12 +134,16 @@ export function PoliticaPrivacidade() {
 
         {/* Branding Logo Header */}
         <div className="text-center mt-6 mb-8 flex flex-col items-center">
-          <img 
-            src="/usar no site/1.jpg" 
-            alt="Portal GCAC Logo" 
-            className="w-48 h-48 object-contain mb-3 drop-shadow-2xl"
-            onError={(e) => { e.currentTarget.style.display = 'none'; }}
-          />
+          <div className="relative w-36 h-36 rounded-full overflow-hidden border border-slate-800/80 shadow-[0_0_15px_rgba(27,111,191,0.2)] bg-black/20 mb-3 flex items-center justify-center">
+            <img 
+              src="/usar no site/1.jpg" 
+              alt="Portal GCAC Logo" 
+              className="w-full h-full object-cover rounded-full"
+              onError={(e) => { e.currentTarget.style.display = 'none'; }}
+            />
+            {/* Vignete de suavização de borda */}
+            <div className="absolute inset-0 rounded-full shadow-[inset_0_0_15px_rgba(13,13,13,0.8)] pointer-events-none" />
+          </div>
           <h1 className="text-2xl font-bold text-white tracking-wide">Portal GCAC</h1>
           <p className="text-slate-400 text-xs mt-1">Política de Privacidade e Proteção de Dados (LGPD)</p>
         </div>

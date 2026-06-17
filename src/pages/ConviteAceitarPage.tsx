@@ -501,12 +501,16 @@ export function ConviteAceitarPage() {
       <div className="w-full max-w-sm animate-slide-up space-y-6">
         {/* Logo */}
         <div className="text-center">
-          <img
-            src="/usar no site/1.jpg"
-            alt="GCAC Logo"
-            className="w-48 h-48 object-contain mx-auto drop-shadow-2xl"
-            onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
-          />
+          <div className="relative w-40 h-40 rounded-full overflow-hidden border border-brand-dark-5/40 shadow-glow-blue bg-black/20 mx-auto flex items-center justify-center">
+            <img
+              src="/usar no site/1.jpg"
+              alt="GCAC Logo"
+              className="w-full h-full object-cover rounded-full"
+              onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+            />
+            {/* Vignete de suavização de borda */}
+            <div className="absolute inset-0 rounded-full shadow-[inset_0_0_15px_rgba(13,13,13,0.8)] pointer-events-none" />
+          </div>
           <h1 className="text-2xl font-black text-white tracking-tight mt-2">PORTAL G CAC</h1>
           <p className="text-brand-green text-xs font-bold uppercase tracking-widest">Gestão & Documentos</p>
         </div>
