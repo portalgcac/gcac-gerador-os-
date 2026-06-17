@@ -58,7 +58,7 @@ const SLIDES = [
     image: '/usar no site/9.png',
     badge: 'LICENÇA DO PORTAL',
     title: 'Adquira seu Acesso',
-    description: 'Imagem de anunciação e oferta especial do aplicativo Portal G CAC. Garanta sua licença e eleve o nível da sua organização operacional.'
+    description: 'Oferta especial do aplicativo Portal G CAC na palma da sua mão. Garanta sua licença e eleve o nível da sua organização operacional.'
   }
 ];
 
