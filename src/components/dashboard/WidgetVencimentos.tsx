@@ -109,9 +109,8 @@ export function WidgetVencimentos() {
         </div>
 
         <div className="flex items-center gap-1.5 flex-shrink-0">
-          {!alerta.isVinculado && (
-            <button 
-              onClick={async (e) => {
+          <button 
+            onClick={async (e) => {
                 e.stopPropagation();
                 try {
                   let dbId = '';
@@ -151,7 +150,6 @@ export function WidgetVencimentos() {
             >
               {alerta.emRenovacao ? <RotateCcw size={14} /> : <FileClock size={14} />}
             </button>
-          )}
 
           <button 
             onClick={() => {
