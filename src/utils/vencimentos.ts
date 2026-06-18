@@ -21,6 +21,7 @@ export interface AlertaDocumento {
   isVinculado?: boolean;
   cacEmpresaId?: string;
   emRenovacao?: boolean;
+  documentoId?: string;
 }
 
 /**

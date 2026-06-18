@@ -113,15 +113,7 @@ export function WidgetVencimentos() {
             onClick={async (e) => {
                 e.stopPropagation();
                 try {
-                  let dbId = '';
-                  if (alerta.tipo === 'CR' || alerta.tipo === 'IBAMA_CR') {
-                    dbId = alerta.clienteId || '';
-                  } else if (alerta.tipo === 'CRAF') {
-                    dbId = alerta.armaId || '';
-                  } else {
-                    dbId = alerta.id.split('-')[0];
-                  }
-                  
+                  const dbId = alerta.documentoId;
                   if (!dbId) return;
                   const novoStatus = !alerta.emRenovacao;
                   await atualizarStatusRenovacao(alerta.tipo, dbId, novoStatus);

@@ -49,6 +49,7 @@ export async function buscarAlertasParaEmpresas(empresaIds: string[], options?: 
             diasRestantes: result.dias,
             clienteNome: c.nome,
             clienteId: c.id,
+            documentoId: c.id,
             isVinculado: options?.isVinculado,
             cacEmpresaId: options?.isVinculado ? c.empresa_id : undefined,
             emRenovacao: !!c.cr_em_renovacao
@@ -67,6 +68,7 @@ export async function buscarAlertasParaEmpresas(empresaIds: string[], options?: 
             diasRestantes: result.dias,
             clienteNome: c.nome,
             clienteId: c.id,
+            documentoId: c.id,
             isVinculado: options?.isVinculado,
             cacEmpresaId: options?.isVinculado ? c.empresa_id : undefined,
             emRenovacao: !!c.cr_ibama_em_renovacao
@@ -107,6 +109,7 @@ export async function buscarAlertasParaEmpresas(empresaIds: string[], options?: 
             clienteId: a.cliente_id,
             armaModelo: a.modelo,
             armaId: a.id,
+            documentoId: a.id,
             isVinculado: options?.isVinculado,
             cacEmpresaId: options?.isVinculado ? a.empresa_id : undefined,
             emRenovacao: !!a.craf_em_renovacao
@@ -151,6 +154,7 @@ export async function buscarAlertasParaEmpresas(empresaIds: string[], options?: 
             clienteId: arma?.cliente_id,
             armaModelo: arma?.modelo,
             armaId: arma?.id,
+            documentoId: g.id,
             isVinculado: options?.isVinculado,
             cacEmpresaId: options?.isVinculado ? g.empresa_id : undefined,
             emRenovacao: !!g.gt_em_renovacao
@@ -194,6 +198,7 @@ export async function buscarAlertasParaEmpresas(empresaIds: string[], options?: 
               diasRestantes: result.dias,
               clienteNome: cliente?.nome,
               clienteId: m.cliente_id,
+              documentoId: m.id,
               isVinculado: options?.isVinculado,
               cacEmpresaId: options?.isVinculado ? m.empresa_id : undefined,
               emRenovacao: !!m.manejo_em_renovacao
