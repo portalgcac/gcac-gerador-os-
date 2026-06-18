@@ -43,6 +43,8 @@ export function FormularioCliente({ clienteEditando, onFechar }: Props) {
     vencimentoCrIbama: clienteEditando?.vencimentoCrIbama ?? '',
     crUrl: clienteEditando?.crUrl ?? '',
     crIbamaUrl: clienteEditando?.crIbamaUrl ?? '',
+    crEmRenovacao: clienteEditando?.crEmRenovacao ?? false,
+    crIbamaEmRenovacao: clienteEditando?.crIbamaEmRenovacao ?? false,
   });
 
   const atualizar = (campo: string, valor: any) => {
@@ -102,6 +104,8 @@ export function FormularioCliente({ clienteEditando, onFechar }: Props) {
         vencimentoCrIbama: form.vencimentoCrIbama,
         crUrl: form.crUrl,
         crIbamaUrl: form.crIbamaUrl,
+        crEmRenovacao: form.crEmRenovacao,
+        crIbamaEmRenovacao: form.crIbamaEmRenovacao,
       };
 
       if (clienteEditando) {
@@ -181,6 +185,14 @@ export function FormularioCliente({ clienteEditando, onFechar }: Props) {
               <label className="label">Vencimento CR</label>
               <input type="date" className="input"
                 value={form.vencimentoCr} onChange={e => atualizar('vencimentoCr', e.target.value)} />
+              <div className="flex items-center gap-1.5 mt-1.5">
+                <input type="checkbox" id="crEmRenovacao"
+                  checked={form.crEmRenovacao} onChange={e => atualizar('crEmRenovacao', e.target.checked)}
+                  className="rounded border-brand-dark-5 bg-brand-dark-4 text-brand-blue focus:ring-0 w-3 h-3" />
+                <label htmlFor="crEmRenovacao" className="text-[10px] text-gray-400 cursor-pointer select-none">
+                  Aguardando PF/Exército
+                </label>
+              </div>
             </div>
           </div>
           <div className="-mt-1 mb-2">
@@ -228,6 +240,14 @@ export function FormularioCliente({ clienteEditando, onFechar }: Props) {
               <label className="label">Vencimento CR IBAMA</label>
               <input type="date" className="input"
                 value={form.vencimentoCrIbama} onChange={e => atualizar('vencimentoCrIbama', e.target.value)} />
+              <div className="flex items-center gap-1.5 mt-1.5">
+                <input type="checkbox" id="crIbamaEmRenovacao"
+                  checked={form.crIbamaEmRenovacao} onChange={e => atualizar('crIbamaEmRenovacao', e.target.checked)}
+                  className="rounded border-brand-dark-5 bg-brand-dark-4 text-brand-blue focus:ring-0 w-3 h-3" />
+                <label htmlFor="crIbamaEmRenovacao" className="text-[10px] text-gray-400 cursor-pointer select-none">
+                  Aguardando PF/IBAMA
+                </label>
+              </div>
             </div>
           </div>
           <div className="-mt-1 mb-2">

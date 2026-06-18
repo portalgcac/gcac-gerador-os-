@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ShieldAlert, Shield, ChevronRight, Calendar, User, Target, MapPin, ExternalLink, Info, X, Link2 } from 'lucide-react';
-import { buscarAlertasGlobais, buscarAlertasCacsVinculados } from '../../services/vencimentosService';
+import { ShieldAlert, Shield, ChevronRight, Calendar, User, Target, MapPin, ExternalLink, Info, X, Link2, FileClock, RotateCcw } from 'lucide-react';
+import { buscarAlertasGlobais, buscarAlertasCacsVinculados, atualizarStatusRenovacao } from '../../services/vencimentosService';
 import { AlertaDocumento, obterClasseAlerta } from '../../utils/vencimentos';
 import { formatarData } from '../../utils/formatters';
 import { useAuth } from '../../context/AuthContext';
@@ -49,15 +49,21 @@ export function WidgetVencimentos() {
     const isIbamaCrVencido = alerta.tipo === 'IBAMA_CR' && alerta.diasRestantes < 0;
     const isIbamaCrHoje = alerta.tipo === 'IBAMA_CR' && alerta.diasRestantes === 0;
 
-    const classeAlerta = isIbamaCrVencido
+    const classeAlerta = alerta.emRenovacao
+      ? 'text-brand-blue-light bg-brand-blue/10 border-brand-blue/20'
+      : isIbamaCrVencido
       ? 'text-orange-500 bg-orange-500/10 border-orange-500/20'
       : obterClasseAlerta(alerta.nivel);
 
-    const textoBadge = isIbamaCrVencido
+    const textoBadge = alerta.emRenovacao
+      ? 'AG. LIBERAÇÃO'
+      : isIbamaCrVencido
       ? 'RENOVÁVEL'
       : alerta.nivel === 'VENCIDO' ? 'VENCIDO' : alerta.nivel === 'CRITICO' ? 'URGENTE' : 'AVISO';
 
-    const textoDescricaoVenc = isIbamaCrVencido
+    const textoDescricaoVenc = alerta.emRenovacao
+      ? 'Processo protocolado. Aguardando liberação da PF/Exército.'
+      : isIbamaCrVencido
       ? `Liberado para Renovação (venceu há ${Math.abs(alerta.diasRestantes)} dia(s))`
       : isIbamaCrHoje
       ? `Vence hoje (Renovável a partir de amanhã)`
@@ -102,32 +108,78 @@ export function WidgetVencimentos() {
           </div>
         </div>
 
-        <button 
-          onClick={() => {
-            if (alerta.isVinculado) {
-              navigate('/clientes-cac', { 
-                state: { 
-                  autoOpenCacEmpresaId: alerta.cacEmpresaId 
-                } 
-              });
-            } else if (alerta.clienteId) {
-              navigate(`/clientes/${alerta.clienteId}`, { 
-                state: { 
-                  aba: 'documentos',
-                  armaId: alerta.armaId 
-                } 
-              });
-            } else {
-              // Fallback
-              const clienteId = alerta.id.split('-')[0];
-              navigate(`/clientes/${clienteId}`, { state: { aba: 'documentos' } });
-            }
-          }}
-          className="p-1.5 hover:bg-black/10 rounded-lg transition-colors flex-shrink-0"
-          title={alerta.isVinculado ? "Ver Acervo Vinculado (Somente Leitura)" : "Ver Cliente"}
-        >
-          <ExternalLink size={14} />
-        </button>
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          {!alerta.isVinculado && (
+            <button 
+              onClick={async (e) => {
+                e.stopPropagation();
+                try {
+                  let dbId = '';
+                  if (alerta.tipo === 'CR' || alerta.tipo === 'IBAMA_CR') {
+                    dbId = alerta.clienteId || '';
+                  } else if (alerta.tipo === 'CRAF') {
+                    dbId = alerta.armaId || '';
+                  } else {
+                    dbId = alerta.id.split('-')[0];
+                  }
+                  
+                  if (!dbId) return;
+                  const novoStatus = !alerta.emRenovacao;
+                  await atualizarStatusRenovacao(alerta.tipo, dbId, novoStatus);
+                  
+                  const updateList = (prev: AlertaDocumento[]) => 
+                    prev.map(a => a.id === alerta.id ? { ...a, emRenovacao: novoStatus } : a).sort((a, b) => {
+                      if (a.emRenovacao !== b.emRenovacao) return a.emRenovacao ? 1 : -1;
+                      const ordem: Record<string, number> = { 'VENCIDO': 0, 'CRITICO': 1, 'AVISO': 2, 'OK': 3 };
+                      if (ordem[a.nivel] !== ordem[b.nivel]) return ordem[a.nivel] - ordem[b.nivel];
+                      return new Date(a.dataVencimento).getTime() - new Date(b.dataVencimento).getTime();
+                    });
+
+                  setAlertasDiretos(updateList);
+                  setAlertasVinculados(updateList);
+                } catch (err) {
+                  console.error('Erro ao atualizar status do alerta:', err);
+                  alert('Erro ao atualizar status do alerta.');
+                }
+              }}
+              className={`p-1.5 hover:bg-black/10 rounded-lg transition-colors flex-shrink-0 ${
+                alerta.emRenovacao 
+                  ? 'text-brand-blue-light hover:text-red-400' 
+                  : 'text-gray-500 hover:text-brand-blue-light'
+              }`}
+              title={alerta.emRenovacao ? "Marcar como Novo (Pendente)" : "Marcar como Protocolado (Aguardando PF/Exército)"}
+            >
+              {alerta.emRenovacao ? <RotateCcw size={14} /> : <FileClock size={14} />}
+            </button>
+          )}
+
+          <button 
+            onClick={() => {
+              if (alerta.isVinculado) {
+                navigate('/clientes-cac', { 
+                  state: { 
+                    autoOpenCacEmpresaId: alerta.cacEmpresaId 
+                  } 
+                });
+              } else if (alerta.clienteId) {
+                navigate(`/clientes/${alerta.clienteId}`, { 
+                  state: { 
+                    aba: 'documentos',
+                    armaId: alerta.armaId 
+                  } 
+                });
+              } else {
+                // Fallback
+                const clienteId = alerta.id.split('-')[0];
+                navigate(`/clientes/${clienteId}`, { state: { aba: 'documentos' } });
+              }
+            }}
+            className="p-1.5 hover:bg-black/10 rounded-lg transition-colors flex-shrink-0"
+            title={alerta.isVinculado ? "Ver Acervo Vinculado (Somente Leitura)" : "Ver Cliente"}
+          >
+            <ExternalLink size={14} />
+          </button>
+        </div>
       </div>
     );
   };

@@ -57,6 +57,8 @@ export interface AcervoVinculado {
     fotoUrl?: string;
     crUrl?: string;
     crIbamaUrl?: string;
+    crEmRenovacao?: boolean;
+    crIbamaEmRenovacao?: boolean;
   };
   armas: Array<{
     id: string;
@@ -69,12 +71,14 @@ export interface AcervoVinculado {
     tipo?: string;
     vencimentoCraf?: string;
     crafUrl?: string;
+    crafEmRenovacao?: boolean;
     gts: Array<{
       id: string;
       tipo: string;
       vencimento: string;
       destino: string;
       arquivoUrl?: string;
+      gtEmRenovacao?: boolean;
     }>;
   }>;
   manejos: Array<{
@@ -86,6 +90,7 @@ export interface AcervoVinculado {
     vencimento: string;
     status: string;
     arquivoUrl?: string;
+    manejoEmRenovacao?: boolean;
   }>;
 }
 
@@ -469,7 +474,7 @@ export async function buscarAcervoVinculado(
   // 2. Busca perfil do cliente
   const { data: clienteData } = await supabase
     .from('clientes')
-    .select('id, nome, cpf, contato, numero_cr, vencimento_cr, numero_cr_ibama, vencimento_cr_ibama, foto_url, cr_url, cr_ibama_url')
+    .select('id, nome, cpf, contato, numero_cr, vencimento_cr, numero_cr_ibama, vencimento_cr_ibama, foto_url, cr_url, cr_ibama_url, cr_em_renovacao, cr_ibama_em_renovacao')
     .eq('empresa_id', cacEmpresaId)
     .limit(1)
     .maybeSingle();
@@ -479,7 +484,7 @@ export async function buscarAcervoVinculado(
   // 3. Busca armas
   const { data: armasData } = await supabase
     .from('armas')
-    .select('id, modelo, calibre, fabricante, numero_serie, numero_sigma, acervo, tipo, vencimento_craf, craf_url')
+    .select('id, modelo, calibre, fabricante, numero_serie, numero_sigma, acervo, tipo, vencimento_craf, craf_url, craf_em_renovacao')
     .eq('empresa_id', cacEmpresaId)
     .order('modelo');
 
@@ -491,7 +496,7 @@ export async function buscarAcervoVinculado(
   if (armaIds.length > 0) {
     const { data: gts } = await supabase
       .from('guias_trafego')
-      .select('id, arma_id, tipo, vencimento, destino, arquivo_url')
+      .select('id, arma_id, tipo, vencimento, destino, arquivo_url, gt_em_renovacao')
       .in('arma_id', armaIds)
       .order('vencimento');
     gtsData = gts || [];
@@ -500,7 +505,7 @@ export async function buscarAcervoVinculado(
   // 5. Busca manejos
   const { data: manejosData } = await supabase
     .from('autorizacoes_manejo')
-    .select('id, numero_car, nome_fazenda, nome_proprietario, cidade, vencimento, status, arquivo_url')
+    .select('id, numero_car, nome_fazenda, nome_proprietario, cidade, vencimento, status, arquivo_url, manejo_em_renovacao')
     .eq('empresa_id', cacEmpresaId)
     .order('vencimento');
 
@@ -523,6 +528,8 @@ export async function buscarAcervoVinculado(
       fotoUrl: clienteData.foto_url,
       crUrl: clienteData.cr_url,
       crIbamaUrl: clienteData.cr_ibama_url,
+      crEmRenovacao: !!clienteData.cr_em_renovacao,
+      crIbamaEmRenovacao: !!clienteData.cr_ibama_em_renovacao,
     },
     armas: armas.map(a => ({
       id: a.id,
@@ -535,9 +542,10 @@ export async function buscarAcervoVinculado(
       tipo: a.tipo,
       vencimentoCraf: a.vencimento_craf,
       crafUrl: a.craf_url,
+      crafEmRenovacao: !!a.craf_em_renovacao,
       gts: gtsData
         .filter(g => g.arma_id === a.id)
-        .map(g => ({ id: g.id, tipo: g.tipo, vencimento: g.vencimento, destino: g.destino, arquivoUrl: g.arquivo_url })),
+        .map(g => ({ id: g.id, tipo: g.tipo, vencimento: g.vencimento, destino: g.destino, arquivoUrl: g.arquivo_url, gtEmRenovacao: !!g.gt_em_renovacao })),
     })),
     manejos: (manejosData || []).map(m => ({
       id: m.id,
@@ -548,6 +556,7 @@ export async function buscarAcervoVinculado(
       vencimento: m.vencimento,
       status: m.status,
       arquivoUrl: m.arquivo_url,
+      manejoEmRenovacao: !!m.manejo_em_renovacao,
     })),
   };
 }

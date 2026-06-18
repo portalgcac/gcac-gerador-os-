@@ -32,7 +32,7 @@ export async function buscarAlertasParaEmpresas(empresaIds: string[], options?: 
   // 1. Buscar Clientes (CR e IBAMA CR)
   const { data: clientes } = await supabase
     .from('clientes')
-    .select('id, nome, numero_cr, vencimento_cr, vencimento_cr_ibama, empresa_id')
+    .select('id, nome, numero_cr, vencimento_cr, vencimento_cr_ibama, empresa_id, cr_em_renovacao, cr_ibama_em_renovacao')
     .in('empresa_id', empresaIds);
 
   if (clientes) {
@@ -50,7 +50,8 @@ export async function buscarAlertasParaEmpresas(empresaIds: string[], options?: 
             clienteNome: c.nome,
             clienteId: c.id,
             isVinculado: options?.isVinculado,
-            cacEmpresaId: options?.isVinculado ? c.empresa_id : undefined
+            cacEmpresaId: options?.isVinculado ? c.empresa_id : undefined,
+            emRenovacao: !!c.cr_em_renovacao
           });
         }
       }
@@ -67,7 +68,8 @@ export async function buscarAlertasParaEmpresas(empresaIds: string[], options?: 
             clienteNome: c.nome,
             clienteId: c.id,
             isVinculado: options?.isVinculado,
-            cacEmpresaId: options?.isVinculado ? c.empresa_id : undefined
+            cacEmpresaId: options?.isVinculado ? c.empresa_id : undefined,
+            emRenovacao: !!c.cr_ibama_em_renovacao
           });
         }
       }
@@ -83,6 +85,7 @@ export async function buscarAlertasParaEmpresas(empresaIds: string[], options?: 
       vencimento_craf, 
       cliente_id,
       empresa_id,
+      craf_em_renovacao,
       clientes:cliente_id (nome)
     `)
     .in('empresa_id', empresaIds);
@@ -105,7 +108,8 @@ export async function buscarAlertasParaEmpresas(empresaIds: string[], options?: 
             armaModelo: a.modelo,
             armaId: a.id,
             isVinculado: options?.isVinculado,
-            cacEmpresaId: options?.isVinculado ? a.empresa_id : undefined
+            cacEmpresaId: options?.isVinculado ? a.empresa_id : undefined,
+            emRenovacao: !!a.craf_em_renovacao
           });
         }
       }
@@ -120,6 +124,7 @@ export async function buscarAlertasParaEmpresas(empresaIds: string[], options?: 
       tipo, 
       vencimento, 
       empresa_id,
+      gt_em_renovacao,
       armas:arma_id (
         modelo, 
         cliente_id,
@@ -147,7 +152,8 @@ export async function buscarAlertasParaEmpresas(empresaIds: string[], options?: 
             armaModelo: arma?.modelo,
             armaId: arma?.id,
             isVinculado: options?.isVinculado,
-            cacEmpresaId: options?.isVinculado ? g.empresa_id : undefined
+            cacEmpresaId: options?.isVinculado ? g.empresa_id : undefined,
+            emRenovacao: !!g.gt_em_renovacao
           });
         }
       }
@@ -165,6 +171,7 @@ export async function buscarAlertasParaEmpresas(empresaIds: string[], options?: 
         cliente_id,
         status,
         empresa_id,
+        manejo_em_renovacao,
         clientes:cliente_id (nome)
       `)
       .in('empresa_id', empresaIds);
@@ -188,7 +195,8 @@ export async function buscarAlertasParaEmpresas(empresaIds: string[], options?: 
               clienteNome: cliente?.nome,
               clienteId: m.cliente_id,
               isVinculado: options?.isVinculado,
-              cacEmpresaId: options?.isVinculado ? m.empresa_id : undefined
+              cacEmpresaId: options?.isVinculado ? m.empresa_id : undefined,
+              emRenovacao: !!m.manejo_em_renovacao
             });
           }
         }
@@ -196,11 +204,56 @@ export async function buscarAlertasParaEmpresas(empresaIds: string[], options?: 
     }
   }
 
-  // Ordenar por gravidade e depois por data
+  // Ordenar por: em renovação por último, depois por gravidade, depois por data
   return alertas.sort((a, b) => {
+    if (a.emRenovacao !== b.emRenovacao) {
+      return a.emRenovacao ? 1 : -1;
+    }
     const ordem: Record<string, number> = { 'VENCIDO': 0, 'CRITICO': 1, 'AVISO': 2, 'OK': 3 };
     if (ordem[a.nivel] !== ordem[b.nivel]) return ordem[a.nivel] - ordem[b.nivel];
     return new Date(a.dataVencimento).getTime() - new Date(b.dataVencimento).getTime();
   });
+}
+
+export async function atualizarStatusRenovacao(tipo: string, id: string, emRenovacao: boolean): Promise<void> {
+  switch (tipo) {
+    case 'CR':
+      const { error: errCr } = await supabase
+        .from('clientes')
+        .update({ cr_em_renovacao: emRenovacao })
+        .eq('id', id);
+      if (errCr) throw errCr;
+      break;
+    case 'IBAMA_CR':
+      const { error: errIbama } = await supabase
+        .from('clientes')
+        .update({ cr_ibama_em_renovacao: emRenovacao })
+        .eq('id', id);
+      if (errIbama) throw errIbama;
+      break;
+    case 'CRAF':
+      const { error: errCraf } = await supabase
+        .from('armas')
+        .update({ craf_em_renovacao: emRenovacao })
+        .eq('id', id);
+      if (errCraf) throw errCraf;
+      break;
+    case 'GT':
+      const { error: errGt } = await supabase
+        .from('guias_trafego')
+        .update({ gt_em_renovacao: emRenovacao })
+        .eq('id', id);
+      if (errGt) throw errGt;
+      break;
+    case 'MANEJO':
+      const { error: errManejo } = await supabase
+        .from('autorizacoes_manejo')
+        .update({ manejo_em_renovacao: emRenovacao })
+        .eq('id', id);
+      if (errManejo) throw errManejo;
+      break;
+    default:
+      throw new Error(`Tipo de alerta desconhecido: ${tipo}`);
+  }
 }
 

@@ -118,6 +118,7 @@ export function AbaDocumentacao({ cliente, armaIdInicial, cacEmpresaId, podeEdit
             acervo: a.acervo as any,
             vencimentoCraf: a.vencimentoCraf || '',
             crafUrl: a.crafUrl,
+            crafEmRenovacao: !!a.crafEmRenovacao,
             criadoEm: new Date().toISOString()
           })));
           setManejos(acervo.manejos.map(m => ({
@@ -130,6 +131,7 @@ export function AbaDocumentacao({ cliente, armaIdInicial, cacEmpresaId, podeEdit
             vencimento: m.vencimento,
             status: m.status as any,
             arquivoUrl: m.arquivoUrl,
+            manejoEmRenovacao: !!m.manejoEmRenovacao,
             criadoEm: new Date().toISOString()
           })));
           
@@ -142,6 +144,7 @@ export function AbaDocumentacao({ cliente, armaIdInicial, cacEmpresaId, podeEdit
               vencimento: g.vencimento,
               destino: g.destino,
               arquivoUrl: g.arquivoUrl,
+              gtEmRenovacao: !!g.gtEmRenovacao,
               criadoEm: new Date().toISOString()
             }));
           });
@@ -193,12 +196,14 @@ export function AbaDocumentacao({ cliente, armaIdInicial, cacEmpresaId, podeEdit
           data={cliente.vencimentoCr} 
           tipo="CR"
           icon={<ShieldAlert size={20} />}
+          emRenovacao={cliente.crEmRenovacao}
         />
         <CardVencimento 
           label="CR IBAMA" 
           data={cliente.vencimentoCrIbama} 
           tipo="IBAMA_CR"
           icon={<Globe size={20} />}
+          emRenovacao={cliente.crIbamaEmRenovacao}
         />
       </div>
 
@@ -253,7 +258,7 @@ export function AbaDocumentacao({ cliente, armaIdInicial, cacEmpresaId, podeEdit
                   <div className="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t border-brand-dark-5/30 sm:border-0">
                     <div className="text-left sm:text-right flex flex-row sm:flex-col items-center sm:items-end gap-1.5 sm:gap-0 shrink-0">
                       <p className="text-[9px] text-gray-500 font-bold uppercase sm:mb-1">CRAF:</p>
-                      <BadgeVencimento data={arma.vencimentoCraf} tipo="CRAF" />
+                      <BadgeVencimento data={arma.vencimentoCraf} tipo="CRAF" emRenovacao={arma.crafEmRenovacao} />
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0">
                       {arma.crafUrl && (
@@ -323,7 +328,7 @@ export function AbaDocumentacao({ cliente, armaIdInicial, cacEmpresaId, podeEdit
                               </div>
                             </div>
                             <div className="flex items-center gap-3">
-                              <BadgeVencimento data={gt.vencimento} tipo="GT" />
+                              <BadgeVencimento data={gt.vencimento} tipo="GT" emRenovacao={gt.gtEmRenovacao} />
                               {gt.arquivoUrl && (
                                 <button 
                                   onClick={() => visualizarDocumentoBase64(gt.arquivoUrl!, `GT-${gt.tipo}-${gt.destino}`)}
@@ -422,7 +427,7 @@ export function AbaDocumentacao({ cliente, armaIdInicial, cacEmpresaId, podeEdit
                   <div className="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t border-brand-dark-5/30 sm:border-0">
                     <div className="text-left sm:text-right flex flex-row sm:flex-col items-center sm:items-end gap-1.5 sm:gap-0 shrink-0">
                       <p className="text-[9px] text-gray-500 font-bold uppercase sm:mb-1">Validade:</p>
-                      <BadgeVencimento data={m.vencimento} tipo="MANEJO" status={m.status} />
+                      <BadgeVencimento data={m.vencimento} tipo="MANEJO" status={m.status} emRenovacao={m.manejoEmRenovacao} />
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0">
                       {m.arquivoUrl && (
@@ -486,7 +491,8 @@ export function AbaDocumentacao({ cliente, armaIdInicial, cacEmpresaId, podeEdit
                 fabricante: d.fabricante?.trim().toUpperCase(),
                 numeroSerie: d.numeroSerie?.trim().toUpperCase(),
                 numeroSigma: d.numeroSigma?.trim().toUpperCase(),
-                clienteId: cliente.id
+                clienteId: cliente.id,
+                crafEmRenovacao: d.crafEmRenovacao
               };
               await salvarArma(armaFormatada, cacEmpresaId);
               await carregarDados();
@@ -509,7 +515,8 @@ export function AbaDocumentacao({ cliente, armaIdInicial, cacEmpresaId, podeEdit
             salvarGt({ 
               ...d, 
               destino: d.destino?.trim().toUpperCase(),
-              armaId: modalGt.armaId 
+              armaId: modalGt.armaId,
+              gtEmRenovacao: d.gtEmRenovacao
             }, cacEmpresaId)
               .then(() => { 
                 carregarDados(); 
@@ -537,7 +544,8 @@ export function AbaDocumentacao({ cliente, armaIdInicial, cacEmpresaId, podeEdit
             nomeProprietario: d.nomeProprietario?.trim().toUpperCase(),
             cidade: d.cidade?.trim().toUpperCase(),
             clienteId: cliente.id,
-            id: manejoParaEditar?.id
+            id: manejoParaEditar?.id,
+            manejoEmRenovacao: d.manejoEmRenovacao
           }, cacEmpresaId)
             .then(() => { 
               carregarDados(); 
@@ -557,7 +565,7 @@ export function AbaDocumentacao({ cliente, armaIdInicial, cacEmpresaId, podeEdit
 
 // --- Componentes Internos ---
 
-function CardVencimento({ label, numero, data, tipo, icon }: { label: string, numero?: string, data?: string, tipo: string, icon: React.ReactNode }) {
+function CardVencimento({ label, numero, data, tipo, icon, emRenovacao }: { label: string, numero?: string, data?: string, tipo: string, icon: React.ReactNode, emRenovacao?: boolean }) {
   return (
     <div className="card bg-brand-dark-3/50 border-brand-dark-5 flex flex-row items-center justify-between p-4 gap-3 flex-wrap xs:flex-nowrap">
       <div className="flex items-center gap-3 min-w-0">
@@ -571,18 +579,26 @@ function CardVencimento({ label, numero, data, tipo, icon }: { label: string, nu
       </div>
       <div className="text-right shrink-0">
         <p className="text-[9px] text-gray-600 font-bold uppercase mb-1">Vencimento</p>
-        <BadgeVencimento data={data} tipo={tipo} />
+        <BadgeVencimento data={data} tipo={tipo} emRenovacao={emRenovacao} />
       </div>
     </div>
   );
 }
 
-function BadgeVencimento({ data, tipo, status }: { data?: string, tipo: string, status?: string }) {
+function BadgeVencimento({ data, tipo, status, emRenovacao }: { data?: string, tipo: string, status?: string, emRenovacao?: boolean }) {
   if (!data) return <span className="text-[10px] text-gray-600 italic">Não informado</span>;
   if (status === 'Inerte') {
     return (
       <span className="px-2 py-1 rounded-lg text-[10px] font-black uppercase border border-brand-dark-5 bg-brand-dark-3 text-gray-500">
         {formatarData(data)}
+      </span>
+    );
+  }
+  if (emRenovacao) {
+    return (
+      <span className="px-2 py-1 rounded-lg text-[10px] font-black uppercase border border-brand-blue/30 bg-brand-blue/10 text-brand-blue-light flex items-center gap-1">
+        <span className="w-1.5 h-1.5 rounded-full bg-brand-blue-light animate-pulse" />
+        AG. LIBERAÇÃO ({formatarData(data)})
       </span>
     );
   }
@@ -618,7 +634,8 @@ export function ModalArma({ armaParaEditar, onFechar, onSalvar }: { armaParaEdit
     numeroSigma: armaParaEditar?.numeroSigma || '', 
     acervo: (armaParaEditar?.acervo || 'Tiro Desportivo') as any, 
     vencimentoCraf: armaParaEditar?.vencimentoCraf || '',
-    crafUrl: armaParaEditar?.crafUrl || ''
+    crafUrl: armaParaEditar?.crafUrl || '',
+    crafEmRenovacao: armaParaEditar?.crafEmRenovacao ?? false
   });
 
   const modelosCombinados = Array.from(new Set([...MODELOS_BASE, ...modelosRegistrados])).sort();
@@ -719,6 +736,14 @@ export function ModalArma({ armaParaEditar, onFechar, onSalvar }: { armaParaEdit
           <div>
             <label className="label">Vencimento CRAF</label>
             <input type="date" className="input" value={form.vencimentoCraf} onChange={e => setForm({...form, vencimentoCraf: e.target.value})} />
+            <div className="flex items-center gap-1.5 mt-1.5">
+              <input type="checkbox" id="crafEmRenovacao"
+                checked={form.crafEmRenovacao} onChange={e => setForm({...form, crafEmRenovacao: e.target.checked})}
+                className="rounded border-brand-dark-5 bg-brand-dark-4 text-brand-blue focus:ring-0 w-3 h-3" />
+              <label htmlFor="crafEmRenovacao" className="text-[10px] text-gray-400 cursor-pointer select-none">
+                Aguardando liberação da Polícia Federal (CRAF em Renovação)
+              </label>
+            </div>
           </div>
           <div>
             <label className="label">Anexo do CRAF (PDF ou Imagem)</label>
@@ -791,7 +816,8 @@ export function ModalGt({ armaAcervo, armaNumeroSerie, gtParaEditar, onFechar, o
     tipo: (gtParaEditar?.tipo || 'Caça') as string, 
     vencimento: gtParaEditar?.vencimento || '', 
     destino: gtParaEditar?.destino || '',
-    arquivoUrl: gtParaEditar?.arquivoUrl || ''
+    arquivoUrl: gtParaEditar?.arquivoUrl || '',
+    gtEmRenovacao: gtParaEditar?.gtEmRenovacao ?? false
   });
   const [sugestoes, setSugestoes] = useState<string[]>([]);
   
@@ -1140,6 +1166,14 @@ export function ModalGt({ armaAcervo, armaNumeroSerie, gtParaEditar, onFechar, o
           <div>
             <label className="label">Data de Vencimento</label>
             <input type="date" className="input" value={form.vencimento} onChange={e => setForm({...form, vencimento: e.target.value})} />
+            <div className="flex items-center gap-1.5 mt-1.5">
+              <input type="checkbox" id="gtEmRenovacao"
+                checked={form.gtEmRenovacao} onChange={e => setForm({...form, gtEmRenovacao: e.target.checked})}
+                className="rounded border-brand-dark-5 bg-brand-dark-4 text-brand-blue focus:ring-0 w-3 h-3" />
+              <label htmlFor="gtEmRenovacao" className="text-[10px] text-gray-400 cursor-pointer select-none">
+                Aguardando liberação da Polícia Federal (GT em Renovação)
+              </label>
+            </div>
           </div>
           <div>
             <label className="label">Anexo da Guia (PDF ou Imagem)</label>
@@ -1214,7 +1248,8 @@ export function ModalManejo({ manejoParaEditar, onFechar, onSalvar }: { manejoPa
     cidade: manejoParaEditar?.cidade || '', 
     vencimento: manejoParaEditar?.vencimento || '',
     status: manejoParaEditar?.status || 'Ativo',
-    arquivoUrl: manejoParaEditar?.arquivoUrl || ''
+    arquivoUrl: manejoParaEditar?.arquivoUrl || '',
+    manejoEmRenovacao: manejoParaEditar?.manejoEmRenovacao ?? false
   });
   const [importando, setImportando] = useState(false);
 
@@ -1305,6 +1340,14 @@ export function ModalManejo({ manejoParaEditar, onFechar, onSalvar }: { manejoPa
             <div>
               <label className="label">Validade da Autorização</label>
               <input type="date" className="input" value={form.vencimento} onChange={e => setForm({...form, vencimento: e.target.value})} />
+              <div className="flex items-center gap-1.5 mt-1.5">
+                <input type="checkbox" id="manejoEmRenovacao"
+                  checked={form.manejoEmRenovacao} onChange={e => setForm({...form, manejoEmRenovacao: e.target.checked})}
+                  className="rounded border-brand-dark-5 bg-brand-dark-4 text-brand-blue focus:ring-0 w-3 h-3" />
+                <label htmlFor="manejoEmRenovacao" className="text-[10px] text-gray-400 cursor-pointer select-none">
+                  Aguardando liberação (Em Renovação)
+                </label>
+              </div>
             </div>
             <div>
               <label className="label">Status da Autorização</label>

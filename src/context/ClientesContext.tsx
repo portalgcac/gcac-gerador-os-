@@ -59,6 +59,8 @@ const mapFromDB = (row: any): Cliente => ({
   vencimentoCr: row.vencimento_cr || '',
   numeroCrIbama: row.numero_cr_ibama || '',
   vencimentoCrIbama: row.vencimento_cr_ibama || '',
+  crEmRenovacao: !!row.cr_em_renovacao,
+  crIbamaEmRenovacao: !!row.cr_ibama_em_renovacao,
   fotoUrl: row.foto_url || '',
   crUrl: row.cr_url || '',
   crIbamaUrl: row.cr_ibama_url || '',
@@ -82,6 +84,8 @@ const mapToDB = (dados: any) => {
   if (dados.vencimentoCr !== undefined) payload.vencimento_cr = dados.vencimentoCr || null;
   if (dados.numeroCrIbama !== undefined) payload.numero_cr_ibama = dados.numeroCrIbama;
   if (dados.vencimentoCrIbama !== undefined) payload.vencimento_cr_ibama = dados.vencimentoCrIbama || null;
+  if (dados.crEmRenovacao !== undefined) payload.cr_em_renovacao = dados.crEmRenovacao;
+  if (dados.crIbamaEmRenovacao !== undefined) payload.cr_ibama_em_renovacao = dados.crIbamaEmRenovacao;
   if (dados.fotoUrl !== undefined) payload.foto_url = dados.fotoUrl || null;
   if (dados.crUrl !== undefined) payload.cr_url = dados.crUrl || null;
   if (dados.crIbamaUrl !== undefined) payload.cr_ibama_url = dados.crIbamaUrl || null;
@@ -326,6 +330,7 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
       acervo: row.acervo,
       vencimentoCraf: row.vencimento_craf,
       crafUrl: row.craf_url,
+      crafEmRenovacao: !!row.craf_em_renovacao,
       criadoEm: row.criado_em
     }));
   }, [usuario]);
@@ -353,6 +358,7 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
       acervo: dados.acervo,
       vencimento_craf: dados.vencimentoCraf || null,
       craf_url: crafUrl || null,
+      craf_em_renovacao: dados.crafEmRenovacao !== undefined ? dados.crafEmRenovacao : false,
       empresa_id: empresaId
     };
 
@@ -396,6 +402,7 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
       vencimento: row.vencimento,
       destino: row.destino,
       arquivoUrl: row.arquivo_url,
+      gtEmRenovacao: !!row.gt_em_renovacao,
       criadoEm: row.criado_em
     }));
   }, [usuario]);
@@ -418,6 +425,7 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
       vencimento: dados.vencimento,
       destino: dados.destino,
       arquivo_url: arquivoUrl || null,
+      gt_em_renovacao: dados.gtEmRenovacao !== undefined ? dados.gtEmRenovacao : false,
       empresa_id: empresaId
     };
 
@@ -460,8 +468,9 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
       cidade: row.cidade,
       vencimento: row.vencimento,
       arquivoUrl: row.arquivo_url,
-      criadoEm: row.criado_em,
-      status: row.status || 'Ativo'
+      status: row.status || 'Ativo',
+      manejoEmRenovacao: !!row.manejo_em_renovacao,
+      criadoEm: row.criado_em
     }));
   }, [usuario]);
 
@@ -486,6 +495,7 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
       vencimento: dados.vencimento,
       status: dados.status || 'Ativo',
       arquivo_url: arquivoUrl || null,
+      manejo_em_renovacao: dados.manejoEmRenovacao !== undefined ? dados.manejoEmRenovacao : false,
       empresa_id: empresaId
     };
 

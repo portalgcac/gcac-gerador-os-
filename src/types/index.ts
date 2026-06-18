@@ -70,6 +70,8 @@ export interface Cliente {
   fotoUrl?: string;
   crUrl?: string;
   crIbamaUrl?: string;
+  crEmRenovacao?: boolean;
+  crIbamaEmRenovacao?: boolean;
   criadoEm: string;
   atualizadoEm: string;
 }
@@ -86,6 +88,7 @@ export interface Arma {
   acervo: 'Caça' | 'Tiro Desportivo' | 'Coleção';
   vencimentoCraf: string;
   crafUrl?: string;
+  crafEmRenovacao?: boolean;
   criadoEm: string;
 }
 
@@ -96,6 +99,7 @@ export interface GuiaTrafego {
   vencimento: string;
   destino: string;
   arquivoUrl?: string;
+  gtEmRenovacao?: boolean;
   criadoEm: string;
 }
 
@@ -110,6 +114,7 @@ export interface AutorizacaoManejo {
   arquivoUrl?: string;
   criadoEm: string;
   status: 'Ativo' | 'Inerte';
+  manejoEmRenovacao?: boolean;
 }
 
 export interface OrdemDeServico {

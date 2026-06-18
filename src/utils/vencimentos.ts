@@ -20,6 +20,7 @@ export interface AlertaDocumento {
   armaId?: string;
   isVinculado?: boolean;
   cacEmpresaId?: string;
+  emRenovacao?: boolean;
 }
 
 /**
