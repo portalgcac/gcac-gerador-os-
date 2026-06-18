@@ -19,7 +19,7 @@ jobs:
           echo "🔔 Disparando notificações push diárias..."
 
           RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
-            "${{ secrets.SUPABASE_URL }}/functions/v1/smooth-processor" \
+            "${{ secrets.SUPABASE_URL }}/functions/v1/enviar-push-diario" \
             -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}" \
             -H "Content-Type: application/json")
 
