@@ -18,15 +18,56 @@ jobs:
         run: |
           echo "🔔 Disparando notificações push diárias..."
 
+          # Resolvendo a URL do Supabase (com suporte a fallback VITE_ )
+          URL="${{ secrets.SUPABASE_URL }}"
+          if [ -z "$URL" ]; then
+            URL="${{ secrets.VITE_SUPABASE_URL }}"
+          fi
+
+          # Resolvendo a Anon Key do Supabase (com suporte a fallback VITE_ )
+          KEY="${{ secrets.SUPABASE_ANON_KEY }}"
+          if [ -z "$KEY" ]; then
+            KEY="${{ secrets.VITE_SUPABASE_ANON_KEY }}"
+          fi
+
+          # Validação das credenciais necessárias
+          if [ -z "$URL" ] || [ -z "$KEY" ]; then
+            echo "❌ ERRO DE CONFIGURAÇÃO:"
+            echo "As credenciais do Supabase não foram encontradas nos Secrets do repositório no GitHub."
+            echo ""
+            echo "Por favor, adicione as chaves abaixo no seu repositório GitHub para que o disparo automático funcione:"
+            echo "1. Acesse: https://github.com/portalgcac/gcac-gerador-os-/settings/secrets/actions"
+            echo "2. Clique em 'New repository secret'"
+            echo "3. Crie a secret com os seguintes dados:"
+            echo "   - Nome: SUPABASE_URL"
+            echo "   - Valor: https://xknexpjapjanozsuowod.supabase.co"
+            echo "4. Crie outra secret com:"
+            echo "   - Nome: SUPABASE_ANON_KEY"
+            echo "   - Valor: (sua Anon Key do Supabase)"
+            echo ""
+            echo "Nota: Você também pode usar os nomes VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY."
+            exit 1
+          fi
+
+          # Remover barra no final da URL se houver
+          URL=$(echo "$URL" | sed 's/\/$//')
+
+          # Executar chamada HTTP para a Edge Function
           RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
-            "${{ secrets.SUPABASE_URL }}/functions/v1/enviar-push-diario" \
-            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}" \
+            "$URL/functions/v1/enviar-push-diario" \
+            -H "Authorization: Bearer $KEY" \
             -H "Content-Type: application/json")
+
+          CURL_EXIT=$?
+          if [ $CURL_EXIT -ne 0 ]; then
+            echo "❌ Erro de rede/conexão ao chamar a Edge Function. Código de saída do curl: $CURL_EXIT"
+            exit $CURL_EXIT
+          fi
 
           HTTP_STATUS=$(echo "$RESPONSE" | tail -n1)
           BODY=$(echo "$RESPONSE" | head -n-1)
 
-          echo "Status HTTP: $HTTP_STATUS"
+          echo "Status HTTP retornado: $HTTP_STATUS"
           echo "Resposta: $BODY"
 
           if [ "$HTTP_STATUS" != "200" ] && [ "$HTTP_STATUS" != "201" ]; then
