@@ -6,7 +6,6 @@ import { useStatusConexao } from '../../hooks/useStatusConexao';
 import { useOrdens } from '../../context/OrdensContext';
 import { useServicos } from '../../context/ServicosContext';
 import { useClientes } from '../../context/ClientesContext';
-import { sincronizarPendentes } from '../../services/driveSync';
 import { 
   LogOut, Cloud, RefreshCw, User, Wifi, WifiOff, ShieldCheck, 
   Plus, Settings2, Edit2, Trash2, BadgeDollarSign, ChevronDown,
@@ -41,7 +40,7 @@ import {
 export function Configuracoes() {
   const { usuario, logout, refreshUsuario, temAcessoRecurso } = useAuth();
   const isCac = usuario?.tipoConta === 'cac_individual';
-  const { ordens } = useOrdens();
+  const { ordens, sincronizarPendentes } = useOrdens();
   const { servicos, deletarServico } = useServicos();
   const { clientes, buscarArmas, buscarGts, buscarManejos } = useClientes();
   const itensFila = ordens.filter(o => o.pendenteSincronizacao).length;

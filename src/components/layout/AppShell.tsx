@@ -4,7 +4,6 @@ import { Sidebar, NavegacaoInferior } from './Sidebar';
 import { useAuth } from '../../context/AuthContext';
 import { useStatusConexao } from '../../hooks/useStatusConexao';
 import { useOrdens } from '../../context/OrdensContext';
-import { sincronizarPendentes } from '../../services/driveSync';
 import { OnboardingCAC } from '../common/OnboardingCAC';
 import { OnboardingEmpresa } from '../common/OnboardingEmpresa';
 import { buscarVinculosPendentesCAC, VinculoDespachanteCac } from '../../services/vinculosService';
@@ -15,7 +14,7 @@ import { Lock, MessageCircle } from 'lucide-react';
 
 export function AppShell() {
   const { estaAutenticado, usuario, logout } = useAuth();
-  const { itensFila } = useOrdens();
+  const { itensFila, sincronizarPendentes } = useOrdens();
   const online = useStatusConexao();
   const location = useLocation();
   const [jaSincronizou, setJaSincronizou] = React.useState(false);

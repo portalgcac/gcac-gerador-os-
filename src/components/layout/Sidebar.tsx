@@ -8,7 +8,6 @@ import { supabase } from '../../db/supabase';
 import { useOrdens } from '../../context/OrdensContext';
 import { useStatusConexao } from '../../hooks/useStatusConexao';
 import { useLembretes } from '../../context/LembretesContext';
-import { sincronizarPendentes } from '../../services/driveSync';
 import { useNotificacoesSistema } from '../../context/NotificacoesSistemaContext';
 import { NotificacoesDropdown } from './NotificacoesDropdown';
 
@@ -87,7 +86,7 @@ const getLinkLabel = (link: typeof links[0], usuario: any) => {
 
 export function Sidebar() {
   const { usuario, logout, temAcessoRecurso } = useAuth();
-  const { ordens, itensFila } = useOrdens();
+  const { ordens, itensFila, sincronizarPendentes } = useOrdens();
   const { lembretes } = useLembretes();
   const { naoLidas } = useNotificacoesSistema();
   const online = useStatusConexao();

@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useCallback, useState, useEffect } from 'react';
 import { OrdemDeServico, StatusOS, FormaPagamento, CanalAtendimento } from '../types';
 import { supabase } from '../db/supabase';
-import { sincronizarOrdem } from '../services/driveSync';
+import { sincronizarOrdem as apiSincronizarOrdem, sincronizarPendentes as apiSincronizarPendentes } from '../services/driveSync';
 import { useAuth } from './AuthContext';
 import { useStatusConexao } from '../hooks/useStatusConexao';
 
@@ -18,6 +18,8 @@ interface OrdensContextType {
   registrarPagamento: (ordemId: string, valor: number, metodo: FormaPagamento) => Promise<void>;
   removerPagamento: (ordemId: string, pagamentoId: string) => Promise<void>;
   sincronizarComPerfil: (ordemId: string) => Promise<boolean>;
+  sincronizarOrdem: (ordem: OrdemDeServico) => Promise<boolean>;
+  sincronizarPendentes: () => Promise<{ ok: number; erro: number }>;
   itensFila: number; 
 }
 
@@ -136,6 +138,22 @@ export function OrdensProvider({ children }: { children: React.ReactNode }) {
   }, [carregarOrdens]);
 
   const totalPendentes = ordens.filter(o => o.status === 'Aguardando Pagamento').length;
+
+  const sincronizarOrdem = useCallback(async (ordem: OrdemDeServico): Promise<boolean> => {
+    const sucesso = await apiSincronizarOrdem(ordem);
+    if (sucesso) {
+      await carregarOrdens();
+    }
+    return sucesso;
+  }, [carregarOrdens]);
+
+  const sincronizarPendentes = useCallback(async (): Promise<{ ok: number; erro: number }> => {
+    const res = await apiSincronizarPendentes();
+    if (res.ok > 0) {
+      await carregarOrdens();
+    }
+    return res;
+  }, [carregarOrdens]);
 
   const criarOrdem = useCallback(async (
     dados: Omit<OrdemDeServico, 'id' | 'numero' | 'criadoEm' | 'atualizadoEm' | 'driveArquivoJsonId' | 'drivePdfId' | 'ultimaSincronizacao' | 'pendenteSincronizacao'>
@@ -403,6 +421,8 @@ export function OrdensProvider({ children }: { children: React.ReactNode }) {
       registrarPagamento,
       removerPagamento,
       sincronizarComPerfil,
+      sincronizarOrdem,
+      sincronizarPendentes,
       itensFila: ordens.filter(o => o.pendenteSincronizacao).length,
     }}>
       {children}

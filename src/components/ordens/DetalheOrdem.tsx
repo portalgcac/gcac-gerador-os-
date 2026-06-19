@@ -8,7 +8,6 @@ import {
 import { useOrdens } from '../../context/OrdensContext';
 import { useAuth } from '../../context/AuthContext';
 import { baixarPdf, imprimirPdf } from '../../services/geradorPdf';
-import { sincronizarOrdem } from '../../services/driveSync';
 import { DialogConfirmacao } from '../common/DialogConfirmacao';
 import { Notificacao, useNotificacao } from '../common/Notificacao';
 import { useClientes } from '../../context/ClientesContext';
@@ -24,7 +23,7 @@ export function DetalheOrdem({ ordem }: DetalheOrdemProps) {
   const { 
     deletarOrdem, atualizarStatusServico, atualizarOrdem, 
     atualizarGruServico, registrarPagamento, removerPagamento,
-    sincronizarComPerfil
+    sincronizarComPerfil, sincronizarOrdem
   } = useOrdens();
   const { clientes, buscarCreditos, adicionarCredito } = useClientes();
   const { estaAutenticado, usuario } = useAuth();
