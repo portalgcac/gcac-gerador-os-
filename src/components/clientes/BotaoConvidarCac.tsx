@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { UserPlus, Copy, Check, MessageCircle, X, Clock, CheckCircle2, XCircle, RefreshCw, Link } from 'lucide-react';
 import {
   gerarConvite,
@@ -27,12 +27,8 @@ export function BotaoConvidarCac({ cliente }: BotaoConvidarCacProps) {
   const [linkGerado, setLinkGerado] = useState<string | null>(null);
   const [conviteAtivo, setConviteAtivo] = useState<ConviteCac | null>(null);
 
-  // Não exibe para CAC Individual nem sem empresa
-  if (usuario?.tipoConta === 'cac_individual' || !usuario?.empresaId) return null;
-
-  const abrirModal = async () => {
-    setModalAberto(true);
-    setCarregandoConvites(true);
+  const carregarConvitesInfo = useCallback(async () => {
+    if (!cliente.id) return;
     const lista = await buscarConvitesPorCliente(cliente.id);
     setConvites(lista);
 
@@ -47,6 +43,21 @@ export function BotaoConvidarCac({ cliente }: BotaoConvidarCacProps) {
       setConviteAtivo(null);
       setLinkGerado(null);
     }
+  }, [cliente.id]);
+
+  useEffect(() => {
+    if (usuario?.tipoConta !== 'cac_individual' && usuario?.empresaId) {
+      carregarConvitesInfo();
+    }
+  }, [carregarConvitesInfo, usuario]);
+
+  // Não exibe para CAC Individual nem sem empresa
+  if (usuario?.tipoConta === 'cac_individual' || !usuario?.empresaId) return null;
+
+  const abrirModal = async () => {
+    setModalAberto(true);
+    setCarregandoConvites(true);
+    await carregarConvitesInfo();
     setCarregandoConvites(false);
   };
 

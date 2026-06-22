@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useClientes } from '../../context/ClientesContext';
 import { Users, Search, Edit2, Trash2, Eye, Shield, Copy, Check } from 'lucide-react';
@@ -9,11 +9,39 @@ import { DialogConfirmacao } from '../common/DialogConfirmacao';
 import { Notificacao, useNotificacao } from '../common/Notificacao';
 import { DetalheCliente } from './DetalheCliente';
 import { useAuth } from '../../context/AuthContext';
+import { supabase } from '../../db/supabase';
 
 export function ListaClientes() {
   const navigate = useNavigate();
   const { usuario } = useAuth();
   const { clientes, deletarCliente } = useClientes();
+  const [vinculosPortal, setVinculosPortal] = useState<Record<string, { status: string; permiteEdicao: boolean }>>({});
+
+  useEffect(() => {
+    async function carregarVinculos() {
+      if (!usuario?.empresaId) return;
+      try {
+        const { data, error } = await supabase
+          .from('vinculos_despachante_cac')
+          .select('cac_cpf, status, permite_edicao')
+          .eq('despachante_empresa_id', usuario.empresaId);
+        
+        if (!error && data) {
+          const map: Record<string, { status: string; permiteEdicao: boolean }> = {};
+          data.forEach(v => {
+            if (v.cac_cpf) {
+              const cpfLimpo = v.cac_cpf.replace(/\D/g, '');
+              map[cpfLimpo] = { status: v.status, permiteEdicao: !!v.permite_edicao };
+            }
+          });
+          setVinculosPortal(map);
+        }
+      } catch (err) {
+        console.error('Erro ao carregar vínculos no portal:', err);
+      }
+    }
+    carregarVinculos();
+  }, [usuario]);
 
   if (usuario?.tipoConta === 'cac_individual') {
     if (clientes.length > 0) {
@@ -122,12 +150,31 @@ export function ListaClientes() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-brand-dark-5">
-                {clientesFiltrados.map(cliente => (
-                  <tr key={cliente.id} className="hover:bg-brand-dark-4 transition-colors">
-                    <td className="px-4 py-3 cursor-pointer group" onClick={() => navigate(`/clientes/${cliente.id}`)}>
-                       <p className="font-bold text-white group-hover:text-brand-blue-light transition-colors">{cliente.nome}</p>
-                      <p className="text-xs text-brand-metal">{formatarCPF(cliente.cpf)}</p>
-                    </td>
+                {clientesFiltrados.map(cliente => {
+                  const cpfLimpo = cliente.cpf ? cliente.cpf.replace(/\D/g, '') : '';
+                  const vinculo = vinculosPortal[cpfLimpo];
+
+                  return (
+                    <tr key={cliente.id} className="hover:bg-brand-dark-4 transition-colors">
+                      <td className="px-4 py-3 cursor-pointer group" onClick={() => navigate(`/clientes/${cliente.id}`)}>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="font-bold text-white group-hover:text-brand-blue-light transition-colors">{cliente.nome}</p>
+                          {vinculo?.status === 'ativo' && (
+                            <span 
+                              className="inline-flex items-center gap-0.5 text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-brand-green/10 border border-brand-green/30 text-brand-green" 
+                              title={vinculo.permiteEdicao ? 'Acesso de escrita/edição ativo' : 'Acesso de leitura ativo'}
+                            >
+                              Portal G CAC {vinculo.permiteEdicao ? '• Edição' : '• Leitura'}
+                            </span>
+                          )}
+                          {vinculo?.status === 'pendente' && (
+                            <span className="inline-flex items-center gap-0.5 text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-yellow-500/10 border border-yellow-500/30 text-yellow-400">
+                              Portal Pendente
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-brand-metal">{formatarCPF(cliente.cpf)}</p>
+                      </td>
                     <td className="px-4 py-3 text-gray-300">
                       {formatarTelefone(cliente.contato)}
                     </td>
@@ -170,7 +217,8 @@ export function ListaClientes() {
                       </button>
                     </td>
                   </tr>
-                ))}
+                );
+              })}
               </tbody>
             </table>
           </div>

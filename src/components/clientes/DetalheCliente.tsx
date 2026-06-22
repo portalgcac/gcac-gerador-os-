@@ -21,6 +21,7 @@ import { useAuth } from '../../context/AuthContext';
 import { visualizarDocumentoBase64 } from '../../utils/fileUtils';
 import { BotaoConvidarCac } from './BotaoConvidarCac';
 import { supabase } from '../../db/supabase';
+import { buscarAcervoVinculado } from '../../services/vinculosService';
 
 interface DetalheClienteProps {
   cliente: Cliente;
@@ -47,6 +48,8 @@ export function DetalheCliente({ cliente }: DetalheClienteProps) {
   const [mostrarTodasOrdens, setMostrarTodasOrdens] = useState(false);
   const [cacEmpresaId, setCacEmpresaId] = useState<string | undefined>(undefined);
   const [podeEditarVinculo, setPodeEditarVinculo] = useState<boolean>(false);
+  const [portalStatus, setPortalStatus] = useState<string | undefined>(undefined);
+  const [alertasCount, setAlertasCount] = useState<number>(0);
 
   // Filtros de histórico
   const todasOrdensCliente = ordens.filter(o => o.cpf === cliente.cpf);
@@ -57,12 +60,14 @@ export function DetalheCliente({ cliente }: DetalheClienteProps) {
   const recibosCliente = recibos.filter(r => r.clienteCPF === cliente.cpf);
   const agendamentosCliente = agendamentos.filter(a => a.clienteCPF === cliente.cpf && a.status === 'pendente');
 
+  const { buscarArmas, buscarManejos, buscarGts } = useClientes();
+
   const tabsDisponiveis = [
     { id: 'ordens', label: 'O.S.', slug: 'ordens', count: todasOrdensCliente.length },
     { id: 'orcamentos', label: 'Orçamentos', slug: 'orcamentos', count: orcamentosCliente.length },
     { id: 'recibos', label: 'Recibos', slug: 'recibos', count: recibosCliente.length },
     { id: 'agendamentos', label: 'Agendamentos', slug: 'agendamentos', count: agendamentosCliente.length },
-    { id: 'documentos', label: 'Acervo & Docs', slug: null, count: 0 },
+    { id: 'documentos', label: 'Acervo & Docs', slug: null, count: alertasCount },
     { id: 'creditos', label: 'Haver', slug: null, count: 0 },
   ].filter(tab => {
     if (usuario?.tipoConta === 'cac_individual') {
@@ -91,18 +96,26 @@ export function DetalheCliente({ cliente }: DetalheClienteProps) {
         const cpfLimpo = cliente.cpf.replace(/\D/g, '');
         const cpfFormatado = cpfLimpo.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
 
-        // 1. Busca vínculo ativo para esse cliente
+        // 1. Busca vínculo para esse cliente (qualquer status para exibirmos a situação do portal)
         const { data: vinculo } = await supabase
           .from('vinculos_despachante_cac')
-          .select('cac_empresa_id, permite_edicao')
+          .select('cac_empresa_id, permite_edicao, status')
           .eq('despachante_empresa_id', despachanteEmpresaId)
           .or(`cac_cpf.eq.${cpfLimpo},cac_cpf.eq.${cpfFormatado}`)
-          .eq('status', 'ativo')
           .maybeSingle();
 
         if (cancelado) return;
 
-        if (!vinculo?.cac_empresa_id) {
+        if (!vinculo) {
+          setCacEmpresaId(undefined);
+          setPodeEditarVinculo(false);
+          setPortalStatus(undefined);
+          return;
+        }
+
+        setPortalStatus(vinculo.status);
+
+        if (vinculo.status !== 'ativo') {
           setCacEmpresaId(undefined);
           setPodeEditarVinculo(false);
           return;
@@ -147,6 +160,79 @@ export function DetalheCliente({ cliente }: DetalheClienteProps) {
       cancelado = true;
     };
   }, [cliente, usuario, atualizarCliente]);
+
+  // Conta os alertas de documentos em background para o badge da aba
+  useEffect(() => {
+    let cancelado = false;
+
+    async function carregarEContarAlertas() {
+      if (!cliente.id) return;
+      try {
+        let crVenc = cliente.vencimentoCr;
+        let crIbamaVenc = cliente.vencimentoCrIbama;
+        let armasList: any[] = [];
+        let gtsList: any[] = [];
+        let manejosList: any[] = [];
+
+        if (cacEmpresaId && usuario?.empresaId) {
+          const acervo = await buscarAcervoVinculado(cacEmpresaId, usuario.empresaId);
+          if (cancelado) return;
+          if (acervo) {
+            crVenc = acervo.cliente.vencimentoCr;
+            crIbamaVenc = acervo.cliente.vencimentoCrIbama;
+            armasList = acervo.armas;
+            acervo.armas.forEach(a => {
+              gtsList.push(...(a.gts || []));
+            });
+            manejosList = acervo.manejos || [];
+          }
+        } else {
+          const [armasData, manejosData] = await Promise.all([
+            buscarArmas(cliente.id),
+            buscarManejos(cliente.id)
+          ]);
+          if (cancelado) return;
+          armasList = armasData || [];
+          manejosList = manejosData || [];
+          await Promise.all((armasData || []).map(async (a) => {
+            const gts = await buscarGts(a.id);
+            if (gts) gtsList.push(...gts);
+          }));
+        }
+
+        if (cancelado) return;
+
+        // Regra de 30 dias (vencido ou expira em menos de 30 dias)
+        const hoje = new Date();
+        hoje.setHours(0, 0, 0, 0);
+        const limite = new Date(hoje.getTime() + 30 * 24 * 60 * 60 * 1000);
+        limite.setHours(23, 59, 59, 999);
+
+        const isAlerta = (venc?: string | null) => {
+          if (!venc) return false;
+          const v = new Date(venc);
+          return v <= limite;
+        };
+
+        let count = 0;
+        if (isAlerta(crVenc)) count++;
+        if (isAlerta(crIbamaVenc)) count++;
+        armasList.forEach(a => { if (isAlerta(a.vencimentoCraf || a.vencimento_craf)) count++; });
+        gtsList.forEach(g => { if (isAlerta(g.vencimento)) count++; });
+        manejosList.forEach(m => { if (isAlerta(m.vencimento)) count++; });
+
+        setAlertasCount(count);
+      } catch (err) {
+        console.error('Erro ao calcular contagem de alertas:', err);
+      }
+    }
+
+    carregarEContarAlertas();
+
+    return () => {
+      cancelado = true;
+    };
+  }, [cliente, cacEmpresaId, usuario, buscarArmas, buscarManejos, buscarGts]);
 
   const handleCopiarSenha = (senha: string) => {
     navigator.clipboard.writeText(senha);
@@ -287,8 +373,18 @@ export function DetalheCliente({ cliente }: DetalheClienteProps) {
             </button>
           )}
           <div>
-            <h1 className="text-2xl font-bold text-white flex items-center gap-2">
+            <h1 className="text-2xl font-bold text-white flex items-center gap-2 flex-wrap">
               {cliente.nome}
+              {portalStatus === 'ativo' && (
+                <span className="inline-flex items-center gap-1 text-[11px] font-black uppercase px-2.5 py-0.5 rounded-full bg-brand-green/20 border border-brand-green/30 text-brand-green">
+                  Portal GCAC: Ativo • {podeEditarVinculo ? 'Edição Habilitada' : 'Somente Leitura'}
+                </span>
+              )}
+              {portalStatus === 'pendente' && (
+                <span className="inline-flex items-center gap-1 text-[11px] font-black uppercase px-2.5 py-0.5 rounded-full bg-yellow-500/10 border border-yellow-500/30 text-yellow-400">
+                  Portal GCAC: Convite Pendente
+                </span>
+              )}
             </h1>
             <p className="text-gray-400 text-sm">
               {usuario?.tipoConta === 'cac_individual' ? 'Meu Acervo & Documentação' : 'Perfil do Cliente'}
@@ -521,6 +617,7 @@ export function DetalheCliente({ cliente }: DetalheClienteProps) {
                   ativo={abaAtiva === tab.id} 
                   onClick={() => setAbaAtiva(tab.id as any)} 
                   count={tab.id === 'ordens' && !mostrarTodasOrdens ? ordensClienteAbertas.length : tab.count}
+                  isAlert={tab.id === 'documentos' && tab.count > 0}
                 >
                   {tab.label}
                 </TabButton>
@@ -637,7 +734,7 @@ export function DetalheCliente({ cliente }: DetalheClienteProps) {
   );
 }
 
-function TabButton({ children, ativo, onClick, count }: { children: React.ReactNode, ativo: boolean, onClick: () => void, count: number }) {
+function TabButton({ children, ativo, onClick, count, isAlert }: { children: React.ReactNode, ativo: boolean, onClick: () => void, count: number, isAlert?: boolean }) {
   return (
     <button 
       onClick={onClick}
@@ -647,7 +744,11 @@ function TabButton({ children, ativo, onClick, count }: { children: React.ReactN
     >
       {children}
       {count > 0 && (
-        <span className={`px-1.5 py-0.5 rounded-full text-[9px] ${ativo ? 'bg-brand-blue text-white' : 'bg-brand-dark-5 text-gray-500'}`}>
+        <span className={`px-1.5 py-0.5 rounded-full text-[9px] ${
+          isAlert 
+            ? 'bg-red-500 text-white font-bold animate-pulse' 
+            : (ativo ? 'bg-brand-blue text-white' : 'bg-brand-dark-5 text-gray-500')
+        }`}>
           {count}
         </span>
       )}

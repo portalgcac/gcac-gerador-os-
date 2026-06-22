@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Target, MapPin, Calendar, Plus, Trash2, ShieldAlert, 
+  Target, MapPin, Calendar, Plus, Trash2, ShieldAlert, AlertTriangle,
   ChevronDown, ChevronUp, FileText, Globe, Landmark, Upload, Loader2, Pencil
 } from 'lucide-react';
 import { parseIbamaPdf } from '../../services/ibamaParserService';
@@ -93,6 +93,37 @@ export function AbaDocumentacao({ cliente, armaIdInicial, cacEmpresaId, podeEdit
   const [gtsPorArma, setGtsPorArma] = useState<Record<string, GuiaTrafego[]>>({});
   const [carregando, setCarregando] = useState(true);
   const [expandirArma, setExpandirArma] = useState<string | null>(armaIdInicial || null);
+  const [alertasCriticos, setAlertasCriticos] = useState(0);
+
+  useEffect(() => {
+    // Regra de 30 dias (vencido ou expira em menos de 30 dias)
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+    const limite = new Date(hoje.getTime() + 30 * 24 * 60 * 60 * 1000);
+    limite.setHours(23, 59, 59, 999);
+
+    const isAlerta = (venc?: string | null) => {
+      if (!venc) return false;
+      const v = new Date(venc);
+      return v <= limite;
+    };
+
+    let count = 0;
+    if (isAlerta(cliente.vencimentoCr)) count++;
+    if (isAlerta(cliente.vencimentoCrIbama)) count++;
+    armas.forEach(a => {
+      if (isAlerta(a.vencimentoCraf)) count++;
+      const gts = gtsPorArma[a.id] || [];
+      gts.forEach(g => {
+        if (isAlerta(g.vencimento)) count++;
+      });
+    });
+    manejos.forEach(m => {
+      if (isAlerta(m.vencimento)) count++;
+    });
+
+    setAlertasCriticos(count);
+  }, [cliente, armas, gtsPorArma, manejos]);
 
   const [modalArma, setModalArma] = useState(false);
   const [armaParaEditar, setArmaParaEditar] = useState<Arma | null>(null);
@@ -188,6 +219,19 @@ export function AbaDocumentacao({ cliente, armaIdInicial, cacEmpresaId, podeEdit
 
   return (
     <div className="space-y-8 animate-fade-in">
+      {/* Banner de Alertas Críticos */}
+      {alertasCriticos > 0 && (
+        <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 flex items-start gap-3">
+          <AlertTriangle size={18} className="text-red-400 shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-bold text-red-300">{alertasCriticos} documento(s) com alerta</p>
+            <p className="text-xs text-red-400/70 mt-0.5">
+              Documentos vencidos ou com vencimento em menos de 30 dias. Contate o usuário se necessário.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* ── Resumo de Vencimentos CR ── */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <CardVencimento 
