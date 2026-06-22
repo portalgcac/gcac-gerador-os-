@@ -83,7 +83,8 @@ export function AbaDocumentacao({ cliente, armaIdInicial, cacEmpresaId, podeEdit
   const { 
     buscarArmas, salvarArma, deletarArma,
     buscarGts, salvarGt, deletarGt,
-    buscarManejos, salvarManejo, deletarManejo
+    buscarManejos, salvarManejo, deletarManejo,
+    atualizarCliente
   } = useClientes();
 
   const podeEditar = !cacEmpresaId || podeEditarVinculo;
@@ -94,35 +95,45 @@ export function AbaDocumentacao({ cliente, armaIdInicial, cacEmpresaId, podeEdit
   const [carregando, setCarregando] = useState(true);
   const [expandirArma, setExpandirArma] = useState<string | null>(armaIdInicial || null);
   const [alertasCriticos, setAlertasCriticos] = useState(0);
+  const [alertasItens, setAlertasItens] = useState<{ id: string; tipo: string; nome: string; data: string }[]>([]);
 
-  useEffect(() => {
-    // Regra de 30 dias (vencido ou expira em menos de 30 dias)
+  const isAlerta = (venc?: string | null) => {
+    if (!venc) return false;
     const hoje = new Date();
     hoje.setHours(0, 0, 0, 0);
     const limite = new Date(hoje.getTime() + 30 * 24 * 60 * 60 * 1000);
     limite.setHours(23, 59, 59, 999);
+    const v = new Date(venc);
+    return v <= limite;
+  };
 
-    const isAlerta = (venc?: string | null) => {
-      if (!venc) return false;
-      const v = new Date(venc);
-      return v <= limite;
-    };
-
-    let count = 0;
-    if (isAlerta(cliente.vencimentoCr)) count++;
-    if (isAlerta(cliente.vencimentoCrIbama)) count++;
+  useEffect(() => {
+    const itens: { id: string; tipo: string; nome: string; data: string }[] = [];
+    if (isAlerta(cliente.vencimentoCr)) {
+      itens.push({ id: 'cr', tipo: 'CR (PF / Exército)', nome: cliente.numeroCr || 'Não informado', data: cliente.vencimentoCr! });
+    }
+    if (isAlerta(cliente.vencimentoCrIbama)) {
+      itens.push({ id: 'cr-ibama', tipo: 'CR IBAMA', nome: cliente.numeroCrIbama || 'Não informado', data: cliente.vencimentoCrIbama! });
+    }
     armas.forEach(a => {
-      if (isAlerta(a.vencimentoCraf)) count++;
+      if (isAlerta(a.vencimentoCraf)) {
+        itens.push({ id: `arma-${a.id}`, tipo: 'CRAF de Arma', nome: `${a.tipo || ''} ${a.modelo} (${a.numeroSerie})`, data: a.vencimentoCraf! });
+      }
       const gts = gtsPorArma[a.id] || [];
       gts.forEach(g => {
-        if (isAlerta(g.vencimento)) count++;
+        if (isAlerta(g.vencimento)) {
+          itens.push({ id: `gt-${g.id}`, tipo: 'Guia de Tráfego (GT)', nome: `Arma ${a.modelo} (${a.numeroSerie}) -> ${g.destino}`, data: g.vencimento! });
+        }
       });
     });
     manejos.forEach(m => {
-      if (isAlerta(m.vencimento)) count++;
+      if (isAlerta(m.vencimento)) {
+        itens.push({ id: `manejo-${m.id}`, tipo: 'Autorização de Manejo', nome: `Fazenda ${m.nomeFazenda} (CAR: ${m.numeroCar})`, data: m.vencimento! });
+      }
     });
 
-    setAlertasCriticos(count);
+    setAlertasItens(itens);
+    setAlertasCriticos(itens.length);
   }, [cliente, armas, gtsPorArma, manejos]);
 
   const [modalArma, setModalArma] = useState(false);
@@ -130,6 +141,7 @@ export function AbaDocumentacao({ cliente, armaIdInicial, cacEmpresaId, podeEdit
   const [modalGt, setModalGt] = useState<{armaId: string, gt?: GuiaTrafego} | null>(null);
   const [modalManejo, setModalManejo] = useState(false);
   const [manejoParaEditar, setManejoParaEditar] = useState<AutorizacaoManejo | null>(null);
+  const [modalEditarCr, setModalEditarCr] = useState<{ tipo: 'CR' | 'IBAMA_CR'; label: string } | null>(null);
 
   const carregarDados = async () => {
     setCarregando(true);
@@ -221,13 +233,32 @@ export function AbaDocumentacao({ cliente, armaIdInicial, cacEmpresaId, podeEdit
     <div className="space-y-8 animate-fade-in">
       {/* Banner de Alertas Críticos */}
       {alertasCriticos > 0 && (
-        <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 flex items-start gap-3">
-          <AlertTriangle size={18} className="text-red-400 shrink-0 mt-0.5" />
-          <div>
-            <p className="text-sm font-bold text-red-300">{alertasCriticos} documento(s) com alerta</p>
-            <p className="text-xs text-red-400/70 mt-0.5">
-              Documentos vencidos ou com vencimento em menos de 30 dias. Contate o usuário se necessário.
-            </p>
+        <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 flex flex-col gap-3">
+          <div className="flex items-start gap-3">
+            <AlertTriangle size={18} className="text-red-400 shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-bold text-red-300">{alertasCriticos} documento(s) com alerta</p>
+              <p className="text-xs text-red-400/70 mt-0.5">
+                Documentos vencidos ou com vencimento em menos de 30 dias:
+              </p>
+            </div>
+          </div>
+          <div className="pl-7 space-y-1">
+            {alertasItens.map(item => {
+              const hoje = new Date();
+              hoje.setHours(0, 0, 0, 0);
+              const vDate = new Date(item.data);
+              const vencido = vDate < hoje;
+              return (
+                <p key={item.id} className="text-xs text-red-400/90 flex flex-wrap gap-x-1.5 items-center">
+                  <span className="font-bold text-white shrink-0">• [{item.tipo}]</span>
+                  <span className="truncate">{item.nome}</span>
+                  <span className={`font-black shrink-0 px-1.5 py-0.2 rounded text-[9px] ${vencido ? 'bg-red-500/25 text-red-300' : 'bg-amber-500/25 text-amber-300'}`}>
+                    {vencido ? 'VENCIDO' : 'VENCE'} EM {formatarData(item.data)}
+                  </span>
+                </p>
+              );
+            })}
           </div>
         </div>
       )}
@@ -241,13 +272,18 @@ export function AbaDocumentacao({ cliente, armaIdInicial, cacEmpresaId, podeEdit
           tipo="CR"
           icon={<ShieldAlert size={20} />}
           emRenovacao={cliente.crEmRenovacao}
+          podeEditar={podeEditar}
+          onEditar={() => setModalEditarCr({ tipo: 'CR', label: 'CR (PF / Exército)' })}
         />
         <CardVencimento 
           label="CR IBAMA" 
+          numero={cliente.numeroCrIbama}
           data={cliente.vencimentoCrIbama} 
           tipo="IBAMA_CR"
           icon={<Globe size={20} />}
           emRenovacao={cliente.crIbamaEmRenovacao}
+          podeEditar={podeEditar}
+          onEditar={() => setModalEditarCr({ tipo: 'IBAMA_CR', label: 'CR IBAMA' })}
         />
       </div>
 
@@ -295,6 +331,18 @@ export function AbaDocumentacao({ cliente, armaIdInicial, cacEmpresaId, podeEdit
                         <span className="text-[9px] px-1.5 py-0.5 rounded bg-brand-blue/20 text-brand-blue-light font-black uppercase tracking-tighter shrink-0">
                           {arma.acervo}
                         </span>
+                        {(() => {
+                          const gts = gtsPorArma[arma.id] || [];
+                          const gtsAlerta = gts.filter(g => isAlerta(g.vencimento)).length;
+                          if (gtsAlerta > 0) {
+                            return (
+                              <span className="text-[9px] px-1.5 py-0.5 rounded bg-red-500/20 text-red-400 font-bold uppercase tracking-tighter shrink-0 flex items-center gap-1">
+                                <AlertTriangle size={10} /> {gtsAlerta} GT com alerta
+                              </span>
+                            );
+                          }
+                          return null;
+                        })()}
                       </div>
                     </div>
                   </div>
@@ -603,13 +651,193 @@ export function AbaDocumentacao({ cliente, armaIdInicial, cacEmpresaId, podeEdit
           } 
         />
       )}
+
+      {modalEditarCr && (
+        <ModalEditarCr 
+          label={modalEditarCr.label}
+          numeroInicial={modalEditarCr.tipo === 'CR' ? cliente.numeroCr : cliente.numeroCrIbama}
+          dataInicial={modalEditarCr.tipo === 'CR' ? cliente.vencimentoCr : cliente.vencimentoCrIbama}
+          urlInicial={modalEditarCr.tipo === 'CR' ? cliente.crUrl : cliente.crIbamaUrl}
+          emRenovacaoInicial={modalEditarCr.tipo === 'CR' ? cliente.crEmRenovacao : cliente.crIbamaEmRenovacao}
+          onFechar={() => setModalEditarCr(null)}
+          onSalvar={async (d) => {
+            try {
+              const mudancas: any = {};
+              if (modalEditarCr.tipo === 'CR') {
+                mudancas.numeroCr = d.numero?.trim().toUpperCase();
+                mudancas.vencimentoCr = d.vencimento;
+                mudancas.crUrl = d.url;
+                mudancas.crEmRenovacao = d.emRenovacao;
+              } else {
+                mudancas.numeroCrIbama = d.numero?.trim().toUpperCase();
+                mudancas.vencimentoCrIbama = d.vencimento;
+                mudancas.crIbamaUrl = d.url;
+                mudancas.crIbamaEmRenovacao = d.emRenovacao;
+              }
+
+              await atualizarCliente(cliente.id, mudancas, cacEmpresaId);
+              await carregarDados();
+              setModalEditarCr(null);
+            } catch (err: any) {
+              console.error('Erro ao salvar CR:', err);
+              alert('Erro ao salvar CR: ' + (err.message || JSON.stringify(err)));
+            }
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+export function ModalEditarCr({ 
+  label,
+  numeroInicial,
+  dataInicial,
+  urlInicial,
+  emRenovacaoInicial,
+  onFechar, 
+  onSalvar 
+}: { 
+  label: string,
+  numeroInicial?: string,
+  dataInicial?: string,
+  urlInicial?: string,
+  emRenovacaoInicial?: boolean,
+  onFechar: () => void, 
+  onSalvar: (d: { numero: string; vencimento: string; url: string; emRenovacao: boolean }) => void 
+}) {
+  const [form, setForm] = useState({
+    numero: numeroInicial || '',
+    vencimento: dataInicial || '',
+    url: urlInicial || '',
+    emRenovacao: emRenovacaoInicial ?? false
+  });
+
+  return (
+    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+      <div className="card w-full max-w-md animate-scale-up" onClick={e => e.stopPropagation()}>
+        <h3 className="text-lg font-bold text-white mb-6">
+          Editar {label}
+        </h3>
+        
+        <div className="space-y-4">
+          <div>
+            <label className="label">Número do Documento</label>
+            <input 
+              type="text" 
+              className="input uppercase" 
+              value={form.numero} 
+              onChange={e => setForm({...form, numero: e.target.value})} 
+              placeholder="Ex: 000.766.870-82"
+            />
+          </div>
+
+          <div>
+            <label className="label">Data de Vencimento</label>
+            <input 
+              type="date" 
+              className="input" 
+              value={form.vencimento} 
+              onChange={e => setForm({...form, vencimento: e.target.value})} 
+            />
+          </div>
+
+          <div className="flex items-center gap-1.5 py-1">
+            <input 
+              type="checkbox" 
+              id="docEmRenovacao"
+              checked={form.emRenovacao} 
+              onChange={e => setForm({...form, emRenovacao: e.target.checked})}
+              className="rounded border-brand-dark-5 bg-brand-dark-4 text-brand-blue focus:ring-0 w-3 h-3" 
+            />
+            <label htmlFor="docEmRenovacao" className="text-[10px] text-gray-400 cursor-pointer select-none">
+              Aguardando liberação / Renovação em andamento
+            </label>
+          </div>
+
+          <div>
+            <label className="label">Anexo do Documento (PDF ou Imagem)</label>
+            <div className="flex items-center gap-3">
+              <input 
+                type="file" 
+                accept="application/pdf,image/*" 
+                className="hidden" 
+                id="cr-attachment" 
+                onChange={async e => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    try {
+                      const base64 = await fileToBase64(file);
+                      setForm({...form, url: base64});
+                    } catch (err) {
+                      console.error(err);
+                      alert('Erro ao carregar o arquivo.');
+                    }
+                  }
+                }} 
+              />
+              <label 
+                htmlFor="cr-attachment" 
+                className="btn-ghost flex items-center gap-2 cursor-pointer text-xs h-10 border border-brand-dark-5 rounded-lg px-3"
+              >
+                <Upload size={14} /> {form.url ? 'Alterar Anexo' : 'Anexar Documento'}
+              </label>
+              {form.url && (
+                <>
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      visualizarDocumentoBase64(form.url, `DOC-${label}`);
+                    }}
+                    className="text-brand-blue hover:text-brand-blue-light text-xs font-semibold"
+                  >
+                    Visualizar
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={() => setForm({...form, url: ''})}
+                    className="text-red-400 hover:text-red-300 text-xs font-semibold"
+                  >
+                    Remover
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex gap-3 pt-6 border-t border-slate-800/60 mt-6">
+          <button onClick={onFechar} className="btn-ghost flex-1">Cancelar</button>
+          <button onClick={() => onSalvar(form)} className="btn-primary flex-1">
+            Salvar Alterações
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
 
 // --- Componentes Internos ---
 
-function CardVencimento({ label, numero, data, tipo, icon, emRenovacao }: { label: string, numero?: string, data?: string, tipo: string, icon: React.ReactNode, emRenovacao?: boolean }) {
+function CardVencimento({ 
+  label, 
+  numero, 
+  data, 
+  tipo, 
+  icon, 
+  emRenovacao,
+  podeEditar,
+  onEditar 
+}: { 
+  label: string, 
+  numero?: string, 
+  data?: string, 
+  tipo: string, 
+  icon: React.ReactNode, 
+  emRenovacao?: boolean,
+  podeEditar?: boolean,
+  onEditar?: () => void 
+}) {
   return (
     <div className="card bg-brand-dark-3/50 border-brand-dark-5 flex flex-row items-center justify-between p-4 gap-3 flex-wrap xs:flex-nowrap">
       <div className="flex items-center gap-3 min-w-0">
@@ -621,9 +849,20 @@ function CardVencimento({ label, numero, data, tipo, icon, emRenovacao }: { labe
           <p className="text-white font-bold text-sm truncate" title={numero}>{numero || 'DATA DE VALIDADE'}</p>
         </div>
       </div>
-      <div className="text-right shrink-0">
-        <p className="text-[9px] text-gray-600 font-bold uppercase mb-1">Vencimento</p>
-        <BadgeVencimento data={data} tipo={tipo} emRenovacao={emRenovacao} />
+      <div className="flex items-center gap-2 shrink-0">
+        <div className="text-right">
+          <p className="text-[9px] text-gray-600 font-bold uppercase mb-1">Vencimento</p>
+          <BadgeVencimento data={data} tipo={tipo} emRenovacao={emRenovacao} />
+        </div>
+        {podeEditar && onEditar && (
+          <button 
+            onClick={onEditar}
+            className="p-2 rounded-lg bg-brand-dark-2 text-gray-400 hover:text-brand-blue transition-colors"
+            title={`Editar ${label}`}
+          >
+            <Pencil size={14} />
+          </button>
+        )}
       </div>
     </div>
   );

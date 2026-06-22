@@ -9,7 +9,7 @@ import { useAuth } from './AuthContext';
 interface ClientesContextType {
   clientes: Cliente[];
   criarCliente: (dados: Omit<Cliente, 'id' | 'criadoEm' | 'atualizadoEm'>) => Promise<string>;
-  atualizarCliente: (id: string, dados: Partial<Cliente>) => Promise<void>;
+  atualizarCliente: (id: string, dados: Partial<Cliente>, overrideEmpresaId?: string) => Promise<void>;
   deletarCliente: (id: string) => Promise<void>;
   buscarCliente: (id: string) => Promise<Cliente | undefined>;
   buscarClientePorNomeExato: (nome: string) => Promise<Cliente | undefined>;
@@ -23,17 +23,17 @@ interface ClientesContextType {
   // Gestão de Armas
   buscarArmas: (clienteId: string) => Promise<Arma[]>;
   salvarArma: (arma: Partial<Arma> & { clienteId: string }, overrideEmpresaId?: string) => Promise<void>;
-  deletarArma: (id: string) => Promise<void>;
+  deletarArma: (id: string, overrideEmpresaId?: string) => Promise<void>;
   
   // Gestão de GTs
   buscarGts: (armaId: string) => Promise<GuiaTrafego[]>;
   salvarGt: (gt: Partial<GuiaTrafego> & { armaId: string }, overrideEmpresaId?: string) => Promise<void>;
-  deletarGt: (id: string) => Promise<void>;
+  deletarGt: (id: string, overrideEmpresaId?: string) => Promise<void>;
   
   // Gestão de Manejo
   buscarManejos: (clienteId: string) => Promise<AutorizacaoManejo[]>;
   salvarManejo: (manejo: Partial<AutorizacaoManejo> & { clienteId: string }, overrideEmpresaId?: string) => Promise<void>;
-  deletarManejo: (id: string) => Promise<void>;
+  deletarManejo: (id: string, overrideEmpresaId?: string) => Promise<void>;
   
   // Gestão de Créditos
   buscarCreditos: (clienteId: string) => Promise<CreditoCliente[]>;
@@ -191,21 +191,23 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
     return data.id;
   }, [carregarClientes, usuario]);
 
-  const atualizarCliente = useCallback(async (id: string, dados: Partial<Cliente>) => {
+  const atualizarCliente = useCallback(async (id: string, dados: Partial<Cliente>, overrideEmpresaId?: string) => {
     if (!usuario?.empresaId) throw new Error('Usuário não autenticado');
+    const localEmpresaId = usuario.empresaId;
+    const portalEmpresaId = overrideEmpresaId;
     
     let crUrl = dados.crUrl;
     let crIbamaUrl = dados.crIbamaUrl;
     
     if (crUrl && crUrl.startsWith('data:')) {
       const ext = crUrl.split(';base64,')[0].split(':')[1].split('/')[1] || 'pdf';
-      const path = `${usuario.empresaId}/clientes/${id}/cr_${uuidv4()}.${ext}`;
+      const path = `${localEmpresaId}/clientes/${id}/cr_${uuidv4()}.${ext}`;
       crUrl = await uploadBase64File(crUrl, 'documentos-clientes', path) || '';
     }
     
     if (crIbamaUrl && crIbamaUrl.startsWith('data:')) {
       const ext = crIbamaUrl.split(';base64,')[0].split(':')[1].split('/')[1] || 'pdf';
-      const path = `${usuario.empresaId}/clientes/${id}/cr_ibama_${uuidv4()}.${ext}`;
+      const path = `${localEmpresaId}/clientes/${id}/cr_ibama_${uuidv4()}.${ext}`;
       crIbamaUrl = await uploadBase64File(crIbamaUrl, 'documentos-clientes', path) || '';
     }
     
@@ -222,12 +224,30 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
       .eq('id', id)
       .single();
 
+    // 1. Atualizar na base local
     const { error } = await supabase
       .from('clientes')
       .update({ ...mapToDB(dadosComUrls), atualizado_em: new Date().toISOString() })
       .eq('id', id);
 
     if (error) throw error;
+
+    // 2. Atualizar na base do portal (se houver vínculo ativo)
+    if (portalEmpresaId && portalEmpresaId !== localEmpresaId) {
+      const { data: cData } = await supabase
+        .from('clientes')
+        .select('id')
+        .eq('empresa_id', portalEmpresaId)
+        .limit(1)
+        .maybeSingle();
+
+      if (cData) {
+        await supabase
+          .from('clientes')
+          .update({ ...mapToDB(dadosComUrls), atualizado_em: new Date().toISOString() })
+          .eq('id', cData.id);
+      }
+    }
 
     // Se encontramos o CPF, atualizar as ordens e orçamentos vinculados a este cliente
     if (clienteAtual?.cpf) {
@@ -248,14 +268,14 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
           .from('ordens')
           .update(payloadVinculados)
           .eq('cpf', clienteAtual.cpf)
-          .eq('empresa_id', usuario.empresaId);
+          .eq('empresa_id', localEmpresaId);
 
         // Atualiza orçamentos
         await supabase
           .from('orcamentos')
           .update(payloadVinculados)
           .eq('cpf', clienteAtual.cpf)
-          .eq('empresa_id', usuario.empresaId);
+          .eq('empresa_id', localEmpresaId);
       }
     }
 
@@ -378,7 +398,7 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
     await carregarMetadadosArmas();
   }, [carregarMetadadosArmas, usuario]);
 
-  const deletarArma = useCallback(async (id: string) => {
+  const deletarArma = useCallback(async (id: string, overrideEmpresaId?: string) => {
     const { error } = await supabase.from('armas').delete().eq('id', id);
     if (error) throw error;
     await carregarMetadadosArmas();
@@ -443,7 +463,7 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
     }
   }, [usuario]);
 
-  const deletarGt = useCallback(async (id: string) => {
+  const deletarGt = useCallback(async (id: string, overrideEmpresaId?: string) => {
     const { error } = await supabase.from('guias_trafego').delete().eq('id', id);
     if (error) throw error;
   }, []);
@@ -513,7 +533,7 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
     }
   }, [usuario]);
 
-  const deletarManejo = useCallback(async (id: string) => {
+  const deletarManejo = useCallback(async (id: string, overrideEmpresaId?: string) => {
     const { error } = await supabase.from('autorizacoes_manejo').delete().eq('id', id);
     if (error) throw error;
   }, []);
