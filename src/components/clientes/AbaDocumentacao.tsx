@@ -839,14 +839,21 @@ function CardVencimento({
   onEditar?: () => void 
 }) {
   return (
-    <div className="card bg-brand-dark-3/50 border-brand-dark-5 flex flex-row items-center justify-between p-4 gap-3 flex-wrap xs:flex-nowrap">
+    <div 
+      onClick={podeEditar && onEditar ? onEditar : undefined}
+      className={`card bg-brand-dark-3/50 border-brand-dark-5 flex flex-row items-center justify-between p-4 gap-3 flex-wrap xs:flex-nowrap ${
+        podeEditar && onEditar ? 'cursor-pointer hover:border-brand-blue/30 hover:bg-brand-dark-3 transition-all' : ''
+      }`}
+    >
       <div className="flex items-center gap-3 min-w-0">
         <div className="p-2.5 rounded-2xl bg-brand-blue/10 text-brand-blue shrink-0">
           {icon}
         </div>
         <div className="min-w-0">
           <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-0.5 truncate">{label}</p>
-          <p className="text-white font-bold text-sm truncate" title={numero}>{numero || 'DATA DE VALIDADE'}</p>
+          <p className={`font-bold text-sm truncate ${numero ? 'text-white' : 'text-gray-500 italic'}`} title={numero}>
+            {numero || 'Nº não informado'}
+          </p>
         </div>
       </div>
       <div className="flex items-center gap-2 shrink-0">
@@ -856,7 +863,11 @@ function CardVencimento({
         </div>
         {podeEditar && onEditar && (
           <button 
-            onClick={onEditar}
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onEditar();
+            }}
             className="p-2 rounded-lg bg-brand-dark-2 text-gray-400 hover:text-brand-blue transition-colors"
             title={`Editar ${label}`}
           >
