@@ -40,6 +40,7 @@ export function ListaOrdens() {
   const filtrosStatus = useMemo(() => searchParams.getAll('status') as StatusOS[], [searchParams]);
   const filtrosStatusExec = useMemo(() => searchParams.getAll('exec') as StatusExecucaoServico[], [searchParams]);
   const filtrosServico = useMemo(() => searchParams.getAll('servico'), [searchParams]);
+  const filtrosGru = useMemo(() => searchParams.getAll('gru'), [searchParams]);
 
   const [confirmandoDelete, setConfirmandoDelete] = useState<string | null>(null);
   const [expandirFiltros, setExpandirFiltros] = useState(false);
@@ -100,7 +101,21 @@ export function ListaOrdens() {
     const matchServico = filtrosServico.length === 0 || 
       (o.servicos && o.servicos.some((s: any) => filtrosServico.includes(s.nome)));
     
-    return matchBusca && matchStatus && matchStatusExec && matchServico;
+    const matchGru = filtrosGru.length === 0 || (() => {
+      const servicosExigemGru = o.servicos?.filter((s: any) => s.exigeGRU === true || (s.exigeGRU === undefined && (s.taxaPF || 0) > 0)) || [];
+      if (servicosExigemGru.length === 0) return false;
+      
+      const todasPagas = servicosExigemGru.every((s: any) => s.pagoGRU === true);
+      const algumaPendente = servicosExigemGru.some((s: any) => !s.pagoGRU);
+      
+      return filtrosGru.some(f => {
+        if (f === 'paga') return todasPagas;
+        if (f === 'pendente') return algumaPendente;
+        return false;
+      });
+    })();
+    
+    return matchBusca && matchStatus && matchStatusExec && matchServico && matchGru;
   });
 
   const toggleFiltroStatus = (val: StatusOS) => {
@@ -116,6 +131,11 @@ export function ListaOrdens() {
   const toggleFiltroServico = (val: string) => {
     const next = filtrosServico.includes(val) ? filtrosServico.filter(v => v !== val) : [...filtrosServico, val];
     updateParams('servico', next);
+  };
+
+  const toggleFiltroGru = (val: string) => {
+    const next = filtrosGru.includes(val) ? filtrosGru.filter(v => v !== val) : [...filtrosGru, val];
+    updateParams('gru', next);
   };
 
   const limparFiltros = () => {
@@ -184,22 +204,22 @@ export function ListaOrdens() {
           <button
             onClick={() => setExpandirFiltros(!expandirFiltros)}
             className={`px-4 flex items-center gap-2 rounded-xl border transition-all ${
-              expandirFiltros || filtrosStatus.length > 0 || filtrosStatusExec.length > 0 || filtrosServico.length > 0
+              expandirFiltros || filtrosStatus.length > 0 || filtrosStatusExec.length > 0 || filtrosServico.length > 0 || filtrosGru.length > 0
                 ? 'bg-brand-blue/10 border-brand-blue text-brand-blue-light'
                 : 'bg-brand-dark-5 border-brand-dark-5 text-gray-400'
             }`}
           >
             <Filter size={16} />
             <span className="hidden sm:inline">Filtros</span>
-            {(filtrosStatus.length + filtrosStatusExec.length + filtrosServico.length) > 0 && (
+            {(filtrosStatus.length + filtrosStatusExec.length + filtrosServico.length + filtrosGru.length) > 0 && (
               <span className="w-5 h-5 rounded-full bg-brand-blue text-white text-[10px] flex items-center justify-center font-bold">
-                {filtrosStatus.length + filtrosStatusExec.length + filtrosServico.length}
+                {filtrosStatus.length + filtrosStatusExec.length + filtrosServico.length + filtrosGru.length}
               </span>
             )}
           </button>
         </div>
 
-        {(expandirFiltros || filtrosStatus.length > 0 || filtrosStatusExec.length > 0 || filtrosServico.length > 0) && (
+        {(expandirFiltros || filtrosStatus.length > 0 || filtrosStatusExec.length > 0 || filtrosServico.length > 0 || filtrosGru.length > 0) && (
           <div className="pt-4 border-t border-brand-dark-5 animate-in fade-in slide-in-from-top-2">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               {/* Status Pagamento */}
@@ -251,6 +271,34 @@ export function ListaOrdens() {
                   ))}
                 </div>
               </div>
+              {/* GRU */}
+              <div className="space-y-3">
+                <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest flex items-center justify-between">
+                  Controle de GRU
+                  {filtrosGru.length > 0 && <button onClick={() => updateParams('gru', [])} className="text-brand-blue hover:text-white transition-colors">Limpar</button>}
+                </p>
+                <div className="flex flex-col gap-2">
+                  {[
+                    { label: 'GRU Paga', valor: 'paga' },
+                    { label: 'GRU Pendente', valor: 'pendente' }
+                  ].map(({ label, valor }) => (
+                    <div key={valor} className="flex items-center gap-3 group cursor-pointer">
+                      <div 
+                        onClick={() => toggleFiltroGru(valor)}
+                        className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${
+                          filtrosGru.includes(valor) ? 'bg-brand-blue border-brand-blue' : 'bg-brand-dark-5 border-brand-dark-5 group-hover:border-brand-metal'
+                        }`}
+                      >
+                        {filtrosGru.includes(valor) && <CheckCircle size={12} className="text-white" />}
+                      </div>
+                      <span className={`text-xs font-semibold transition-colors ${filtrosGru.includes(valor) ? 'text-brand-blue-light' : 'text-gray-400 group-hover:text-gray-300'}`}>
+                        {label}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
               {/* Serviços */}
               <div className="space-y-3">
                 <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest flex items-center justify-between">
@@ -301,11 +349,11 @@ export function ListaOrdens() {
           </div>
           <p className="text-gray-400 font-medium">Nenhuma OS encontrada</p>
           <p className="text-sm text-gray-500 mt-1">
-            {busca || filtrosStatus.length > 0 || filtrosStatusExec.length > 0
+            {busca || filtrosStatus.length > 0 || filtrosStatusExec.length > 0 || filtrosServico.length > 0 || filtrosGru.length > 0
               ? 'Tente ajustar os filtros de busca'
               : 'Clique em "Nova OS" para criar a primeira ordem'}
           </p>
-          {!busca && filtrosStatus.length === 0 && filtrosStatusExec.length === 0 && (
+          {!busca && filtrosStatus.length === 0 && filtrosStatusExec.length === 0 && filtrosServico.length === 0 && filtrosGru.length === 0 && (
             <button onClick={() => navigate('/ordens/nova')} className="btn-primary mt-4 mx-auto">
               <Plus size={16} />
               Criar primeira OS
