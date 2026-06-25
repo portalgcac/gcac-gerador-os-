@@ -46,6 +46,7 @@ import { ConviteAceitarPage } from './pages/ConviteAceitarPage';
 import { PreCadastroPage } from './pages/PreCadastroPage';
 import PortalAdminPage from './pages/PortalAdminPage';
 import { TermosUso, PoliticaPrivacidade } from './components/public/TermosPrivacidade';
+import { GerenciadorDeclaracoes } from './components/declaracoes/GerenciadorDeclaracoes';
 
 const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
@@ -217,6 +218,8 @@ function RotaProtegida({ children, modulo }: { children: React.ReactNode, modulo
       temAcessoTenant = temAcessoRecurso('dash_atencao_diaria');
     } else if (modulo === 'agenda') {
       temAcessoTenant = temAcessoRecurso('dash_lembretes');
+    } else if (modulo === 'declaracoes') {
+      temAcessoTenant = temAcessoRecurso('modulo_clientes') || temAcessoRecurso('modulo_declaracoes');
     }
 
     if (!temAcessoTenant) {
@@ -228,7 +231,8 @@ function RotaProtegida({ children, modulo }: { children: React.ReactNode, modulo
   if (usuario.role === 'admin') return <>{children}</>;
 
   // Se houver um módulo específico, verifica permissão do colaborador
-  if (modulo && !usuario.permissoes?.includes(modulo)) {
+  const permKey = modulo === 'declaracoes' ? 'clientes' : (modulo || '');
+  if (modulo && !usuario.permissoes?.includes(modulo) && !usuario.permissoes?.includes(permKey)) {
     return <Navigate to="/" replace />;
   }
 
@@ -318,6 +322,7 @@ export default function App() {
                               <Route path="rotina" element={<RotaProtegida modulo="rotina"><RotinaDiaria /></RotaProtegida>} />
                               <Route path="agenda" element={<RotaProtegida modulo="agenda"><ListaLembretes /></RotaProtegida>} />
                               <Route path="configuracoes" element={<RotaProtegida modulo="config"><Configuracoes /></RotaProtegida>} />
+                              <Route path="declaracoes" element={<RotaProtegida modulo="declaracoes"><GerenciadorDeclaracoes /></RotaProtegida>} />
                               
                               {/* Orçamentos */}
                               <Route path="orcamentos" element={<RotaProtegida modulo="orcamentos"><ListaOrcamentos /></RotaProtegida>} />

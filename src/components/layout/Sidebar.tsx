@@ -23,6 +23,7 @@ const links = [
   { to: '/clientes',   label: 'Meus Clientes',     icon: Users,         slug: 'clientes' },
   { to: '/clientes-cac', label: 'Clientes CAC',   icon: Link2,         slug: 'clientes' },
   { to: '/configuracoes', label: 'Configurações', icon: Settings,      slug: 'config' },
+  { to: '/declaracoes', label: 'Declarações',     icon: FileText,      slug: 'declaracoes' },
 ].sort((a, b) => a.label.localeCompare(b.label));
 
 const temAcessoLink = (link: typeof links[0], usuario: any, temAcessoRecurso: (r: string) => boolean) => {
@@ -31,7 +32,9 @@ const temAcessoLink = (link: typeof links[0], usuario: any, temAcessoRecurso: (r
   }
 
   // Verificar permissão no nível de usuário
-  const temPermissaoUser = usuario?.permissoes?.includes(link.slug) || usuario?.role === 'admin';
+  const temPermissaoUser = usuario?.permissoes?.includes(link.slug) || 
+                           (link.slug === 'declaracoes' && usuario?.permissoes?.includes('clientes')) ||
+                           usuario?.role === 'admin';
   if (!temPermissaoUser) return false;
 
   // Verificar permissão no nível de empresa (tenant)
@@ -67,6 +70,9 @@ const temAcessoLink = (link: typeof links[0], usuario: any, temAcessoRecurso: (r
       return temAcessoRecurso('modulo_clientes_cac');
     }
     return temAcessoRecurso('modulo_clientes');
+  }
+  if (link.slug === 'declaracoes') {
+    return temAcessoRecurso('modulo_clientes') || temAcessoRecurso('modulo_declaracoes');
   }
 
   return true;

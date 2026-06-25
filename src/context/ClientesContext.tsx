@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useCallback, useState, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { Cliente, Arma, GuiaTrafego, AutorizacaoManejo, CreditoCliente } from '../types';
+import { Cliente, Arma, GuiaTrafego, AutorizacaoManejo, CreditoCliente, ModeloDeclaracao } from '../types';
 import { supabase } from '../db/supabase';
 import { uploadBase64File } from '../utils/fileUtils';
 
@@ -39,6 +39,11 @@ interface ClientesContextType {
   buscarCreditos: (clienteId: string) => Promise<CreditoCliente[]>;
   adicionarCredito: (credito: Omit<CreditoCliente, 'id' | 'criadoEm'>) => Promise<void>;
   deletarCredito: (id: string) => Promise<void>;
+
+  // Gestão de Modelos de Declaração
+  buscarModelosDeclaracao: () => Promise<ModeloDeclaracao[]>;
+  salvarModeloDeclaracao: (modelo: Partial<ModeloDeclaracao>) => Promise<void>;
+  deletarModeloDeclaracao: (id: string) => Promise<void>;
 }
 
 const ClientesContext = createContext<ClientesContextType | null>(null);
@@ -64,6 +69,10 @@ const mapFromDB = (row: any): Cliente => ({
   fotoUrl: row.foto_url || '',
   crUrl: row.cr_url || '',
   crIbamaUrl: row.cr_ibama_url || '',
+  rg: row.rg || '',
+  dataNascimento: row.data_nascimento || '',
+  nomePai: row.nome_pai || '',
+  nomeMae: row.nome_mae || '',
   criadoEm: row.criado_em,
   atualizadoEm: row.atualizado_em,
 });
@@ -89,6 +98,10 @@ const mapToDB = (dados: any) => {
   if (dados.fotoUrl !== undefined) payload.foto_url = dados.fotoUrl || null;
   if (dados.crUrl !== undefined) payload.cr_url = dados.crUrl || null;
   if (dados.crIbamaUrl !== undefined) payload.cr_ibama_url = dados.crIbamaUrl || null;
+  if (dados.rg !== undefined) payload.rg = dados.rg;
+  if (dados.dataNascimento !== undefined) payload.data_nascimento = dados.dataNascimento || null;
+  if (dados.nomePai !== undefined) payload.nome_pai = dados.nomePai;
+  if (dados.nomeMae !== undefined) payload.nome_mae = dados.nomeMae;
   return payload;
 };
 
@@ -582,6 +595,100 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
     if (error) throw error;
   }, []);
 
+  const buscarModelosDeclaracao = useCallback(async (): Promise<ModeloDeclaracao[]> => {
+    if (!usuario?.empresaId) return [];
+    const { data, error } = await supabase
+      .from('modelos_declaracao')
+      .select('*')
+      .eq('empresa_id', usuario.empresaId)
+      .order('titulo', { ascending: true });
+
+    if (error) throw error;
+
+    if (data.length === 0) {
+      const modelosPadrao = [
+        {
+          titulo: 'DECLARAÇÃO DE INEXISTÊNCIA DE ARMA DE FOGO VINCULADA À ATIVIDADE',
+          texto: 'Eu, {{nome}}, portador(a) do RG nº {{rg}} e do CPF nº {{cpf}} nascido(a) na data de {{data_nascimento}}, residente no endereço {{endereco}}, filho(a) de {{nome_pai}} e {{nome_mae}}, venho através desta declarar que:\n\nDECLARO, sob as penas da lei, em especial o art. 299 do Código Penal Brasileiro (Falsidade Ideológica), para fins de instrução de processo de Exclusão da Atividade de Tiro Desportivo do meu Certificado de Registro junto a Polícia Federal do Brasil, que NÃO POSSUO nenhuma arma de fogo registrada, acervada ou de qualquer forma vinculada à atividade de Tiro Desportivo em meu nome.\n\nDeclaro ainda estar ciente de que a inveracidade das informações aqui prestadas poderá acarretar sanções penais, civis e administrativas cabíveis.\n\nPor ser expressão da verdade, assino a presente declaração.',
+          empresa_id: usuario.empresaId
+        },
+        {
+          titulo: 'DECLARAÇÃO DE COMPROMISSO DE PARTICIPAÇÃO EM TREINAMENTOS E COMPETIÇÕES',
+          texto: 'Eu, {{nome}}, portador do CPF nº {{cpf}}, residente no endereço {{endereco}}, portador do RG nº {{rg}}, filiado à Entidade de Tiro CLUBE DE TIRO E CACA PRO TIRO, ME COMPROMETO a comprovar, no mínimo, a habitualidade e a participação em treinamentos e competições na forma prevista na legislação vigente (Art. 35 do Decreto nº 11.615/2023).\n\nPor ser expressão da verdade, firmo o presente compromisso.',
+          empresa_id: usuario.empresaId
+        },
+        {
+          titulo: 'DECLARAÇÃO DE IDONEIDADE',
+          texto: 'Eu, {{nome}}, nascido(a) em {{data_nascimento}}, filho(a) de {{nome_pai}} e {{nome_mae}}, portador do CPF nº {{cpf}} e RG nº {{rg}}, residente no endereço {{endereco}}, declaro, sob as penas da lei, que não respondo a inquéritos policiais nem a processos criminais, e estou ciente de que, em caso de falsidade ideológica, ficarei sujeito às sanções prescritas no Código Penal (Art. 299) e às demais cominações legais aplicáveis.\n\nPor ser verdade, firmo a presente.',
+          empresa_id: usuario.empresaId
+        },
+        {
+          titulo: 'DECLARAÇÃO DE SEGURANÇA DO ACERVO (DSA)',
+          texto: 'Eu, {{nome}}, nascido(a) em {{data_nascimento}}, residente no endereço {{endereco}}, portador do CPF nº {{cpf}} e RG nº {{rg}}, DECLARO, para fim de Concessão, Revalidação ou Apostilamento de Registro de Colecionador, Atirador Desportivo e Caçador (CAC) junto ao Comando do Exército e Polícia Federal, que o local de guarda do meu acervo de armas de fogo e munições possui cofre ou local seguro com trancas apropriadas para a devida custódia dos equipamentos, conforme as normas de segurança vigentes.\n\nPor ser a expressão da verdade, firmo a presente declaração.',
+          empresa_id: usuario.empresaId
+        },
+        {
+          titulo: 'DECLARAÇÃO DE ENDEREÇO DE 5 ANOS',
+          texto: 'Eu, {{nome}}, portador(a) do RG nº {{rg}} e do CPF nº {{cpf}}, nascido(a) na data de {{data_nascimento}}, declaro para os devidos fins de comprovação que resido no endereço {{endereco}}.\n\nDeclaro também, sob as penas da lei, que nos últimos 5 (cinco) anos residi nos endereços supracitados e declarei idoneidade de residência para fins de registro e aquisição de produtos controlados.\n\nEstando ciente de que a falsidade da presente declaração implica em sanções penais previstas no Art. 299 do Código Penal Brasileiro.',
+          empresa_id: usuario.empresaId
+        }
+      ];
+
+      const { data: insertedData, error: insertError } = await supabase
+        .from('modelos_declaracao')
+        .insert(modelosPadrao)
+        .select('*');
+
+      if (insertError) throw insertError;
+      return (insertedData || []).map(row => ({
+        id: row.id,
+        titulo: row.titulo,
+        texto: row.texto,
+        empresaId: row.empresa_id,
+        criadoEm: row.criado_em
+      }));
+    }
+
+    return data.map(row => ({
+      id: row.id,
+      titulo: row.titulo,
+      texto: row.texto,
+      empresaId: row.empresa_id,
+      criadoEm: row.criado_em
+    }));
+  }, [usuario]);
+
+  const salvarModeloDeclaracao = useCallback(async (dados: Partial<ModeloDeclaracao>) => {
+    if (!usuario?.empresaId) throw new Error('Usuário não autenticado');
+    
+    const payload = {
+      titulo: dados.titulo || '',
+      texto: dados.texto || '',
+      empresa_id: usuario.empresaId
+    };
+
+    if (dados.id) {
+      const { error } = await supabase
+        .from('modelos_declaracao')
+        .update(payload)
+        .eq('id', dados.id);
+      if (error) throw error;
+    } else {
+      const { error } = await supabase
+        .from('modelos_declaracao')
+        .insert([payload]);
+      if (error) throw error;
+    }
+  }, [usuario]);
+
+  const deletarModeloDeclaracao = useCallback(async (id: string) => {
+    const { error } = await supabase
+      .from('modelos_declaracao')
+      .delete()
+      .eq('id', id);
+    if (error) throw error;
+  }, []);
+
   useEffect(() => {
     if (usuario?.tipoConta === 'cac_individual' && usuario?.empresaId && carregado) {
       if (clientes.length === 0) {
@@ -648,7 +755,10 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
       deletarManejo,
       buscarCreditos,
       adicionarCredito,
-      deletarCredito
+      deletarCredito,
+      buscarModelosDeclaracao,
+      salvarModeloDeclaracao,
+      deletarModeloDeclaracao
     }}>
       {children}
     </ClientesContext.Provider>

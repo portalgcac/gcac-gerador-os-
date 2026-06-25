@@ -45,6 +45,10 @@ export function FormularioCliente({ clienteEditando, onFechar }: Props) {
     crIbamaUrl: clienteEditando?.crIbamaUrl ?? '',
     crEmRenovacao: clienteEditando?.crEmRenovacao ?? false,
     crIbamaEmRenovacao: clienteEditando?.crIbamaEmRenovacao ?? false,
+    rg: clienteEditando?.rg ?? '',
+    dataNascimento: clienteEditando?.dataNascimento ?? '',
+    nomePai: clienteEditando?.nomePai ?? '',
+    nomeMae: clienteEditando?.nomeMae ?? '',
   });
 
   const atualizar = (campo: string, valor: any) => {
@@ -106,6 +110,10 @@ export function FormularioCliente({ clienteEditando, onFechar }: Props) {
         crIbamaUrl: form.crIbamaUrl,
         crEmRenovacao: form.crEmRenovacao,
         crIbamaEmRenovacao: form.crIbamaEmRenovacao,
+        rg: form.rg.trim().toUpperCase(),
+        dataNascimento: form.dataNascimento,
+        nomePai: form.nomePai.trim().toUpperCase(),
+        nomeMae: form.nomeMae.trim().toUpperCase(),
       };
 
       if (clienteEditando) {
@@ -172,6 +180,32 @@ export function FormularioCliente({ clienteEditando, onFechar }: Props) {
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white">
                 {mostrarSenha ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="label">RG</label>
+              <input type="text" className="input uppercase" placeholder="Ex: 1234567 DGPC GO"
+                value={form.rg} onChange={e => atualizar('rg', e.target.value)} />
+            </div>
+            <div>
+              <label className="label">Data de Nascimento</label>
+              <input type="date" className="input"
+                value={form.dataNascimento} onChange={e => atualizar('dataNascimento', e.target.value)} />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="label">Nome do Pai</label>
+              <input type="text" className="input uppercase" placeholder="Nome do pai (opcional)"
+                value={form.nomePai} onChange={e => atualizar('nomePai', e.target.value)} />
+            </div>
+            <div>
+              <label className="label">Nome da Mãe</label>
+              <input type="text" className="input uppercase" placeholder="Nome da mãe (opcional)"
+                value={form.nomeMae} onChange={e => atualizar('nomeMae', e.target.value)} />
             </div>
           </div>
 

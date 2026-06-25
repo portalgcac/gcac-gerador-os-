@@ -657,6 +657,15 @@ export function DetalheCliente({ cliente }: DetalheClienteProps) {
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
+          {usuario?.tipoConta !== 'cac_individual' && (
+            <button 
+              onClick={() => navigate(`/declaracoes?clienteId=${cliente.id}`)}
+              className="btn-ghost px-3 py-1.5 text-sm font-black uppercase tracking-wider flex items-center gap-2 border border-brand-blue/30 text-brand-blue-light hover:bg-brand-blue/10"
+            >
+              <FileText size={16} />
+              Gerar Declaração
+            </button>
+          )}
           <button 
             onClick={() => setEditando(true)}
             className="btn-ghost px-3 py-1.5 text-sm font-black uppercase tracking-wider flex items-center gap-2 border border-brand-dark-5"

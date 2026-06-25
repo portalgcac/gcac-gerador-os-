@@ -72,6 +72,10 @@ export interface Cliente {
   crIbamaUrl?: string;
   crEmRenovacao?: boolean;
   crIbamaEmRenovacao?: boolean;
+  rg?: string;
+  dataNascimento?: string;
+  nomePai?: string;
+  nomeMae?: string;
   criadoEm: string;
   atualizadoEm: string;
 }
@@ -454,5 +458,13 @@ export interface CreditoCliente {
   descricao: string;
   origemId?: string;
   criadoPorNome?: string;
+  criadoEm: string;
+}
+
+export interface ModeloDeclaracao {
+  id: string;
+  titulo: string;
+  texto: string;
+  empresaId: string;
   criadoEm: string;
 }
