@@ -15,7 +15,7 @@ function formatarDataBr(dataStr?: string): string {
 
 export function GerenciadorDeclaracoes() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const { clientes, buscarModelosDeclaracao, salvarModeloDeclaracao, deletarModeloDeclaracao } = useClientes();
+  const { clientes, buscarModelosDeclaracao, salvarModeloDeclaracao, deletarModeloDeclaracao, atualizarCliente } = useClientes();
   
   const [abaAtiva, setAbaAtiva] = useState<'gerar' | 'modelos'>('gerar');
   const [carregandoModelos, setCarregandoModelos] = useState(true);
@@ -33,9 +33,46 @@ export function GerenciadorDeclaracoes() {
   const [modeloEditando, setModeloEditando] = useState<Partial<ModeloDeclaracao> | null>(null);
   const [salvandoModelo, setSalvandoModelo] = useState(false);
 
+  // Novos Estados
+  const [salvandoDadosCliente, setSalvandoDadosCliente] = useState(false);
+  const [dadosCliente, setDadosCliente] = useState({
+    nome: '',
+    rg: '',
+    cpf: '',
+    dataNascimento: '',
+    nomePai: '',
+    nomeMae: '',
+    endereco: ''
+  });
+  const lastSelectedIdRef = React.useRef<string>('');
+
   const clienteSelecionado = useMemo(() => {
-    return clientes.find(c => c.id === clienteSelecionadoId);
-  }, [clientes, clienteSelecionadoId]);
+    if (!clienteSelecionadoId) return undefined;
+    if (clienteSelecionadoId === 'avulso') {
+      return {
+        id: 'avulso',
+        nome: dadosCliente.nome || 'Pessoa Não Cadastrada',
+        rg: dadosCliente.rg,
+        cpf: dadosCliente.cpf,
+        dataNascimento: dadosCliente.dataNascimento,
+        nomePai: dadosCliente.nomePai,
+        nomeMae: dadosCliente.nomeMae,
+        endereco: dadosCliente.endereco,
+      } as Cliente;
+    }
+    const dbClient = clientes.find(c => c.id === clienteSelecionadoId);
+    if (!dbClient) return undefined;
+    return {
+      ...dbClient,
+      nome: dadosCliente.nome,
+      rg: dadosCliente.rg,
+      cpf: dadosCliente.cpf,
+      dataNascimento: dadosCliente.dataNascimento,
+      nomePai: dadosCliente.nomePai,
+      nomeMae: dadosCliente.nomeMae,
+      endereco: dadosCliente.endereco,
+    } as Cliente;
+  }, [clientes, clienteSelecionadoId, dadosCliente]);
 
   const modeloSelecionado = useMemo(() => {
     return modelos.find(m => m.id === modeloSelecionadoId);
@@ -76,7 +113,52 @@ export function GerenciadorDeclaracoes() {
     return `${hoje.getDate()} de ${meses[hoje.getMonth()]} de ${hoje.getFullYear()}`;
   }, []);
 
-  const obterValorPlaceholder = (chave: string, client?: Cliente): string => {
+  // Synchronize local input state with selected client
+  useEffect(() => {
+    const shouldLoad = 
+      clienteSelecionadoId !== lastSelectedIdRef.current || 
+      (clienteSelecionadoId && !dadosCliente.nome && clientes.some(c => c.id === clienteSelecionadoId));
+
+    if (shouldLoad) {
+      lastSelectedIdRef.current = clienteSelecionadoId;
+      if (clienteSelecionadoId === 'avulso') {
+        setDadosCliente({
+          nome: '',
+          rg: '',
+          cpf: '',
+          dataNascimento: '',
+          nomePai: '',
+          nomeMae: '',
+          endereco: ''
+        });
+      } else if (clienteSelecionadoId) {
+        const client = clientes.find(c => c.id === clienteSelecionadoId);
+        if (client) {
+          setDadosCliente({
+            nome: client.nome || '',
+            rg: client.rg || '',
+            cpf: client.cpf || '',
+            dataNascimento: client.dataNascimento || '',
+            nomePai: client.nomePai || '',
+            nomeMae: client.nomeMae || '',
+            endereco: client.endereco || ''
+          });
+        }
+      } else {
+        setDadosCliente({
+          nome: '',
+          rg: '',
+          cpf: '',
+          dataNascimento: '',
+          nomePai: '',
+          nomeMae: '',
+          endereco: ''
+        });
+      }
+    }
+  }, [clienteSelecionadoId, clientes, dadosCliente.nome]);
+
+  const obterValorPlaceholder = (chave: string, client?: typeof dadosCliente): string => {
     if (!client) return `{{${chave}}}`;
     switch (chave) {
       case 'nome': return client.nome || '';
@@ -91,7 +173,7 @@ export function GerenciadorDeclaracoes() {
     }
   };
 
-  const processarPlaceholders = (texto: string, client?: Cliente) => {
+  const processarPlaceholders = (texto: string, client?: typeof dadosCliente) => {
     if (!texto) return '';
     return texto
       .replace(/{{nome}}/g, obterValorPlaceholder('nome', client))
@@ -104,16 +186,16 @@ export function GerenciadorDeclaracoes() {
       .replace(/{{data_atual}}/g, obterValorPlaceholder('data_atual', client));
   };
 
-  // Atualizar texto editado quando mudar o modelo ou cliente selecionado
+  // Atualizar texto editado quando mudar o modelo ou dados do cliente
   useEffect(() => {
     if (modeloSelecionado) {
       setTituloManual(modeloSelecionado.titulo);
-      setTextoEditado(processarPlaceholders(modeloSelecionado.texto, clienteSelecionado));
+      setTextoEditado(processarPlaceholders(modeloSelecionado.texto, dadosCliente));
     } else {
       setTituloManual('');
       setTextoEditado('');
     }
-  }, [modeloSelecionadoId, clienteSelecionadoId, modelos]);
+  }, [modeloSelecionadoId, clienteSelecionadoId, dadosCliente, modelos]);
 
   // Verificar campos faltantes no cliente
   const camposFaltantes = useMemo(() => {
@@ -150,6 +232,28 @@ export function GerenciadorDeclaracoes() {
       alert('Erro ao gerar arquivo PDF.');
     } finally {
       setGerandoPdf(false);
+    }
+  };
+
+  const handleSalvarDadosNoCadastro = async () => {
+    if (!clienteSelecionadoId || clienteSelecionadoId === 'avulso') return;
+    setSalvandoDadosCliente(true);
+    try {
+      await atualizarCliente(clienteSelecionadoId, {
+        nome: dadosCliente.nome.trim(),
+        cpf: dadosCliente.cpf.trim(),
+        rg: dadosCliente.rg.trim(),
+        dataNascimento: dadosCliente.dataNascimento,
+        nomePai: dadosCliente.nomePai.trim(),
+        nomeMae: dadosCliente.nomeMae.trim(),
+        endereco: dadosCliente.endereco.trim(),
+      });
+      alert('Dados do cliente salvos com sucesso no cadastro!');
+    } catch (err) {
+      console.error(err);
+      alert('Erro ao salvar os dados do cliente no cadastro.');
+    } finally {
+      setSalvandoDadosCliente(false);
     }
   };
 
@@ -245,11 +349,14 @@ export function GerenciadorDeclaracoes() {
             <div>
               <label className="label">1. Selecione o Cliente</label>
               <select
-                className="input"
+                className="input font-medium"
                 value={clienteSelecionadoId}
                 onChange={e => setClienteSelecionadoId(e.target.value)}
               >
                 <option value="">Selecione um cliente...</option>
+                <option value="avulso" className="text-brand-blue font-semibold">
+                  [Pessoa não cadastrada / Avulsa]
+                </option>
                 {clientes.map(c => (
                   <option key={c.id} value={c.id}>{c.nome}</option>
                 ))}
@@ -290,21 +397,112 @@ export function GerenciadorDeclaracoes() {
               </div>
             )}
 
-            {/* Dicas de Placeholders e Dados Resolvidos */}
+            {/* Formulário de Dados para Declaração (Editável na hora) */}
             {clienteSelecionado && (
-              <div className="p-3 bg-brand-dark-4 border border-brand-dark-5 rounded-xl space-y-2">
-                <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest flex items-center gap-1.5">
-                  <User size={12} className="text-brand-blue" /> Informações Resolvidas
+              <div className="p-3.5 bg-brand-dark-4 border border-brand-dark-5 rounded-xl space-y-3">
+                <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest flex items-center gap-1.5 border-b border-brand-dark-5 pb-2">
+                  <User size={12} className="text-brand-blue" />
+                  {clienteSelecionadoId === 'avulso' ? 'Dados da Pessoa (Avulsa)' : 'Dados do Cliente (Editável)'}
                 </p>
-                <div className="space-y-1.5 text-[11px] text-gray-400 max-h-[220px] overflow-y-auto pr-1">
-                  <div><span className="text-gray-500">Nome:</span> <span className="text-white font-medium">{clienteSelecionado.nome}</span></div>
-                  <div><span className="text-gray-500">CPF:</span> <span className="text-white font-medium">{clienteSelecionado.cpf}</span></div>
-                  <div><span className="text-gray-500">RG:</span> <span className="text-white font-medium">{clienteSelecionado.rg || 'Não cadastrado'}</span></div>
-                  <div><span className="text-gray-500">Nascimento:</span> <span className="text-white font-medium">{formatarDataBr(clienteSelecionado.dataNascimento) || 'Não cadastrado'}</span></div>
-                  <div><span className="text-gray-500">Filiação Pai:</span> <span className="text-white font-medium">{clienteSelecionado.nomePai || 'Não cadastrado'}</span></div>
-                  <div><span className="text-gray-500">Filiação Mãe:</span> <span className="text-white font-medium">{clienteSelecionado.nomeMae || 'Não cadastrado'}</span></div>
-                  <div className="truncate"><span className="text-gray-500">Endereço:</span> <span className="text-white font-medium" title={clienteSelecionado.endereco}>{clienteSelecionado.endereco || 'Não cadastrado'}</span></div>
+                
+                <div className="space-y-3 max-h-[320px] overflow-y-auto pr-1">
+                  <div>
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Nome Completo</label>
+                    <input
+                      type="text"
+                      placeholder="NOME COMPLETO"
+                      className="input py-1.5 px-2.5 text-xs font-semibold uppercase mt-1"
+                      value={dadosCliente.nome}
+                      onChange={e => setDadosCliente(prev => ({ ...prev, nome: e.target.value }))}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">CPF</label>
+                      <input
+                        type="text"
+                        placeholder="000.000.000-00"
+                        className="input py-1.5 px-2.5 text-xs font-semibold mt-1"
+                        value={dadosCliente.cpf}
+                        onChange={e => setDadosCliente(prev => ({ ...prev, cpf: e.target.value }))}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">RG</label>
+                      <input
+                        type="text"
+                        placeholder="RG / Órgão Expedidor"
+                        className="input py-1.5 px-2.5 text-xs font-semibold uppercase mt-1"
+                        value={dadosCliente.rg}
+                        onChange={e => setDadosCliente(prev => ({ ...prev, rg: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Data de Nascimento</label>
+                    <input
+                      type="date"
+                      className="input py-1.5 px-2.5 text-xs font-semibold mt-1"
+                      value={dadosCliente.dataNascimento}
+                      onChange={e => setDadosCliente(prev => ({ ...prev, dataNascimento: e.target.value }))}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Nome do Pai</label>
+                    <input
+                      type="text"
+                      placeholder="NOME DO PAI (OPCIONAL)"
+                      className="input py-1.5 px-2.5 text-xs font-semibold uppercase mt-1"
+                      value={dadosCliente.nomePai}
+                      onChange={e => setDadosCliente(prev => ({ ...prev, nomePai: e.target.value }))}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Nome da Mãe</label>
+                    <input
+                      type="text"
+                      placeholder="NOME DA MÃE"
+                      className="input py-1.5 px-2.5 text-xs font-semibold uppercase mt-1"
+                      value={dadosCliente.nomeMae}
+                      onChange={e => setDadosCliente(prev => ({ ...prev, nomeMae: e.target.value }))}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Endereço Completo</label>
+                    <textarea
+                      placeholder="RUA, NÚMERO, BAIRRO, CIDADE - UF"
+                      className="input py-1.5 px-2.5 text-xs font-semibold mt-1 h-16 resize-none leading-normal"
+                      value={dadosCliente.endereco}
+                      onChange={e => setDadosCliente(prev => ({ ...prev, endereco: e.target.value }))}
+                    />
+                  </div>
                 </div>
+
+                {clienteSelecionadoId && clienteSelecionadoId !== 'avulso' && (
+                  <button
+                    type="button"
+                    disabled={salvandoDadosCliente}
+                    onClick={handleSalvarDadosNoCadastro}
+                    className="w-full mt-2 btn-primary py-2 text-xs flex items-center justify-center gap-1.5 bg-brand-blue/80 hover:bg-brand-blue transition-all"
+                  >
+                    {salvandoDadosCliente ? (
+                      <>
+                        <RefreshCw size={14} className="animate-spin" />
+                        Salvando dados...
+                      </>
+                    ) : (
+                      <>
+                        <Check size={14} />
+                        Salvar no Cadastro
+                      </>
+                    )}
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -469,14 +667,14 @@ export function GerenciadorDeclaracoes() {
                   </div>
 
                   {/* Variables Helper Panel */}
-                  <div className="md:col-span-1 p-3.5 bg-brand-dark-4 border border-brand-dark-5 rounded-xl h-fit space-y-3">
-                    <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest">
+                  <div className="md:col-span-1 p-4 bg-brand-dark-4 border border-brand-dark-5 rounded-xl h-fit space-y-3">
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-brand-dark-5 pb-2">
                       Variáveis Dinâmicas
                     </p>
                     <p className="text-[11px] text-gray-400">
-                      Clique em qualquer tag abaixo para inseri-la no final do texto do modelo:
+                      Clique em uma variável para inseri-la no final do texto do modelo:
                     </p>
-                    <div className="flex flex-col gap-1.5 pt-1">
+                    <div className="flex flex-wrap gap-2 pt-1">
                       {[
                         { key: 'nome', label: 'Nome Completo' },
                         { key: 'rg', label: 'RG do Cliente' },
@@ -485,16 +683,16 @@ export function GerenciadorDeclaracoes() {
                         { key: 'nome_pai', label: 'Nome do Pai' },
                         { key: 'nome_mae', label: 'Nome da Mãe' },
                         { key: 'data_nascimento', label: 'Data de Nascimento' },
-                        { key: 'data_atual', label: 'Data Atual por extenso' }
+                        { key: 'data_atual', label: 'Data Atual (por extenso)' }
                       ].map(v => (
                         <button
                           key={v.key}
                           type="button"
                           onClick={() => inserirPlaceholderNoModelo(v.key)}
-                          className="px-2 py-1 bg-brand-dark-3 hover:bg-brand-blue/20 border border-brand-dark-5 hover:border-brand-blue/30 rounded-lg text-left text-[11px] font-mono text-brand-blue-light transition-all flex items-center justify-between"
+                          className="px-2.5 py-1.5 bg-brand-dark-3 hover:bg-brand-blue/20 border border-brand-dark-5 hover:border-brand-blue/40 text-gray-300 hover:text-white rounded-lg text-left text-xs transition-all flex items-center gap-1.5 font-medium shadow-sm cursor-pointer"
                         >
-                          <span>{`{{${v.key}}}`}</span>
-                          <span className="text-[9px] text-gray-500 font-sans">{v.label}</span>
+                          <Plus size={12} className="text-brand-blue" />
+                          <span>{v.label}</span>
                         </button>
                       ))}
                     </div>
