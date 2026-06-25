@@ -540,6 +540,13 @@ export function DetalheCliente({ cliente }: DetalheClienteProps) {
       onClick: () => setModalWhatsAppAberto(true),
       slug: null
     },
+    { 
+      label: 'Gerar Declaração', 
+      icon: <FileText size={20} />, 
+      color: 'bg-brand-blue/10 text-brand-blue border-brand-blue/20 hover:bg-brand-blue/20',
+      onClick: () => navigate(`/declaracoes?clienteId=${cliente.id}`),
+      slug: 'clientes'
+    },
   ].filter(acao => {
     if (usuario?.tipoConta === 'cac_individual') {
       return false;
@@ -657,15 +664,6 @@ export function DetalheCliente({ cliente }: DetalheClienteProps) {
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
-          {usuario?.tipoConta !== 'cac_individual' && (
-            <button 
-              onClick={() => navigate(`/declaracoes?clienteId=${cliente.id}`)}
-              className="btn-ghost px-3 py-1.5 text-sm font-black uppercase tracking-wider flex items-center gap-2 border border-brand-blue/30 text-brand-blue-light hover:bg-brand-blue/10"
-            >
-              <FileText size={16} />
-              Gerar Declaração
-            </button>
-          )}
           <button 
             onClick={() => setEditando(true)}
             className="btn-ghost px-3 py-1.5 text-sm font-black uppercase tracking-wider flex items-center gap-2 border border-brand-dark-5"
