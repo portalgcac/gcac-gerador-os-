@@ -42,8 +42,22 @@ export function GerenciadorDeclaracoes() {
     dataNascimento: '',
     nomePai: '',
     nomeMae: '',
-    endereco: ''
+    endereco: '',
+    numeroCr: '',
+    vencimentoCr: '',
+    clubeFiliado: ''
   });
+  
+  const [dadosClube, setDadosClube] = useState({
+    nome: '',
+    cnpj: '',
+    cr: '',
+    crValidade: '',
+    endereco: '',
+    filiacaoNum: '',
+    filiacaoData: ''
+  });
+
   const lastSelectedIdRef = React.useRef<string>('');
 
   const clienteSelecionado = useMemo(() => {
@@ -58,6 +72,9 @@ export function GerenciadorDeclaracoes() {
         nomePai: dadosCliente.nomePai,
         nomeMae: dadosCliente.nomeMae,
         endereco: dadosCliente.endereco,
+        numeroCr: dadosCliente.numeroCr,
+        vencimentoCr: dadosCliente.vencimentoCr,
+        clubeFiliado: dadosCliente.clubeFiliado,
       } as Cliente;
     }
     const dbClient = clientes.find(c => c.id === clienteSelecionadoId);
@@ -71,12 +88,24 @@ export function GerenciadorDeclaracoes() {
       nomePai: dadosCliente.nomePai,
       nomeMae: dadosCliente.nomeMae,
       endereco: dadosCliente.endereco,
+      numeroCr: dadosCliente.numeroCr,
+      vencimentoCr: dadosCliente.vencimentoCr,
+      clubeFiliado: dadosCliente.clubeFiliado,
     } as Cliente;
   }, [clientes, clienteSelecionadoId, dadosCliente]);
 
   const modeloSelecionado = useMemo(() => {
     return modelos.find(m => m.id === modeloSelecionadoId);
   }, [modelos, modeloSelecionadoId]);
+
+  const exigeDadosClube = useMemo(() => {
+    if (!modeloSelecionado) return false;
+    const text = modeloSelecionado.texto;
+    return (
+      modeloSelecionado.titulo.includes('COMPROMISSO DE PARTICIPAÇÃO') ||
+      text.includes('{{clube_')
+    );
+  }, [modeloSelecionado]);
 
   // Carregar Modelos do DB
   const carregarModelos = async () => {
@@ -129,7 +158,10 @@ export function GerenciadorDeclaracoes() {
           dataNascimento: '',
           nomePai: '',
           nomeMae: '',
-          endereco: ''
+          endereco: '',
+          numeroCr: '',
+          vencimentoCr: '',
+          clubeFiliado: ''
         });
       } else if (clienteSelecionadoId) {
         const client = clientes.find(c => c.id === clienteSelecionadoId);
@@ -141,7 +173,10 @@ export function GerenciadorDeclaracoes() {
             dataNascimento: client.dataNascimento || '',
             nomePai: client.nomePai || '',
             nomeMae: client.nomeMae || '',
-            endereco: client.endereco || ''
+            endereco: client.endereco || '',
+            numeroCr: client.numeroCr || '',
+            vencimentoCr: client.vencimentoCr || '',
+            clubeFiliado: client.clubeFiliado || ''
           });
         }
       } else {
@@ -152,13 +187,32 @@ export function GerenciadorDeclaracoes() {
           dataNascimento: '',
           nomePai: '',
           nomeMae: '',
-          endereco: ''
+          endereco: '',
+          numeroCr: '',
+          vencimentoCr: '',
+          clubeFiliado: ''
         });
       }
     }
   }, [clienteSelecionadoId, clientes, dadosCliente.nome]);
 
-  const obterValorPlaceholder = (chave: string, client?: typeof dadosCliente): string => {
+  // Synchronize club data with club selection/defaults
+  useEffect(() => {
+    const nomeClube = dadosCliente.clubeFiliado || 'CLUBE DE TIRO E CACA PRO TIRO';
+    const isProTiro = nomeClube.toUpperCase().includes('PRO TIRO') || nomeClube.toUpperCase().includes('PRO-TIRO');
+    
+    setDadosClube(prev => ({
+      ...prev,
+      nome: nomeClube,
+      cnpj: isProTiro ? '34.222.235/0001-40' : prev.cnpj || '',
+      cr: isProTiro ? '409494' : prev.cr || '',
+      endereco: isProTiro 
+        ? 'Avenida Goiás, 1802, SALA 03 QUADRA05 LOTE 03, Vila Santa Maria, CEP 75800-133, Jataí - GO' 
+        : prev.endereco || '',
+    }));
+  }, [dadosCliente.clubeFiliado]);
+
+  const obterValorPlaceholder = (chave: string, client?: typeof dadosCliente, club?: typeof dadosClube): string => {
     if (!client) return `{{${chave}}}`;
     switch (chave) {
       case 'nome': return client.nome || '';
@@ -169,33 +223,81 @@ export function GerenciadorDeclaracoes() {
       case 'nome_mae': return client.nomeMae || '___________';
       case 'data_nascimento': return formatarDataBr(client.dataNascimento) || '___/___/_____';
       case 'data_atual': return dataAtualPorExtenso;
+      case 'numero_cr': return client.numeroCr || '___________';
+      case 'vencimento_cr': return formatarDataBr(client.vencimentoCr) || '___/___/_____';
+      // Club fields
+      case 'clube_nome': return club?.nome || '___________';
+      case 'clube_cnpj': return club?.cnpj || '___________';
+      case 'clube_cr': return club?.cr || '___________';
+      case 'clube_cr_validade': return formatarDataBr(club?.crValidade) || '___/___/_____';
+      case 'clube_endereco': return club?.endereco || '___________';
+      case 'clube_filiacao_num': return club?.filiacaoNum || '___________';
+      case 'clube_filiacao_data': return formatarDataBr(club?.filiacaoData) || '___/___/_____';
       default: return `{{${chave}}}`;
     }
   };
 
-  const processarPlaceholders = (texto: string, client?: typeof dadosCliente) => {
+  const processarPlaceholders = (texto: string, client?: typeof dadosCliente, club?: typeof dadosClube) => {
     if (!texto) return '';
     return texto
-      .replace(/{{nome}}/g, obterValorPlaceholder('nome', client))
-      .replace(/{{rg}}/g, obterValorPlaceholder('rg', client))
-      .replace(/{{cpf}}/g, obterValorPlaceholder('cpf', client))
-      .replace(/{{endereco}}/g, obterValorPlaceholder('endereco', client))
-      .replace(/{{nome_pai}}/g, obterValorPlaceholder('nome_pai', client))
-      .replace(/{{nome_mae}}/g, obterValorPlaceholder('nome_mae', client))
-      .replace(/{{data_nascimento}}/g, obterValorPlaceholder('data_nascimento', client))
-      .replace(/{{data_atual}}/g, obterValorPlaceholder('data_atual', client));
+      .replace(/{{nome}}/g, obterValorPlaceholder('nome', client, club))
+      .replace(/{{rg}}/g, obterValorPlaceholder('rg', client, club))
+      .replace(/{{cpf}}/g, obterValorPlaceholder('cpf', client, club))
+      .replace(/{{endereco}}/g, obterValorPlaceholder('endereco', client, club))
+      .replace(/{{nome_pai}}/g, obterValorPlaceholder('nome_pai', client, club))
+      .replace(/{{nome_mae}}/g, obterValorPlaceholder('nome_mae', client, club))
+      .replace(/{{data_nascimento}}/g, obterValorPlaceholder('data_nascimento', client, club))
+      .replace(/{{data_atual}}/g, obterValorPlaceholder('data_atual', client, club))
+      .replace(/{{numero_cr}}/g, obterValorPlaceholder('numero_cr', client, club))
+      .replace(/{{vencimento_cr}}/g, obterValorPlaceholder('vencimento_cr', client, club))
+      .replace(/{{clube_nome}}/g, obterValorPlaceholder('clube_nome', client, club))
+      .replace(/{{clube_cnpj}}/g, obterValorPlaceholder('clube_cnpj', client, club))
+      .replace(/{{clube_cr}}/g, obterValorPlaceholder('clube_cr', client, club))
+      .replace(/{{clube_cr_validade}}/g, obterValorPlaceholder('clube_cr_validade', client, club))
+      .replace(/{{clube_endereco}}/g, obterValorPlaceholder('clube_endereco', client, club))
+      .replace(/{{clube_filiacao_num}}/g, obterValorPlaceholder('clube_filiacao_num', client, club))
+      .replace(/{{clube_filiacao_data}}/g, obterValorPlaceholder('clube_filiacao_data', client, club));
   };
 
-  // Atualizar texto editado quando mudar o modelo ou dados do cliente
+  // Atualizar texto editado quando mudar o modelo ou dados do cliente/clube
   useEffect(() => {
     if (modeloSelecionado) {
       setTituloManual(modeloSelecionado.titulo);
-      setTextoEditado(processarPlaceholders(modeloSelecionado.texto, dadosCliente));
+      
+      let textoBase = modeloSelecionado.texto;
+      // Auto-upgrade old seeded template if it doesn't have the new placeholders
+      if (
+        modeloSelecionado.titulo === 'DECLARAÇÃO DE COMPROMISSO DE PARTICIPAÇÃO EM TREINAMENTOS E COMPETIÇÕES' &&
+        !textoBase.includes('{{clube_cnpj}}')
+      ) {
+        textoBase = `DADOS DA ENTIDADE DE TIRO DECLARANTE
+Nome: {{clube_nome}}
+CNPJ: {{clube_cnpj}}
+Certificado de Registro: {{clube_cr}} (Vencimento: {{clube_cr_validade}})
+Endereço: {{clube_endereco}}
+
+DADOS DO ATIRADOR DESPORTIVO
+Nome: {{nome}}
+CPF: {{cpf}}
+Certificado de Registro: {{numero_cr}} (Vencimento: {{vencimento_cr}})
+Endereço: {{endereco}}
+
+FILIAÇÃO À ENTIDADE DE TIRO
+Número: {{clube_filiacao_num}}
+Data: {{clube_filiacao_data}}
+
+COMPROMISSO
+Eu, {{nome}}, portador do CPF nº {{cpf}}, residente no endereço {{endereco}}, portador do RG nº {{rg}}, filiado à Entidade de Tiro acima nomeada, ME COMPROMETO a comprovar, no mínimo, a habitualidade e a participação em treinamentos e competições na forma prevista na legislação vigente (Art. 35 do Decreto nº 11.615/2023).
+
+Por ser expressão da verdade, firmo o presente compromisso.`;
+      }
+      
+      setTextoEditado(processarPlaceholders(textoBase, dadosCliente, dadosClube));
     } else {
       setTituloManual('');
       setTextoEditado('');
     }
-  }, [modeloSelecionadoId, clienteSelecionadoId, dadosCliente, modelos]);
+  }, [modeloSelecionadoId, clienteSelecionadoId, dadosCliente, dadosClube, modelos]);
 
   // Verificar campos faltantes no cliente
   const camposFaltantes = useMemo(() => {
@@ -247,6 +349,9 @@ export function GerenciadorDeclaracoes() {
         nomePai: dadosCliente.nomePai.trim(),
         nomeMae: dadosCliente.nomeMae.trim(),
         endereco: dadosCliente.endereco.trim(),
+        numeroCr: dadosCliente.numeroCr.trim(),
+        vencimentoCr: dadosCliente.vencimentoCr,
+        clubeFiliado: dadosCliente.clubeFiliado.trim(),
       });
       alert('Dados do cliente salvos com sucesso no cadastro!');
     } catch (err) {
@@ -450,6 +555,39 @@ export function GerenciadorDeclaracoes() {
                     />
                   </div>
 
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Nº do CR</label>
+                      <input
+                        type="text"
+                        placeholder="Nº DO CR"
+                        className="input py-1.5 px-2.5 text-xs font-semibold uppercase mt-1"
+                        value={dadosCliente.numeroCr}
+                        onChange={e => setDadosCliente(prev => ({ ...prev, numeroCr: e.target.value }))}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Vencimento do CR</label>
+                      <input
+                        type="date"
+                        className="input py-1.5 px-2.5 text-xs font-semibold mt-1"
+                        value={dadosCliente.vencimentoCr}
+                        onChange={e => setDadosCliente(prev => ({ ...prev, vencimentoCr: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Clube de Tiro Filiado</label>
+                    <input
+                      type="text"
+                      placeholder="NOME DO CLUBE"
+                      className="input py-1.5 px-2.5 text-xs font-semibold uppercase mt-1"
+                      value={dadosCliente.clubeFiliado}
+                      onChange={e => setDadosCliente(prev => ({ ...prev, clubeFiliado: e.target.value }))}
+                    />
+                  </div>
+
                   <div>
                     <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Nome do Pai</label>
                     <input
@@ -503,6 +641,96 @@ export function GerenciadorDeclaracoes() {
                     )}
                   </button>
                 )}
+              </div>
+            )}
+
+            {/* Formulário de Dados do Clube de Tiro de Vinculação */}
+            {clienteSelecionado && exigeDadosClube && (
+              <div className="p-3.5 bg-brand-dark-4 border border-brand-dark-5 rounded-xl space-y-3">
+                <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest flex items-center gap-1.5 border-b border-brand-dark-5 pb-2">
+                  <Sparkles size={12} className="text-brand-blue" />
+                  Dados da Entidade de Tiro (Clube)
+                </p>
+                
+                <div className="space-y-3 max-h-[320px] overflow-y-auto pr-1">
+                  <div>
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Nome do Clube de Tiro</label>
+                    <input
+                      type="text"
+                      placeholder="CLUBE DE TIRO"
+                      className="input py-1.5 px-2.5 text-xs font-semibold uppercase mt-1"
+                      value={dadosClube.nome}
+                      onChange={e => setDadosClube(prev => ({ ...prev, nome: e.target.value }))}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">CNPJ</label>
+                      <input
+                        type="text"
+                        placeholder="00.000.000/0000-00"
+                        className="input py-1.5 px-2.5 text-xs font-semibold mt-1"
+                        value={dadosClube.cnpj}
+                        onChange={e => setDadosClube(prev => ({ ...prev, cnpj: e.target.value }))}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">CR da Entidade</label>
+                      <input
+                        type="text"
+                        placeholder="CR ENTIDADE"
+                        className="input py-1.5 px-2.5 text-xs font-semibold uppercase mt-1"
+                        value={dadosClube.cr}
+                        onChange={e => setDadosClube(prev => ({ ...prev, cr: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-2">
+                    <div>
+                      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Vencimento do CR do Clube</label>
+                      <input
+                        type="date"
+                        className="input py-1.5 px-2.5 text-xs font-semibold mt-1"
+                        value={dadosClube.crValidade}
+                        onChange={e => setDadosClube(prev => ({ ...prev, crValidade: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Endereço do Clube</label>
+                    <textarea
+                      placeholder="ENDEREÇO DO CLUBE"
+                      className="input py-1.5 px-2.5 text-xs font-semibold mt-1 h-14 resize-none leading-normal"
+                      value={dadosClube.endereco}
+                      onChange={e => setDadosClube(prev => ({ ...prev, endereco: e.target.value }))}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Nº de Filiação</label>
+                      <input
+                        type="text"
+                        placeholder="FILIAÇÃO Nº"
+                        className="input py-1.5 px-2.5 text-xs font-semibold uppercase mt-1"
+                        value={dadosClube.filiacaoNum}
+                        onChange={e => setDadosClube(prev => ({ ...prev, filiacaoNum: e.target.value }))}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Data de Filiação</label>
+                      <input
+                        type="date"
+                        className="input py-1.5 px-2.5 text-xs font-semibold mt-1"
+                        value={dadosClube.filiacaoData}
+                        onChange={e => setDadosClube(prev => ({ ...prev, filiacaoData: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
           </div>
@@ -683,7 +911,16 @@ export function GerenciadorDeclaracoes() {
                         { key: 'nome_pai', label: 'Nome do Pai' },
                         { key: 'nome_mae', label: 'Nome da Mãe' },
                         { key: 'data_nascimento', label: 'Data de Nascimento' },
-                        { key: 'data_atual', label: 'Data Atual (por extenso)' }
+                        { key: 'data_atual', label: 'Data Atual (por extenso)' },
+                        { key: 'numero_cr', label: 'CR do Cliente' },
+                        { key: 'vencimento_cr', label: 'Vencimento do CR do Cliente' },
+                        { key: 'clube_nome', label: 'Nome do Clube' },
+                        { key: 'clube_cnpj', label: 'CNPJ do Clube' },
+                        { key: 'clube_cr', label: 'CR do Clube' },
+                        { key: 'clube_cr_validade', label: 'Vencimento CR do Clube' },
+                        { key: 'clube_endereco', label: 'Endereço do Clube' },
+                        { key: 'clube_filiacao_num', label: 'Nº Filiação Clube' },
+                        { key: 'clube_filiacao_data', label: 'Data Filiação Clube' }
                       ].map(v => (
                         <button
                           key={v.key}

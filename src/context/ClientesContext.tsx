@@ -614,7 +614,7 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
         },
         {
           titulo: 'DECLARAÇÃO DE COMPROMISSO DE PARTICIPAÇÃO EM TREINAMENTOS E COMPETIÇÕES',
-          texto: 'Eu, {{nome}}, portador do CPF nº {{cpf}}, residente no endereço {{endereco}}, portador do RG nº {{rg}}, filiado à Entidade de Tiro CLUBE DE TIRO E CACA PRO TIRO, ME COMPROMETO a comprovar, no mínimo, a habitualidade e a participação em treinamentos e competições na forma prevista na legislação vigente (Art. 35 do Decreto nº 11.615/2023).\n\nPor ser expressão da verdade, firmo o presente compromisso.',
+          texto: 'DADOS DA ENTIDADE DE TIRO DECLARANTE\nNome: {{clube_nome}}\nCNPJ: {{clube_cnpj}}\nCertificado de Registro: {{clube_cr}} (Vencimento: {{clube_cr_validade}})\nEndereço: {{clube_endereco}}\n\nDADOS DO ATIRADOR DESPORTIVO\nNome: {{nome}}\nCPF: {{cpf}}\nCertificado de Registro: {{numero_cr}} (Vencimento: {{vencimento_cr}})\nEndereço: {{endereco}}\n\nFILIAÇÃO À ENTIDADE DE TIRO\nNúmero: {{clube_filiacao_num}}\nData: {{clube_filiacao_data}}\n\nCOMPROMISSO\nEu, {{nome}}, portador do CPF nº {{cpf}}, residente no endereço {{endereco}}, portador do RG nº {{rg}}, filiado à Entidade de Tiro acima nomeada, ME COMPROMETO a comprovar, no mínimo, a habitualidade e a participação em treinamentos e competições na forma prevista na legislação vigente (Art. 35 do Decreto nº 11.615/2023).\n\nPor ser expressão da verdade, firmo o presente compromisso.',
           empresa_id: usuario.empresaId
         },
         {
