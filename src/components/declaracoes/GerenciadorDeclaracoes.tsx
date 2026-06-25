@@ -47,6 +47,10 @@ interface ToolbarProps {
 function Toolbar({ editorRef }: ToolbarProps) {
   const [mostrarMenuTabela, setMostrarMenuTabela] = useState(false);
   const [estaNaTabela, setEstaNaTabela] = useState(false);
+  const [hoveredR, setHoveredR] = useState(0);
+  const [hoveredC, setHoveredC] = useState(0);
+  const [manualLinhas, setManualLinhas] = useState('3');
+  const [manualColunas, setManualColunas] = useState('3');
 
   // Close dropdown on click outside
   useEffect(() => {
@@ -102,30 +106,52 @@ function Toolbar({ editorRef }: ToolbarProps) {
     }
   };
 
-  const inserirTabelaPadrao = () => {
-    const tableHtml = `
+  const inserirTabelaCustom = (linhas: number, colunas: number) => {
+    if (linhas <= 0 || colunas <= 0) return;
+    
+    let tableHtml = `
       <table style="width: 100%; border-collapse: collapse; margin: 15px 0; font-size: 13px;">
         <thead>
           <tr style="background-color: #f3f4f6;">
-            <th style="border: 1px solid #d1d5db; padding: 8px; text-align: left; font-weight: bold; color: #0D0D0D;">Coluna 1</th>
-            <th style="border: 1px solid #d1d5db; padding: 8px; text-align: left; font-weight: bold; color: #0D0D0D;">Coluna 2</th>
-            <th style="border: 1px solid #d1d5db; padding: 8px; text-align: left; font-weight: bold; color: #0D0D0D;">Coluna 3</th>
+    `;
+    
+    // Header row
+    for (let c = 1; c <= colunas; c++) {
+      tableHtml += `
+            <th style="border: 1px solid #d1d5db; padding: 8px; text-align: left; font-weight: bold; color: #0D0D0D;">Coluna ${c}</th>
+      `;
+    }
+    
+    tableHtml += `
           </tr>
         </thead>
         <tbody>
+    `;
+    
+    // Body rows
+    for (let r = 2; r <= linhas; r++) {
+      tableHtml += `
           <tr>
-            <td style="border: 1px solid #d1d5db; padding: 8px; color: #1F2937;">Dado 1</td>
-            <td style="border: 1px solid #d1d5db; padding: 8px; color: #1F2937;">Dado 2</td>
-            <td style="border: 1px solid #d1d5db; padding: 8px; color: #1F2937;">Dado 3</td>
+      `;
+      for (let c = 1; c <= colunas; c++) {
+        tableHtml += `
+            <td style="border: 1px solid #d1d5db; padding: 8px; color: #1F2937;">Dado</td>
+        `;
+      }
+      tableHtml += `
           </tr>
-          <tr>
-            <td style="border: 1px solid #d1d5db; padding: 8px; color: #1F2937;">Dado 4</td>
-            <td style="border: 1px solid #d1d5db; padding: 8px; color: #1F2937;">Dado 5</td>
-            <td style="border: 1px solid #d1d5db; padding: 8px; color: #1F2937;">Dado 6</td>
-          </tr>
+      `;
+    }
+    
+    if (linhas === 1) {
+      // no body rows
+    }
+    
+    tableHtml += `
         </tbody>
       </table>
     `;
+    
     if (editorRef.current) {
       editorRef.current.focus();
     }
@@ -342,22 +368,10 @@ function Toolbar({ editorRef }: ToolbarProps) {
         </button>
 
         {mostrarMenuTabela && (
-          <div className="absolute left-0 mt-1 bg-brand-dark-3 border border-brand-dark-5 rounded-xl shadow-xl py-1 w-52 z-50 text-xs text-gray-300">
-            {!estaNaTabela ? (
-              <button
-                type="button"
-                onClick={() => {
-                  inserirTabelaPadrao();
-                  setMostrarMenuTabela(false);
-                }}
-                onMouseDown={(e) => e.preventDefault()}
-                className="w-full text-left px-3 py-2 hover:bg-brand-blue/15 hover:text-white transition-all flex items-center gap-2"
-              >
-                <Plus size={12} className="text-brand-blue" />
-                <span>Inserir Tabela (3x3)</span>
-              </button>
-            ) : (
-              <>
+          <div className="absolute left-0 mt-1 bg-brand-dark-3 border border-brand-dark-5 rounded-xl shadow-xl py-1.5 w-52 z-50 text-xs text-gray-300 flex flex-col">
+            {estaNaTabela && (
+              <div className="flex flex-col border-b border-brand-dark-5/50 pb-1.5 mb-1.5">
+                <div className="px-3 py-1 text-[10px] text-gray-500 font-bold uppercase tracking-wider">Ações de Célula</div>
                 <button
                   type="button"
                   onClick={() => {
@@ -389,7 +403,7 @@ function Toolbar({ editorRef }: ToolbarProps) {
                     setMostrarMenuTabela(false);
                   }}
                   onMouseDown={(e) => e.preventDefault()}
-                  className="w-full text-left px-3 py-1.5 hover:bg-red-500/10 hover:text-red-400 transition-all flex items-center gap-2 border-b border-brand-dark-5/50 pb-2 mb-1"
+                  className="w-full text-left px-3 py-1.5 hover:bg-red-500/10 hover:text-red-400 transition-all flex items-center gap-2 border-b border-brand-dark-5/50 pb-2 mb-1.5"
                 >
                   <Minus size={12} className="text-red-500" />
                   <span>Excluir Linha</span>
@@ -426,7 +440,7 @@ function Toolbar({ editorRef }: ToolbarProps) {
                     setMostrarMenuTabela(false);
                   }}
                   onMouseDown={(e) => e.preventDefault()}
-                  className="w-full text-left px-3 py-1.5 hover:bg-red-500/10 hover:text-red-400 transition-all flex items-center gap-2 border-b border-brand-dark-5/50 pb-2 mb-1"
+                  className="w-full text-left px-3 py-1.5 hover:bg-red-500/10 hover:text-red-400 transition-all flex items-center gap-2 border-b border-brand-dark-5/50 pb-2 mb-1.5"
                 >
                   <Minus size={12} className="text-red-500" />
                   <span>Excluir Coluna</span>
@@ -444,21 +458,101 @@ function Toolbar({ editorRef }: ToolbarProps) {
                   <Trash2 size={12} className="text-red-500" />
                   <span>Excluir Tabela</span>
                 </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    inserirTabelaPadrao();
-                    setMostrarMenuTabela(false);
-                  }}
-                  onMouseDown={(e) => e.preventDefault()}
-                  className="w-full text-left px-3 py-1.5 hover:bg-brand-blue/15 hover:text-white transition-all flex items-center gap-2 border-t border-brand-dark-5/50 mt-1 pt-2"
-                >
-                  <Plus size={12} className="text-brand-blue" />
-                  <span>Inserir Nova Tabela (3x3)</span>
-                </button>
-              </>
+              </div>
             )}
+
+            {/* Always show custom Table Generator (Grid selector + manual size inputs) */}
+            <div className="flex flex-col gap-2">
+              <div className="px-3 text-[10px] text-gray-500 font-bold uppercase tracking-wider">
+                {estaNaTabela ? 'Inserir Outra Tabela' : 'Criar Tabela'}
+              </div>
+              
+              <div 
+                className="px-3 py-2 flex flex-col items-center gap-2 bg-brand-dark-4/40"
+                onMouseLeave={() => {
+                  setHoveredR(0);
+                  setHoveredC(0);
+                }}
+              >
+                <div className="grid grid-cols-8 gap-1">
+                  {Array.from({ length: 8 * 8 }).map((_, idx) => {
+                    const r = Math.floor(idx / 8) + 1;
+                    const c = (idx % 8) + 1;
+                    const isHighlighted = r <= hoveredR && c <= hoveredC;
+                    return (
+                      <div
+                        key={idx}
+                        onMouseEnter={() => {
+                          setHoveredR(r);
+                          setHoveredC(c);
+                        }}
+                        onClick={() => {
+                          inserirTabelaCustom(r, c);
+                          setMostrarMenuTabela(false);
+                        }}
+                        onMouseDown={(e) => e.preventDefault()}
+                        className={`w-3.5 h-3.5 rounded-sm border transition-all cursor-pointer ${
+                          isHighlighted 
+                            ? 'bg-brand-blue border-brand-blue shadow-sm shadow-brand-blue/30 scale-105' 
+                            : 'bg-brand-dark-3 border-brand-dark-5 hover:border-gray-400'
+                        }`}
+                      />
+                    );
+                  })}
+                </div>
+                
+                <div className="text-[10px] text-gray-400 font-medium text-center h-4 flex items-center justify-center">
+                  {hoveredR > 0 && hoveredC > 0 ? (
+                    <span className="text-white font-bold">
+                      Tabela {hoveredR}x{hoveredC}
+                    </span>
+                  ) : (
+                    <span>Arraste para definir o tamanho</span>
+                  )}
+                </div>
+              </div>
+
+              {/* Manual Input Form */}
+              <div className="p-3 border-t border-brand-dark-5/50 flex flex-col gap-2 bg-brand-dark-4/20">
+                <div className="text-[9px] text-gray-500 font-bold uppercase tracking-wider">Ou digite o tamanho:</div>
+                <div className="flex items-center gap-1.5 justify-between">
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="number"
+                      min="1"
+                      max="50"
+                      value={manualLinhas}
+                      onChange={(e) => setManualLinhas(e.target.value)}
+                      className="w-10 bg-brand-dark-3 border border-brand-dark-5 rounded px-1.5 py-0.5 text-center text-xs text-white focus:outline-none focus:border-brand-blue"
+                      placeholder="Linhas"
+                    />
+                    <span className="text-gray-500 text-xs">x</span>
+                    <input
+                      type="number"
+                      min="1"
+                      max="50"
+                      value={manualColunas}
+                      onChange={(e) => setManualColunas(e.target.value)}
+                      className="w-10 bg-brand-dark-3 border border-brand-dark-5 rounded px-1.5 py-0.5 text-center text-xs text-white focus:outline-none focus:border-brand-blue"
+                      placeholder="Cols"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const r = parseInt(manualLinhas) || 3;
+                      const c = parseInt(manualColunas) || 3;
+                      inserirTabelaCustom(r, c);
+                      setMostrarMenuTabela(false);
+                    }}
+                    onMouseDown={(e) => e.preventDefault()}
+                    className="px-2 py-0.5 bg-brand-blue hover:bg-brand-blue-hover text-white rounded text-[10px] font-bold transition-all"
+                  >
+                    Inserir
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </div>
