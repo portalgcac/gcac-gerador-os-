@@ -45,6 +45,52 @@ interface ToolbarProps {
 }
 
 function Toolbar({ editorRef }: ToolbarProps) {
+  const [mostrarMenuTabela, setMostrarMenuTabela] = useState(false);
+  const [estaNaTabela, setEstaNaTabela] = useState(false);
+
+  // Close dropdown on click outside
+  useEffect(() => {
+    if (!mostrarMenuTabela) return;
+    const handleOutsideClick = () => {
+      setMostrarMenuTabela(false);
+    };
+    document.addEventListener('click', handleOutsideClick);
+    return () => {
+      document.removeEventListener('click', handleOutsideClick);
+    };
+  }, [mostrarMenuTabela]);
+
+  const obterCelulaAtiva = (): HTMLTableCellElement | null => {
+    const selecao = window.getSelection();
+    if (!selecao || selecao.rangeCount === 0) return null;
+    let node: Node | null = selecao.getRangeAt(0).startContainer;
+    while (node && node !== document.body) {
+      if (node.nodeName === 'TD' || node.nodeName === 'TH') {
+        return node as HTMLTableCellElement;
+      }
+      node = node.parentNode;
+    }
+    return null;
+  };
+
+  const obterTabelaAtiva = (celula: HTMLTableCellElement): HTMLTableElement | null => {
+    let node: Node | null = celula;
+    while (node && node !== document.body) {
+      if (node.nodeName === 'TABLE') {
+        return node as HTMLTableElement;
+      }
+      node = node.parentNode;
+    }
+    return null;
+  };
+
+  const abrirMenuTabela = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const celula = obterCelulaAtiva();
+    setEstaNaTabela(!!celula);
+    setMostrarMenuTabela(!mostrarMenuTabela);
+  };
+
   const executar = (comando: string, valor: string = '') => {
     if (editorRef.current) {
       editorRef.current.focus();
@@ -56,23 +102,26 @@ function Toolbar({ editorRef }: ToolbarProps) {
     }
   };
 
-  const inserirTabela = () => {
+  const inserirTabelaPadrao = () => {
     const tableHtml = `
       <table style="width: 100%; border-collapse: collapse; margin: 15px 0; font-size: 13px;">
         <thead>
           <tr style="background-color: #f3f4f6;">
             <th style="border: 1px solid #d1d5db; padding: 8px; text-align: left; font-weight: bold; color: #0D0D0D;">Coluna 1</th>
             <th style="border: 1px solid #d1d5db; padding: 8px; text-align: left; font-weight: bold; color: #0D0D0D;">Coluna 2</th>
+            <th style="border: 1px solid #d1d5db; padding: 8px; text-align: left; font-weight: bold; color: #0D0D0D;">Coluna 3</th>
           </tr>
         </thead>
         <tbody>
           <tr>
             <td style="border: 1px solid #d1d5db; padding: 8px; color: #1F2937;">Dado 1</td>
             <td style="border: 1px solid #d1d5db; padding: 8px; color: #1F2937;">Dado 2</td>
+            <td style="border: 1px solid #d1d5db; padding: 8px; color: #1F2937;">Dado 3</td>
           </tr>
           <tr>
-            <td style="border: 1px solid #d1d5db; padding: 8px; color: #1F2937;">Dado 3</td>
             <td style="border: 1px solid #d1d5db; padding: 8px; color: #1F2937;">Dado 4</td>
+            <td style="border: 1px solid #d1d5db; padding: 8px; color: #1F2937;">Dado 5</td>
+            <td style="border: 1px solid #d1d5db; padding: 8px; color: #1F2937;">Dado 6</td>
           </tr>
         </tbody>
       </table>
@@ -81,10 +130,118 @@ function Toolbar({ editorRef }: ToolbarProps) {
       editorRef.current.focus();
     }
     inserirHtmlNoCursor(tableHtml);
+    dispararInput();
+  };
+
+  const dispararInput = () => {
     if (editorRef.current) {
       const event = new Event('input', { bubbles: true });
       editorRef.current.dispatchEvent(event);
     }
+  };
+
+  const inserirLinha = (acima: boolean) => {
+    const celula = obterCelulaAtiva();
+    if (!celula) return;
+    const trAtiva = celula.parentNode as HTMLTableRowElement;
+    if (!trAtiva) return;
+    const parent = trAtiva.parentNode as HTMLTableSectionElement;
+    if (!parent) return;
+
+    const cellCount = trAtiva.cells.length;
+    const rowIndexInParent = Array.from(parent.rows).indexOf(trAtiva);
+    const targetIndex = acima ? rowIndexInParent : rowIndexInParent + 1;
+    
+    const novaLinha = parent.insertRow(targetIndex);
+    for (let i = 0; i < cellCount; i++) {
+      const cellType = trAtiva.cells[i].nodeName.toLowerCase();
+      const novaCelula = document.createElement(cellType);
+      
+      novaCelula.innerHTML = cellType === 'th' ? 'Coluna' : 'Dado';
+      novaCelula.style.border = '1px solid #d1d5db';
+      novaCelula.style.padding = '8px';
+      
+      if (cellType === 'th') {
+        novaCelula.style.textAlign = 'left';
+        novaCelula.style.fontWeight = 'bold';
+        novaCelula.style.color = '#0D0D0D';
+      } else {
+        novaCelula.style.color = '#1F2937';
+      }
+      
+      novaLinha.appendChild(novaCelula);
+    }
+    dispararInput();
+  };
+
+  const excluirLinha = () => {
+    const celula = obterCelulaAtiva();
+    if (!celula) return;
+    const trAtiva = celula.parentNode as HTMLTableRowElement;
+    if (!trAtiva) return;
+    trAtiva.parentNode?.removeChild(trAtiva);
+    dispararInput();
+  };
+
+  const inserirColuna = (esquerda: boolean) => {
+    const celula = obterCelulaAtiva();
+    if (!celula) return;
+    const tabela = obterTabelaAtiva(celula);
+    if (!tabela) return;
+
+    const cellIndex = celula.cellIndex;
+    const targetIndex = esquerda ? cellIndex : cellIndex + 1;
+
+    for (let i = 0; i < tabela.rows.length; i++) {
+      const row = tabela.rows[i];
+      const isHeader = row.parentNode?.nodeName === 'THEAD' || i === 0;
+      
+      const novaCelula = document.createElement(isHeader ? 'th' : 'td');
+      novaCelula.innerHTML = isHeader ? 'Coluna' : 'Dado';
+      novaCelula.style.border = '1px solid #d1d5db';
+      novaCelula.style.padding = '8px';
+      
+      if (isHeader) {
+        novaCelula.style.textAlign = 'left';
+        novaCelula.style.fontWeight = 'bold';
+        novaCelula.style.color = '#0D0D0D';
+      } else {
+        novaCelula.style.color = '#1F2937';
+      }
+
+      const refCell = row.cells[targetIndex];
+      if (refCell) {
+        row.insertBefore(novaCelula, refCell);
+      } else {
+        row.appendChild(novaCelula);
+      }
+    }
+    dispararInput();
+  };
+
+  const excluirColuna = () => {
+    const celula = obterCelulaAtiva();
+    if (!celula) return;
+    const tabela = obterTabelaAtiva(celula);
+    if (!tabela) return;
+
+    const cellIndex = celula.cellIndex;
+    for (let i = 0; i < tabela.rows.length; i++) {
+      const row = tabela.rows[i];
+      if (row.cells[cellIndex]) {
+        row.deleteCell(cellIndex);
+      }
+    }
+    dispararInput();
+  };
+
+  const excluirTabela = () => {
+    const celula = obterCelulaAtiva();
+    if (!celula) return;
+    const tabela = obterTabelaAtiva(celula);
+    if (!tabela) return;
+    tabela.parentNode?.removeChild(tabela);
+    dispararInput();
   };
 
   return (
@@ -92,6 +249,7 @@ function Toolbar({ editorRef }: ToolbarProps) {
       <button
         type="button"
         onClick={() => executar('bold')}
+        onMouseDown={(e) => e.preventDefault()}
         className="p-1.5 hover:bg-brand-dark-5 text-gray-400 hover:text-white rounded-lg transition-all"
         title="Negrito"
       >
@@ -100,6 +258,7 @@ function Toolbar({ editorRef }: ToolbarProps) {
       <button
         type="button"
         onClick={() => executar('italic')}
+        onMouseDown={(e) => e.preventDefault()}
         className="p-1.5 hover:bg-brand-dark-5 text-gray-400 hover:text-white rounded-lg transition-all"
         title="Itálico"
       >
@@ -108,6 +267,7 @@ function Toolbar({ editorRef }: ToolbarProps) {
       <button
         type="button"
         onClick={() => executar('underline')}
+        onMouseDown={(e) => e.preventDefault()}
         className="p-1.5 hover:bg-brand-dark-5 text-gray-400 hover:text-white rounded-lg transition-all"
         title="Sublinhado"
       >
@@ -119,6 +279,7 @@ function Toolbar({ editorRef }: ToolbarProps) {
       <button
         type="button"
         onClick={() => executar('justifyLeft')}
+        onMouseDown={(e) => e.preventDefault()}
         className="p-1.5 hover:bg-brand-dark-5 text-gray-400 hover:text-white rounded-lg transition-all"
         title="Alinhar à Esquerda"
       >
@@ -127,6 +288,7 @@ function Toolbar({ editorRef }: ToolbarProps) {
       <button
         type="button"
         onClick={() => executar('justifyCenter')}
+        onMouseDown={(e) => e.preventDefault()}
         className="p-1.5 hover:bg-brand-dark-5 text-gray-400 hover:text-white rounded-lg transition-all"
         title="Centralizar"
       >
@@ -135,6 +297,7 @@ function Toolbar({ editorRef }: ToolbarProps) {
       <button
         type="button"
         onClick={() => executar('justifyRight')}
+        onMouseDown={(e) => e.preventDefault()}
         className="p-1.5 hover:bg-brand-dark-5 text-gray-400 hover:text-white rounded-lg transition-all"
         title="Alinhar à Direita"
       >
@@ -143,6 +306,7 @@ function Toolbar({ editorRef }: ToolbarProps) {
       <button
         type="button"
         onClick={() => executar('justifyFull')}
+        onMouseDown={(e) => e.preventDefault()}
         className="p-1.5 hover:bg-brand-dark-5 text-gray-400 hover:text-white rounded-lg transition-all"
         title="Justificar"
       >
@@ -154,19 +318,150 @@ function Toolbar({ editorRef }: ToolbarProps) {
       <button
         type="button"
         onClick={() => executar('insertHorizontalRule')}
+        onMouseDown={(e) => e.preventDefault()}
         className="p-1.5 hover:bg-brand-dark-5 text-gray-400 hover:text-white rounded-lg transition-all"
         title="Inserir Linha Horizontal"
       >
         <Minus size={14} />
       </button>
-      <button
-        type="button"
-        onClick={inserirTabela}
-        className="p-1.5 hover:bg-brand-dark-5 text-gray-400 hover:text-white rounded-lg transition-all"
-        title="Inserir Tabela"
-      >
-        <Table size={14} />
-      </button>
+
+      <div className="h-4 w-px bg-brand-dark-5 mx-1" />
+
+      {/* Table Dropdown Menu */}
+      <div className="relative">
+        <button
+          type="button"
+          onClick={abrirMenuTabela}
+          onMouseDown={(e) => e.preventDefault()}
+          className={`p-1.5 hover:bg-brand-dark-5 rounded-lg transition-all flex items-center gap-1 ${
+            mostrarMenuTabela ? 'bg-brand-dark-5 text-white' : 'text-gray-400 hover:text-white'
+          }`}
+          title="Opções de Tabela"
+        >
+          <Table size={14} />
+        </button>
+
+        {mostrarMenuTabela && (
+          <div className="absolute left-0 mt-1 bg-brand-dark-3 border border-brand-dark-5 rounded-xl shadow-xl py-1 w-52 z-50 text-xs text-gray-300">
+            {!estaNaTabela ? (
+              <button
+                type="button"
+                onClick={() => {
+                  inserirTabelaPadrao();
+                  setMostrarMenuTabela(false);
+                }}
+                onMouseDown={(e) => e.preventDefault()}
+                className="w-full text-left px-3 py-2 hover:bg-brand-blue/15 hover:text-white transition-all flex items-center gap-2"
+              >
+                <Plus size={12} className="text-brand-blue" />
+                <span>Inserir Tabela (3x3)</span>
+              </button>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    inserirLinha(true);
+                    setMostrarMenuTabela(false);
+                  }}
+                  onMouseDown={(e) => e.preventDefault()}
+                  className="w-full text-left px-3 py-1.5 hover:bg-brand-blue/15 hover:text-white transition-all flex items-center gap-2"
+                >
+                  <Plus size={12} className="text-brand-blue" />
+                  <span>Inserir Linha Acima</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    inserirLinha(false);
+                    setMostrarMenuTabela(false);
+                  }}
+                  onMouseDown={(e) => e.preventDefault()}
+                  className="w-full text-left px-3 py-1.5 hover:bg-brand-blue/15 hover:text-white transition-all flex items-center gap-2"
+                >
+                  <Plus size={12} className="text-brand-blue" />
+                  <span>Inserir Linha Abaixo</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    excluirLinha();
+                    setMostrarMenuTabela(false);
+                  }}
+                  onMouseDown={(e) => e.preventDefault()}
+                  className="w-full text-left px-3 py-1.5 hover:bg-red-500/10 hover:text-red-400 transition-all flex items-center gap-2 border-b border-brand-dark-5/50 pb-2 mb-1"
+                >
+                  <Minus size={12} className="text-red-500" />
+                  <span>Excluir Linha</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    inserirColuna(true);
+                    setMostrarMenuTabela(false);
+                  }}
+                  onMouseDown={(e) => e.preventDefault()}
+                  className="w-full text-left px-3 py-1.5 hover:bg-brand-blue/15 hover:text-white transition-all flex items-center gap-2"
+                >
+                  <Plus size={12} className="text-brand-blue" />
+                  <span>Inserir Coluna à Esquerda</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    inserirColuna(false);
+                    setMostrarMenuTabela(false);
+                  }}
+                  onMouseDown={(e) => e.preventDefault()}
+                  className="w-full text-left px-3 py-1.5 hover:bg-brand-blue/15 hover:text-white transition-all flex items-center gap-2"
+                >
+                  <Plus size={12} className="text-brand-blue" />
+                  <span>Inserir Coluna à Direita</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    excluirColuna();
+                    setMostrarMenuTabela(false);
+                  }}
+                  onMouseDown={(e) => e.preventDefault()}
+                  className="w-full text-left px-3 py-1.5 hover:bg-red-500/10 hover:text-red-400 transition-all flex items-center gap-2 border-b border-brand-dark-5/50 pb-2 mb-1"
+                >
+                  <Minus size={12} className="text-red-500" />
+                  <span>Excluir Coluna</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    excluirTabela();
+                    setMostrarMenuTabela(false);
+                  }}
+                  onMouseDown={(e) => e.preventDefault()}
+                  className="w-full text-left px-3 py-1.5 hover:bg-red-500/15 hover:text-red-400 transition-all flex items-center gap-2 text-red-400 font-medium"
+                >
+                  <Trash2 size={12} className="text-red-500" />
+                  <span>Excluir Tabela</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    inserirTabelaPadrao();
+                    setMostrarMenuTabela(false);
+                  }}
+                  onMouseDown={(e) => e.preventDefault()}
+                  className="w-full text-left px-3 py-1.5 hover:bg-brand-blue/15 hover:text-white transition-all flex items-center gap-2 border-t border-brand-dark-5/50 mt-1 pt-2"
+                >
+                  <Plus size={12} className="text-brand-blue" />
+                  <span>Inserir Nova Tabela (3x3)</span>
+                </button>
+              </>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
