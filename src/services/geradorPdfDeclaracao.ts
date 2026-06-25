@@ -1,4 +1,5 @@
 import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 async function blobParaBase64(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -9,11 +10,8 @@ async function blobParaBase64(blob: Blob): Promise<string> {
   });
 }
 
-export async function gerarPdfDeclaracaoBlob(titulo: string, texto: string, nomeCliente: string): Promise<Blob> {
+export async function gerarPdfDeclaracaoBlob(titulo: string, textoHtml: string, nomeCliente: string): Promise<Blob> {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-  const largura = doc.internal.pageSize.getWidth();
-  const altura  = doc.internal.pageSize.getHeight();
-  let y = 15;
 
   let nomeEmpresa = '';
   let logoBase64 = '';
@@ -37,7 +35,6 @@ export async function gerarPdfDeclaracaoBlob(titulo: string, texto: string, nome
     }
 
     if (!logoBase64 && !nomeEmpresa) {
-      // Fallback para logo padrão se não houver dados da empresa
       const logoRes = await fetch('/LOGO PORTAL G CAC 2 SEM FRASE.png');
       if (logoRes.ok) {
         const logoBlob = await logoRes.blob();
@@ -45,114 +42,89 @@ export async function gerarPdfDeclaracaoBlob(titulo: string, texto: string, nome
       }
       nomeEmpresa = 'GCAC DESPACHANTE BÉLICO';
     }
-
-    if (logoBase64) {
-      let format = 'PNG';
-      if (logoBase64.startsWith('data:image/jpeg') || logoBase64.startsWith('data:image/jpg')) {
-        format = 'JPEG';
-      } else if (logoBase64.startsWith('data:image/webp')) {
-        format = 'WEBP';
-      }
-      doc.addImage(logoBase64, format, 12, 10, 20, 20);
-    }
   } catch (err) {
     console.error('Erro ao carregar cabeçalho:', err);
   }
 
-  // Nome e Identificação do Despachante
-  doc.setTextColor('#0D0D0D');
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(14);
-  doc.text(nomeEmpresa, 36, 18);
+  // Create hidden DOM container for high fidelity PDF layout
+  const container = document.createElement('div');
+  container.className = 'pdf-render-container';
+  container.style.width = '794px'; // 210mm at 96 DPI
+  container.style.padding = '60px 80px';
+  container.style.boxSizing = 'border-box';
+  container.style.backgroundColor = '#FFFFFF';
+  container.style.color = '#000000';
+  container.style.fontFamily = 'Helvetica, Arial, sans-serif';
+  container.style.fontSize = '14px';
+  container.style.lineHeight = '1.6';
+  container.style.position = 'absolute';
+  container.style.left = '-9999px';
+  container.style.top = '-9999px';
 
-  doc.setTextColor('#1B6FBF');
-  doc.setFontSize(9);
-  doc.text('DOCUMENTO OFICIAL DE DECLARAÇÃO', 36, 24);
-
-  // Linha divisória do cabeçalho
-  doc.setDrawColor('#E2E8F0');
-  doc.setLineWidth(0.5);
-  doc.line(12, 33, largura - 12, 33);
-  doc.setLineWidth(0.1);
-
-  y = 48;
-
-  // Título da Declaração
-  doc.setTextColor('#0D0D0D');
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(14);
-  const tituloSplitted = doc.splitTextToSize(titulo.toUpperCase(), largura - 30);
-  doc.text(tituloSplitted, largura / 2, y, { align: 'center' });
-  
-  y += (tituloSplitted.length * 6) + 12;
-
-  // Corpo do Texto
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(11);
-  doc.setTextColor('#1F2937'); // cinza escuro para melhor legibilidade
-
-  const paragrafos = texto.split('\n');
-  const maxLarguraTexto = largura - 32; // 16mm de margem esquerda e direita
-
-  for (const paragrafo of paragrafos) {
-    const textoLimpo = paragrafo.trim();
-    if (!textoLimpo) {
-      y += 5; // espaço entre parágrafos
-      continue;
-    }
-
-    const linhas = doc.splitTextToSize(textoLimpo, maxLarguraTexto);
-    for (const linha of linhas) {
-      if (y > altura - 45) { // Se passar perto do final da página, cria nova
-        doc.addPage();
-        y = 20;
-      }
-      // Alinhamento à esquerda (jsPDF nativo justificado é limitado)
-      doc.text(linha, 16, y);
-      y += 6.5; // Espaçamento de linha
-    }
-    y += 4; // Espaçamento após parágrafo
-  }
-
-  y += 10;
-
-  // Data e Assinatura
-  if (y > altura - 55) {
-    doc.addPage();
-    y = 30;
-  }
-
-  // Data por extenso
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(11);
-  doc.setTextColor('#0D0D0D');
   const meses = [
     'janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
     'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'
   ];
   const hoje = new Date();
   const dataExtenso = `${cidadeEmpresa} - ${estadoEmpresa}, ${hoje.getDate()} de ${meses[hoje.getMonth()]} de ${hoje.getFullYear()}.`;
-  doc.text(dataExtenso, 16, y);
 
-  y += 25;
+  container.innerHTML = `
+    <!-- Header -->
+    <div style="display: flex; align-items: center; border-bottom: 2px solid #E2E8F0; padding-bottom: 12px; margin-bottom: 24px;">
+      ${logoBase64 ? `<img src="${logoBase64}" style="width: 60px; height: 60px; margin-right: 16px; object-fit: contain;" />` : ''}
+      <div style="display: flex; flex-direction: column;">
+        <span style="font-size: 15px; font-weight: bold; color: #0D0D0D; font-family: Helvetica, Arial, sans-serif;">${nomeEmpresa}</span>
+        <span style="font-size: 9px; font-weight: bold; color: #1B6FBF; letter-spacing: 1px; margin-top: 2px; font-family: Helvetica, Arial, sans-serif;">DOCUMENTO OFICIAL DE DECLARAÇÃO</span>
+      </div>
+    </div>
 
-  // Linha de assinatura
-  if (y > altura - 25) {
-    doc.addPage();
-    y = 40;
+    <!-- Title -->
+    <div style="text-align: center; font-size: 15px; font-weight: bold; margin-bottom: 24px; text-transform: uppercase; font-family: Helvetica, Arial, sans-serif; color: #0D0D0D;">
+      ${titulo}
+    </div>
+
+    <!-- Body text (render HTML) -->
+    <div style="text-align: justify; font-size: 13px; color: #1F2937; margin-bottom: 30px; font-family: Helvetica, Arial, sans-serif; line-height: 1.6; word-wrap: break-word;">
+      ${textoHtml}
+    </div>
+
+    <!-- Date -->
+    <div style="font-size: 13px; color: #0D0D0D; margin-bottom: 40px; font-family: Helvetica, Arial, sans-serif;">
+      ${dataExtenso}
+    </div>
+
+    <!-- Signature -->
+    <div style="display: flex; flex-direction: column; align-items: center; margin-top: 40px; page-break-inside: avoid; break-inside: avoid;">
+      <div style="width: 250px; border-top: 1.5px solid #94A3B8; margin-bottom: 6px;"></div>
+      <span style="font-size: 13px; font-weight: bold; text-transform: uppercase; font-family: Helvetica, Arial, sans-serif; color: #0D0D0D;">${nomeCliente}</span>
+      <span style="font-size: 10px; color: #64748B; font-family: Helvetica, Arial, sans-serif;">Declarante</span>
+    </div>
+  `;
+
+  document.body.appendChild(container);
+  (window as any).html2canvas = html2canvas;
+
+  try {
+    await new Promise<void>((resolve, reject) => {
+      doc.html(container, {
+        callback: () => resolve(),
+        x: 0,
+        y: 0,
+        width: 210, // A4 width in mm
+        windowWidth: 794,
+        html2canvas: {
+          scale: 2,
+          useCORS: true,
+          logging: false
+        }
+      });
+    });
+  } catch (err) {
+    console.error('Erro na renderização do PDF:', err);
+    throw err;
+  } finally {
+    document.body.removeChild(container);
   }
-  doc.setDrawColor('#94A3B8');
-  doc.setLineWidth(0.3);
-  doc.line(largura / 2 - 50, y, largura / 2 + 50, y);
-  
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(11);
-  doc.text(nomeCliente.toUpperCase(), largura / 2, y + 5, { align: 'center' });
-  
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(9);
-  doc.setTextColor('#64748B');
-  doc.text('Declarante', largura / 2, y + 9, { align: 'center' });
 
   return doc.output('blob');
 }

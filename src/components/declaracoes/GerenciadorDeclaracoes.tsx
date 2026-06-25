@@ -1,6 +1,9 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { FileText, Plus, Trash2, Edit3, Download, Copy, Check, AlertCircle, Sparkles, User, RefreshCw } from 'lucide-react';
+import { 
+  FileText, Plus, Trash2, Edit3, Download, Copy, Check, AlertCircle, Sparkles, User, RefreshCw,
+  Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight, AlignJustify, Minus, Table 
+} from 'lucide-react';
 import { useClientes } from '../../context/ClientesContext';
 import { Cliente, ModeloDeclaracao } from '../../types';
 import { gerarPdfDeclaracaoBlob } from '../../services/geradorPdfDeclaracao';
@@ -11,6 +14,161 @@ function formatarDataBr(dataStr?: string): string {
   if (parts.length !== 3) return dataStr;
   const [ano, mes, dia] = parts;
   return `${dia}/${mes}/${ano}`;
+}
+
+function inserirHtmlNoCursor(html: string) {
+  const selecao = window.getSelection();
+  if (!selecao || selecao.rangeCount === 0) return;
+  const range = selecao.getRangeAt(0);
+  range.deleteContents();
+  
+  const el = document.createElement("div");
+  el.innerHTML = html;
+  const frag = document.createDocumentFragment();
+  let node, lastNode;
+  while ((node = el.firstChild)) {
+    lastNode = frag.appendChild(node);
+  }
+  range.insertNode(frag);
+  
+  if (lastNode) {
+    const newRange = range.cloneRange();
+    newRange.setStartAfter(lastNode);
+    newRange.collapse(true);
+    selecao.removeAllRanges();
+    selecao.addRange(newRange);
+  }
+}
+
+interface ToolbarProps {
+  editorRef: React.RefObject<HTMLDivElement | null>;
+}
+
+function Toolbar({ editorRef }: ToolbarProps) {
+  const executar = (comando: string, valor: string = '') => {
+    if (editorRef.current) {
+      editorRef.current.focus();
+    }
+    document.execCommand(comando, false, valor);
+    if (editorRef.current) {
+      const event = new Event('input', { bubbles: true });
+      editorRef.current.dispatchEvent(event);
+    }
+  };
+
+  const inserirTabela = () => {
+    const tableHtml = `
+      <table style="width: 100%; border-collapse: collapse; margin: 15px 0; font-size: 13px;">
+        <thead>
+          <tr style="background-color: #f3f4f6;">
+            <th style="border: 1px solid #d1d5db; padding: 8px; text-align: left; font-weight: bold; color: #0D0D0D;">Coluna 1</th>
+            <th style="border: 1px solid #d1d5db; padding: 8px; text-align: left; font-weight: bold; color: #0D0D0D;">Coluna 2</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="border: 1px solid #d1d5db; padding: 8px; color: #1F2937;">Dado 1</td>
+            <td style="border: 1px solid #d1d5db; padding: 8px; color: #1F2937;">Dado 2</td>
+          </tr>
+          <tr>
+            <td style="border: 1px solid #d1d5db; padding: 8px; color: #1F2937;">Dado 3</td>
+            <td style="border: 1px solid #d1d5db; padding: 8px; color: #1F2937;">Dado 4</td>
+          </tr>
+        </tbody>
+      </table>
+    `;
+    if (editorRef.current) {
+      editorRef.current.focus();
+    }
+    inserirHtmlNoCursor(tableHtml);
+    if (editorRef.current) {
+      const event = new Event('input', { bubbles: true });
+      editorRef.current.dispatchEvent(event);
+    }
+  };
+
+  return (
+    <div className="flex flex-wrap gap-1 p-1.5 bg-brand-dark-4 border-b border-brand-dark-5 items-center">
+      <button
+        type="button"
+        onClick={() => executar('bold')}
+        className="p-1.5 hover:bg-brand-dark-5 text-gray-400 hover:text-white rounded-lg transition-all"
+        title="Negrito"
+      >
+        <Bold size={14} />
+      </button>
+      <button
+        type="button"
+        onClick={() => executar('italic')}
+        className="p-1.5 hover:bg-brand-dark-5 text-gray-400 hover:text-white rounded-lg transition-all"
+        title="Itálico"
+      >
+        <Italic size={14} />
+      </button>
+      <button
+        type="button"
+        onClick={() => executar('underline')}
+        className="p-1.5 hover:bg-brand-dark-5 text-gray-400 hover:text-white rounded-lg transition-all"
+        title="Sublinhado"
+      >
+        <Underline size={14} />
+      </button>
+      
+      <div className="h-4 w-px bg-brand-dark-5 mx-1" />
+      
+      <button
+        type="button"
+        onClick={() => executar('justifyLeft')}
+        className="p-1.5 hover:bg-brand-dark-5 text-gray-400 hover:text-white rounded-lg transition-all"
+        title="Alinhar à Esquerda"
+      >
+        <AlignLeft size={14} />
+      </button>
+      <button
+        type="button"
+        onClick={() => executar('justifyCenter')}
+        className="p-1.5 hover:bg-brand-dark-5 text-gray-400 hover:text-white rounded-lg transition-all"
+        title="Centralizar"
+      >
+        <AlignCenter size={14} />
+      </button>
+      <button
+        type="button"
+        onClick={() => executar('justifyRight')}
+        className="p-1.5 hover:bg-brand-dark-5 text-gray-400 hover:text-white rounded-lg transition-all"
+        title="Alinhar à Direita"
+      >
+        <AlignRight size={14} />
+      </button>
+      <button
+        type="button"
+        onClick={() => executar('justifyFull')}
+        className="p-1.5 hover:bg-brand-dark-5 text-gray-400 hover:text-white rounded-lg transition-all"
+        title="Justificar"
+      >
+        <AlignJustify size={14} />
+      </button>
+      
+      <div className="h-4 w-px bg-brand-dark-5 mx-1" />
+      
+      <button
+        type="button"
+        onClick={() => executar('insertHorizontalRule')}
+        className="p-1.5 hover:bg-brand-dark-5 text-gray-400 hover:text-white rounded-lg transition-all"
+        title="Inserir Linha Horizontal"
+      >
+        <Minus size={14} />
+      </button>
+      <button
+        type="button"
+        onClick={inserirTabela}
+        className="p-1.5 hover:bg-brand-dark-5 text-gray-400 hover:text-white rounded-lg transition-all"
+        title="Inserir Tabela"
+      >
+        <Table size={14} />
+      </button>
+    </div>
+  );
 }
 
 export function GerenciadorDeclaracoes() {
@@ -32,6 +190,28 @@ export function GerenciadorDeclaracoes() {
   // Estado de Edição de Modelo
   const [modeloEditando, setModeloEditando] = useState<Partial<ModeloDeclaracao> | null>(null);
   const [salvandoModelo, setSalvandoModelo] = useState(false);
+
+  // Refs for WYSIWYG HTML Editors
+  const editorRefModel = useRef<HTMLDivElement>(null);
+  const editorRefGerar = useRef<HTMLDivElement>(null);
+
+  const handleEditorModelInput = () => {
+    if (editorRefModel.current && modeloEditando) {
+      setModeloEditando(prev => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          texto: editorRefModel.current!.innerHTML
+        };
+      });
+    }
+  };
+
+  const handleEditorGerarInput = () => {
+    if (editorRefGerar.current) {
+      setTextoEditado(editorRefGerar.current.innerHTML);
+    }
+  };
 
   // Novos Estados
   const [salvandoDadosCliente, setSalvandoDadosCliente] = useState(false);
@@ -259,6 +439,31 @@ export function GerenciadorDeclaracoes() {
       .replace(/{{clube_filiacao_data}}/g, obterValorPlaceholder('clube_filiacao_data', client, club));
   };
 
+  // Sync editor innerHTML when model text changes from outside
+  useEffect(() => {
+    if (editorRefModel.current) {
+      if (modeloEditando) {
+        const text = modeloEditando.texto || '';
+        const htmlText = (!text.trim().startsWith('<') && !text.includes('</')) 
+          ? text.replace(/\n/g, '<br>')
+          : text;
+        
+        if (editorRefModel.current.innerHTML !== htmlText) {
+          editorRefModel.current.innerHTML = htmlText;
+        }
+      } else {
+        editorRefModel.current.innerHTML = '';
+      }
+    }
+  }, [modeloEditando?.id, modeloEditando === null]);
+
+  // Sync editor innerHTML when textoEditado changes from outside (e.g. template compile)
+  useEffect(() => {
+    if (editorRefGerar.current && editorRefGerar.current.innerHTML !== textoEditado) {
+      editorRefGerar.current.innerHTML = textoEditado;
+    }
+  }, [textoEditado]);
+
   // Atualizar texto editado quando mudar o modelo ou dados do cliente/clube
   useEffect(() => {
     if (modeloSelecionado) {
@@ -290,6 +495,11 @@ COMPROMISSO
 Eu, {{nome}}, portador do CPF nº {{cpf}}, residente no endereço {{endereco}}, portador do RG nº {{rg}}, filiado à Entidade de Tiro acima nomeada, ME COMPROMETO a comprovar, no mínimo, a habitualidade e a participação em treinamentos e competições na forma prevista na legislação vigente (Art. 35 do Decreto nº 11.615/2023).
 
 Por ser expressão da verdade, firmo o presente compromisso.`;
+      }
+      
+      // Convert plain text newlines to <br> for HTML rendering if it's not HTML yet
+      if (!textoBase.trim().startsWith('<') && !textoBase.includes('</')) {
+        textoBase = textoBase.replace(/\n/g, '<br>');
       }
       
       setTextoEditado(processarPlaceholders(textoBase, dadosCliente, dadosClube));
@@ -402,11 +612,19 @@ Por ser expressão da verdade, firmo o presente compromisso.`;
 
   const inserirPlaceholderNoModelo = (tag: string) => {
     if (!modeloEditando) return;
-    const text = modeloEditando.texto || '';
-    setModeloEditando({
-      ...modeloEditando,
-      texto: text + ` {{${tag}}}`
-    });
+    
+    if (editorRefModel.current) {
+      editorRefModel.current.focus();
+    }
+    
+    inserirHtmlNoCursor(`{{${tag}}}`);
+    
+    if (editorRefModel.current) {
+      setModeloEditando({
+        ...modeloEditando,
+        texto: editorRefModel.current.innerHTML
+      });
+    }
   };
 
   return (
@@ -773,11 +991,16 @@ Por ser expressão da verdade, firmo o presente compromisso.`;
                 </div>
                 <div>
                   <label className="label">Corpo do Texto (Edite livremente antes de gerar o PDF)</label>
-                  <textarea
-                    className="input h-[450px] font-mono text-xs py-3 leading-relaxed focus:ring-0 resize-y"
-                    value={textoEditado}
-                    onChange={e => setTextoEditado(e.target.value)}
-                  />
+                  <div className="rounded-xl border border-brand-dark-5 overflow-hidden">
+                    <Toolbar editorRef={editorRefGerar} />
+                    <div
+                      ref={editorRefGerar}
+                      contentEditable
+                      suppressContentEditableWarning
+                      onInput={handleEditorGerarInput}
+                      className="input min-h-[450px] h-[450px] overflow-y-auto font-sans text-sm py-3 px-4 leading-relaxed focus:outline-none focus:ring-0 rounded-b-xl border-t-0 bg-brand-dark-3/30"
+                    />
+                  </div>
                 </div>
               </div>
             ) : (
@@ -884,13 +1107,16 @@ Por ser expressão da verdade, firmo o presente compromisso.`;
 
                     <div>
                       <label className="label label-required">Corpo do Texto</label>
-                      <textarea
-                        required
-                        placeholder="Redija o texto utilizando os placeholders para autocompletar com dados dos clientes..."
-                        className="input h-[380px] font-mono text-xs py-3 leading-relaxed"
-                        value={modeloEditando.texto || ''}
-                        onChange={e => setModeloEditando({ ...modeloEditando, texto: e.target.value })}
-                      />
+                      <div className="rounded-xl border border-brand-dark-5 overflow-hidden">
+                        <Toolbar editorRef={editorRefModel} />
+                        <div
+                          ref={editorRefModel}
+                          contentEditable
+                          suppressContentEditableWarning
+                          onInput={handleEditorModelInput}
+                          className="input min-h-[380px] h-[380px] overflow-y-auto font-sans text-sm py-3 px-4 leading-relaxed focus:outline-none focus:ring-0 rounded-b-xl border-t-0 bg-brand-dark-3/30"
+                        />
+                      </div>
                     </div>
                   </div>
 
