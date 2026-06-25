@@ -366,17 +366,31 @@ export function AbaDocumentacao({ cliente, armaIdInicial, cacEmpresaId, podeEdit
                         </button>
                       )}
                       {podeEditar && (
-                        <button 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setArmaParaEditar(arma);
-                            setModalArma(true);
-                          }}
-                          className="p-2 rounded-lg bg-brand-dark-2 text-gray-400 hover:text-brand-blue transition-colors"
-                          title="Editar Arma"
-                        >
-                          <Pencil size={16} />
-                        </button>
+                        <>
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setArmaParaEditar(arma);
+                              setModalArma(true);
+                            }}
+                            className="p-2 rounded-lg bg-brand-dark-2 text-gray-400 hover:text-brand-blue transition-colors"
+                            title="Editar Arma"
+                          >
+                            <Pencil size={16} />
+                          </button>
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (confirm('Deseja realmente excluir esta arma e todas as suas guias?')) {
+                                deletarArma(arma.id).then(carregarDados);
+                              }
+                            }}
+                            className="p-2 rounded-lg bg-brand-dark-2 text-gray-400 hover:text-red-400 transition-colors"
+                            title="Excluir Arma"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </>
                       )}
                       <div className="p-1 text-gray-400">
                         {expandirArma === arma.id ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
