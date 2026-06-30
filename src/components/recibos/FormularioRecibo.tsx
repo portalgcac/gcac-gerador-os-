@@ -113,7 +113,7 @@ export function FormularioRecibo() {
         })),
         valorTotal: os.valor,
         ordemId: os.id,
-        formaPagamento: (os.formaPagamento as FormaPagamento) || 'PIX',
+        formaPagamento: (os.formaPagamento && os.formaPagamento !== 'Pendente') ? (os.formaPagamento as FormaPagamento) : 'PIX',
         observacoes: os.observacoes
       });
     }
@@ -322,7 +322,7 @@ export function FormularioRecibo() {
                 value={form.formaPagamento}
                 onChange={e => atualizar('formaPagamento', e.target.value as FormaPagamento)}
               >
-                {FORMAS_PAGAMENTO.map(f => (
+                {FORMAS_PAGAMENTO.filter(f => f !== 'Pendente').map(f => (
                   <option key={f} value={f}>{f}</option>
                 ))}
               </select>
