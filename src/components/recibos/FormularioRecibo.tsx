@@ -31,6 +31,7 @@ export function FormularioRecibo() {
   const [cenario, setCenario] = useState<'os' | 'manual'>('os');
   const [salvando, setSalvando] = useState(false);
   const [focoCliente, setFocoCliente] = useState(false);
+  const [clientePreDefinido, setClientePreDefinido] = useState<Cliente | null>(null);
 
   const [form, setForm] = useState({
     clienteNome: '',
@@ -53,7 +54,19 @@ export function FormularioRecibo() {
     const state = location.state as { clientePreDefinido?: Cliente };
     if (state?.clientePreDefinido) {
       const c = state.clientePreDefinido;
-      setCenario('manual');
+      setClientePreDefinido(c);
+      
+      // Busca se o cliente tem alguma OS disponível
+      const cCpfClean = c.cpf ? c.cpf.replace(/\D/g, '') : '';
+      const temOs = ordens.some(o => {
+        const statusValido = o.status === 'Aguardando Pagamento' || o.status === 'Pago';
+        const oCpfClean = o.cpf ? o.cpf.replace(/\D/g, '') : '';
+        return statusValido && oCpfClean === cCpfClean;
+      });
+
+      // Se tiver OS, deixa o cenário como 'os' (padrão do formulário), senão muda para 'manual'
+      setCenario(temOs ? 'os' : 'manual');
+
       setForm(f => ({
         ...f,
         clienteNome: c.nome,
@@ -63,7 +76,7 @@ export function FormularioRecibo() {
       // Limpar o estado para não repetir o preenchimento
       window.history.replaceState({}, document.title);
     }
-  }, [location]);
+  }, [location, ordens]);
 
   const [erros, setErros] = useState<Record<string, string>>({});
 
@@ -73,7 +86,17 @@ export function FormularioRecibo() {
   };
 
   // --- Cenário 1: Seleção de OS ---
-  const ordensDisponiveis = ordens.filter(o => o.status === 'Aguardando Pagamento' || o.status === 'Pago');
+  const ordensDisponiveis = ordens.filter(o => {
+    const statusValido = o.status === 'Aguardando Pagamento' || o.status === 'Pago';
+    if (!statusValido) return false;
+    
+    if (clientePreDefinido) {
+      const oCpfClean = o.cpf ? o.cpf.replace(/\D/g, '') : '';
+      const cCpfClean = clientePreDefinido.cpf ? clientePreDefinido.cpf.replace(/\D/g, '') : '';
+      return oCpfClean === cCpfClean;
+    }
+    return true;
+  });
 
   const selecionarOS = (id: string) => {
     const os = ordens.find(o => o.id === id);
@@ -224,7 +247,14 @@ export function FormularioRecibo() {
           <div className="space-y-4">
             {cenario === 'os' ? (
               <div>
-                <label className="label label-required">Selecione a Ordem de Serviço</label>
+                <div className="flex justify-between items-center mb-1">
+                  <label className="label label-required">Selecione a Ordem de Serviço</label>
+                  {clientePreDefinido && (
+                    <span className="text-[10px] bg-brand-blue/20 text-brand-blue-light border border-brand-blue/30 px-2.5 py-0.5 rounded-full font-black uppercase tracking-wider">
+                      Filtrado por: {clientePreDefinido.nome}
+                    </span>
+                  )}
+                </div>
                 <select 
                   className={`select ${erros.ordemId ? 'border-red-500' : ''}`}
                   value={form.ordemId}
@@ -239,7 +269,11 @@ export function FormularioRecibo() {
                 </select>
                 {erros.ordemId && <p className="text-red-400 text-xs mt-1">{erros.ordemId}</p>}
                 {ordensDisponiveis.length === 0 && (
-                  <p className="text-xs text-yellow-500 mt-2">Nenhuma OS com status "Aguardando Pagamento" ou "Pago" encontrada.</p>
+                  <p className="text-xs text-yellow-500 mt-2">
+                    {clientePreDefinido 
+                      ? `Nenhuma OS com status "Aguardando Pagamento" ou "Pago" encontrada para ${clientePreDefinido.nome}.`
+                      : 'Nenhuma OS com status "Aguardando Pagamento" ou "Pago" encontrada.'}
+                  </p>
                 )}
               </div>
             ) : (
