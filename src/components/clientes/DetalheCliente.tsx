@@ -708,7 +708,7 @@ export function DetalheCliente({ cliente }: DetalheClienteProps) {
 
           {/* Botão de convite para Portal CAC (apenas despachantes/empresa) */}
           {usuario?.tipoConta !== 'cac_individual' && (usuario?.role === 'admin' || temAcessoRecurso('modulo_clientes_cac')) && (
-            <BotaoConvidarCac cliente={cliente} />
+            <BotaoConvidarCac cliente={cliente} isUsuarioPortal={isUsuarioPortal} portalStatus={portalStatus} />
           )}
           
           {usuario?.tipoConta !== 'cac_individual' && (
