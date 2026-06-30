@@ -9,6 +9,7 @@ import { Recibo } from '../../types';
 import { formatarMoeda, formatarData } from '../../utils/formatters';
 import { baixarPdfRecibo } from '../../services/geradorPdfRecibo';
 import { useRecibos } from '../../context/RecibosContext';
+import { useOrdens } from '../../context/OrdensContext';
 import { DialogConfirmacao } from '../common/DialogConfirmacao';
 import { ModalEscolhaWhatsApp } from '../common/ModalEscolhaWhatsApp';
 import { MessageCircle } from 'lucide-react';
@@ -21,6 +22,7 @@ interface DetalheReciboProps {
 export function DetalheRecibo({ recibo }: DetalheReciboProps) {
   const navigate = useNavigate();
   const { deletarRecibo } = useRecibos();
+  const { ordens } = useOrdens();
   const { usuario } = useAuth();
   const ehEmpresaGuilherme = usuario?.email === 'gui.gomesassis@gmail.com' || usuario?.dadosEmpresa?.responsavelNome?.toUpperCase() === 'GUILHERME GOMES';
   const podeExcluir = usuario?.role === 'admin' || usuario?.permissoes?.includes('excluir_registros');
@@ -29,10 +31,12 @@ export function DetalheRecibo({ recibo }: DetalheReciboProps) {
   const [modalWhatsAppAberto, setModalWhatsAppAberto] = React.useState(false);
   const [mensagemWhatsApp, setMensagemWhatsApp] = React.useState('');
 
+  const ordemVinculada = ordens.find(o => o.id === recibo.ordemId);
+
   const handleBaixarPdf = async () => {
     setGerandoPdf(true);
     try {
-      await baixarPdfRecibo(recibo);
+      await baixarPdfRecibo(recibo, ordemVinculada?.numero);
     } catch (err) {
       console.error('Erro ao gerar PDF:', err);
       alert('Erro ao gerar arquivo PDF. Tente imprimir pelo navegador.');
@@ -186,7 +190,10 @@ export function DetalheRecibo({ recibo }: DetalheReciboProps) {
             <p className="text-lg leading-relaxed font-medium">
               Recebemos de <span className="font-bold border-b border-gray-400 pb-0.5">{recibo.clienteNome}</span>, 
               inscrito no CPF/CNPJ <span className="font-bold">{recibo.clienteCPF}</span>, 
-              a importância de <span className="text-2xl font-black text-brand-blue-light print:text-gray-900">{formatarMoeda(recibo.valorTotal)}</span>.
+              a importância de <span className="text-2xl font-black text-brand-blue-light print:text-gray-900">{formatarMoeda(recibo.valorTotal)}</span>
+              {ordemVinculada && (
+                <> referente à <span className="font-bold">Ordem de Serviço #{String(ordemVinculada.numero).padStart(4, '0')}</span></>
+              )}.
             </p>
           </div>
 

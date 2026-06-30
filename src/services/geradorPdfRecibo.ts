@@ -9,7 +9,7 @@ const ESCURO_BRAND  = '#0D0D0D';
 const CINZA_TEXTO  = '#666666';
 const LINHA_LEVE    = '#EEEEEE';
 
-export async function gerarPdfReciboBlob(recibo: Recibo): Promise<Blob> {
+export async function gerarPdfReciboBlob(recibo: Recibo, numeroOS?: string | number): Promise<Blob> {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const largura = doc.internal.pageSize.getWidth();
   const altura  = doc.internal.pageSize.getHeight();
@@ -97,7 +97,7 @@ export async function gerarPdfReciboBlob(recibo: Recibo): Promise<Blob> {
   doc.setFont('helvetica', 'normal');
   const textoRecibo = `Recebemos de ${recibo.clienteNome}, `;
   const textoCpf = `inscrito no CPF/CNPJ ${recibo.clienteCPF}, `;
-  const textoImportancia = `a importância de:`;
+  const textoImportancia = `a importância de: ${numeroOS ? `(ref. OS #${String(numeroOS).padStart(4, '0')})` : ''}`;
   
   doc.text(textoRecibo, 18, y + 10);
   doc.text(textoCpf, 18, y + 16);
@@ -308,8 +308,8 @@ async function blobParaBase64(blob: Blob): Promise<string> {
   });
 }
 
-export async function baixarPdfRecibo(recibo: Recibo): Promise<void> {
-  const blob = await gerarPdfReciboBlob(recibo);
+export async function baixarPdfRecibo(recibo: Recibo, numeroOS?: string | number): Promise<void> {
+  const blob = await gerarPdfReciboBlob(recibo, numeroOS);
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
