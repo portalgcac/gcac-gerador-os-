@@ -47,10 +47,11 @@ export function DetalheCliente({ cliente }: DetalheClienteProps) {
   const [confirmandoDelete, setConfirmandoDelete] = useState(false);
   const [modalWhatsAppAberto, setModalWhatsAppAberto] = useState(false);
   const [mostrarTodasOrdens, setMostrarTodasOrdens] = useState(false);
-  const [cacEmpresaId, setCacEmpresaId] = useState<string | undefined>(undefined);
+    const [cacEmpresaId, setCacEmpresaId] = useState<string | undefined>(undefined);
   const [podeEditarVinculo, setPodeEditarVinculo] = useState<boolean>(false);
   const [portalStatus, setPortalStatus] = useState<string | undefined>(undefined);
   const [alertasCount, setAlertasCount] = useState<number>(0);
+  const [isUsuarioPortal, setIsUsuarioPortal] = useState<boolean | undefined>(undefined);
 
   // Filtros de histórico
   const todasOrdensCliente = ordens.filter(o => o.cpf === cliente.cpf);
@@ -91,11 +92,34 @@ export function DetalheCliente({ cliente }: DetalheClienteProps) {
     if (usuario?.tipoConta === 'cac_individual' || !despachanteEmpresaId || !cliente.cpf) return;
 
     let cancelado = false;
+    setIsUsuarioPortal(undefined);
+    setCacEmpresaId(undefined);
+    setPodeEditarVinculo(false);
+    setPortalStatus(undefined);
 
     async function sincronizarComPortal() {
       try {
         const cpfLimpo = cliente.cpf.replace(/\D/g, '');
         const cpfFormatado = cpfLimpo.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+
+        // Busca se existe cadastro de CAC Individual com esse CPF no Portal GCAC
+        const { data: cacExistente } = await supabase
+          .from('clientes')
+          .select(`
+            id,
+            empresa_id,
+            empresas!inner (
+              id,
+              tipo_conta
+            )
+          `)
+          .or(`cpf.eq.${cpfLimpo},cpf.eq.${cpfFormatado}`)
+          .eq('empresas.tipo_conta', 'cac_individual')
+          .limit(1)
+          .maybeSingle() as any;
+
+        if (cancelado) return;
+        setIsUsuarioPortal(!!cacExistente);
 
         // 1. Busca vínculo para esse cliente (qualquer status para exibirmos a situação do portal)
         const { data: vinculo } = await supabase
@@ -654,6 +678,16 @@ export function DetalheCliente({ cliente }: DetalheClienteProps) {
               {portalStatus === 'pendente' && (
                 <span className="inline-flex items-center gap-1 text-[11px] font-black uppercase px-2.5 py-0.5 rounded-full bg-yellow-500/10 border border-yellow-500/30 text-yellow-400">
                   Portal GCAC: Convite Pendente
+                </span>
+              )}
+              {isUsuarioPortal === true && portalStatus !== 'ativo' && portalStatus !== 'pendente' && (
+                <span className="inline-flex items-center gap-1 text-[11px] font-black uppercase px-2.5 py-0.5 rounded-full bg-brand-blue/20 border border-brand-blue/30 text-brand-blue-light">
+                  Usuário do Portal GCAC (Sem Vínculo)
+                </span>
+              )}
+              {isUsuarioPortal === false && portalStatus !== 'ativo' && portalStatus !== 'pendente' && (
+                <span className="inline-flex items-center gap-1 text-[11px] font-black uppercase px-2.5 py-0.5 rounded-full bg-gray-500/10 border border-gray-500/30 text-gray-400">
+                  Não cadastrado no Portal GCAC
                 </span>
               )}
             </h1>

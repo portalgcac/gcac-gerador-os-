@@ -16,6 +16,7 @@ export function ListaClientes() {
   const { usuario } = useAuth();
   const { clientes, deletarCliente } = useClientes();
   const [vinculosPortal, setVinculosPortal] = useState<Record<string, { status: string; permiteEdicao: boolean }>>({});
+  const [cadastradosNoPortal, setCadastradosNoPortal] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     async function carregarVinculos() {
@@ -42,6 +43,43 @@ export function ListaClientes() {
     }
     carregarVinculos();
   }, [usuario]);
+
+  useEffect(() => {
+    async function carregarCadastradosNoPortal() {
+      if (!usuario?.empresaId || clientes.length === 0) return;
+      try {
+        const cpfsLimpos = clientes.map(c => c.cpf?.replace(/\D/g, '')).filter(Boolean);
+        if (cpfsLimpos.length === 0) return;
+
+        const cpfsFormatados = cpfsLimpos.map(c => c.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4'));
+        const todosCpfs = [...cpfsLimpos, ...cpfsFormatados];
+
+        const { data: cacsData, error } = await supabase
+          .from('clientes')
+          .select(`
+            cpf,
+            empresas!inner (
+              tipo_conta
+            )
+          `)
+          .in('cpf', todosCpfs)
+          .eq('empresas.tipo_conta', 'cac_individual') as any;
+
+        if (!error && cacsData) {
+          const set = new Set<string>();
+          cacsData.forEach((c: any) => {
+            if (c.cpf) {
+              set.add(c.cpf.replace(/\D/g, ''));
+            }
+          });
+          setCadastradosNoPortal(set);
+        }
+      } catch (err) {
+        console.error('Erro ao carregar cadastrados no portal:', err);
+      }
+    }
+    carregarCadastradosNoPortal();
+  }, [clientes, usuario]);
 
   if (usuario?.tipoConta === 'cac_individual') {
     if (clientes.length > 0) {
@@ -170,6 +208,14 @@ export function ListaClientes() {
                           {vinculo?.status === 'pendente' && (
                             <span className="inline-flex items-center gap-0.5 text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-yellow-500/10 border border-yellow-500/30 text-yellow-400">
                               Portal Pendente
+                            </span>
+                          )}
+                          {(!vinculo || (vinculo.status !== 'ativo' && vinculo.status !== 'pendente')) && cadastradosNoPortal.has(cpfLimpo) && (
+                            <span 
+                              className="inline-flex items-center gap-0.5 text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-brand-blue/10 border border-brand-blue/30 text-brand-blue-light"
+                              title="Cliente possui cadastro no Portal GCAC, mas não está vinculado à sua empresa"
+                            >
+                              Portal G CAC • Cadastrado (Sem Vínculo)
                             </span>
                           )}
                         </div>
