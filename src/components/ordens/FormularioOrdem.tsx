@@ -19,6 +19,7 @@ import { Notificacao, useNotificacao } from '../common/Notificacao';
 import { classeStatusExecucao, iconeStatusExecucao, formatarMoeda, removerAcentos } from '../../utils/formatters';
 import { supabase } from '../../db/supabase';
 import { useAuth } from '../../context/AuthContext';
+import { isLaudoExame } from '../../utils/categoriaHelper';
 
 interface FormularioOrdemProps {
   ordemExistente?: OrdemDeServico;
@@ -187,10 +188,10 @@ export function FormularioOrdem({ ordemExistente }: FormularioOrdemProps) {
     endereco:          ordemExistente?.endereco           ?? '',
     servicos:          ordemExistente?.servicos          ?? [],
     valor:             ordemExistente 
-                         ? (ordemExistente.servicos || []).filter(s => !s.pagoDireto && s.categoria !== 'Laudo').reduce((acc: number, s: any) => acc + (s.valor || 0), 0)
+                         ? (ordemExistente.servicos || []).filter(s => !s.pagoDireto && !isLaudoExame(s.categoria || '', usuario?.dadosEmpresa?.categoriasServico)).reduce((acc: number, s: any) => acc + (s.valor || 0), 0)
                          : 0,
     valorTexto:        ordemExistente 
-                         ? String((ordemExistente.servicos || []).filter(s => !s.pagoDireto && s.categoria !== 'Laudo').reduce((acc: number, s: any) => acc + (s.valor || 0), 0)).replace('.', ',') 
+                         ? String((ordemExistente.servicos || []).filter(s => !s.pagoDireto && !isLaudoExame(s.categoria || '', usuario?.dadosEmpresa?.categoriasServico)).reduce((acc: number, s: any) => acc + (s.valor || 0), 0)).replace('.', ',') 
                          : '',
     formaPagamento:    (ordemExistente?.formaPagamento   ?? 'Pendente') as FormaPagamento,
     status:            (ordemExistente?.status           ?? 'Aguardando Pagamento') as StatusOS,
@@ -310,7 +311,7 @@ export function FormularioOrdem({ ordemExistente }: FormularioOrdemProps) {
   const adicionarServico = (serv: ServicoConfig) => {
     // Escolhe o valor baseado no status de filiado
     const valorAplicado = form.filiadoProTiro ? (serv.valorFiliado || serv.valorPadrao) : serv.valorPadrao;
-    const isLaudo = serv.categoria === 'Laudo';
+    const isLaudo = isLaudoExame(serv.categoria || '', usuario?.dadosEmpresa?.categoriasServico);
 
     const novosServicos = [
       ...form.servicos,
@@ -682,7 +683,7 @@ export function FormularioOrdem({ ordemExistente }: FormularioOrdemProps) {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <h4 className="text-sm font-bold text-white truncate">{serv.nome}</h4>
-                        {serv.categoria === 'Laudo' && (
+                        {isLaudoExame(serv.categoria || '', usuario?.dadosEmpresa?.categoriasServico) && (
                           <button
                             type="button"
                             onClick={() => atualizarPagoDireto(serv.id, !serv.pagoDireto)}

@@ -1,6 +1,7 @@
 import jsPDF from 'jspdf';
 import { Orcamento } from '../types';
 import { formatarMoeda, formatarData, formatarNumeroOS, formatarCPF, formatarTelefone } from '../utils/formatters';
+import { isLaudoExame } from '../utils/categoriaHelper';
 
 // Cores GCAC
 const VERDE  = '#6DBE45';
@@ -19,6 +20,8 @@ export async function gerarPdfOrcamentoBlob(orcamento: Orcamento): Promise<Blob>
   let responsavel = '';
   let telefone = '';
   let endereco = '';
+  let mensagemAlertaCraf = '';
+  let categoriasConfig: any[] = [];
 
   try {
     const dadosUsuario = localStorage.getItem('gcac_usuario');
@@ -29,6 +32,8 @@ export async function gerarPdfOrcamentoBlob(orcamento: Orcamento): Promise<Blob>
       responsavel = u.dadosEmpresa?.responsavelNome || (ehGuilherme ? 'Guilherme Gomes' : '');
       telefone = u.dadosEmpresa?.contatoTelefone || (ehGuilherme ? '(64) 9.9995-9865' : '');
       endereco = u.dadosEmpresa?.endereco || (ehGuilherme ? 'Av. Goias, n 1802, Sala 04 - Bairro Santa Maria - Jatai-GO' : '');
+      mensagemAlertaCraf = u.dadosEmpresa?.mensagemAlertaCraf || '';
+      categoriasConfig = u.dadosEmpresa?.categoriasServico || [];
     }
   } catch (err) {
     console.error('Erro ao ler dados da empresa do localStorage:', err);
@@ -191,35 +196,45 @@ export async function gerarPdfOrcamentoBlob(orcamento: Orcamento): Promise<Blob>
   // ── Aviso de Renovação CRAF (Condicional) ────────────────────────────────
   const temRenovacaoCRAF = orcamento.servicos.some(s => s.nome.toUpperCase().includes('RENOVAÇÃO DE CRAF'));
   if (temRenovacaoCRAF) {
-    if (y + 35 > 275) {
+    const lines = mensagemAlertaCraf 
+      ? mensagemAlertaCraf.split('\n')
+      : [
+          '• Tiro Desportivo (Nível 1): 8 habitualidades/tipo de arma nos ciclos 27/12/23 a 27/12/24 e 8 habitualidades de 27/12/24 a 27/12/25.',
+          '• Caça: Comprovar 18 meses de SIMAF/IBAMA ativos.',
+          '(Base Legal: Decreto 11.615/23, arts. 35 e 37; Portaria 166-COLOG/23, arts. 12, 16 e 17).'
+        ];
+
+    // Calcula a altura da caixa com base no número de linhas (aproximadamente 5.5mm por linha + margens)
+    const rectHeight = 12 + (lines.length * 5.5);
+
+    if (y + rectHeight + 5 > 275) {
       doc.addPage();
       y = 15;
     }
     
     doc.setFillColor('#FFFBEB');
     doc.setDrawColor('#F59E0B');
-    doc.roundedRect(12, y, largura - 24, 30, 2, 2, 'FD');
+    doc.roundedRect(12, y, largura - 24, rectHeight, 2, 2, 'FD');
     
     doc.setTextColor('#B45309');
     doc.setFontSize(8.5);
     doc.setFont('helvetica', 'bold');
     doc.text('AVISO DE EXIGÊNCIAS PARA RENOVAÇÃO DE CRAF', 17, y + 6);
     
-    doc.setFontSize(7.5);
     doc.setFont('helvetica', 'normal');
-    const msgRenovacao = [
-      '• Tiro Desportivo (Nível 1): 8 habitualidades/tipo de arma nos ciclos 27/12/23 a 27/12/24 e 8 habitualidades de 27/12/24 a 27/12/25.',
-      '• Caça: Comprovar 18 meses de SIMAF/IBAMA ativos.',
-      '(Base Legal: Decreto 11.615/23, arts. 35 e 37; Portaria 166-COLOG/23, arts. 12, 16 e 17).'
-    ];
+    lines.forEach((line, index) => {
+      const lineY = y + 12 + (index * 5.5);
+      if (line.toLowerCase().includes('base legal') || line.trim().startsWith('(')) {
+        doc.setFontSize(6.5);
+        doc.setTextColor('#D97706');
+      } else {
+        doc.setFontSize(7.5);
+        doc.setTextColor('#B45309');
+      }
+      doc.text(line, 17, lineY);
+    });
     
-    doc.text(msgRenovacao[0], 17, y + 12);
-    doc.text(msgRenovacao[1], 17, y + 17);
-    doc.setFontSize(6.5);
-    doc.setTextColor('#D97706');
-    doc.text(msgRenovacao[2], 17, y + 24);
-    
-    y += 36;
+    y += rectHeight + 6;
   }
 
   // ── Resumo Geral ─────────────────────────────────────────────────────────
@@ -233,8 +248,8 @@ export async function gerarPdfOrcamentoBlob(orcamento: Orcamento): Promise<Blob>
   y += 2;
 
   // Detalhamento de valores
-  const honorarios = orcamento.servicos.filter(s => s.categoria !== 'Laudo').reduce((acc, s) => acc + (s.valor || 0), 0);
-  const laudos = orcamento.servicos.filter(s => s.categoria === 'Laudo').reduce((acc, s) => acc + (s.valor || 0), 0);
+  const honorarios = orcamento.servicos.filter(s => !isLaudoExame(s.categoria || '', categoriasConfig)).reduce((acc, s) => acc + (s.valor || 0), 0);
+  const laudos = orcamento.servicos.filter(s => isLaudoExame(s.categoria || '', categoriasConfig)).reduce((acc, s) => acc + (s.valor || 0), 0);
 
   // Caixa valor total (aumentada para caber o detalhamento)
   doc.setFillColor('#EDF7ED');

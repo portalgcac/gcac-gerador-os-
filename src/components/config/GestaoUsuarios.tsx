@@ -551,6 +551,27 @@ export function GestaoUsuarios({ abaInicial }: GestaoUsuariosProps = {}) {
   const handleSalvar = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      // Validação de duplicidade de CPF em usuarios_autorizados
+      if (formData.cpf) {
+        const cpfLimpo = formData.cpf.replace(/\D/g, '');
+        if (cpfLimpo) {
+          const query = supabase
+            .from('usuarios_autorizados')
+            .select('id, nome')
+            .or(`cpf.eq.${cpfLimpo},cpf.eq.${formData.cpf}`);
+          
+          if (editando) {
+            query.neq('id', editando.id);
+          }
+          
+          const { data: cpfDuplicado, error: errCpf } = await query.limit(1);
+          if (errCpf) throw errCpf;
+          if (cpfDuplicado && cpfDuplicado.length > 0) {
+            throw new Error(`Este CPF já está sendo utilizado pelo usuário ${cpfDuplicado[0].nome}.`);
+          }
+        }
+      }
+
       let targetEmpresaId = formData.empresa_id;
 
       // Onboarding de CAC Individual criado manualmente pelo Master Admin

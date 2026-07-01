@@ -17,10 +17,11 @@ import {
 import { supabase } from '../../db/supabase';
 import { Notificacao, useNotificacao } from '../common/Notificacao';
 import { ModalServico } from './ModalServico';
+import { ModalCategoria } from './ModalCategoria';
 import { GestaoUsuarios } from './GestaoUsuarios';
 import { formatarMoeda, formatarData } from '../../utils/formatters';
 import { compressImage, uploadBase64File } from '../../utils/fileUtils';
-import { ServicoConfig } from '../../types';
+import { ServicoConfig, CategoriaServico } from '../../types';
 import { CONTEUDO_MANUAL } from '../../services/manualService';
 import { baixarManualPdf } from '../../services/geradorPdfManual';
 import { exportarAcervoPdf, exportarAcervoExcel } from '../../services/geradorExportacaoAcervo';
@@ -53,6 +54,10 @@ export function Configuracoes() {
   // Controle de Modal de Serviços
   const [modalAberto, setModalAberto] = useState(false);
   const [servicoEditando, setServicoEditando] = useState<ServicoConfig | null>(null);
+
+  // Controle de Modal de Categorias
+  const [modalCategoriaAberto, setModalCategoriaAberto] = useState(false);
+  const [categoriaEditando, setCategoriaEditando] = useState<CategoriaServico | null>(null);
   // Controle de Seções Retráteis
   const [servicosExpandido, setServicosExpandido] = useState(false);
   const [usuariosExpandido, setUsuariosExpandido] = useState(false);
@@ -238,7 +243,8 @@ export function Configuracoes() {
     telefone: usuario?.dadosEmpresa?.contatoTelefone || '',
     responsavel: usuario?.dadosEmpresa?.responsavelNome || '',
     clubeParceiro: usuario?.dadosEmpresa?.clubeParceiroPadrao || '',
-    logoUrl: usuario?.dadosEmpresa?.logoUrl || ''
+    logoUrl: usuario?.dadosEmpresa?.logoUrl || '',
+    mensagemAlertaCraf: usuario?.dadosEmpresa?.mensagemAlertaCraf || ''
   });
   const [salvandoEmpresa, setSalvandoEmpresa] = useState(false);
 
@@ -251,7 +257,8 @@ export function Configuracoes() {
         telefone: usuario.dadosEmpresa.contatoTelefone || '',
         responsavel: usuario.dadosEmpresa.responsavelNome || '',
         clubeParceiro: usuario.dadosEmpresa.clubeParceiroPadrao || '',
-        logoUrl: usuario.dadosEmpresa.logoUrl || ''
+        logoUrl: usuario.dadosEmpresa.logoUrl || '',
+        mensagemAlertaCraf: usuario.dadosEmpresa.mensagemAlertaCraf || ''
       });
     }
   }, [usuario?.dadosEmpresa]);
@@ -269,7 +276,8 @@ export function Configuracoes() {
           contato_telefone: formEmpresa.telefone.trim(),
           endereco: formEmpresa.endereco.trim(),
           cnpj: formEmpresa.cnpj.trim(),
-          logo_url: formEmpresa.logoUrl || null
+          logo_url: formEmpresa.logoUrl || null,
+          mensagem_alerta_craf: formEmpresa.mensagemAlertaCraf.trim() || null
         })
         .eq('id', usuario.empresaId);
 
@@ -600,6 +608,109 @@ export function Configuracoes() {
   const abrirEditarServico = (s: ServicoConfig) => {
     setServicoEditando(s);
     setModalAberto(true);
+  };
+
+  const categorias = usuario?.dadosEmpresa?.categoriasServico || [
+    { id: 'honorario', nome: 'Honorário', calculaComoServico: true },
+    { id: 'laudo', nome: 'Laudo', calculaComoServico: false }
+  ];
+
+  const abrirNovaCategoria = () => {
+    setCategoriaEditando(null);
+    setModalCategoriaAberto(true);
+  };
+
+  const abrirEditarCategoria = (cat: CategoriaServico) => {
+    setCategoriaEditando(cat);
+    setModalCategoriaAberto(true);
+  };
+
+  const handleSalvarCategoria = async (dados: { nome: string; calculaComoServico: boolean }) => {
+    if (!usuario?.empresaId) return;
+
+    let novasCategorias: CategoriaServico[] = [];
+
+    const nomeFormatado = dados.nome.trim();
+
+    if (categoriaEditando) {
+      if (categoriaEditando.id === 'honorario' || categoriaEditando.id === 'laudo') {
+        mostrar('erro', 'As categorias padrão não podem ser editadas.');
+        return;
+      }
+      novasCategorias = categorias.map(c => 
+        c.id === categoriaEditando.id 
+          ? { ...c, nome: nomeFormatado, calculaComoServico: dados.calculaComoServico } 
+          : c
+      );
+    } else {
+      const existe = categorias.some(c => c.nome.toUpperCase() === nomeFormatado.toUpperCase());
+      if (existe) {
+        mostrar('erro', 'Já existe uma categoria com este nome.');
+        return;
+      }
+
+      const novaCat: CategoriaServico = {
+        id: uuidv4(),
+        nome: nomeFormatado,
+        calculaComoServico: dados.calculaComoServico
+      };
+      novasCategorias = [...categorias, novaCat];
+    }
+
+    try {
+      const { error } = await supabase
+        .from('empresas')
+        .update({
+          categorias_servico: novasCategorias
+        })
+        .eq('id', usuario.empresaId);
+
+      if (error) throw error;
+
+      mostrar('sucesso', 'Categorias atualizadas com sucesso!');
+      await refreshUsuario();
+    } catch (err: any) {
+      console.error(err);
+      mostrar('erro', 'Erro ao salvar categoria: ' + err.message);
+    }
+  };
+
+  const handleExcluirCategoria = async (cat: CategoriaServico) => {
+    if (!usuario?.empresaId) return;
+
+    if (cat.id === 'honorario' || cat.id === 'laudo') {
+      mostrar('erro', 'As categorias padrão não podem ser excluídas.');
+      return;
+    }
+
+    const usaCategoria = servicos.some(s => (s.categoria || '').trim().toUpperCase() === cat.nome.trim().toUpperCase());
+    if (usaCategoria) {
+      mostrar('erro', `Não é possível excluir esta categoria pois ela está vinculada a serviços.`);
+      return;
+    }
+
+    if (!window.confirm(`Tem certeza que deseja excluir a categoria "${cat.nome}"?`)) {
+      return;
+    }
+
+    const novasCategorias = categorias.filter(c => c.id !== cat.id);
+
+    try {
+      const { error } = await supabase
+        .from('empresas')
+        .update({
+          categorias_servico: novasCategorias
+        })
+        .eq('id', usuario.empresaId);
+
+      if (error) throw error;
+
+      mostrar('sucesso', 'Categoria excluída com sucesso!');
+      await refreshUsuario();
+    } catch (err: any) {
+      console.error(err);
+      mostrar('erro', 'Erro ao excluir categoria: ' + err.message);
+    }
   };
 
   if (isCac) {
@@ -1127,6 +1238,23 @@ export function Configuracoes() {
                   </p>
                 </div>
 
+                <div className="col-span-1 sm:col-span-2 space-y-1 border-t border-brand-dark-5 pt-3">
+                  <label className="label text-amber-500 font-bold flex items-center gap-1.5">
+                    <Shield size={14} />
+                    Aviso de Exigências para Renovação de CRAF
+                  </label>
+                  <textarea 
+                    rows={4} 
+                    className="input bg-brand-dark-3 text-white font-mono text-xs leading-relaxed" 
+                    value={formEmpresa.mensagemAlertaCraf} 
+                    onChange={e => setFormEmpresa({...formEmpresa, mensagemAlertaCraf: e.target.value})} 
+                    placeholder={`Ex:\n• Tiro Desportivo (Nível 1): 8 habitualidades...\n• Caça: Comprovar 18 meses...\n(Base Legal: Decreto 11.615/23...)`}
+                  />
+                  <p className="text-[10px] text-gray-500 italic mt-1">
+                    Esta mensagem será exibida na tela de detalhes e no PDF do Orçamento de Renovação de CRAF. Se deixada em branco, o sistema usará o texto padrão.
+                  </p>
+                </div>
+
                 <div className="col-span-1 sm:col-span-2 space-y-2 border-t border-brand-dark-5 pt-3">
                   <label className="label text-brand-blue-light font-bold">Logotipo Personalizado da Empresa</label>
                   <div className="flex flex-col sm:flex-row items-center gap-4 bg-brand-dark-3/55 p-3 rounded-lg border border-brand-dark-5">
@@ -1591,6 +1719,80 @@ export function Configuracoes() {
                 Configure o **Valor de Venda** sugerido e a **Taxa PF** interna. O valor da taxa será subtraído do bruto no Painel para mostrar seu **Lucro Real**.
               </p>
             </div>
+
+            {/* Categorias de Serviços */}
+            <div className="border-t border-brand-dark-5 pt-6 mt-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-bold text-white uppercase tracking-wider">Categorias de Serviço</h3>
+                  <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mt-0.5">
+                    Defina se cada categoria é receita da empresa ou repasse externo/laudo
+                  </p>
+                </div>
+                <button 
+                  type="button"
+                  onClick={abrirNovaCategoria}
+                  className="btn-secondary btn-sm px-3 bg-brand-dark-4 hover:bg-brand-dark-5 border border-brand-dark-5 text-white rounded flex items-center gap-1.5"
+                >
+                  <Plus size={14} /> Nova Categoria
+                </button>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead className="text-gray-500 text-xs uppercase bg-brand-dark-3/50">
+                    <tr>
+                      <th className="px-3 py-2 font-bold">Categoria</th>
+                      <th className="px-3 py-2 font-bold">Cálculo Financeiro</th>
+                      <th className="px-3 py-2 font-bold text-right">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-brand-dark-5">
+                    {categorias.map(cat => (
+                      <tr key={cat.id} className="hover:bg-brand-dark-4 transition-colors">
+                        <td className="px-3 py-3 font-medium text-white py-4 flex items-center gap-2">
+                          <span className="font-bold">{cat.nome.toUpperCase()}</span>
+                          {(cat.id === 'honorario' || cat.id === 'laudo') && (
+                            <span className="text-[8px] bg-brand-dark-5 px-1.5 py-0.5 rounded text-gray-400 font-bold tracking-widest uppercase">Padrão</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-3">
+                          {cat.calculaComoServico ? (
+                            <span className="text-xs font-semibold text-brand-green bg-brand-green/10 border border-brand-green/20 px-2 py-0.5 rounded-full uppercase">
+                              Receita / Honorários da Empresa
+                            </span>
+                          ) : (
+                            <span className="text-xs font-semibold text-amber-500 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full uppercase">
+                              Repasse Externo / Laudos
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-3 py-3 text-right">
+                          <button 
+                            type="button"
+                            onClick={() => abrirEditarCategoria(cat)} 
+                            className="p-1.5 text-gray-400 hover:text-brand-blue-light"
+                            title="Editar Categoria"
+                          >
+                            <Edit2 size={14} />
+                          </button>
+                          {cat.id !== 'honorario' && cat.id !== 'laudo' && (
+                            <button 
+                              type="button"
+                              onClick={() => handleExcluirCategoria(cat)} 
+                              className="p-1.5 text-gray-400 hover:text-red-400"
+                              title="Excluir Categoria"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         )}
       </div>
@@ -1843,6 +2045,12 @@ export function Configuracoes() {
         aberto={modalAberto} 
         fechar={() => setModalAberto(false)} 
         servicoParaEditar={servicoEditando} 
+      />
+      <ModalCategoria
+        aberto={modalCategoriaAberto}
+        fechar={() => setModalCategoriaAberto(false)}
+        categoriaParaEditar={categoriaEditando}
+        onSalvar={handleSalvarCategoria}
       />
       <Notificacao {...notif} onFechar={fechar} />
     </div>

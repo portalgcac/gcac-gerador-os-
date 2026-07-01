@@ -13,6 +13,7 @@ import { DialogConfirmacao } from '../common/DialogConfirmacao';
 import { Notificacao, useNotificacao } from '../common/Notificacao';
 import { ModalEscolhaWhatsApp } from '../common/ModalEscolhaWhatsApp';
 import { useAuth } from '../../context/AuthContext';
+import { isLaudoExame } from '../../utils/categoriaHelper';
 
 interface DetalheOrcamentoProps {
   orcamento: Orcamento;
@@ -128,12 +129,12 @@ export function DetalheOrcamento({ orcamento }: DetalheOrcamentoProps) {
           detalhes: s.detalhes,
           valor: s.valor,
           categoria: s.categoria || 'Honorário',
-          pagoDireto: s.pagoDireto || s.categoria === 'Laudo',
+          pagoDireto: s.pagoDireto || isLaudoExame(s.categoria || '', usuario?.dadosEmpresa?.categoriasServico),
           taxaPF: s.taxaPF,
           exigeGRU: s.exigeGRU,
           statusExecucao: 'Não Iniciado'
         })),
-        valor: orcamento.servicos.filter(s => !s.pagoDireto && s.categoria !== 'Laudo').reduce((acc, s) => acc + (s.valor || 0), 0),
+        valor: orcamento.servicos.filter(s => !s.pagoDireto && !isLaudoExame(s.categoria || '', usuario?.dadosEmpresa?.categoriasServico)).reduce((acc, s) => acc + (s.valor || 0), 0),
         valorPago: 0,
         historicoPagamentos: [],
         formaPagamento: 'PIX', // Padrão
@@ -293,8 +294,8 @@ export function DetalheOrcamento({ orcamento }: DetalheOrcamentoProps) {
 
             <div className="flex flex-col sm:flex-row justify-end items-center gap-4 pt-2">
               <div className="space-y-1 text-right">
-                <p className="text-[10px] font-bold text-gray-500 uppercase">Honorários: <span className="text-white ml-1">{formatarMoeda(orcamento.servicos.filter(s => s.categoria !== 'Laudo').reduce((acc, s) => acc + (s.valor || 0), 0))}</span></p>
-                <p className="text-[10px] font-bold text-gray-500 uppercase">Laudos: <span className="text-white ml-1">{formatarMoeda(orcamento.servicos.filter(s => s.categoria === 'Laudo').reduce((acc, s) => acc + (s.valor || 0), 0))}</span></p>
+                <p className="text-[10px] font-bold text-gray-500 uppercase">Honorários: <span className="text-white ml-1">{formatarMoeda(orcamento.servicos.filter(s => !isLaudoExame(s.categoria || '', usuario?.dadosEmpresa?.categoriasServico)).reduce((acc, s) => acc + (s.valor || 0), 0))}</span></p>
+                <p className="text-[10px] font-bold text-gray-500 uppercase">Laudos: <span className="text-white ml-1">{formatarMoeda(orcamento.servicos.filter(s => isLaudoExame(s.categoria || '', usuario?.dadosEmpresa?.categoriasServico)).reduce((acc, s) => acc + (s.valor || 0), 0))}</span></p>
               </div>
 
               <div className="text-right p-4 bg-brand-dark-3 border border-brand-dark-5 rounded-xl w-full sm:w-auto min-w-[180px]">
@@ -309,12 +310,18 @@ export function DetalheOrcamento({ orcamento }: DetalheOrcamentoProps) {
                   <Shield size={16} />
                   Aviso de exigências para Renovação de CRAF
                 </div>
-                <div className="space-y-1.5 text-xs text-amber-200/80 leading-relaxed">
-                  <p>• <strong>Tiro Desportivo (Nível 1):</strong> 8 habitualidades/tipo de arma nos ciclos 27/12/23 a 27/12/24 e 8 habitualidades de 27/12/24 a 27/12/25.</p>
-                  <p>• <strong>Caça:</strong> Comprovar 18 meses de SIMAF/IBAMA ativos.</p>
-                  <p className="text-[9px] text-amber-500/60 font-medium italic mt-1">
-                    (Base Legal: Decreto 11.615/23, arts. 35 e 37; Portaria 166-COLOG/23, arts. 12, 16 e 17).
-                  </p>
+                <div className="space-y-1.5 text-xs text-amber-200/80 leading-relaxed whitespace-pre-wrap">
+                  {usuario?.dadosEmpresa?.mensagemAlertaCraf ? (
+                    usuario.dadosEmpresa.mensagemAlertaCraf
+                  ) : (
+                    <>
+                      <p>• <strong>Tiro Desportivo (Nível 1):</strong> 8 habitualidades/tipo de arma nos ciclos 27/12/23 a 27/12/24 e 8 habitualidades de 27/12/24 a 27/12/25.</p>
+                      <p>• <strong>Caça:</strong> Comprovar 18 meses de SIMAF/IBAMA ativos.</p>
+                      <p className="text-[9px] text-amber-500/60 font-medium italic mt-1">
+                        (Base Legal: Decreto 11.615/23, arts. 35 e 37; Portaria 166-COLOG/23, arts. 12, 16 e 17).
+                      </p>
+                    </>
+                  )}
                 </div>
               </div>
             )}

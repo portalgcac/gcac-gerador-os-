@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { X, Save, Info } from 'lucide-react';
 import { ServicoConfig } from '../../types';
 import { useServicos } from '../../context/ServicosContext';
+import { useAuth } from '../../context/AuthContext';
+import { obterRotuloCategoria } from '../../utils/categoriaHelper';
 
 interface ModalServicoProps {
   aberto: boolean;
@@ -11,6 +13,7 @@ interface ModalServicoProps {
 
 export function ModalServico({ aberto, fechar, servicoParaEditar }: ModalServicoProps) {
   const { criarServico, atualizarServico } = useServicos();
+  const { usuario } = useAuth();
   const [salvando, setSalvando] = useState(false);
   
   const [nome, setNome] = useState('');
@@ -18,7 +21,12 @@ export function ModalServico({ aberto, fechar, servicoParaEditar }: ModalServico
   const [valorFiliado, setValorFiliado] = useState('');
   const [taxaPF, setTaxaPF] = useState('');
   const [exigeGRU, setExigeGRU] = useState(false);
-  const [categoria, setCategoria] = useState<'Honorário' | 'Laudo'>('Honorário');
+  const [categoria, setCategoria] = useState<string>('Honorário');
+
+  const categorias = usuario?.dadosEmpresa?.categoriasServico || [
+    { id: 'honorario', nome: 'Honorário', calculaComoServico: true },
+    { id: 'laudo', nome: 'Laudo', calculaComoServico: false }
+  ];
 
   useEffect(() => {
     if (servicoParaEditar) {
@@ -34,9 +42,9 @@ export function ModalServico({ aberto, fechar, servicoParaEditar }: ModalServico
       setValorFiliado('');
       setTaxaPF('');
       setExigeGRU(false);
-      setCategoria('Honorário');
+      setCategoria(categorias[0]?.nome || 'Honorário');
     }
-  }, [servicoParaEditar, aberto]);
+  }, [servicoParaEditar, aberto, categorias]);
 
   if (!aberto) return null;
 
@@ -95,10 +103,13 @@ export function ModalServico({ aberto, fechar, servicoParaEditar }: ModalServico
             <select 
               className="input bg-brand-dark-3 border-brand-blue/20"
               value={categoria}
-              onChange={e => setCategoria(e.target.value as any)}
+              onChange={e => setCategoria(e.target.value)}
             >
-              <option value="Honorário">HONORÁRIO / SERVIÇO</option>
-              <option value="Laudo">LAUDO / EXAME EXTERNO</option>
+              {categorias.map(cat => (
+                <option key={cat.id} value={cat.nome}>
+                  {obterRotuloCategoria(cat.nome)}
+                </option>
+              ))}
             </select>
           </div>
 

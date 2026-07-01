@@ -170,6 +170,16 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
   ): Promise<string> => {
     if (!usuario?.empresaId) throw new Error('Usuário não autenticado');
     
+    if (dados.cpf) {
+      const cleanCpf = dados.cpf.replace(/\D/g, '');
+      if (cleanCpf) {
+        const existe = clientes.some(c => c.cpf && c.cpf.replace(/\D/g, '') === cleanCpf);
+        if (existe) {
+          throw new Error('Já existe um cliente cadastrado com este CPF.');
+        }
+      }
+    }
+    
     const clienteId = uuidv4();
     
     let crUrl = dados.crUrl;
@@ -202,12 +212,22 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
     if (error) throw error;
     await carregarClientes();
     return data.id;
-  }, [carregarClientes, usuario]);
+  }, [carregarClientes, usuario, clientes]);
 
   const atualizarCliente = useCallback(async (id: string, dados: Partial<Cliente>, overrideEmpresaId?: string) => {
     if (!usuario?.empresaId) throw new Error('Usuário não autenticado');
     const localEmpresaId = usuario.empresaId;
     const portalEmpresaId = overrideEmpresaId;
+    
+    if (dados.cpf !== undefined) {
+      const cleanCpf = dados.cpf.replace(/\D/g, '');
+      if (cleanCpf) {
+        const existe = clientes.some(c => c.id !== id && c.cpf && c.cpf.replace(/\D/g, '') === cleanCpf);
+        if (existe) {
+          throw new Error('Já existe outro cliente cadastrado com este CPF.');
+        }
+      }
+    }
     
     let crUrl = dados.crUrl;
     let crIbamaUrl = dados.crIbamaUrl;
@@ -293,7 +313,7 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
     }
 
     await carregarClientes();
-  }, [carregarClientes, usuario]);
+  }, [carregarClientes, usuario, clientes]);
 
   const deletarCliente = useCallback(async (id: string) => {
     const { error } = await supabase

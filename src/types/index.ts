@@ -270,10 +270,17 @@ export interface FilaSincronizacao {
   criadoEm: string;
 }
 
+export interface CategoriaServico {
+  id: string;
+  nome: string;
+  calculaComoServico: boolean;
+}
+
 export interface DadosEmpresa {
   id: string;
   nome: string;
   tipoConta: 'empresa' | 'cac_individual';
+  categoriasServico?: CategoriaServico[];
   clubeParceiroPadrao?: string;
   razaoSocialFantasia?: string;
   responsavelNome?: string;
@@ -282,6 +289,7 @@ export interface DadosEmpresa {
   cnpj?: string;
   recursosLiberados?: string[];
   logoUrl?: string;
+  mensagemAlertaCraf?: string;
   plano?: string;
   planoStatus?: string;
   frequenciaPagamento?: string;

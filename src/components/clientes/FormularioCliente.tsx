@@ -12,7 +12,7 @@ interface Props {
 
 export function FormularioCliente({ clienteEditando, onFechar }: Props) {
   const { usuario } = useAuth();
-  const { criarCliente, atualizarCliente, clubesRegistrados } = useClientes();
+  const { clientes, criarCliente, atualizarCliente, clubesRegistrados } = useClientes();
   const [salvando, setSalvando] = useState(false);
   const salvandoRef = useRef(false);
   const [mostrarSenha, setMostrarSenha] = useState(false);
@@ -88,6 +88,19 @@ export function FormularioCliente({ clienteEditando, onFechar }: Props) {
       alert('Nome, CPF e Contato são obrigatórios.');
       return;
     }
+
+    const cleanCpf = form.cpf.replace(/\D/g, '');
+    if (cleanCpf) {
+      const existeCpf = clientes.some(c => 
+        c.cpf && c.cpf.replace(/\D/g, '') === cleanCpf && 
+        (!clienteEditando || c.id !== clienteEditando.id)
+      );
+      if (existeCpf) {
+        alert('Este CPF já está cadastrado para outro cliente nesta empresa.');
+        return;
+      }
+    }
+
     salvandoRef.current = true;
     setSalvando(true);
     try {
@@ -122,8 +135,8 @@ export function FormularioCliente({ clienteEditando, onFechar }: Props) {
         await criarCliente(payload);
       }
       onFechar();
-    } catch (err) {
-      alert('Erro ao salvar o cliente');
+    } catch (err: any) {
+      alert(err?.message || 'Erro ao salvar o cliente');
       salvandoRef.current = false;
       setSalvando(false);
     }

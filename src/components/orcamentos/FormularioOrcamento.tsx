@@ -15,6 +15,7 @@ import { Notificacao, useNotificacao } from '../common/Notificacao';
 import { formatarMoeda, removerAcentos } from '../../utils/formatters';
 import { supabase } from '../../db/supabase';
 import { useAuth } from '../../context/AuthContext';
+import { isLaudoExame } from '../../utils/categoriaHelper';
 
 interface FormularioOrcamentoProps {
   orcamentoExistente?: Orcamento;
@@ -151,7 +152,7 @@ export function FormularioOrcamento({ orcamentoExistente }: FormularioOrcamentoP
     endereco:          orcamentoExistente?.endereco          ?? '',
     servicos:          orcamentoExistente?.servicos          ?? [],
     valorTotal:        orcamentoExistente 
-                         ? orcamentoExistente.servicos.filter(s => !s.pagoDireto && s.categoria !== 'Laudo').reduce((acc, s) => acc + (s.valor || 0), 0)
+                         ? orcamentoExistente.servicos.filter(s => !s.pagoDireto && !isLaudoExame(s.categoria || '', usuario?.dadosEmpresa?.categoriasServico)).reduce((acc, s) => acc + (s.valor || 0), 0)
                          : 0,
     formaPagamento:    (orcamentoExistente as any)?.formaPagamento ?? 'Pendente',
     status:            (orcamentoExistente?.status           ?? 'Pendente') as StatusOrcamento,
@@ -256,7 +257,7 @@ export function FormularioOrcamento({ orcamentoExistente }: FormularioOrcamentoP
   const adicionarServico = (serv: ServicoConfig) => {
     // Escolhe o valor baseado no status de filiado
     const valorAplicado = form.filiadoProTiro ? (serv.valorFiliado || serv.valorPadrao) : serv.valorPadrao;
-    const isLaudo = serv.categoria === 'Laudo';
+    const isLaudo = isLaudoExame(serv.categoria || '', usuario?.dadosEmpresa?.categoriasServico);
 
     setForm(f => {
       const novosServicos = [
@@ -376,14 +377,14 @@ export function FormularioOrcamento({ orcamentoExistente }: FormularioOrcamentoP
           detalhes: s.detalhes,
           valor: s.valor,
           categoria: s.categoria || 'Honorário',
-          pagoDireto: s.pagoDireto || s.categoria === 'Laudo',
+          pagoDireto: s.pagoDireto || isLaudoExame(s.categoria || '', usuario?.dadosEmpresa?.categoriasServico),
           taxaPF: s.taxaPF,
           exigeGRU: s.exigeGRU,
           responsavelNome: s.responsavelNome,
           valorRepasse: s.valorRepasse,
           statusExecucao: 'Não Iniciado'
         })),
-        valor: dados.servicos.filter((s: any) => !s.pagoDireto && s.categoria !== 'Laudo').reduce((acc: number, s: any) => acc + (s.valor || 0), 0),
+        valor: dados.servicos.filter((s: any) => !s.pagoDireto && !isLaudoExame(s.categoria || '', usuario?.dadosEmpresa?.categoriasServico)).reduce((acc: number, s: any) => acc + (s.valor || 0), 0),
         valorPago: 0,
         historicoPagamentos: [],
         formaPagamento: 'PIX',
@@ -646,7 +647,7 @@ export function FormularioOrcamento({ orcamentoExistente }: FormularioOrcamentoP
                     <h4 className="text-sm font-bold text-brand-blue-light">
                       {serv.nome}
                     </h4>
-                    {serv.categoria === 'Laudo' && (
+                    {isLaudoExame(serv.categoria || '', usuario?.dadosEmpresa?.categoriasServico) && (
                       <button
                         type="button"
                         onClick={() => atualizarPagoDireto(serv.id, !serv.pagoDireto)}

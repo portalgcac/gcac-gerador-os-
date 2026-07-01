@@ -134,10 +134,55 @@ export function PreCadastroPage() {
     return true;
   };
 
-  const avancar = () => {
-    if (validarPasso()) {
-      setStep(prev => prev + 1);
+  const avancar = async () => {
+    if (carregando) return;
+    if (!validarPasso()) return;
+
+    if (step === 3) {
+      const docLimpo = cpf.replace(/\D/g, '');
+      if (docLimpo) {
+        setCarregando(true);
+        setErro('');
+        try {
+          // 1. Verificar em leads_pre_cadastro
+          const { data: leadExistente, error: errLead } = await supabase
+            .from('leads_pre_cadastro')
+            .select('status')
+            .eq('cpf', docLimpo)
+            .in('status', ['pendente', 'contatado', 'ativado'])
+            .limit(1);
+
+          if (errLead) throw errLead;
+          if (leadExistente && leadExistente.length > 0) {
+            setErro('Este CPF/CNPJ já possui um pré-cadastro ativo ou pendente.');
+            setCarregando(false);
+            return;
+          }
+
+          // 2. Verificar em usuarios_autorizados
+          const { data: usuarioExistente, error: errUser } = await supabase
+            .from('usuarios_autorizados')
+            .select('id')
+            .or(`cpf.eq.${docLimpo},cpf.eq.${cpf}`)
+            .limit(1);
+
+          if (errUser) throw errUser;
+          if (usuarioExistente && usuarioExistente.length > 0) {
+            setErro('Este CPF/CNPJ já está cadastrado em uma conta ativa.');
+            setCarregando(false);
+            return;
+          }
+        } catch (err) {
+          console.error(err);
+          setErro('Erro ao verificar CPF/CNPJ duplicado. Tente novamente.');
+          setCarregando(false);
+          return;
+        }
+        setCarregando(false);
+      }
     }
+
+    setStep(prev => prev + 1);
   };
 
   const voltar = () => {
@@ -150,12 +195,43 @@ export function PreCadastroPage() {
     setCarregando(true);
 
     try {
+      const docLimpo = cpf.replace(/\D/g, '');
+
+      // 1. Verificar em leads_pre_cadastro
+      const { data: leadExistente, error: errLead } = await supabase
+        .from('leads_pre_cadastro')
+        .select('status')
+        .eq('cpf', docLimpo)
+        .in('status', ['pendente', 'contatado', 'ativado'])
+        .limit(1);
+
+      if (errLead) throw errLead;
+      if (leadExistente && leadExistente.length > 0) {
+        setErro('Este CPF/CNPJ já possui um pré-cadastro ativo ou pendente.');
+        setCarregando(false);
+        return;
+      }
+
+      // 2. Verificar em usuarios_autorizados
+      const { data: usuarioExistente, error: errUser } = await supabase
+        .from('usuarios_autorizados')
+        .select('id')
+        .or(`cpf.eq.${docLimpo},cpf.eq.${cpf}`)
+        .limit(1);
+
+      if (errUser) throw errUser;
+      if (usuarioExistente && usuarioExistente.length > 0) {
+        setErro('Este CPF/CNPJ já está cadastrado em uma conta ativa.');
+        setCarregando(false);
+        return;
+      }
+
       const { error } = await supabase
         .from('leads_pre_cadastro')
         .insert([
           {
             nome: nome.toUpperCase(),
-            cpf: cpf.replace(/\D/g, ''),
+            cpf: docLimpo,
             email: email.toLowerCase().trim(),
             contato: contato.replace(/\D/g, ''),
             plano,
@@ -859,9 +935,14 @@ export function PreCadastroPage() {
                 <button
                   type="button"
                   onClick={avancar}
+                  disabled={carregando}
                   className="btn-primary flex items-center justify-center gap-2 flex-grow py-3 rounded-xl text-sm"
                 >
-                  Continuar <ArrowRight size={16} />
+                  {carregando ? (
+                    <div className="w-5 h-5 border-2 border-brand-dark border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <>Continuar <ArrowRight size={16} /></>
+                  )}
                 </button>
               ) : (
                 <button

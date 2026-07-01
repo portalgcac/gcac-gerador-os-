@@ -7,6 +7,7 @@ import {
 } from '../../types';
 import { useOrdens } from '../../context/OrdensContext';
 import { useAuth } from '../../context/AuthContext';
+import { isLaudoExame } from '../../utils/categoriaHelper';
 import { baixarPdf, imprimirPdf } from '../../services/geradorPdf';
 import { DialogConfirmacao } from '../common/DialogConfirmacao';
 import { Notificacao, useNotificacao } from '../common/Notificacao';
@@ -491,8 +492,8 @@ export function DetalheOrdem({ ordem }: DetalheOrdemProps) {
             <p className="text-[10px] text-gray-500 mb-1 font-bold uppercase">Total da O.S.</p>
             <p className="text-xl font-black text-white">{formatarMoeda(ordem.valor)}</p>
             <div className="mt-2 pt-2 border-t border-brand-dark-5 space-y-1">
-              <p className="text-[9px] text-gray-500 uppercase flex justify-between">Honorários: <span className="text-gray-300">{formatarMoeda(ordem.servicos?.filter((s: any) => s.categoria !== 'Laudo').reduce((acc, s) => acc + (s.valor || 0), 0) || 0)}</span></p>
-              <p className="text-[9px] text-gray-500 uppercase flex justify-between">Laudos: <span className="text-gray-300">{formatarMoeda(ordem.servicos?.filter((s: any) => s.categoria === 'Laudo').reduce((acc, s) => acc + (s.valor || 0), 0) || 0)}</span></p>
+              <p className="text-[9px] text-gray-500 uppercase flex justify-between">Honorários: <span className="text-gray-300">{formatarMoeda(ordem.servicos?.filter((s: any) => !isLaudoExame(s.categoria || '', usuario?.dadosEmpresa?.categoriasServico)).reduce((acc, s) => acc + (s.valor || 0), 0) || 0)}</span></p>
+              <p className="text-[9px] text-gray-500 uppercase flex justify-between">Laudos: <span className="text-gray-300">{formatarMoeda(ordem.servicos?.filter((s: any) => isLaudoExame(s.categoria || '', usuario?.dadosEmpresa?.categoriasServico)).reduce((acc, s) => acc + (s.valor || 0), 0) || 0)}</span></p>
             </div>
           </div>
           

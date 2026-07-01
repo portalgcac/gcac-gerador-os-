@@ -1,6 +1,7 @@
 import jsPDF from 'jspdf';
 import { OrdemDeServico } from '../types';
 import { formatarMoeda, formatarData, formatarNumeroOS, formatarCPF, formatarTelefone } from '../utils/formatters';
+import { isLaudoExame } from '../utils/categoriaHelper';
 
 // Cores GCAC
 const AZUL   = '#1B6FBF';
@@ -21,6 +22,7 @@ export async function gerarPdfBlob(ordem: OrdemDeServico): Promise<Blob> {
   let telefone = '';
   let endereco = '';
   let clubeParceiro = '';
+  let categoriasConfig: any[] = [];
 
   try {
     const dadosUsuario = localStorage.getItem('gcac_usuario');
@@ -32,6 +34,7 @@ export async function gerarPdfBlob(ordem: OrdemDeServico): Promise<Blob> {
       telefone = u.dadosEmpresa?.contatoTelefone || (ehGuilherme ? '(64) 9.9995-9865' : '');
       endereco = u.dadosEmpresa?.endereco || (ehGuilherme ? 'Av. Goias, n 1802, Sala 04 - Bairro Santa Maria - Jatai-GO' : '');
       clubeParceiro = u.dadosEmpresa?.clubeParceiroPadrao || (ehGuilherme ? 'CLUBE DE TIRO E CAÇA PRÓ TIRO (JATAÍ)' : '');
+      categoriasConfig = u.dadosEmpresa?.categoriasServico || [];
     }
   } catch (err) {
     console.error('Erro ao ler dados da empresa do localStorage:', err);
@@ -199,8 +202,8 @@ export async function gerarPdfBlob(ordem: OrdemDeServico): Promise<Blob> {
   y += 2;
 
   // Detalhamento de valores
-  const honorarios = (ordem.servicos || []).filter(s => s.categoria !== 'Laudo').reduce((acc, s) => acc + (s.valor || 0), 0);
-  const laudos = (ordem.servicos || []).filter(s => s.categoria === 'Laudo').reduce((acc, s) => acc + (s.valor || 0), 0);
+  const honorarios = (ordem.servicos || []).filter(s => !isLaudoExame(s.categoria || '', categoriasConfig)).reduce((acc, s) => acc + (s.valor || 0), 0);
+  const laudos = (ordem.servicos || []).filter(s => isLaudoExame(s.categoria || '', categoriasConfig)).reduce((acc, s) => acc + (s.valor || 0), 0);
 
   // Caixa valor
   doc.setFillColor('#EBF5FB');
