@@ -33,7 +33,6 @@ export function DetalheOrcamento({ orcamento }: DetalheOrcamentoProps) {
   const [mensagemWhatsApp, setMensagemWhatsApp] = useState('');
 
   const osVinculada = orcamento.convertidoOsId ? ordens.find(o => o.id === orcamento.convertidoOsId) : null;
-  const temRenovacaoCRAF = orcamento.servicos.some(s => s.nome.toUpperCase().includes('RENOVAÇÃO DE CRAF'));
   const clienteDoOrcamento = clientes.find(c => c.cpf === orcamento.cpf);
 
   React.useEffect(() => {
@@ -304,27 +303,7 @@ export function DetalheOrcamento({ orcamento }: DetalheOrcamentoProps) {
               </div>
             </div>
             
-            {temRenovacaoCRAF && (
-              <div className="mt-4 p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl space-y-2 animate-fade-in">
-                <div className="flex items-center gap-2 text-amber-500 font-black uppercase tracking-widest text-[10px]">
-                  <Shield size={16} />
-                  Aviso de exigências para Renovação de CRAF
-                </div>
-                <div className="space-y-1.5 text-xs text-amber-200/80 leading-relaxed whitespace-pre-wrap">
-                  {usuario?.dadosEmpresa?.mensagemAlertaCraf ? (
-                    usuario.dadosEmpresa.mensagemAlertaCraf
-                  ) : (
-                    <>
-                      <p>• <strong>Tiro Desportivo (Nível 1):</strong> 8 habitualidades/tipo de arma nos ciclos 27/12/23 a 27/12/24 e 8 habitualidades de 27/12/24 a 27/12/25.</p>
-                      <p>• <strong>Caça:</strong> Comprovar 18 meses de SIMAF/IBAMA ativos.</p>
-                      <p className="text-[9px] text-amber-500/60 font-medium italic mt-1">
-                        (Base Legal: Decreto 11.615/23, arts. 35 e 37; Portaria 166-COLOG/23, arts. 12, 16 e 17).
-                      </p>
-                    </>
-                  )}
-                </div>
-              </div>
-            )}
+
             
             {orcamento.observacoes && (
               <div className="pt-2">

@@ -1349,22 +1349,6 @@ export function Configuracoes() {
                   </p>
                 </div>
 
-                <div className="col-span-1 sm:col-span-2 space-y-1 border-t border-brand-dark-5 pt-3">
-                  <label className="label text-amber-500 font-bold flex items-center gap-1.5">
-                    <Shield size={14} />
-                    Aviso de Exigências para Renovação de CRAF
-                  </label>
-                  <textarea 
-                    rows={4} 
-                    className="input bg-brand-dark-3 text-white font-mono text-xs leading-relaxed" 
-                    value={formEmpresa.mensagemAlertaCraf} 
-                    onChange={e => setFormEmpresa({...formEmpresa, mensagemAlertaCraf: e.target.value})} 
-                    placeholder={`Ex:\n• Tiro Desportivo (Nível 1): 8 habitualidades...\n• Caça: Comprovar 18 meses...\n(Base Legal: Decreto 11.615/23...)`}
-                  />
-                  <p className="text-[10px] text-gray-500 italic mt-1">
-                    Esta mensagem será exibida na tela de detalhes e no PDF do Orçamento de Renovação de CRAF. Se deixada em branco, o sistema usará o texto padrão.
-                  </p>
-                </div>
 
                 <div className="col-span-1 sm:col-span-2 space-y-2 border-t border-brand-dark-5 pt-3">
                   <label className="label text-brand-blue-light font-bold">Logotipo Personalizado da Empresa</label>
