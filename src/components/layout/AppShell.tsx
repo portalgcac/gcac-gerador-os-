@@ -286,7 +286,7 @@ export function AppShell() {
           <div className="flex-grow">
             <Outlet />
           </div>
-          <footer className="mt-8 pt-4 border-t border-white/[0.04] flex flex-col sm:flex-row items-center justify-between gap-2 text-[9px] text-gray-500 font-bold uppercase tracking-wider">
+          <footer className="mt-8 pt-4 border-t border-white/[0.04] flex flex-col sm:flex-row items-center justify-between gap-2 text-[9px] text-gray-500 font-bold uppercase tracking-wider print:hidden">
             <div>
               Portal G CAC — Solução para Atiradores, Colecionadores, Caçadores e Despachantes
             </div>

@@ -988,7 +988,7 @@ export function Relatorios() {
       
       <style dangerouslySetInnerHTML={{ __html: `
         @media print {
-          .no-print, .print\\:hidden, button, input, select, aside, nav, header, .dica-filtros {
+          .no-print, .print\\:hidden, button, input, select, aside, nav, header, footer, .dica-filtros {
             display: none !important;
           }
           
@@ -998,6 +998,7 @@ export function Relatorios() {
             margin: 0 !important;
             padding: 0 !important;
             width: 100% !important;
+            max-width: 100% !important;
             height: auto !important;
             min-height: auto !important;
             max-height: none !important;
@@ -1006,100 +1007,165 @@ export function Relatorios() {
           }
 
           @page {
-            size: A4 landscape;
-            margin: 8mm 10mm;
+            size: auto;
+            margin: 6mm 8mm;
           }
 
           .print-header {
             display: flex !important;
-            flex-direction: row;
-            justify-content: space-between;
-            align-items: center;
-            border-bottom: 2px solid #000 !important;
-            padding-bottom: 4px !important;
-            margin-bottom: 12px !important;
+            flex-direction: row !important;
+            justify-content: space-between !important;
+            align-items: center !important;
+            border-bottom: 2px solid #0f172a !important;
+            padding-bottom: 5px !important;
+            margin-bottom: 10px !important;
           }
           
-          table {
+          .overflow-x-auto {
+            overflow: visible !important;
             width: 100% !important;
-            border-collapse: collapse !important;
-            font-size: 8px !important;
-            color: #000 !important;
-            background: #fff !important;
-          }
-          th {
-            background-color: #f3f4f6 !important;
-            border: 1px solid #d1d5db !important;
-            padding: 4px 6px !important;
-            font-weight: bold !important;
-            text-align: left !important;
-            white-space: nowrap !important;
-          }
-          td {
-            border: 1px solid #e5e7eb !important;
-            padding: 3px 5px !important;
-            color: #000 !important;
+            max-width: 100% !important;
           }
 
-          /* Evitar quebra de linha nas colunas comuns de dados nas tabelas */
-          table td:nth-child(1),
-          table td:nth-child(3),
-          table td:nth-child(4),
-          table td:nth-child(5),
-          table td:nth-child(6),
-          table td:nth-child(7) {
+          table {
+            width: 100% !important;
+            max-width: 100% !important;
+            table-layout: fixed !important;
+            border-collapse: collapse !important;
+            font-size: 7px !important;
+            line-height: 1.15 !important;
+            color: #0f172a !important;
+            background: #fff !important;
+            box-sizing: border-box !important;
+          }
+
+          thead {
+            display: table-header-group !important;
+          }
+
+          tbody {
+            display: table-row-group !important;
+          }
+
+          tr {
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+          }
+
+          th {
+            background-color: #f1f5f9 !important;
+            border: 1px solid #cbd5e1 !important;
+            padding: 3px 4px !important;
+            font-weight: 800 !important;
+            font-size: 6.5px !important;
+            line-height: 1.15 !important;
+            color: #0f172a !important;
+            white-space: normal !important;
+            word-break: normal !important;
+            overflow-wrap: break-word !important;
+            vertical-align: middle !important;
+            box-sizing: border-box !important;
+          }
+
+          td {
+            border: 1px solid #e2e8f0 !important;
+            padding: 2.5px 4px !important;
+            color: #0f172a !important;
+            font-size: 7px !important;
+            line-height: 1.15 !important;
+            vertical-align: middle !important;
+            word-break: normal !important;
+            overflow-wrap: break-word !important;
+            box-sizing: border-box !important;
+          }
+
+          tfoot td {
+            font-weight: 900 !important;
+            border-top: 2px solid #334155 !important;
+            background-color: #f8fafc !important;
+          }
+
+          td.whitespace-nowrap,
+          th.whitespace-nowrap {
             white-space: nowrap !important;
+          }
+
+          .text-right, th.text-right, td.text-right {
+            text-align: right !important;
+          }
+
+          .text-center, th.text-center, td.text-center {
+            text-align: center !important;
+          }
+
+          td.text-right {
+            font-variant-numeric: tabular-nums !important;
           }
 
           .print-cards-grid {
             display: grid !important;
             grid-template-columns: repeat(4, 1fr) !important;
-            gap: 8px !important;
-            margin-bottom: 12px !important;
+            gap: 6px !important;
+            margin-bottom: 10px !important;
           }
+
           .print-cards-grid-6 {
             grid-template-columns: repeat(6, 1fr) !important;
           }
+
           .print-card {
-            border: 1px solid #9ca3af !important;
-            background-color: #f9fafb !important;
-            padding: 6px !important;
+            border: 1px solid #cbd5e1 !important;
+            background-color: #f8fafc !important;
+            padding: 5px 6px !important;
             border-radius: 4px !important;
             text-align: center !important;
+            box-shadow: none !important;
           }
-          .print-card h4 {
-            font-size: 7px !important;
+
+          .print-card h4, .print-card p.font-black, .print-card p.text-gray-500 {
+            font-size: 6.5px !important;
             text-transform: uppercase !important;
-            color: #374151 !important;
+            color: #475569 !important;
             margin-bottom: 2px !important;
-            font-weight: bold !important;
+            font-weight: 800 !important;
           }
-          .print-card p {
-            font-size: 11px !important;
+
+          .print-card h3, .print-card p.text-2xl, .print-card p.text-lg, .print-card p.text-xl {
+            font-size: 10px !important;
             font-weight: 900 !important;
-            color: #000 !important;
+            color: #0f172a !important;
             margin: 0 !important;
           }
           
+          .card {
+            background-color: #fff !important;
+            border: 1px solid #cbd5e1 !important;
+            color: #0f172a !important;
+            box-shadow: none !important;
+          }
+
           .print-section-title {
-            font-size: 9px !important;
-            font-weight: bold !important;
-            border-bottom: 1.5px solid #000 !important;
+            font-size: 8.5px !important;
+            font-weight: 800 !important;
+            border-bottom: 1.5px solid #0f172a !important;
             padding-bottom: 2px !important;
-            margin-top: 10px !important;
-            margin-bottom: 5px !important;
+            margin-top: 8px !important;
+            margin-bottom: 4px !important;
             text-transform: uppercase !important;
-            color: #000 !important;
+            color: #0f172a !important;
           }
           
           #print-area {
             display: block !important;
             visibility: visible !important;
             width: 100% !important;
+            max-width: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
           }
 
-          .text-white, .text-gray-300, .text-gray-400 {
-            color: #000 !important;
+          .text-white, .text-gray-200, .text-gray-300, .text-gray-400 {
+            color: #0f172a !important;
           }
           .text-brand-green, .text-brand-green-light {
             color: #047857 !important;
@@ -1107,11 +1173,17 @@ export function Relatorios() {
           .text-brand-blue, .text-brand-blue-light {
             color: #1d4ed8 !important;
           }
-          .text-yellow-400, .text-yellow-500 {
+          .text-yellow-400, .text-yellow-500, .text-amber-400 {
             color: #b45309 !important;
           }
           .text-red-400, .text-red-500 {
             color: #b91c1c !important;
+          }
+          .text-purple-400, .text-purple-300 {
+            color: #6d28d9 !important;
+          }
+          .text-orange-400, .text-orange-300 {
+            color: #c2410c !important;
           }
         }
       `}} />
@@ -1888,17 +1960,17 @@ export function Relatorios() {
             <div className="space-y-2">
               <h3 className="text-sm font-bold text-white uppercase tracking-wider print-section-title">Listagem das Ordens de Serviço do Período</h3>
               <div className="overflow-x-auto rounded-xl border border-brand-dark-5 bg-brand-dark-3 print:border-gray-300 print:bg-white">
-                <table className="min-w-full divide-y divide-brand-dark-5 print:divide-gray-300">
+                <table className="min-w-full divide-y divide-brand-dark-5 print:divide-gray-300 print:table-fixed print:w-full">
                   <thead className="bg-brand-dark-4 print:bg-gray-100">
                     <tr>
-                      <th className="px-4 py-3 text-[10px] font-bold uppercase text-gray-400">OS</th>
-                      <th className="px-4 py-3 text-[10px] font-bold uppercase text-gray-400">Cliente</th>
-                      <th className="px-4 py-3 text-[10px] font-bold uppercase text-gray-400">CPF</th>
-                      <th className="px-4 py-3 text-[10px] font-bold uppercase text-gray-400">Abertura</th>
-                      <th className="px-4 py-3 text-[10px] font-bold uppercase text-gray-400">Valor Total</th>
-                      <th className="px-4 py-3 text-[10px] font-bold uppercase text-gray-400">Valor Pago</th>
-                      <th className="px-4 py-3 text-[10px] font-bold uppercase text-gray-400">Status</th>
-                      <th className="px-4 py-3 text-[10px] font-bold uppercase text-gray-400">Serviços</th>
+                      <th className="px-4 py-3 text-[10px] font-bold uppercase text-gray-400 print:w-[8%] print:whitespace-normal text-center">OS</th>
+                      <th className="px-4 py-3 text-[10px] font-bold uppercase text-gray-400 print:w-[20%] print:whitespace-normal">Cliente</th>
+                      <th className="px-4 py-3 text-[10px] font-bold uppercase text-gray-400 print:w-[14%] print:whitespace-normal text-center">CPF</th>
+                      <th className="px-4 py-3 text-[10px] font-bold uppercase text-gray-400 print:w-[10%] print:whitespace-normal text-center">Abertura</th>
+                      <th className="px-4 py-3 text-[10px] font-bold uppercase text-gray-400 print:w-[12%] print:whitespace-normal text-right">Valor Total</th>
+                      <th className="px-4 py-3 text-[10px] font-bold uppercase text-gray-400 print:w-[12%] print:whitespace-normal text-right">Valor Pago</th>
+                      <th className="px-4 py-3 text-[10px] font-bold uppercase text-gray-400 print:w-[10%] print:whitespace-normal text-center">Status</th>
+                      <th className="px-4 py-3 text-[10px] font-bold uppercase text-gray-400 print:w-[14%] print:whitespace-normal">Serviços</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-brand-dark-5 bg-transparent print:divide-gray-200">
@@ -1911,25 +1983,25 @@ export function Relatorios() {
                     ) : (
                       ordensFiltradas.map((o) => (
                         <tr key={o.id} className="hover:bg-white/[0.01]">
-                          <td className="px-4 py-2.5 text-xs font-bold text-white print:text-black whitespace-nowrap">
+                          <td className="px-4 py-2.5 text-xs font-bold text-white text-center print:text-black print:whitespace-nowrap">
                             #{String(o.numero).padStart(4, '0')}
                           </td>
-                          <td className="px-4 py-2.5 text-xs text-gray-300 font-bold truncate max-w-[150px] print:text-black">
+                          <td className="px-4 py-2.5 text-xs text-gray-300 font-bold truncate max-w-[150px] print:max-w-none print:whitespace-normal print:break-words print:text-black">
                             {o.nomeCliente}
                           </td>
-                          <td className="px-4 py-2.5 text-xs text-gray-400 whitespace-nowrap print:text-black">
+                          <td className="px-4 py-2.5 text-xs text-gray-400 text-center whitespace-nowrap print:text-black print:whitespace-nowrap">
                             {formatarCPF(o.cpf)}
                           </td>
-                          <td className="px-4 py-2.5 text-xs text-gray-400 whitespace-nowrap print:text-black">
+                          <td className="px-4 py-2.5 text-xs text-gray-400 text-center whitespace-nowrap print:text-black print:whitespace-nowrap">
                             {o.criadoEm ? format(parseISO(o.criadoEm), 'dd/MM/yyyy') : ''}
                           </td>
-                          <td className="px-4 py-2.5 text-xs font-semibold text-white print:text-black">
+                          <td className="px-4 py-2.5 text-xs font-semibold text-white text-right print:text-black print:whitespace-nowrap">
                             {formatarMoeda(o.valor)}
                           </td>
-                          <td className="px-4 py-2.5 text-xs text-brand-green font-bold print:text-black">
+                          <td className="px-4 py-2.5 text-xs text-brand-green font-bold text-right print:text-black print:whitespace-nowrap">
                             {formatarMoeda(o.valorPago)}
                           </td>
-                          <td className="px-4 py-2.5 text-[10px] font-black uppercase tracking-tighter whitespace-nowrap">
+                          <td className="px-4 py-2.5 text-[10px] font-black uppercase tracking-tighter text-center whitespace-nowrap print:whitespace-nowrap">
                             <span className={`px-2 py-0.5 rounded-full ${
                               o.status === 'Pago' ? 'bg-brand-green/10 text-brand-green-light border border-brand-green/20' :
                               o.status === 'Parcialmente Pago' ? 'bg-brand-blue/10 text-brand-blue-light border border-brand-blue/20' :
@@ -1939,7 +2011,7 @@ export function Relatorios() {
                               {o.status}
                             </span>
                           </td>
-                          <td className="px-4 py-2.5 text-[10px] text-gray-400 max-w-[200px] truncate print:text-black" title={o.servicos?.map(s => s.nome).join(', ')}>
+                          <td className="px-4 py-2.5 text-[10px] text-gray-400 max-w-[200px] truncate print:max-w-none print:whitespace-normal print:break-words print:text-black" title={o.servicos?.map(s => s.nome).join(', ')}>
                             {o.servicos?.map(s => s.nome).join(', ')}
                           </td>
                         </tr>
@@ -2079,14 +2151,14 @@ export function Relatorios() {
                   </span>
                 </div>
                 <div className="overflow-x-auto rounded-xl border border-brand-dark-5 bg-brand-dark-3 print:border-gray-300 print:bg-white">
-                  <table className="min-w-full divide-y divide-brand-dark-5 print:divide-gray-300">
+                  <table className="min-w-full divide-y divide-brand-dark-5 print:divide-gray-300 print:table-fixed print:w-full">
                     <thead className="bg-brand-dark-4 print:bg-gray-100">
                       <tr>
-                        <th className="px-4 py-3 text-[10px] font-bold uppercase text-gray-400">Serviço Prestado</th>
-                        <th className="px-4 py-3 text-[10px] font-bold uppercase text-gray-400 text-center">Quant. Executada</th>
-                        <th className="px-4 py-3 text-[10px] font-bold uppercase text-gray-400 text-right">Faturamento Bruto</th>
-                        <th className="px-4 py-3 text-[10px] font-bold uppercase text-gray-400 text-right">Dedução Taxas PF (GRU)</th>
-                        <th className="px-4 py-3 text-[10px] font-bold uppercase text-gray-400 text-right">Líquido Real</th>
+                        <th className="px-4 py-3 text-[10px] font-bold uppercase text-gray-400 print:w-[42%] print:whitespace-normal">Serviço Prestado</th>
+                        <th className="px-4 py-3 text-[10px] font-bold uppercase text-gray-400 text-center print:w-[12%] print:whitespace-normal">Quant. Executada</th>
+                        <th className="px-4 py-3 text-[10px] font-bold uppercase text-gray-400 text-right print:w-[15%] print:whitespace-normal">Faturamento Bruto</th>
+                        <th className="px-4 py-3 text-[10px] font-bold uppercase text-gray-400 text-right print:w-[16%] print:whitespace-normal">Dedução Taxas PF (GRU)</th>
+                        <th className="px-4 py-3 text-[10px] font-bold uppercase text-gray-400 text-right print:w-[15%] print:whitespace-normal">Líquido Real</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-brand-dark-5 bg-transparent print:divide-gray-200">
@@ -2099,13 +2171,13 @@ export function Relatorios() {
                       ) : (
                         servicosBreakdown.map((s) => (
                           <tr key={s.nome} className="hover:bg-white/[0.01]">
-                            <td className="px-4 py-2.5 text-xs font-bold text-white print:text-black">{s.nome}</td>
-                            <td className="px-4 py-2.5 text-xs text-gray-300 text-center print:text-black">{s.count}</td>
-                            <td className="px-4 py-2.5 text-xs font-bold text-brand-green text-right print:text-black">{formatarMoeda(s.bruto)}</td>
-                            <td className="px-4 py-2.5 text-xs font-bold text-amber-400 text-right print:text-black">
+                            <td className="px-4 py-2.5 text-xs font-bold text-white print:text-black print:whitespace-normal print:break-words">{s.nome}</td>
+                            <td className="px-4 py-2.5 text-xs text-gray-300 text-center print:text-black print:whitespace-nowrap">{s.count}</td>
+                            <td className="px-4 py-2.5 text-xs font-bold text-brand-green text-right print:text-black print:whitespace-nowrap">{formatarMoeda(s.bruto)}</td>
+                            <td className="px-4 py-2.5 text-xs font-bold text-amber-400 text-right print:text-black print:whitespace-nowrap">
                               {s.taxas > 0 ? `-${formatarMoeda(s.taxas)}` : 'R$ 0,00'}
                             </td>
-                            <td className={`px-4 py-2.5 text-xs font-black text-right print:text-black ${s.liquido >= 0 ? 'text-brand-blue-light' : 'text-red-400'}`}>
+                            <td className={`px-4 py-2.5 text-xs font-black text-right print:text-black print:whitespace-nowrap ${s.liquido >= 0 ? 'text-brand-blue-light' : 'text-red-400'}`}>
                               {formatarMoeda(s.liquido)}
                             </td>
                           </tr>
@@ -2115,17 +2187,17 @@ export function Relatorios() {
                     {servicosBreakdown.length > 0 && (
                       <tfoot className="bg-brand-dark-4/70 font-black text-xs border-t-2 border-brand-dark-5 print:bg-gray-100 print:border-gray-400">
                         <tr>
-                          <td className="px-4 py-2.5 text-white uppercase print:text-black">Total Consolidado</td>
-                          <td className="px-4 py-2.5 text-center text-gray-300 print:text-black">
+                          <td className="px-4 py-2.5 text-white uppercase print:text-black print:whitespace-normal">Total Consolidado</td>
+                          <td className="px-4 py-2.5 text-center text-gray-300 print:text-black print:whitespace-nowrap">
                             {servicosBreakdown.reduce((sum, s) => sum + s.count, 0)}
                           </td>
-                          <td className="px-4 py-2.5 text-right text-brand-green print:text-black">
+                          <td className="px-4 py-2.5 text-right text-brand-green print:text-black print:whitespace-nowrap">
                             {formatarMoeda(servicosBreakdown.reduce((sum, s) => sum + s.bruto, 0))}
                           </td>
-                          <td className="px-4 py-2.5 text-right text-amber-400 print:text-black">
+                          <td className="px-4 py-2.5 text-right text-amber-400 print:text-black print:whitespace-nowrap">
                             -{formatarMoeda(servicosBreakdown.reduce((sum, s) => sum + s.taxas, 0))}
                           </td>
-                          <td className="px-4 py-2.5 text-right text-brand-blue-light print:text-black">
+                          <td className="px-4 py-2.5 text-right text-brand-blue-light print:text-black print:whitespace-nowrap">
                             {formatarMoeda(servicosBreakdown.reduce((sum, s) => sum + s.liquido, 0))}
                           </td>
                         </tr>
@@ -2141,12 +2213,12 @@ export function Relatorios() {
               <div className="space-y-2">
                 <h3 className="text-sm font-bold text-white uppercase tracking-wider print-section-title">Repasses e Comissões devidas no Período</h3>
                 <div className="overflow-x-auto rounded-xl border border-brand-dark-5 bg-brand-dark-3 print:border-gray-300 print:bg-white">
-                  <table className="min-w-full divide-y divide-brand-dark-5 print:divide-gray-300">
+                  <table className="min-w-full divide-y divide-brand-dark-5 print:divide-gray-300 print:table-fixed print:w-full">
                     <thead className="bg-brand-dark-4 print:bg-gray-100">
                       <tr>
-                        <th className="px-4 py-3 text-[10px] font-bold uppercase text-gray-400">Responsável / Colaborador</th>
-                        <th className="px-4 py-3 text-[10px] font-bold uppercase text-gray-400 text-center">Serviços Executados</th>
-                        <th className="px-4 py-3 text-[10px] font-bold uppercase text-gray-400 text-right">Total a Repassar</th>
+                        <th className="px-4 py-3 text-[10px] font-bold uppercase text-gray-400 print:w-[50%] print:whitespace-normal">Responsável / Colaborador</th>
+                        <th className="px-4 py-3 text-[10px] font-bold uppercase text-gray-400 text-center print:w-[25%] print:whitespace-normal">Serviços Executados</th>
+                        <th className="px-4 py-3 text-[10px] font-bold uppercase text-gray-400 text-right print:w-[25%] print:whitespace-normal">Total a Repassar</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-brand-dark-5 bg-transparent print:divide-gray-200">
@@ -2159,9 +2231,9 @@ export function Relatorios() {
                       ) : (
                         comissoesEquipe.map((c) => (
                           <tr key={c.colaborador}>
-                            <td className="px-4 py-2.5 text-xs font-bold text-white print:text-black">{c.colaborador}</td>
-                            <td className="px-4 py-2.5 text-xs text-gray-300 text-center print:text-black">{c.count}</td>
-                            <td className="px-4 py-2.5 text-xs font-black text-brand-green text-right print:text-black">{formatarMoeda(c.total)}</td>
+                            <td className="px-4 py-2.5 text-xs font-bold text-white print:text-black print:whitespace-normal print:break-words">{c.colaborador}</td>
+                            <td className="px-4 py-2.5 text-xs text-gray-300 text-center print:text-black print:whitespace-nowrap">{c.count}</td>
+                            <td className="px-4 py-2.5 text-xs font-black text-brand-green text-right print:text-black print:whitespace-nowrap">{formatarMoeda(c.total)}</td>
                           </tr>
                         ))
                       )}
@@ -2176,15 +2248,15 @@ export function Relatorios() {
               <div className="space-y-2">
                 <h3 className="text-sm font-bold text-white uppercase tracking-wider print-section-title">Extrato de Transações do Caixa</h3>
                 <div className="overflow-x-auto rounded-xl border border-brand-dark-5 bg-brand-dark-3 print:border-gray-300 print:bg-white">
-                  <table className="min-w-full divide-y divide-brand-dark-5 print:divide-gray-300">
+                  <table className="min-w-full divide-y divide-brand-dark-5 print:divide-gray-300 print:table-fixed print:w-full">
                     <thead className="bg-brand-dark-4 print:bg-gray-100">
                       <tr>
-                        <th className="px-4 py-3 text-[10px] font-bold uppercase text-gray-400">Data</th>
-                        <th className="px-4 py-3 text-[10px] font-bold uppercase text-gray-400">Tipo</th>
-                        <th className="px-4 py-3 text-[10px] font-bold uppercase text-gray-400">Método / Categoria</th>
-                        <th className="px-4 py-3 text-[10px] font-bold uppercase text-gray-400">Descrição</th>
-                        <th className="px-4 py-3 text-[10px] font-bold uppercase text-gray-400">Cliente / Destino</th>
-                        <th className="px-4 py-3 text-[10px] font-bold uppercase text-gray-400 text-right">Valor</th>
+                        <th className="px-4 py-3 text-[10px] font-bold uppercase text-gray-400 print:w-[12%] print:whitespace-normal text-center">Data</th>
+                        <th className="px-4 py-3 text-[10px] font-bold uppercase text-gray-400 print:w-[10%] print:whitespace-normal text-center">Tipo</th>
+                        <th className="px-4 py-3 text-[10px] font-bold uppercase text-gray-400 print:w-[18%] print:whitespace-normal">Método / Categoria</th>
+                        <th className="px-4 py-3 text-[10px] font-bold uppercase text-gray-400 print:w-[28%] print:whitespace-normal">Descrição</th>
+                        <th className="px-4 py-3 text-[10px] font-bold uppercase text-gray-400 print:w-[18%] print:whitespace-normal">Cliente / Destino</th>
+                        <th className="px-4 py-3 text-[10px] font-bold uppercase text-gray-400 print:w-[14%] print:whitespace-normal text-right">Valor</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-brand-dark-5 bg-transparent print:divide-gray-200">
@@ -2197,18 +2269,18 @@ export function Relatorios() {
                       ) : (
                         extratoTransacoes.map((t) => (
                           <tr key={t.id} className="hover:bg-white/[0.01]">
-                            <td className="px-4 py-2 text-xs text-gray-400 whitespace-nowrap print:text-black">
+                            <td className="px-4 py-2 text-xs text-gray-400 whitespace-nowrap text-center print:text-black print:whitespace-nowrap">
                               {format(parseISO(t.data), 'dd/MM/yyyy')}
                             </td>
-                            <td className="px-4 py-2 text-xs font-black uppercase">
+                            <td className="px-4 py-2 text-xs font-black uppercase text-center print:whitespace-nowrap">
                               <span className={t.tipo === 'entrada' ? 'text-brand-green' : 'text-red-400'}>
                                 {t.tipo === 'entrada' ? 'Entrada' : 'Saída'}
                               </span>
                             </td>
-                            <td className="px-4 py-2 text-xs text-gray-300 print:text-black">{t.categoria}</td>
-                            <td className="px-4 py-2 text-xs text-gray-300 print:text-black">{t.descricao}</td>
-                            <td className="px-4 py-2 text-xs text-gray-400 truncate max-w-[150px] print:text-black">{t.entidade}</td>
-                            <td className={`px-4 py-2 text-xs font-black text-right print:text-black ${t.tipo === 'entrada' ? 'text-brand-green' : 'text-red-400'}`}>
+                            <td className="px-4 py-2 text-xs text-gray-300 print:text-black print:whitespace-normal print:break-words">{t.categoria}</td>
+                            <td className="px-4 py-2 text-xs text-gray-300 print:text-black print:whitespace-normal print:break-words">{t.descricao}</td>
+                            <td className="px-4 py-2 text-xs text-gray-400 print:text-black print:whitespace-normal print:break-words">{t.entidade}</td>
+                            <td className={`px-4 py-2 text-xs font-black text-right print:text-black print:whitespace-nowrap ${t.tipo === 'entrada' ? 'text-brand-green' : 'text-red-400'}`}>
                               {t.tipo === 'entrada' ? '+' : '-'}{formatarMoeda(t.valor)}
                             </td>
                           </tr>
@@ -2310,20 +2382,20 @@ export function Relatorios() {
             <div className="space-y-2">
               <h3 className="text-sm font-bold text-white uppercase tracking-wider print-section-title">Listagem Consolidada de Clientes</h3>
               <div className="overflow-x-auto rounded-xl border border-brand-dark-5 bg-brand-dark-3 print:border-gray-300 print:bg-white">
-                <table className="min-w-full divide-y divide-brand-dark-5 print:divide-gray-300">
+                <table className="min-w-full divide-y divide-brand-dark-5 print:divide-gray-300 print:table-auto print:w-full">
                   <thead className="bg-brand-dark-4 print:bg-gray-100">
                     <tr>
-                      <th className="px-3 py-3 text-[10px] font-bold uppercase text-gray-400">Cliente</th>
-                      {colunasClientes.cpf && <th className="px-3 py-3 text-[10px] font-bold uppercase text-gray-400">CPF</th>}
-                      {colunasClientes.contato && <th className="px-3 py-3 text-[10px] font-bold uppercase text-gray-400">Contato</th>}
-                      {colunasClientes.filiado && <th className="px-3 py-3 text-[10px] font-bold uppercase text-gray-400 text-center">Filiado</th>}
-                      {colunasClientes.cr && <th className="px-3 py-3 text-[10px] font-bold uppercase text-gray-400">Nº CR</th>}
-                      {colunasClientes.vencimentoCr && <th className="px-3 py-3 text-[10px] font-bold uppercase text-gray-400">Vencimento CR</th>}
-                      {colunasClientes.crIbama && <th className="px-3 py-3 text-[10px] font-bold uppercase text-gray-400">Nº CR IBAMA</th>}
-                      {colunasClientes.vencimentoIbama && <th className="px-3 py-3 text-[10px] font-bold uppercase text-gray-400">Vencimento IBAMA</th>}
-                      {colunasClientes.armasCount && <th className="px-3 py-3 text-[10px] font-bold uppercase text-gray-400 text-center">Armas</th>}
-                      {colunasClientes.gtsCount && <th className="px-3 py-3 text-[10px] font-bold uppercase text-gray-400 text-center">GTs</th>}
-                      {colunasClientes.manejosCount && <th className="px-3 py-3 text-[10px] font-bold uppercase text-gray-400 text-center">Manejos</th>}
+                      <th className="px-3 py-3 text-[10px] font-bold uppercase text-gray-400 print:whitespace-normal">Cliente</th>
+                      {colunasClientes.cpf && <th className="px-3 py-3 text-[10px] font-bold uppercase text-gray-400 print:whitespace-nowrap text-center">CPF</th>}
+                      {colunasClientes.contato && <th className="px-3 py-3 text-[10px] font-bold uppercase text-gray-400 print:whitespace-nowrap text-center">Contato</th>}
+                      {colunasClientes.filiado && <th className="px-3 py-3 text-[10px] font-bold uppercase text-gray-400 text-center print:whitespace-nowrap">Filiado</th>}
+                      {colunasClientes.cr && <th className="px-3 py-3 text-[10px] font-bold uppercase text-gray-400 print:whitespace-nowrap text-center">Nº CR</th>}
+                      {colunasClientes.vencimentoCr && <th className="px-3 py-3 text-[10px] font-bold uppercase text-gray-400 print:whitespace-nowrap text-center">Vencimento CR</th>}
+                      {colunasClientes.crIbama && <th className="px-3 py-3 text-[10px] font-bold uppercase text-gray-400 print:whitespace-nowrap text-center">Nº CR IBAMA</th>}
+                      {colunasClientes.vencimentoIbama && <th className="px-3 py-3 text-[10px] font-bold uppercase text-gray-400 print:whitespace-nowrap text-center">Vencimento IBAMA</th>}
+                      {colunasClientes.armasCount && <th className="px-3 py-3 text-[10px] font-bold uppercase text-gray-400 text-center print:whitespace-nowrap">Armas</th>}
+                      {colunasClientes.gtsCount && <th className="px-3 py-3 text-[10px] font-bold uppercase text-gray-400 text-center print:whitespace-nowrap">GTs</th>}
+                      {colunasClientes.manejosCount && <th className="px-3 py-3 text-[10px] font-bold uppercase text-gray-400 text-center print:whitespace-nowrap">Manejos</th>}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-brand-dark-5 bg-transparent print:divide-gray-200">
@@ -2336,41 +2408,41 @@ export function Relatorios() {
                     ) : (
                       tabelaClientesRelatorio.map((c) => (
                         <tr key={c.id} className="hover:bg-white/[0.01]">
-                          <td className="px-3 py-2 text-xs font-bold text-white print:text-black truncate max-w-[140px]" title={c.nome}>
+                          <td className="px-3 py-2 text-xs font-bold text-white print:text-black truncate max-w-[140px] print:max-w-none print:whitespace-normal print:break-words" title={c.nome}>
                             {c.nome}
                           </td>
                           {colunasClientes.cpf && (
-                            <td className="px-3 py-2 text-xs text-gray-400 print:text-black whitespace-nowrap">
+                            <td className="px-3 py-2 text-xs text-gray-400 text-center print:text-black print:whitespace-nowrap">
                               {formatarCPF(c.cpf)}
                             </td>
                           )}
                           {colunasClientes.contato && (
-                            <td className="px-3 py-2 text-xs text-gray-400 print:text-black whitespace-nowrap">
+                            <td className="px-3 py-2 text-xs text-gray-400 text-center print:text-black print:whitespace-nowrap">
                               {formatarTelefone(c.contato)}
                             </td>
                           )}
                           {colunasClientes.filiado && (
-                            <td className="px-3 py-2 text-xs text-center font-bold text-gray-300 print:text-black">
+                            <td className="px-3 py-2 text-xs text-center font-bold text-gray-300 print:text-black print:whitespace-nowrap">
                               <span className={c.filiado === 'Sim' ? 'text-brand-green' : 'text-gray-500'}>
                                 {c.filiado}
                               </span>
                             </td>
                           )}
-                          {colunasClientes.cr && <td className="px-3 py-2 text-xs text-gray-300 print:text-black whitespace-nowrap">{c.numeroCr}</td>}
+                          {colunasClientes.cr && <td className="px-3 py-2 text-xs text-center text-gray-300 print:text-black print:whitespace-nowrap">{c.numeroCr}</td>}
                           {colunasClientes.vencimentoCr && (
-                            <td className={`px-3 py-2 text-xs whitespace-nowrap print:text-black ${
+                            <td className={`px-3 py-2 text-xs text-center whitespace-nowrap print:text-black print:whitespace-nowrap ${
                               c.vencimentoCrRaw && isBefore(parseISO(c.vencimentoCrRaw), new Date()) ? 'text-red-400 font-bold' : 'text-gray-400'
                             }`}>{c.vencimentoCr}</td>
                           )}
-                          {colunasClientes.crIbama && <td className="px-3 py-2 text-xs text-gray-300 print:text-black whitespace-nowrap">{c.numeroCrIbama}</td>}
+                          {colunasClientes.crIbama && <td className="px-3 py-2 text-xs text-center text-gray-300 print:text-black print:whitespace-nowrap">{c.numeroCrIbama}</td>}
                           {colunasClientes.vencimentoIbama && (
-                            <td className={`px-3 py-2 text-xs whitespace-nowrap print:text-black ${
+                            <td className={`px-3 py-2 text-xs text-center whitespace-nowrap print:text-black print:whitespace-nowrap ${
                               c.vencimentoCrIbamaRaw && isBefore(parseISO(c.vencimentoCrIbamaRaw), new Date()) ? 'text-red-400 font-bold' : 'text-gray-400'
                             }`}>{c.vencimentoCrIbama}</td>
                           )}
-                          {colunasClientes.armasCount && <td className="px-3 py-2 text-xs text-center text-brand-blue-light font-bold print:text-black">{c.armasCount}</td>}
-                          {colunasClientes.gtsCount && <td className="px-3 py-2 text-xs text-center text-purple-300 font-bold print:text-black">{c.gtsCount}</td>}
-                          {colunasClientes.manejosCount && <td className="px-3 py-2 text-xs text-center text-orange-300 font-bold print:text-black">{c.manejosCount}</td>}
+                          {colunasClientes.armasCount && <td className="px-3 py-2 text-xs text-center text-brand-blue-light font-bold print:text-black print:whitespace-nowrap">{c.armasCount}</td>}
+                          {colunasClientes.gtsCount && <td className="px-3 py-2 text-xs text-center text-purple-300 font-bold print:text-black print:whitespace-nowrap">{c.gtsCount}</td>}
+                          {colunasClientes.manejosCount && <td className="px-3 py-2 text-xs text-center text-orange-300 font-bold print:text-black print:whitespace-nowrap">{c.manejosCount}</td>}
                         </tr>
                       ))
                     )}
@@ -2416,15 +2488,15 @@ export function Relatorios() {
             <div className="space-y-2">
               <h3 className="text-sm font-bold text-white uppercase tracking-wider print-section-title">Detalhamento dos Alertas de Documentação</h3>
               <div className="overflow-x-auto rounded-xl border border-brand-dark-5 bg-brand-dark-3 print:border-gray-300 print:bg-white">
-                <table className="min-w-full divide-y divide-brand-dark-5 print:divide-gray-300">
+                <table className="min-w-full divide-y divide-brand-dark-5 print:divide-gray-300 print:table-fixed print:w-full">
                   <thead className="bg-brand-dark-4 print:bg-gray-100">
                     <tr>
-                      <th className="px-4 py-3 text-[10px] font-bold uppercase text-gray-400">Tipo Doc.</th>
-                      <th className="px-4 py-3 text-[10px] font-bold uppercase text-gray-400">Descrição / Identificação</th>
-                      <th className="px-4 py-3 text-[10px] font-bold uppercase text-gray-400">Cliente</th>
-                      <th className="px-4 py-3 text-[10px] font-bold uppercase text-gray-400">Vencimento</th>
-                      <th className="px-4 py-3 text-[10px] font-bold uppercase text-gray-400">Status Alerta</th>
-                      <th className="px-4 py-3 text-[10px] font-bold uppercase text-gray-400 text-right">Tempo Restante</th>
+                      <th className="px-4 py-3 text-[10px] font-bold uppercase text-gray-400 print:w-[10%] print:whitespace-normal text-center">Tipo Doc.</th>
+                      <th className="px-4 py-3 text-[10px] font-bold uppercase text-gray-400 print:w-[26%] print:whitespace-normal">Descrição / Identificação</th>
+                      <th className="px-4 py-3 text-[10px] font-bold uppercase text-gray-400 print:w-[24%] print:whitespace-normal">Cliente</th>
+                      <th className="px-4 py-3 text-[10px] font-bold uppercase text-gray-400 print:w-[12%] print:whitespace-normal text-center">Vencimento</th>
+                      <th className="px-4 py-3 text-[10px] font-bold uppercase text-gray-400 print:w-[14%] print:whitespace-normal text-center">Status Alerta</th>
+                      <th className="px-4 py-3 text-[10px] font-bold uppercase text-gray-400 print:w-[14%] print:whitespace-normal text-right">Tempo Restante</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-brand-dark-5 bg-transparent print:divide-gray-200">
@@ -2441,7 +2513,7 @@ export function Relatorios() {
                         
                         return (
                           <tr key={a.id} className="hover:bg-white/[0.01]">
-                            <td className="px-4 py-2.5 text-xs font-black print:text-black">
+                            <td className="px-4 py-2.5 text-xs font-black text-center print:text-black print:whitespace-nowrap">
                               <span className={`px-2 py-0.5 rounded-md ${
                                 a.tipo === 'CR' || a.tipo === 'IBAMA_CR' ? 'bg-brand-blue/15 text-brand-blue-light' :
                                 a.tipo === 'CRAF' ? 'bg-purple-500/15 text-purple-300' :
@@ -2450,10 +2522,10 @@ export function Relatorios() {
                                 {a.tipo}
                               </span>
                             </td>
-                            <td className="px-4 py-2.5 text-xs text-gray-200 font-bold print:text-black">{a.label}</td>
-                            <td className="px-4 py-2.5 text-xs text-gray-300 font-bold print:text-black truncate max-w-[150px]">{a.clienteNome}</td>
-                            <td className="px-4 py-2.5 text-xs text-gray-400 print:text-black whitespace-nowrap">{formatarData(a.dataVencimento)}</td>
-                            <td className="px-4 py-2.5 text-xs font-black uppercase whitespace-nowrap">
+                            <td className="px-4 py-2.5 text-xs text-gray-200 font-bold print:text-black print:whitespace-normal print:break-words">{a.label}</td>
+                            <td className="px-4 py-2.5 text-xs text-gray-300 font-bold truncate max-w-[150px] print:max-w-none print:text-black print:whitespace-normal print:break-words">{a.clienteNome}</td>
+                            <td className="px-4 py-2.5 text-xs text-gray-400 text-center print:text-black print:whitespace-nowrap">{formatarData(a.dataVencimento)}</td>
+                            <td className="px-4 py-2.5 text-xs font-black uppercase text-center print:whitespace-nowrap">
                               {emRenovacao ? (
                                 <span className="text-brand-blue-light print:text-black">Ag. Liberação</span>
                               ) : isVencido ? (
@@ -2464,7 +2536,7 @@ export function Relatorios() {
                                 <span className="text-yellow-400 font-black">Aviso</span>
                               )}
                             </td>
-                            <td className={`px-4 py-2.5 text-xs font-black text-right whitespace-nowrap print:text-black ${
+                            <td className={`px-4 py-2.5 text-xs font-black text-right whitespace-nowrap print:text-black print:whitespace-nowrap ${
                               emRenovacao ? 'text-brand-blue-light' : isVencido ? 'text-red-500' : a.diasRestantes <= 30 ? 'text-orange-400' : 'text-yellow-400'
                             }`}>
                               {emRenovacao ? 'Em Renovação' : isVencido ? `${Math.abs(a.diasRestantes)}d vencido` : `${a.diasRestantes}d restantes`}
