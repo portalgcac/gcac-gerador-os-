@@ -146,16 +146,21 @@ export function ExportadorRelatorio({ isOpen, onClose, dataInicioProp, dataFimPr
     const contato = usuario?.dadosEmpresa?.contatoTelefone || '';
     const endereco = usuario?.dadosEmpresa?.endereco || '';
 
-    // 1. Filtragem das OSs com base nos critérios selecionados
+    // 1. Filtragem das OSs com base nos critérios selecionados (criadas no período OU com pagamento recebido no período)
+    const intervaloData = {
+      start: startOfDay(parseISO(dataInicio)),
+      end: endOfDay(parseISO(dataFim))
+    };
+
     const ordensFiltradas = ordens.filter(item => {
-      const dataItem = parseISO(item.criadoEm);
-      const noIntervalo = isWithinInterval(dataItem, {
-        start: startOfDay(parseISO(dataInicio)),
-        end: endOfDay(parseISO(dataFim))
-      });
-      if (!noIntervalo) return false;
       const ehMigracao = item.migrado === true || item.observacoes?.includes('[MIGRAÇÃO]');
       if (ehMigracao) return false;
+
+      const dataItem = item.criadoEm ? parseISO(item.criadoEm) : null;
+      const criadaNoIntervalo = dataItem ? isWithinInterval(dataItem, intervaloData) : false;
+      const tevePagamentoNoIntervalo = item.historicoPagamentos?.some(p => p.data && isWithinInterval(parseISO(p.data), intervaloData));
+
+      if (!criadaNoIntervalo && !tevePagamentoNoIntervalo) return false;
 
       // Filtro de Status OS
       if (statusOSFiltro.length > 0 && !statusOSFiltro.includes(item.status)) return false;
@@ -176,10 +181,7 @@ export function ExportadorRelatorio({ isOpen, onClose, dataInicioProp, dataFimPr
     // 2. Filtragem de Despesas PJ
     const despesasFiltradas = despesas.filter(item => {
       const dataItem = parseISO(item.data);
-      return isWithinInterval(dataItem, {
-        start: startOfDay(parseISO(dataInicio)),
-        end: endOfDay(parseISO(dataFim))
-      });
+      return isWithinInterval(dataItem, intervaloData);
     });
 
     // 3. Totais calculados considerando apenas as formas de pagamento ativas no filtro
@@ -188,7 +190,7 @@ export function ExportadorRelatorio({ isOpen, onClose, dataInicioProp, dataFimPr
       if (o.historicoPagamentos && o.historicoPagamentos.length > 0) {
         o.historicoPagamentos.forEach(p => {
           const dataPagamento = parseISO(p.data);
-          if (isWithinInterval(dataPagamento, { start: startOfDay(parseISO(dataInicio)), end: endOfDay(parseISO(dataFim)) })) {
+          if (isWithinInterval(dataPagamento, intervaloData)) {
             if (formasPagamentoFiltro.includes(p.metodo)) {
               faturamento += (p.valor || 0);
             }
@@ -196,7 +198,7 @@ export function ExportadorRelatorio({ isOpen, onClose, dataInicioProp, dataFimPr
         });
       } else if (o.valorPago > 0) {
         const dataOS = parseISO(o.criadoEm);
-        if (isWithinInterval(dataOS, { start: startOfDay(parseISO(dataInicio)), end: endOfDay(parseISO(dataFim)) })) {
+        if (isWithinInterval(dataOS, intervaloData)) {
           if (formasPagamentoFiltro.includes(o.formaPagamento)) {
             faturamento += (o.valorPago || 0);
           }
@@ -204,10 +206,18 @@ export function ExportadorRelatorio({ isOpen, onClose, dataInicioProp, dataFimPr
       }
     });
 
-    // Dedução das Taxas GRU correspondentes às ordens filtradas
-    const taxas = ordensFiltradas
-      .filter(o => o.status === 'Pago' || o.status === 'Parcialmente Pago')
-      .reduce((s, o) => s + (o.taxaPFTotal || 0), 0);
+    // Dedução das Taxas GRU correspondentes às ordens que movimentaram no período
+    const ordensPagasPeriodo = ordensFiltradas.filter(o => {
+      const temPagamentoNoPeriodo = o.historicoPagamentos?.some(p => p.data && isWithinInterval(parseISO(p.data), intervaloData));
+      const criadaNoPeriodoPaga = (o.status === 'Pago' || o.status === 'Parcialmente Pago') && (o.valorPago || 0) > 0;
+      return temPagamentoNoPeriodo || criadaNoPeriodoPaga;
+    });
+
+    const taxas = ordensPagasPeriodo.reduce((s, o) => {
+      const taxaOS = Number(o.taxaPFTotal) || 0;
+      const sumServ = (o.servicos || []).reduce((acc: number, serv: any) => acc + (Number(serv.taxaPF) || 0), 0);
+      return s + Math.max(taxaOS, sumServ);
+    }, 0);
 
     const despesasTotal = despesasFiltradas.reduce((s, d) => s + (d.valor || 0), 0);
     const margemBruta = faturamento - taxas;
@@ -529,7 +539,7 @@ export function ExportadorRelatorio({ isOpen, onClose, dataInicioProp, dataFimPr
           o.formaPagamento || 'A Combinar',
           formatarMoeda(o.valor),
           formatarMoeda(o.taxaPFTotal || 0),
-          formatarMoeda((o.valorPago || 0) - (o.taxaPFTotal || 0))
+          o.status === 'Pago' ? formatarMoeda((o.valorPago || o.valor) - (o.taxaPFTotal || 0)) : formatarMoeda(0)
         ]);
         drawSectionTable(osHeaders, osRows, 'HISTÓRICO DETALHADO DE ENTRADAS (ORDENS DE SERVIÇO)');
       }
@@ -604,7 +614,7 @@ export function ExportadorRelatorio({ isOpen, onClose, dataInicioProp, dataFimPr
           'Desconto': o.desconto || 0,
           'Valor Pago': o.valorPago,
           'Taxas PF (GRU)': o.taxaPFTotal || 0,
-          'Líquido (OS)': (o.valorPago || 0) - (o.taxaPFTotal || 0),
+          'Líquido (OS)': o.status === 'Pago' ? (o.valorPago || o.valor) - (o.taxaPFTotal || 0) : 0,
           'Status': o.status,
           'Forma de Pagamento': o.formaPagamento
         }));

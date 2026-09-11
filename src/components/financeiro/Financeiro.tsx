@@ -95,13 +95,17 @@ export function Financeiro() {
     };
   }, [tipoFiltro, dataFiltro, quinzenaFiltro, dataInicioCustom, dataFimCustom]);
 
-  // Filtragem de dados
+  // Filtragem de dados: ordens criadas no período OU que tiveram recebimentos no período
   const ordensMes = useMemo(() => {
     return ordens.filter(o => {
       const ehMigracao = o.migrado === true || o.observacoes?.includes('[MIGRAÇÃO]');
       if (ehMigracao) return false;
-      const dataCriacao = parseISO(o.criadoEm);
-      return isWithinInterval(dataCriacao, { start: dataInicio, end: dataFim });
+
+      const dataCriacao = o.criadoEm ? parseISO(o.criadoEm) : null;
+      const criadaNoPeriodo = dataCriacao ? isWithinInterval(dataCriacao, { start: dataInicio, end: dataFim }) : false;
+      const tevePagamentoNoPeriodo = o.historicoPagamentos?.some(p => p.data && isWithinInterval(parseISO(p.data), { start: dataInicio, end: dataFim }));
+
+      return criadaNoPeriodo || tevePagamentoNoPeriodo;
     });
   }, [ordens, dataInicio, dataFim]);
 
@@ -112,23 +116,67 @@ export function Financeiro() {
     });
   }, [despesas, dataInicio, dataFim]);
 
-  // Cálculos Financeiros
+  // Cálculos Financeiros (Movimentação Real de Caixa no Período)
   const totais = useMemo(() => {
-    const faturamento = ordensMes.reduce((s, o) => s + (o.valorPago || 0), 0);
-    const taxas = ordensMes
-      .filter(o => o.status === 'Pago' || o.status === 'Parcialmente Pago')
-      .reduce((s, o) => s + (o.taxaPFTotal || 0), 0);
-    
+    // 1. Apuração de todas as entradas/recebimentos ocorridos no período selecionado (Regime de Caixa)
+    const formasPgtoBreakdown: Record<string, number> = {};
+    let faturamento = 0;
+
+    ordens.forEach(o => {
+      const ehMigracao = o.migrado === true || o.observacoes?.includes('[MIGRAÇÃO]');
+      if (ehMigracao) return;
+
+      if (o.historicoPagamentos && o.historicoPagamentos.length > 0) {
+        o.historicoPagamentos.forEach(p => {
+          if (!p.data) return;
+          const dataPagamento = parseISO(p.data);
+          if (isWithinInterval(dataPagamento, { start: dataInicio, end: dataFim })) {
+            const metodo = p.metodo || 'Pendente';
+            const val = Number(p.valor) || 0;
+            formasPgtoBreakdown[metodo] = (formasPgtoBreakdown[metodo] || 0) + val;
+            faturamento += val;
+          }
+        });
+      } else if ((o.valorPago || 0) > 0 && o.criadoEm) {
+        const dataOS = parseISO(o.criadoEm);
+        if (isWithinInterval(dataOS, { start: dataInicio, end: dataFim })) {
+          const metodo = o.formaPagamento || 'Outro';
+          const val = Number(o.valorPago) || 0;
+          formasPgtoBreakdown[metodo] = (formasPgtoBreakdown[metodo] || 0) + val;
+          faturamento += val;
+        }
+      }
+    });
+
+    // 2. Apuração de Taxas PF (GRU) das ordens pagas que movimentaram no período
+    const ordensPagasPeriodo = ordensMes.filter(o => {
+      const temPagamentoNoPeriodo = o.historicoPagamentos?.some(p => p.data && isWithinInterval(parseISO(p.data), { start: dataInicio, end: dataFim }));
+      const criadaNoPeriodoPaga = (o.status === 'Pago' || o.status === 'Parcialmente Pago') && (o.valorPago || 0) > 0;
+      return temPagamentoNoPeriodo || criadaNoPeriodoPaga;
+    });
+
+    let taxas = 0;
+    ordensPagasPeriodo.forEach(o => {
+      let taxaOS = Number(o.taxaPFTotal) || 0;
+      const sumServ = (o.servicos || []).reduce((acc: number, s: any) => acc + (Number(s.taxaPF) || 0), 0);
+      taxas += Math.max(taxaOS, sumServ);
+    });
+
     const despesasTotal = despesasMes.reduce((s, d) => s + (d.valor || 0), 0);
-    
-    // Novo cálculo: A receber apenas de quem já protocolou ou concluiu
+
+    // Total a receber das OSs do período
+    const totalPendente = ordensMes
+      .filter(o => o.status !== 'Pago' && o.status !== 'Gratuidade')
+      .reduce((s, o) => s + Math.max(0, (o.valor || 0) - (o.desconto || 0) - (o.valorPago || 0)), 0);
+
+    // Protocoladas
     const pendenteProtocolado = ordensMes
       .filter(o => 
         o.status !== 'Pago' && 
         o.status !== 'Gratuidade' && 
         (o.servicos || []).some(s => s.statusExecucao === 'Protocolado — Ag. PF' || s.statusExecucao === 'Concluído')
       )
-      .reduce((s, o) => s + (o.valor - (o.desconto || 0) - (o.valorPago || 0)), 0);
+      .reduce((s, o) => s + Math.max(0, (o.valor || 0) - (o.desconto || 0) - (o.valorPago || 0)), 0);
     
     const countPendenteProtocolado = ordensMes.filter(o => 
       o.status !== 'Pago' && 
@@ -136,28 +184,10 @@ export function Financeiro() {
       (o.servicos || []).some(s => s.statusExecucao === 'Protocolado — Ag. PF' || s.statusExecucao === 'Concluído')
     ).length;
 
+    const countPendente = ordensMes.filter(o => o.status !== 'Pago' && o.status !== 'Gratuidade').length;
+
     const margemBruta = faturamento - taxas;
     const lucroLiquido = margemBruta - despesasTotal;
-
-    // Agrupamento por formas de pagamento no período selecionado
-    const formasPgtoBreakdown: Record<string, number> = {};
-    ordensMes.forEach(o => {
-      if (o.historicoPagamentos && o.historicoPagamentos.length > 0) {
-        o.historicoPagamentos.forEach(p => {
-          const dataPagamento = parseISO(p.data);
-          if (isWithinInterval(dataPagamento, { start: dataInicio, end: dataFim })) {
-            const metodo = p.metodo || 'Pendente';
-            formasPgtoBreakdown[metodo] = (formasPgtoBreakdown[metodo] || 0) + (p.valor || 0);
-          }
-        });
-      } else if (o.valorPago > 0) {
-        const dataOS = parseISO(o.criadoEm);
-        if (isWithinInterval(dataOS, { start: dataInicio, end: dataFim })) {
-          const metodo = o.formaPagamento || 'Pendente';
-          formasPgtoBreakdown[metodo] = (formasPgtoBreakdown[metodo] || 0) + (o.valorPago || 0);
-        }
-      }
-    });
 
     return {
       faturamento,
@@ -165,13 +195,15 @@ export function Financeiro() {
       despesas: despesasTotal,
       margemBruta,
       lucroLiquido,
+      totalPendente,
+      countPendente,
       pendenteProtocolado,
       countPendenteProtocolado,
       totalOS: ordensMes.length,
-      concluidas: ordensMes.filter(o => o.status === 'Pago').length,
+      concluidas: ordensPagasPeriodo.filter(o => o.status === 'Pago').length,
       formasPgtoBreakdown
     };
-  }, [ordensMes, despesasMes, dataInicio, dataFim]);
+  }, [ordens, ordensMes, despesasMes, dataInicio, dataFim]);
 
   const handleExportarExcel = () => {
     setIsExportModalOpen(true);
@@ -365,11 +397,16 @@ export function Financeiro() {
 
         <div className="card border-yellow-500/20 relative overflow-hidden group">
           <div className="absolute top-0 left-0 w-1 h-full bg-yellow-500" />
-          <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">A Receber (Protocolados)</p>
-          <p className="text-2xl font-black text-white">{formatarMoeda(totais.pendenteProtocolado)}</p>
-          <div className="mt-2 flex items-center gap-1 text-[10px]">
-            <span className="text-yellow-500 font-bold">{totais.countPendenteProtocolado}</span>
-            <span className="text-gray-500">processos aguardando</span>
+          <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">Total a Receber</p>
+          <p className="text-2xl font-black text-white">{formatarMoeda(totais.totalPendente)}</p>
+          <div className="mt-2 flex flex-col text-[10px] text-gray-400">
+            <div className="flex items-center gap-1">
+              <span className="text-yellow-500 font-bold">{totais.countPendente}</span>
+              <span className="text-gray-400">processos pendentes</span>
+            </div>
+            <div className="text-[9px] text-gray-500">
+              Protocolados: <span className="text-yellow-500 font-semibold">{formatarMoeda(totais.pendenteProtocolado)}</span> ({totais.countPendenteProtocolado})
+            </div>
           </div>
           <Clock size={80} className="absolute -right-4 -bottom-4 text-yellow-500/5 group-hover:text-yellow-500/10 transition-colors" />
         </div>
@@ -522,8 +559,10 @@ export function Financeiro() {
                       </td>
                       <td className="table-cell font-bold text-white">{formatarMoeda(o.valor)}</td>
                       <td className="table-cell text-red-400">-{formatarMoeda(o.taxaPFTotal || 0)}</td>
-                      <td className="table-cell font-black text-brand-green">
-                        {formatarMoeda((o.valorPago || 0) - (o.taxaPFTotal || 0))}
+                      <td className="table-cell font-black">
+                        <span className={o.status === 'Pago' ? 'text-brand-green' : 'text-gray-500'}>
+                          {o.status === 'Pago' ? formatarMoeda((o.valorPago || o.valor) - (o.taxaPFTotal || 0)) : formatarMoeda(0)}
+                        </span>
                       </td>
                       <td className="table-cell">
                         <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${

@@ -23,14 +23,61 @@ export function Dashboard() {
 
   const dataAtual = new Date();
 
-  const ordensParaStats = ordens.filter(o => {
-    // Só entra no painel se NÃO for migração
+  // Ordens criadas no mês atual (não migração)
+  const ordensCriadasMes = ordens.filter(o => {
+    const ehMigracao = o.migrado === true || o.observacoes?.includes('[MIGRAÇÃO]');
+    if (ehMigracao) return false;
+    return o.criadoEm ? isSameMonth(parseISO(o.criadoEm), dataAtual) : false;
+  });
+
+  // Ordens que movimentaram no mês atual (criadas no mês ou com pagamento recebido no mês)
+  const ordensMovimentadasMes = ordens.filter(o => {
     const ehMigracao = o.migrado === true || o.observacoes?.includes('[MIGRAÇÃO]');
     if (ehMigracao) return false;
 
-    // Filtro por mês atual
-    return isSameMonth(parseISO(o.criadoEm), dataAtual);
+    const criadaNoMes = o.criadoEm ? isSameMonth(parseISO(o.criadoEm), dataAtual) : false;
+    const tevePagamentoNoMes = o.historicoPagamentos?.some(p => p.data && isSameMonth(parseISO(p.data), dataAtual));
+
+    return criadaNoMes || tevePagamentoNoMes;
   });
+
+  // 1. Receita Real recebida no mês (Regime de Caixa)
+  let receitaRealMes = 0;
+  ordens.forEach(o => {
+    const ehMigracao = o.migrado === true || o.observacoes?.includes('[MIGRAÇÃO]');
+    if (ehMigracao) return;
+
+    if (o.historicoPagamentos && o.historicoPagamentos.length > 0) {
+      o.historicoPagamentos.forEach(p => {
+        if (p.data && isSameMonth(parseISO(p.data), dataAtual)) {
+          receitaRealMes += (Number(p.valor) || 0);
+        }
+      });
+    } else if ((o.valorPago || 0) > 0 && o.criadoEm) {
+      if (isSameMonth(parseISO(o.criadoEm), dataAtual)) {
+        receitaRealMes += (Number(o.valorPago) || 0);
+      }
+    }
+  });
+
+  // 2. Taxas PF (GRU) das ordens pagas que movimentaram no mês
+  const ordensPagasPeriodo = ordensMovimentadasMes.filter(o => {
+    const temPagamentoNoMes = o.historicoPagamentos?.some(p => p.data && isSameMonth(parseISO(p.data), dataAtual));
+    const criadaNoMesPaga = (o.status === 'Pago' || o.status === 'Parcialmente Pago') && (o.valorPago || 0) > 0;
+    return temPagamentoNoMes || criadaNoMesPaga;
+  });
+
+  let taxasMes = 0;
+  ordensPagasPeriodo.forEach(o => {
+    let taxaOS = Number(o.taxaPFTotal) || 0;
+    const sumServ = (o.servicos || []).reduce((acc: number, s: any) => acc + (Number(s.taxaPF) || 0), 0);
+    taxasMes += Math.max(taxaOS, sumServ);
+  });
+
+  // 3. A receber das OSs pendentes do período
+  const receitaPendente = ordensMovimentadasMes
+    .filter(o => o.status !== 'Pago' && o.status !== 'Gratuidade')
+    .reduce((s, o) => s + Math.max(0, (o.valor || 0) - (o.desconto || 0) - (o.valorPago || 0)), 0);
 
   const despesasMes = despesas.filter(d => isSameMonth(parseISO(d.data), dataAtual));
   const valorDespesas = despesasMes.reduce((s, d) => s + (d.valor || 0), 0);
@@ -40,14 +87,14 @@ export function Dashboard() {
 
   const stats = {
     // Contagens Globais (Mês Atual)
-    total:       ordensParaStats.length,
-    pendente:    ordensParaStats.filter(o => o.status === 'Aguardando Pagamento').length,
-    pagas:       ordensParaStats.filter(o => o.status === 'Pago' || o.status === 'Gratuidade').length,
+    total:       ordensCriadasMes.length,
+    pendente:    ordensCriadasMes.filter(o => o.status === 'Aguardando Pagamento').length,
+    pagas:       ordensCriadasMes.filter(o => o.status === 'Pago' || o.status === 'Gratuidade').length,
 
-    // Financeiro Bruto (Mês Atual)
-    receita:     ordensParaStats.reduce((s, o) => s + (o.valorPago || 0), 0),
-    taxas:       ordensParaStats.filter(o => o.status === 'Pago' || o.status === 'Parcialmente Pago').reduce((s, o) => s + (o.taxaPFTotal || 0), 0),
-    receitaPendente: ordensParaStats.reduce((s, o) => s + (o.valor - (o.desconto || 0) - (o.valorPago || 0)), 0),
+    // Financeiro Bruto e Líquido Real (Mês Atual - Regime de Caixa)
+    receita:     receitaRealMes,
+    taxas:       taxasMes,
+    receitaPendente,
   };
 
   const margemServicos = stats.receita - stats.taxas;
@@ -74,7 +121,7 @@ export function Dashboard() {
  
   const servicosNaoIniciados = operStats['Não Iniciado'];
  
-  const recentes = [...ordensParaStats].slice(0, 5);
+  const recentes = [...ordensCriadasMes].slice(0, 5);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -194,20 +241,24 @@ export function Dashboard() {
             <div className="hidden md:block w-px bg-brand-dark-5" />
 
             {/* Lucro Líquido e Breakdown */}
-            <div className="grid grid-cols-2 md:block gap-4 md:space-y-4 min-w-[200px]">
+            <div className="grid grid-cols-2 md:block gap-4 md:space-y-4 min-w-[220px]">
               <div>
                 <p className="text-[10px] font-bold text-brand-blue uppercase tracking-wider">Lucro Líquido Real</p>
                 <p className="text-lg font-bold text-white">{formatarMoeda(lucroLiquido)}</p>
-                <p className="text-[9px] text-gray-500">Já subtraídas as despesas PJ</p>
+                <p className="text-[9px] text-gray-500">Já subtraídas taxas PF e despesas PJ</p>
               </div>
-              <div className="flex gap-4">
-                <div>
-                  <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Despesas PJ</p>
-                  <p className="text-xs font-bold text-red-400">-{formatarMoeda(valorDespesas)}</p>
-                </div>
+              <div className="flex flex-wrap gap-3">
                 <div>
                   <p className="text-[10px] font-bold text-brand-green uppercase tracking-wider">Total Recebido</p>
                   <p className="text-xs font-bold text-brand-green-light">{formatarMoeda(stats.receita)}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-red-400 uppercase tracking-wider">Taxas GRU</p>
+                  <p className="text-xs font-bold text-red-400">-{formatarMoeda(stats.taxas)}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Despesas PJ</p>
+                  <p className="text-xs font-bold text-red-400">-{formatarMoeda(valorDespesas)}</p>
                 </div>
               </div>
             </div>
