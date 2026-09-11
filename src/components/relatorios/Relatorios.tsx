@@ -29,6 +29,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useOrdens } from '../../context/OrdensContext';
 import { useClientes } from '../../context/ClientesContext';
 import { useFinanceiro, CATEGORIAS_DESPESA } from '../../context/FinanceiroContext';
+import { useServicos } from '../../context/ServicosContext';
 import { buscarAlertasGlobais, buscarAlertasCacsVinculados } from '../../services/vencimentosService';
 import { formatarMoeda, formatarData, formatarCPF, formatarTelefone } from '../../utils/formatters';
 import { 
@@ -83,6 +84,7 @@ export function Relatorios() {
   const { ordens } = useOrdens();
   const { clientes } = useClientes();
   const { despesas } = useFinanceiro();
+  const { servicos: servicosCatalog } = useServicos();
 
   // Abas e Filtro de Período Geral
   const [activeTab, setActiveTab] = useState<TabType>('ordens');
@@ -120,6 +122,7 @@ export function Relatorios() {
     resumo: true,
     meiosPagamento: true,
     categoriasDespesa: true,
+    taxasPF: true,
     comissoes: true,
     extrato: true
   });
@@ -358,24 +361,49 @@ export function Relatorios() {
     // Recebimentos (Entradas)
     if (incluirEntradas) {
       ordens.forEach(o => {
-        o.historicoPagamentos?.forEach(p => {
-          if (!p.data) return;
-          const dataPag = parseISO(p.data);
-          if (safeIsWithinInterval(dataPag, intervalFiltro.start, intervalFiltro.end)) {
-            // Filtro por Forma de Pagamento (Se vazio, ignora o filtro)
-            if (filtroFormaPagamento.length === 0 || filtroFormaPagamento.includes(p.metodo)) {
+        const ehMigracao = o.migrado === true || o.observacoes?.includes('[MIGRAÇÃO]');
+        if (ehMigracao) return;
+
+        if (o.historicoPagamentos && o.historicoPagamentos.length > 0) {
+          o.historicoPagamentos.forEach(p => {
+            if (!p.data) return;
+            const dataPag = parseISO(p.data);
+            if (safeIsWithinInterval(dataPag, intervalFiltro.start, intervalFiltro.end)) {
+              // Filtro por Forma de Pagamento (Se vazio, ignora o filtro)
+              if (filtroFormaPagamento.length === 0 || filtroFormaPagamento.includes(p.metodo)) {
+                transacoes.push({
+                  id: `rec-${p.id}`,
+                  ordemId: o.id,
+                  ordemNumero: o.numero,
+                  data: p.data,
+                  tipo: 'entrada',
+                  categoria: p.metodo,
+                  descricao: `Recebimento OS-${String(o.numero).padStart(4, '0')}`,
+                  entidade: o.nomeCliente,
+                  valor: p.valor
+                });
+              }
+            }
+          });
+        } else if ((o.valorPago || 0) > 0 && o.criadoEm) {
+          const dataOS = parseISO(o.criadoEm);
+          if (safeIsWithinInterval(dataOS, intervalFiltro.start, intervalFiltro.end)) {
+            const metodo = o.formaPagamento || 'Outro';
+            if (filtroFormaPagamento.length === 0 || filtroFormaPagamento.includes(metodo)) {
               transacoes.push({
-                id: `rec-${p.id}`,
-                data: p.data,
+                id: `rec-os-${o.id}`,
+                ordemId: o.id,
+                ordemNumero: o.numero,
+                data: o.criadoEm,
                 tipo: 'entrada',
-                categoria: p.metodo,
+                categoria: metodo,
                 descricao: `Recebimento OS-${String(o.numero).padStart(4, '0')}`,
                 entidade: o.nomeCliente,
-                valor: p.valor
+                valor: o.valorPago
               });
             }
           }
-        });
+        }
       });
     }
 
@@ -405,7 +433,82 @@ export function Relatorios() {
     return transacoes.sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime());
   }, [ordens, despesas, intervalFiltro, incluirEntradas, incluirSaidas, filtroFormaPagamento, filtroCategoriaDespesa]);
 
-  // Estatísticas consolidadas com base nas transações ativas no extrato filtrado
+  // Mapa de taxas padrão por nome de serviço cadastrado
+  const catalogTaxaMap = useMemo(() => {
+    const map: Record<string, number> = {};
+    (servicosCatalog || []).forEach(sc => {
+      if (sc.nome && typeof sc.taxaPF === 'number') {
+        map[sc.nome.trim()] = sc.taxaPF;
+      }
+    });
+    return map;
+  }, [servicosCatalog]);
+
+  // Identificação das ordens únicas que geraram receita ou pagamento no período filtrado
+  const ordensPagasNoPeriodo = useMemo(() => {
+    const ids = new Set<string>();
+    const lista: typeof ordens = [];
+
+    // 1. Ordens que tiveram lançamentos de entrada no extrato filtrado do período
+    extratoTransacoes.forEach(t => {
+      if (t.tipo === 'entrada' && t.ordemId && !ids.has(t.ordemId)) {
+        const ord = ordens.find(o => o.id === t.ordemId);
+        if (ord) {
+          ids.add(ord.id);
+          lista.push(ord);
+        }
+      }
+    });
+
+    // 2. Ordens criadas no período com pagamento confirmado
+    ordens.forEach(o => {
+      const ehMigracao = o.migrado === true || o.observacoes?.includes('[MIGRAÇÃO]');
+      if (ehMigracao) return;
+      if (ids.has(o.id)) return;
+      if (!o.criadoEm) return;
+      const dataCriacao = parseISO(o.criadoEm);
+      if (safeIsWithinInterval(dataCriacao, intervalFiltro.start, intervalFiltro.end)) {
+        if ((o.status === 'Pago' || o.status === 'Parcialmente Pago') && (o.valorPago || 0) > 0) {
+          ids.add(o.id);
+          lista.push(o);
+        }
+      }
+    });
+
+    return lista;
+  }, [extratoTransacoes, ordens, intervalFiltro]);
+
+  // Detalhamento de Faturamento e Taxas PF por Tipo de Serviço no Período
+  const servicosBreakdown = useMemo(() => {
+    const map: Record<string, { nome: string; count: number; bruto: number; taxas: number; liquido: number }> = {};
+
+    ordensPagasNoPeriodo.forEach(o => {
+      const valorOS = (o.valor || 0) > 0 ? o.valor : 1;
+      const valorPagoOS = o.valorPago || 0;
+      const ehPago = o.status === 'Pago' || o.status === 'Parcialmente Pago';
+
+      (o.servicos || []).forEach(s => {
+        const nomeServ = s.nome?.trim() || 'Serviço Não Identificado';
+        if (!map[nomeServ]) {
+          map[nomeServ] = { nome: nomeServ, count: 0, bruto: 0, taxas: 0, liquido: 0 };
+        }
+
+        const servVal = (s.valor !== undefined && s.valor > 0) ? s.valor : (valorOS / (o.servicos.length || 1));
+        const brutoProp = valorOS > 0 ? (servVal / valorOS) * valorPagoOS : servVal;
+        const taxaProp = ehPago ? (Number(s.taxaPF) || catalogTaxaMap[s.nome?.trim() || ''] || 0) : 0;
+        const liquidoProp = brutoProp - taxaProp;
+
+        map[nomeServ].count += 1;
+        map[nomeServ].bruto += brutoProp;
+        map[nomeServ].taxas += taxaProp;
+        map[nomeServ].liquido += liquidoProp;
+      });
+    });
+
+    return Object.values(map).sort((a, b) => b.bruto - a.bruto);
+  }, [ordensPagasNoPeriodo, catalogTaxaMap]);
+
+  // Estatísticas consolidadas com base nas transações ativas no extrato filtrado e dedução de Taxas PF
   const faturamentoStats = useMemo(() => {
     let faturamentoBruto = 0;
     let totalDespesasVal = 0;
@@ -419,26 +522,45 @@ export function Relatorios() {
     // Calcular "A Receber" apenas das OSs do período filtrado
     ordens.forEach(o => {
       if (!o.criadoEm) return;
+      const ehMigracao = o.migrado === true || o.observacoes?.includes('[MIGRAÇÃO]');
+      if (ehMigracao) return;
       const dataCriacao = parseISO(o.criadoEm);
       if (safeIsWithinInterval(dataCriacao, intervalFiltro.start, intervalFiltro.end)) {
-        if (filtroStatusOS.includes(o.status) && o.status !== 'Pago' && o.status !== 'Gratuidade') {
+        if (o.status !== 'Pago' && o.status !== 'Gratuidade') {
           const restante = Math.max(0, (o.valor || 0) - (o.desconto || 0) - (o.valorPago || 0));
           aReceberVal += restante;
         }
       }
     });
 
-    const saldoLiquido = faturamentoBruto - totalDespesasVal;
+    // Dedução das Taxas PF (GRU Operacionais) das ordens pagas no período
+    let totalTaxasPF = 0;
+    if (incluirEntradas) {
+      ordensPagasNoPeriodo.forEach(o => {
+        let taxaOS = Number(o.taxaPFTotal) || 0;
+        const sumServ = (o.servicos || []).reduce((acc, s) => {
+          const t = Number(s.taxaPF) || catalogTaxaMap[s.nome?.trim() || ''] || 0;
+          return acc + t;
+        }, 0);
+        taxaOS = Math.max(taxaOS, sumServ);
+        totalTaxasPF += taxaOS;
+      });
+    }
+
+    const margemBruta = faturamentoBruto - totalTaxasPF;
+    const saldoLiquido = margemBruta - totalDespesasVal;
     const margemLucro = faturamentoBruto > 0 ? (saldoLiquido / faturamentoBruto) * 100 : 0;
 
     return {
       faturamentoBruto,
+      totalTaxasPF,
+      margemBruta,
       totalDespesas: totalDespesasVal,
       saldoLiquido,
       margemLucro,
       aReceber: aReceberVal
     };
-  }, [extratoTransacoes, ordens, intervalFiltro, filtroStatusOS]);
+  }, [extratoTransacoes, ordens, intervalFiltro, incluirEntradas, ordensPagasNoPeriodo, catalogTaxaMap]);
 
   // Agrupamento de receitas por meio de pagamento (dos filtros ativos)
   const receitasPorMetodo = useMemo(() => {
@@ -719,14 +841,26 @@ export function Relatorios() {
     } else if (activeTab === 'financeiro') {
       const resumoFin = [
         ['Métrica', 'Valor'],
-        ['Faturamento Bruto', faturamentoStats.faturamentoBruto],
-        ['Total Despesas', faturamentoStats.totalDespesas],
-        ['Saldo Líquido', faturamentoStats.saldoLiquido],
-        ['Margem de Lucro (%)', faturamentoStats.margemLucro.toFixed(2) + '%'],
-        ['A Receber (Previsão)', faturamentoStats.aReceber],
+        ['Faturamento Bruto (Entradas)', faturamentoStats.faturamentoBruto],
+        ['(-) Dedução Taxas PF (GRU Operacionais)', faturamentoStats.totalTaxasPF],
+        ['(=) Margem / Lucro Bruto Operacional', faturamentoStats.margemBruta],
+        ['(-) Total Despesas PJ (Saídas)', faturamentoStats.totalDespesas],
+        ['(=) Saldo Líquido Real', faturamentoStats.saldoLiquido],
+        ['Margem de Lucro Real (%)', faturamentoStats.margemLucro.toFixed(2) + '%'],
+        ['A Receber (Previsão Período)', faturamentoStats.aReceber],
       ];
       const wsRes = XLSX.utils.aoa_to_sheet(resumoFin);
       XLSX.utils.book_append_sheet(wb, wsRes, 'Resumo Financeiro');
+
+      const servicosDet = servicosBreakdown.map(s => ({
+        'Serviço Prestado': s.nome,
+        'Quantidade': s.count,
+        'Faturamento Bruto (R$)': s.bruto,
+        'Taxas PF / GRU (R$)': s.taxas,
+        'Faturamento Líquido Real (R$)': s.liquido
+      }));
+      const wsServ = XLSX.utils.json_to_sheet(servicosDet);
+      XLSX.utils.book_append_sheet(wb, wsServ, 'Taxas PF e Serviços');
 
       const extratoDet = extratoTransacoes.map(t => ({
         'Data': format(parseISO(t.data), 'dd/MM/yyyy'),
@@ -922,6 +1056,9 @@ export function Relatorios() {
             grid-template-columns: repeat(4, 1fr) !important;
             gap: 8px !important;
             margin-bottom: 12px !important;
+          }
+          .print-cards-grid-6 {
+            grid-template-columns: repeat(6, 1fr) !important;
           }
           .print-card {
             border: 1px solid #9ca3af !important;
@@ -1394,6 +1531,7 @@ export function Relatorios() {
                         {chave === 'resumo' ? 'Resumos rápidos' :
                          chave === 'meiosPagamento' ? 'Meios de Recebimento' :
                          chave === 'categoriasDespesa' ? 'Categorias de Despesa' :
+                         chave === 'taxasPF' ? 'Taxas PF (GRU) e Serviços' :
                          chave === 'comissoes' ? 'Comissões de Equipe' : 'Extrato de Caixa'}
                       </span>
                     </label>
@@ -1821,10 +1959,10 @@ export function Relatorios() {
             
             {/* Resumo */}
             {secoesFinanceiro.resumo && (
-              <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 print-cards-grid">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4 print-cards-grid print-cards-grid-6">
                 <div className="card bg-brand-dark-3 border-brand-dark-5 print-card">
                   <p className="text-gray-500 text-[10px] font-black uppercase tracking-wider">Faturamento Bruto</p>
-                  <h3 className="text-xl font-black text-brand-green mt-1">{formatarMoeda(faturamentoStats.faturamentoBruto)}</h3>
+                  <h3 className="text-lg sm:text-xl font-black text-brand-green mt-1">{formatarMoeda(faturamentoStats.faturamentoBruto)}</h3>
                   <div className="flex items-center gap-1 mt-2 text-[9px] text-gray-500 print:hidden">
                     <ArrowUpCircle size={10} className="text-brand-green" />
                     <span>Entradas filtradas</span>
@@ -1832,8 +1970,17 @@ export function Relatorios() {
                 </div>
 
                 <div className="card bg-brand-dark-3 border-brand-dark-5 print-card">
+                  <p className="text-gray-500 text-[10px] font-black uppercase tracking-wider">Taxas PF (GRU)</p>
+                  <h3 className="text-lg sm:text-xl font-black text-amber-400 mt-1">-{formatarMoeda(faturamentoStats.totalTaxasPF)}</h3>
+                  <div className="flex items-center gap-1 mt-2 text-[9px] text-gray-500 print:hidden">
+                    <ArrowDownCircle size={10} className="text-amber-400" />
+                    <span>Dedução operacional</span>
+                  </div>
+                </div>
+
+                <div className="card bg-brand-dark-3 border-brand-dark-5 print-card">
                   <p className="text-gray-500 text-[10px] font-black uppercase tracking-wider">Total de Despesas</p>
-                  <h3 className="text-xl font-black text-red-400 mt-1">{formatarMoeda(faturamentoStats.totalDespesas)}</h3>
+                  <h3 className="text-lg sm:text-xl font-black text-red-400 mt-1">-{formatarMoeda(faturamentoStats.totalDespesas)}</h3>
                   <div className="flex items-center gap-1 mt-2 text-[9px] text-gray-500 print:hidden">
                     <ArrowDownCircle size={10} className="text-red-400" />
                     <span>Saídas filtradas</span>
@@ -1841,28 +1988,28 @@ export function Relatorios() {
                 </div>
 
                 <div className="card bg-brand-dark-3 border-brand-dark-5 print-card">
-                  <p className="text-gray-500 text-[10px] font-black uppercase tracking-wider">Saldo Líquido</p>
-                  <h3 className={`text-xl font-black mt-1 ${faturamentoStats.saldoLiquido >= 0 ? 'text-brand-blue-light' : 'text-red-400'}`}>
+                  <p className="text-gray-500 text-[10px] font-black uppercase tracking-wider">Saldo Líquido Real</p>
+                  <h3 className={`text-lg sm:text-xl font-black mt-1 ${faturamentoStats.saldoLiquido >= 0 ? 'text-brand-blue-light' : 'text-red-400'}`}>
                     {formatarMoeda(faturamentoStats.saldoLiquido)}
                   </h3>
                   <div className="flex items-center gap-1 mt-2 text-[9px] text-gray-500 print:hidden">
                     <DollarSign size={10} className="text-brand-blue-light" />
-                    <span>Líquido filtrado</span>
+                    <span>Líquido pós taxas</span>
                   </div>
                 </div>
 
                 <div className="card bg-brand-dark-3 border-brand-dark-5 print-card">
                   <p className="text-gray-500 text-[10px] font-black uppercase tracking-wider">Margem de Lucro</p>
-                  <h3 className="text-xl font-black text-purple-400 mt-1">{faturamentoStats.margemLucro.toFixed(1)}%</h3>
+                  <h3 className="text-lg sm:text-xl font-black text-purple-400 mt-1">{faturamentoStats.margemLucro.toFixed(1)}%</h3>
                   <div className="flex items-center gap-1 mt-2 text-[9px] text-gray-500 print:hidden">
                     <Percent size={10} className="text-purple-400" />
-                    <span>Rentabilidade</span>
+                    <span>Rentabilidade Real</span>
                   </div>
                 </div>
 
                 <div className="card bg-brand-dark-3 border-brand-dark-5 print-card">
                   <p className="text-gray-500 text-[10px] font-black uppercase tracking-wider">A Receber (Período)</p>
-                  <h3 className="text-xl font-black text-yellow-500 mt-1">{formatarMoeda(faturamentoStats.aReceber)}</h3>
+                  <h3 className="text-lg sm:text-xl font-black text-yellow-500 mt-1">{formatarMoeda(faturamentoStats.aReceber)}</h3>
                   <div className="flex items-center gap-1 mt-2 text-[9px] text-gray-500 print:hidden">
                     <Clock size={10} className="text-yellow-500" />
                     <span>OS do período</span>
@@ -1919,6 +2066,75 @@ export function Relatorios() {
               )}
 
             </div>
+
+            {/* Detalhamento de Taxas PF (GRU) e Faturamento por Serviço */}
+            {secoesFinanceiro.taxasPF && (
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-sm font-bold text-white uppercase tracking-wider print-section-title">
+                    Detalhamento de Taxas PF (GRU) e Faturamento por Serviço
+                  </h3>
+                  <span className="text-[10px] font-bold text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded border border-amber-400/20 print:hidden">
+                    Total Taxas PF: -{formatarMoeda(faturamentoStats.totalTaxasPF)}
+                  </span>
+                </div>
+                <div className="overflow-x-auto rounded-xl border border-brand-dark-5 bg-brand-dark-3 print:border-gray-300 print:bg-white">
+                  <table className="min-w-full divide-y divide-brand-dark-5 print:divide-gray-300">
+                    <thead className="bg-brand-dark-4 print:bg-gray-100">
+                      <tr>
+                        <th className="px-4 py-3 text-[10px] font-bold uppercase text-gray-400">Serviço Prestado</th>
+                        <th className="px-4 py-3 text-[10px] font-bold uppercase text-gray-400 text-center">Quant. Executada</th>
+                        <th className="px-4 py-3 text-[10px] font-bold uppercase text-gray-400 text-right">Faturamento Bruto</th>
+                        <th className="px-4 py-3 text-[10px] font-bold uppercase text-gray-400 text-right">Dedução Taxas PF (GRU)</th>
+                        <th className="px-4 py-3 text-[10px] font-bold uppercase text-gray-400 text-right">Líquido Real</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-brand-dark-5 bg-transparent print:divide-gray-200">
+                      {servicosBreakdown.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} className="px-4 py-6 text-center text-xs text-gray-500">
+                            Nenhum serviço registrado com recebimento para o período filtrado.
+                          </td>
+                        </tr>
+                      ) : (
+                        servicosBreakdown.map((s) => (
+                          <tr key={s.nome} className="hover:bg-white/[0.01]">
+                            <td className="px-4 py-2.5 text-xs font-bold text-white print:text-black">{s.nome}</td>
+                            <td className="px-4 py-2.5 text-xs text-gray-300 text-center print:text-black">{s.count}</td>
+                            <td className="px-4 py-2.5 text-xs font-bold text-brand-green text-right print:text-black">{formatarMoeda(s.bruto)}</td>
+                            <td className="px-4 py-2.5 text-xs font-bold text-amber-400 text-right print:text-black">
+                              {s.taxas > 0 ? `-${formatarMoeda(s.taxas)}` : 'R$ 0,00'}
+                            </td>
+                            <td className={`px-4 py-2.5 text-xs font-black text-right print:text-black ${s.liquido >= 0 ? 'text-brand-blue-light' : 'text-red-400'}`}>
+                              {formatarMoeda(s.liquido)}
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                    {servicosBreakdown.length > 0 && (
+                      <tfoot className="bg-brand-dark-4/70 font-black text-xs border-t-2 border-brand-dark-5 print:bg-gray-100 print:border-gray-400">
+                        <tr>
+                          <td className="px-4 py-2.5 text-white uppercase print:text-black">Total Consolidado</td>
+                          <td className="px-4 py-2.5 text-center text-gray-300 print:text-black">
+                            {servicosBreakdown.reduce((sum, s) => sum + s.count, 0)}
+                          </td>
+                          <td className="px-4 py-2.5 text-right text-brand-green print:text-black">
+                            {formatarMoeda(servicosBreakdown.reduce((sum, s) => sum + s.bruto, 0))}
+                          </td>
+                          <td className="px-4 py-2.5 text-right text-amber-400 print:text-black">
+                            -{formatarMoeda(servicosBreakdown.reduce((sum, s) => sum + s.taxas, 0))}
+                          </td>
+                          <td className="px-4 py-2.5 text-right text-brand-blue-light print:text-black">
+                            {formatarMoeda(servicosBreakdown.reduce((sum, s) => sum + s.liquido, 0))}
+                          </td>
+                        </tr>
+                      </tfoot>
+                    )}
+                  </table>
+                </div>
+              </div>
+            )}
 
             {/* Repasses e Comissões */}
             {secoesFinanceiro.comissoes && (
