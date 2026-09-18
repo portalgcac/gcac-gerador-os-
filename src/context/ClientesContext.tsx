@@ -1,9 +1,10 @@
 import React, { createContext, useContext, useCallback, useState, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { Cliente, Arma, GuiaTrafego, AutorizacaoManejo, CreditoCliente, ModeloDeclaracao, OpcaoArma } from '../types';
+import { Cliente, Arma, GuiaTrafego, AutorizacaoManejo, CreditoCliente, ModeloDeclaracao, OpcaoArma, ItemCatalogoArma } from '../types';
 import { supabase } from '../db/supabase';
 import { uploadBase64File } from '../utils/fileUtils';
 import { normalizarCalibre, normalizarModelo, normalizarFabricante } from '../utils/formatters';
+import { CATALOGO_BASE_ARMAS, normalizarTipoArma } from '../data/catalogoArmas';
 
 import { useAuth } from './AuthContext';
 
@@ -49,6 +50,14 @@ interface ClientesContextType {
   modelosRegistrados: string[];
   calibresRegistrados: string[];
   fabricantesRegistrados: string[];
+
+  // Inteligência de Armas e Seleção em Cascata (Self-Learning)
+  catalogoArmas: ItemCatalogoArma[];
+  obterTiposDeArma: () => string[];
+  obterFabricantesPorTipo: (tipo?: string) => string[];
+  obterModelosPorTipoEFabricante: (tipo?: string, fabricante?: string) => string[];
+  obterCalibreSugerido: (tipo?: string, fabricante?: string, modelo?: string) => string | undefined;
+  aprenderItemArma: (tipo: string, fabricante: string, modelo: string, calibre?: string) => Promise<void>;
   
   // Opções Cadastradas (Modo Trancado)
   opcoesArmas: OpcaoArma[];
@@ -181,12 +190,13 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
   const [modelosRegistrados, setModelosRegistrados] = useState<string[]>([]);
   const [calibresRegistrados, setCalibresRegistrados] = useState<string[]>([]);
   const [fabricantesRegistrados, setFabricantesRegistrados] = useState<string[]>([]);
+  const [catalogoArmas, setCatalogoArmas] = useState<ItemCatalogoArma[]>(CATALOGO_BASE_ARMAS);
 
   const carregarMetadadosArmas = useCallback(async () => {
     if (!usuario?.empresaId) return;
     const { data, error } = await supabase
       .from('armas')
-      .select('modelo, calibre, fabricante')
+      .select('tipo, modelo, calibre, fabricante')
       .eq('empresa_id', usuario.empresaId);
 
     if (error) {
@@ -194,29 +204,172 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
+    const mapaCatalogo = new Map<string, ItemCatalogoArma>();
+    // 1. Carregar catálogo mestre de fábrica
+    CATALOGO_BASE_ARMAS.forEach(item => {
+      const chave = `${normalizarTipoArma(item.tipo)}||${normalizarFabricante(item.fabricante)}||${normalizarModelo(item.modelo)}`;
+      mapaCatalogo.set(chave, {
+        tipo: normalizarTipoArma(item.tipo),
+        fabricante: normalizarFabricante(item.fabricante),
+        modelo: normalizarModelo(item.modelo),
+        calibrePadrao: item.calibrePadrao ? normalizarCalibre(item.calibrePadrao) : undefined
+      });
+    });
+
     if (data) {
       const modelos = new Set<string>();
       const calibres = new Set<string>();
       const fabricantes = new Set<string>();
 
       data.forEach(arma => {
-        if (arma.modelo && arma.modelo.trim() !== '') {
-          const mod = normalizarModelo(arma.modelo);
-          if (mod) modelos.add(mod);
-        }
-        if (arma.calibre && arma.calibre.trim() !== '') {
-          const cal = normalizarCalibre(arma.calibre);
-          if (cal) calibres.add(cal);
-        }
-        if (arma.fabricante && arma.fabricante.trim() !== '') {
-          const fab = normalizarFabricante(arma.fabricante);
-          if (fab) fabricantes.add(fab);
+        const mod = normalizarModelo(arma.modelo);
+        const cal = normalizarCalibre(arma.calibre);
+        const fab = normalizarFabricante(arma.fabricante);
+        const tip = normalizarTipoArma(arma.tipo) || 'PISTOLA';
+
+        if (mod) modelos.add(mod);
+        if (cal) calibres.add(cal);
+        if (fab) fabricantes.add(fab);
+
+        // 2. Aprender cada combinação já registrada no acervo de clientes
+        if (mod && fab) {
+          const chave = `${tip}||${fab}||${mod}`;
+          if (!mapaCatalogo.has(chave)) {
+            mapaCatalogo.set(chave, {
+              tipo: tip,
+              fabricante: fab,
+              modelo: mod,
+              calibrePadrao: cal || undefined
+            });
+          }
         }
       });
 
       setModelosRegistrados(Array.from(modelos).sort());
       setCalibresRegistrados(Array.from(calibres).sort());
       setFabricantesRegistrados(Array.from(fabricantes).sort());
+    }
+
+    setCatalogoArmas(Array.from(mapaCatalogo.values()));
+  }, [usuario]);
+
+  const obterTiposDeArma = useCallback((): string[] => {
+    const tipos = new Set<string>(['PISTOLA', 'REVÓLVER', 'CARABINA / FUZIL', 'ESPINGARDA']);
+    catalogoArmas.forEach(item => {
+      if (item.tipo) tipos.add(normalizarTipoArma(item.tipo));
+    });
+    return Array.from(tipos).filter(Boolean).sort();
+  }, [catalogoArmas]);
+
+  const obterFabricantesPorTipo = useCallback((tipo?: string): string[] => {
+    const fabricantes = new Set<string>();
+    const tipoNorm = normalizarTipoArma(tipo);
+
+    catalogoArmas.forEach(item => {
+      if (!tipoNorm || normalizarTipoArma(item.tipo) === tipoNorm) {
+        if (item.fabricante) fabricantes.add(normalizarFabricante(item.fabricante));
+      }
+    });
+
+    if (fabricantes.size === 0) {
+      FABRICANTES_BASE.forEach(f => fabricantes.add(f));
+      fabricantesRegistrados.forEach(f => fabricantes.add(f));
+    }
+
+    return Array.from(fabricantes).filter(Boolean).sort();
+  }, [catalogoArmas, fabricantesRegistrados]);
+
+  const obterModelosPorTipoEFabricante = useCallback((tipo?: string, fabricante?: string): string[] => {
+    const modelos = new Set<string>();
+    const tipoNorm = normalizarTipoArma(tipo);
+    const fabNorm = normalizarFabricante(fabricante);
+
+    catalogoArmas.forEach(item => {
+      const matchTipo = !tipoNorm || normalizarTipoArma(item.tipo) === tipoNorm;
+      const matchFab = !fabNorm || normalizarFabricante(item.fabricante) === fabNorm;
+      if (matchTipo && matchFab && item.modelo) {
+        modelos.add(normalizarModelo(item.modelo));
+      }
+    });
+
+    if (modelos.size === 0 && !fabNorm && !tipoNorm) {
+      modelosRegistrados.forEach(m => modelos.add(m));
+    }
+
+    return Array.from(modelos).filter(Boolean).sort();
+  }, [catalogoArmas, modelosRegistrados]);
+
+  const obterCalibreSugerido = useCallback((tipo?: string, fabricante?: string, modelo?: string): string | undefined => {
+    if (!modelo) return undefined;
+    const modNorm = normalizarModelo(modelo);
+    const fabNorm = normalizarFabricante(fabricante);
+    const tipoNorm = normalizarTipoArma(tipo);
+
+    const exato = catalogoArmas.find(item => 
+      normalizarModelo(item.modelo) === modNorm &&
+      (!fabNorm || normalizarFabricante(item.fabricante) === fabNorm) &&
+      (!tipoNorm || normalizarTipoArma(item.tipo) === tipoNorm) &&
+      item.calibrePadrao
+    );
+    if (exato?.calibrePadrao) return normalizarCalibre(exato.calibrePadrao);
+
+    const porModelo = catalogoArmas.find(item => normalizarModelo(item.modelo) === modNorm && item.calibrePadrao);
+    if (porModelo?.calibrePadrao) return normalizarCalibre(porModelo.calibrePadrao);
+
+    return undefined;
+  }, [catalogoArmas]);
+
+  const aprenderItemArma = useCallback(async (tipo: string, fabricante: string, modelo: string, calibre?: string) => {
+    if (!modelo || !fabricante) return;
+    const tipNorm = normalizarTipoArma(tipo) || 'PISTOLA';
+    const fabNorm = normalizarFabricante(fabricante);
+    const modNorm = normalizarModelo(modelo);
+    const calNorm = calibre ? normalizarCalibre(calibre) : undefined;
+
+    // Atualiza catálogo em memória imediatamente
+    setCatalogoArmas(prev => {
+      const existe = prev.some(i => 
+        normalizarTipoArma(i.tipo) === tipNorm &&
+        normalizarFabricante(i.fabricante) === fabNorm &&
+        normalizarModelo(i.modelo) === modNorm
+      );
+      if (existe) return prev;
+      return [...prev, {
+        tipo: tipNorm,
+        fabricante: fabNorm,
+        modelo: modNorm,
+        calibrePadrao: calNorm
+      }];
+    });
+
+    // Se a empresa estiver conectada, registra também nas opções da empresa
+    if (usuario?.empresaId) {
+      try {
+        const { error: insModErr } = await supabase.from('opcoes_armas').insert([{
+          empresa_id: usuario.empresaId,
+          tipo: 'modelo',
+          nome: modNorm
+        }]);
+        if (insModErr && insModErr.code !== '23505') console.warn('Erro aprendendo modelo:', insModErr.message);
+
+        const { error: insFabErr } = await supabase.from('opcoes_armas').insert([{
+          empresa_id: usuario.empresaId,
+          tipo: 'fabricante',
+          nome: fabNorm
+        }]);
+        if (insFabErr && insFabErr.code !== '23505') console.warn('Erro aprendendo fabricante:', insFabErr.message);
+
+        if (calNorm) {
+          const { error: insCalErr } = await supabase.from('opcoes_armas').insert([{
+            empresa_id: usuario.empresaId,
+            tipo: 'calibre',
+            nome: calNorm
+          }]);
+          if (insCalErr && insCalErr.code !== '23505') console.warn('Erro aprendendo calibre:', insCalErr.message);
+        }
+      } catch (e) {
+        console.error('Aprendizado silencioso opcoes_armas:', e);
+      }
     }
   }, [usuario]);
 
@@ -741,8 +894,17 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
       .upsert({ id: armaId, ...payload });
     if (error) throw error;
     
+    if (dados.modelo && dados.fabricante) {
+      await aprenderItemArma(
+        dados.tipo || '',
+        dados.fabricante,
+        dados.modelo,
+        dados.calibre || undefined
+      );
+    }
+
     await carregarMetadadosArmas();
-  }, [carregarMetadadosArmas, usuario]);
+  }, [carregarMetadadosArmas, aprenderItemArma, usuario]);
 
   const deletarArma = useCallback(async (id: string, overrideEmpresaId?: string) => {
     const { error } = await supabase.from('armas').delete().eq('id', id);
@@ -1077,6 +1239,12 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
       modelosRegistrados,
       calibresRegistrados,
       fabricantesRegistrados,
+      catalogoArmas,
+      obterTiposDeArma,
+      obterFabricantesPorTipo,
+      obterModelosPorTipoEFabricante,
+      obterCalibreSugerido,
+      aprenderItemArma,
       opcoesArmas,
       carregandoOpcoes,
       inicializarOpcoesArmasPadrao,

@@ -14,6 +14,7 @@ import { fileToBase64, visualizarDocumentoBase64 } from '../../utils/fileUtils';
 import { useAuth } from '../../context/AuthContext';
 import { buscarAcervoVinculado } from '../../services/vinculosService';
 import { ModalUploadCelular } from '../common/ModalUploadCelular';
+import { normalizarTipoArma } from '../../data/catalogoArmas';
 
 const TIPOS_ARMA = ['Pistola', 'Revólver', 'Carabina / Fuzil', 'Espingarda'];
 
@@ -1033,13 +1034,21 @@ function EmptyState({ msg }: { msg: string }) {
 // --- Formulários Internos (Modais) ---
 
 export function ModalArma({ armaParaEditar, onFechar, onSalvar }: { armaParaEditar?: Arma, onFechar: () => void, onSalvar: (d: any) => void }) {
-  const { opcoesArmas } = useClientes();
+  const { 
+    opcoesArmas,
+    calibresRegistrados,
+    obterTiposDeArma,
+    obterFabricantesPorTipo,
+    obterModelosPorTipoEFabricante,
+    obterCalibreSugerido
+  } = useClientes();
+
   const [form, setForm] = useState({
     id: armaParaEditar?.id,
-    tipo: armaParaEditar?.tipo || '', 
-    modelo: armaParaEditar?.modelo || '', 
-    calibre: armaParaEditar?.calibre || '', 
-    fabricante: armaParaEditar?.fabricante || '', 
+    tipo: armaParaEditar?.tipo ? normalizarTipoArma(armaParaEditar.tipo) : 'PISTOLA', 
+    fabricante: armaParaEditar?.fabricante ? normalizarFabricante(armaParaEditar.fabricante) : '', 
+    modelo: armaParaEditar?.modelo ? normalizarModelo(armaParaEditar.modelo) : '', 
+    calibre: armaParaEditar?.calibre ? normalizarCalibre(armaParaEditar.calibre) : '', 
     numeroSerie: armaParaEditar?.numeroSerie || '', 
     numeroSigma: armaParaEditar?.numeroSigma || '', 
     acervo: (armaParaEditar?.acervo || 'Tiro Desportivo') as any, 
@@ -1047,84 +1056,267 @@ export function ModalArma({ armaParaEditar, onFechar, onSalvar }: { armaParaEdit
     crafUrl: armaParaEditar?.crafUrl || '',
     crafEmRenovacao: armaParaEditar?.crafEmRenovacao ?? false
   });
+
   const [cameraModalAberto, setCameraModalAberto] = useState(false);
+  const [modoManualModelo, setModoManualModelo] = useState(false);
+  const [modoManualFabricante, setModoManualFabricante] = useState(false);
+  const [calibreAutoSugerido, setCalibreAutoSugerido] = useState<string | null>(null);
 
-  const modelosConfigurados = opcoesArmas.filter(o => o.tipo === 'modelo').map(o => o.nome);
+  // Tipos disponíveis (Base + Aprendidos)
+  const tiposDisponiveis = obterTiposDeArma();
+
+  // Fabricantes disponíveis filtrados pelo tipo selecionado
+  const fabricantesFiltrados = obterFabricantesPorTipo(form.tipo);
+
+  // Modelos disponíveis filtrados por tipo e fabricante
+  const modelosFiltrados = obterModelosPorTipoEFabricante(form.tipo, form.fabricante);
+
+  // Lista de calibres combinados (Configurados + Registrados + Padrões)
   const calibresConfigurados = opcoesArmas.filter(o => o.tipo === 'calibre').map(o => o.nome);
-  const fabricantesConfigurados = opcoesArmas.filter(o => o.tipo === 'fabricante').map(o => o.nome);
-
-  const modelosCombinados = Array.from(
-    new Set([
-      ...modelosConfigurados,
-      ...(form.modelo ? [normalizarModelo(form.modelo)] : [])
-    ])
-  ).filter(Boolean).sort() as string[];
-
   const calibresCombinados = Array.from(
     new Set([
+      ...(calibreAutoSugerido ? [calibreAutoSugerido] : []),
       ...calibresConfigurados,
-      ...(form.calibre ? [normalizarCalibre(form.calibre)] : [])
+      ...calibresRegistrados,
+      '.22 LR', '.22 WMR', '.223 REM / 5.56 NATO', '.308 WIN / 7.62 NATO',
+      '.357 MAG', '.38 SPL', '.380 ACP', '9mm LUGER', '.40 S&W', '.44 MAG',
+      '.45 ACP', '12 GA', '20 GA', '28 GA', '36 GA'
     ])
-  ).filter(Boolean).sort() as string[];
+  ).map(normalizarCalibre).filter(Boolean) as string[];
 
-  const fabricantesCombinados = Array.from(
-    new Set([
-      ...fabricantesConfigurados,
-      ...(form.fabricante ? [normalizarFabricante(form.fabricante)] : [])
-    ])
-  ).filter(Boolean).sort() as string[];
+  // Mudança do tipo de arma (Cascata)
+  const handleTipoChange = (novoTipo: string) => {
+    const tipoNorm = normalizarTipoArma(novoTipo);
+    setForm(prev => {
+      const novosModelos = obterModelosPorTipoEFabricante(tipoNorm, prev.fabricante);
+      const modeloAindaValido = novosModelos.includes(prev.modelo);
+      return {
+        ...prev,
+        tipo: tipoNorm,
+        modelo: modeloAindaValido ? prev.modelo : ''
+      };
+    });
+  };
+
+  // Mudança do fabricante (Cascata)
+  const handleFabricanteChange = (novoFab: string) => {
+    if (novoFab === '__NOVO__') {
+      setModoManualFabricante(true);
+      return;
+    }
+    const fabNorm = normalizarFabricante(novoFab);
+    setForm(prev => {
+      const novosModelos = obterModelosPorTipoEFabricante(prev.tipo, fabNorm);
+      const modeloAindaValido = novosModelos.includes(prev.modelo);
+      const novoModelo = modeloAindaValido ? prev.modelo : '';
+      const calSug = novoModelo ? obterCalibreSugerido(prev.tipo, fabNorm, novoModelo) : undefined;
+      if (calSug) setCalibreAutoSugerido(calSug);
+      return {
+        ...prev,
+        fabricante: fabNorm,
+        modelo: novoModelo,
+        calibre: calSug ? calSug : prev.calibre
+      };
+    });
+  };
+
+  // Mudança do modelo (Preenchimento inteligente de calibre)
+  const handleModeloChange = (novoModelo: string) => {
+    if (novoModelo === '__NOVO__') {
+      setModoManualModelo(true);
+      return;
+    }
+    const modNorm = normalizarModelo(novoModelo);
+    const calSug = obterCalibreSugerido(form.tipo, form.fabricante, modNorm);
+    if (calSug) {
+      setCalibreAutoSugerido(calSug);
+      setForm(prev => ({
+        ...prev,
+        modelo: modNorm,
+        calibre: calSug
+      }));
+    } else {
+      setCalibreAutoSugerido(null);
+      setForm(prev => ({
+        ...prev,
+        modelo: modNorm
+      }));
+    }
+  };
+
+  const handleSalvar = () => {
+    const formatado = {
+      ...form,
+      tipo: normalizarTipoArma(form.tipo),
+      fabricante: normalizarFabricante(form.fabricante),
+      modelo: normalizarModelo(form.modelo),
+      calibre: normalizarCalibre(form.calibre),
+      numeroSerie: form.numeroSerie?.trim().toUpperCase(),
+      numeroSigma: form.numeroSigma?.trim().toUpperCase()
+    };
+    onSalvar(formatado);
+  };
 
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
       <div className="card w-full max-w-md max-h-[90vh] flex flex-col animate-scale-up" onClick={e => e.stopPropagation()}>
-        <h3 className="text-lg font-bold text-white mb-6">
-          {armaParaEditar ? 'Editar Arma' : 'Cadastrar Nova Arma'}
-        </h3>
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="text-lg font-bold text-white">
+              {armaParaEditar ? 'Editar Arma' : 'Cadastrar Nova Arma'}
+            </h3>
+            <p className="text-[11px] text-gray-400">
+              Seleção inteligente em cascata com aprendizado automático.
+            </p>
+          </div>
+          <button 
+            type="button" 
+            onClick={onFechar} 
+            className="text-gray-400 hover:text-white p-1 rounded-lg hover:bg-brand-dark-4"
+          >
+            ✕
+          </button>
+        </div>
         
         <div className="flex-1 overflow-y-auto pr-1 space-y-4 scrollbar-thin scrollbar-thumb-slate-800">
-          <div>
-            <label className="label">Tipo de Arma</label>
-            <select
-              className="input uppercase font-bold" 
-              value={form.tipo} 
-              onChange={e => setForm({...form, tipo: e.target.value})}
-            >
-              <option value="" disabled>SELECIONE...</option>
-              {TIPOS_ARMA.map(t => (
-                <option key={t} value={t} className="bg-brand-dark-4 text-white">
-                  {t.toUpperCase()}
-                </option>
-              ))}
-              {form.tipo && !TIPOS_ARMA.includes(form.tipo) && (
-                <option value={form.tipo} className="bg-brand-dark-4 text-white">
-                  {form.tipo.toUpperCase()}
-                </option>
-              )}
-            </select>
-          </div>
-
+          {/* Linha 1: Tipo de Arma e Fabricante / Marca */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="label">Modelo</label>
-              <select 
-                className="input uppercase font-bold" 
-                value={form.modelo} 
-                onChange={e => setForm({...form, modelo: e.target.value})}
+              <label className="label text-xs">1. Tipo de Arma</label>
+              <select
+                className="input uppercase font-bold text-xs" 
+                value={form.tipo} 
+                onChange={e => handleTipoChange(e.target.value)}
               >
-                <option value="" disabled>SELECIONE...</option>
-                {modelosCombinados.map(m => (
-                  <option key={m} value={m} className="bg-brand-dark-4 text-white">
-                    {m.toUpperCase()}
+                <option value="" disabled>SELECIONE O TIPO...</option>
+                {tiposDisponiveis.map(t => (
+                  <option key={t} value={t} className="bg-brand-dark-4 text-white">
+                    {t.toUpperCase()}
                   </option>
                 ))}
               </select>
             </div>
+
             <div>
-              <label className="label">Calibre</label>
+              <div className="flex justify-between items-center mb-1">
+                <label className="label text-xs m-0">2. Marca / Fabricante</label>
+                {modoManualFabricante && (
+                  <button 
+                    type="button" 
+                    onClick={() => setModoManualFabricante(false)}
+                    className="text-[10px] text-brand-blue hover:underline"
+                  >
+                    Ver Lista
+                  </button>
+                )}
+              </div>
+              {modoManualFabricante ? (
+                <input 
+                  type="text" 
+                  className="input uppercase font-bold text-xs"
+                  placeholder="Ex: CANIK, CZ..."
+                  value={form.fabricante}
+                  onChange={e => setForm({ ...form, fabricante: normalizarFabricante(e.target.value) })}
+                  autoFocus
+                />
+              ) : (
+                <select 
+                  className="input uppercase font-bold text-xs" 
+                  value={form.fabricante} 
+                  onChange={e => handleFabricanteChange(e.target.value)}
+                >
+                  <option value="">SELECIONE A MARCA...</option>
+                  {fabricantesFiltrados.map(f => (
+                    <option key={f} value={f} className="bg-brand-dark-4 text-white">
+                      {f.toUpperCase()}
+                    </option>
+                  ))}
+                  {form.fabricante && !fabricantesFiltrados.includes(form.fabricante) && (
+                    <option key={form.fabricante} value={form.fabricante} className="bg-brand-dark-4 text-white">
+                      {form.fabricante.toUpperCase()}
+                    </option>
+                  )}
+                  <option value="__NOVO__" className="bg-brand-blue/20 text-brand-blue-light font-bold">
+                    + OUTRA MARCA (DIGITAR)...
+                  </option>
+                </select>
+              )}
+            </div>
+          </div>
+
+          {/* Linha 2: Modelo e Calibre */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <div className="flex justify-between items-center mb-1">
+                <label className="label text-xs m-0 flex items-center gap-1">
+                  <span>3. Modelo</span>
+                  {modelosFiltrados.length > 0 && !modoManualModelo && (
+                    <span className="text-[10px] text-gray-500 font-normal">
+                      ({modelosFiltrados.length})
+                    </span>
+                  )}
+                </label>
+                {modoManualModelo && (
+                  <button 
+                    type="button" 
+                    onClick={() => setModoManualModelo(false)}
+                    className="text-[10px] text-brand-blue hover:underline"
+                  >
+                    Ver Lista
+                  </button>
+                )}
+              </div>
+              {modoManualModelo ? (
+                <input 
+                  type="text" 
+                  className="input uppercase font-bold text-xs"
+                  placeholder="Digite o modelo (ex: METE MC9)"
+                  value={form.modelo}
+                  onChange={e => setForm({ ...form, modelo: normalizarModelo(e.target.value) })}
+                  autoFocus
+                />
+              ) : (
+                <select 
+                  className="input uppercase font-bold text-xs" 
+                  value={form.modelo} 
+                  onChange={e => handleModeloChange(e.target.value)}
+                >
+                  <option value="">
+                    {form.fabricante ? 'SELECIONE O MODELO...' : 'ESCOLHA A MARCA PRIMEIRO'}
+                  </option>
+                  {modelosFiltrados.map(m => (
+                    <option key={m} value={m} className="bg-brand-dark-4 text-white">
+                      {m.toUpperCase()}
+                    </option>
+                  ))}
+                  {form.modelo && !modelosFiltrados.includes(form.modelo) && (
+                    <option value={form.modelo} className="bg-brand-dark-4 text-white">
+                      {form.modelo.toUpperCase()}
+                    </option>
+                  )}
+                  <option value="__NOVO__" className="bg-brand-blue/20 text-brand-blue-light font-bold">
+                    + NOVO MODELO (DIGITAR E APRENDER)...
+                  </option>
+                </select>
+              )}
+            </div>
+
+            <div>
+              <div className="flex justify-between items-center mb-1">
+                <label className="label text-xs m-0">4. Calibre</label>
+                {calibreAutoSugerido && (
+                  <span className="text-[9px] text-emerald-400 font-semibold flex items-center gap-0.5 animate-fade-in">
+                    ✓ Sugerido
+                  </span>
+                )}
+              </div>
               <select 
-                className="input uppercase font-bold" 
+                className={`input uppercase font-bold text-xs ${calibreAutoSugerido ? 'border-emerald-500/50 bg-emerald-500/5' : ''}`} 
                 value={form.calibre} 
-                onChange={e => setForm({...form, calibre: e.target.value})}
+                onChange={e => {
+                  setForm({...form, calibre: e.target.value});
+                  setCalibreAutoSugerido(null);
+                }}
               >
                 <option value="" disabled>SELECIONE...</option>
                 {calibresCombinados.map(c => (
@@ -1135,67 +1327,80 @@ export function ModalArma({ armaParaEditar, onFechar, onSalvar }: { armaParaEdit
               </select>
             </div>
           </div>
+
+          {/* Linha 3: Nº de Série e Nº SIGMA */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="label">Fabricante</label>
-              <select 
-                className="input uppercase font-bold" 
-                value={form.fabricante} 
-                onChange={e => setForm({...form, fabricante: e.target.value})}
-              >
-                <option value="" disabled>SELECIONE...</option>
-                {fabricantesCombinados.map(f => (
-                  <option key={f} value={f} className="bg-brand-dark-4 text-white">
-                    {f.toUpperCase()}
-                  </option>
-                ))}
-              </select>
+              <label className="label text-xs">Nº de Série</label>
+              <input 
+                type="text" 
+                className="input uppercase text-xs" 
+                placeholder="Ex: ABC123456" 
+                value={form.numeroSerie} 
+                onChange={e => setForm({...form, numeroSerie: e.target.value})} 
+              />
             </div>
             <div>
-              <label className="label">Nº de Série</label>
-              <input type="text" className="input uppercase" value={form.numeroSerie} onChange={e => setForm({...form, numeroSerie: e.target.value})} />
+              <label className="label text-xs">Nº SIGMA / SINARM</label>
+              <input 
+                type="text" 
+                className="input uppercase text-xs" 
+                placeholder="Ex: 1234567" 
+                value={form.numeroSigma} 
+                onChange={e => setForm({...form, numeroSigma: e.target.value})} 
+              />
             </div>
           </div>
+
+          {/* Linha 4: Acervo e Vencimento CRAF */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="label">Nº SIGMA</label>
-              <input type="text" className="input uppercase" value={form.numeroSigma} onChange={e => setForm({...form, numeroSigma: e.target.value})} />
-            </div>
-            <div>
-              <label className="label">Acervo</label>
-              <select className="input" value={form.acervo} onChange={e => setForm({...form, acervo: e.target.value as any})}>
-                <option value="Caça">Caça</option>
+              <label className="label text-xs">Acervo</label>
+              <select 
+                className="input text-xs" 
+                value={form.acervo} 
+                onChange={e => setForm({...form, acervo: e.target.value as any})}
+              >
                 <option value="Tiro Desportivo">Tiro Desportivo</option>
+                <option value="Caça">Caça</option>
                 <option value="Coleção">Coleção</option>
               </select>
             </div>
-          </div>
-          <div>
-            <label className="label">Vencimento CRAF</label>
-            <input 
-              type="date" 
-              className="input" 
-              value={form.vencimentoCraf} 
-              onChange={e => {
-                const val = e.target.value;
-                setForm(prev => ({
-                  ...prev,
-                  vencimentoCraf: val,
-                  crafEmRenovacao: val !== (armaParaEditar?.vencimentoCraf || '') ? false : prev.crafEmRenovacao
-                }));
-              }} 
-            />
-            <div className="flex items-center gap-1.5 mt-1.5">
-              <input type="checkbox" id="crafEmRenovacao"
-                checked={form.crafEmRenovacao} onChange={e => setForm({...form, crafEmRenovacao: e.target.checked})}
-                className="rounded border-brand-dark-5 bg-brand-dark-4 text-brand-blue focus:ring-0 w-3 h-3" />
-              <label htmlFor="crafEmRenovacao" className="text-[10px] text-gray-400 cursor-pointer select-none">
-                Aguardando liberação da Polícia Federal (CRAF em Renovação)
-              </label>
+            <div>
+              <label className="label text-xs">Vencimento CRAF</label>
+              <input 
+                type="date" 
+                className="input text-xs" 
+                value={form.vencimentoCraf} 
+                onChange={e => {
+                  const val = e.target.value;
+                  setForm(prev => ({
+                    ...prev,
+                    vencimentoCraf: val,
+                    crafEmRenovacao: val !== (armaParaEditar?.vencimentoCraf || '') ? false : prev.crafEmRenovacao
+                  }));
+                }} 
+              />
             </div>
           </div>
+
+          {/* CRAF em Renovação */}
+          <div className="flex items-center gap-1.5 py-0.5">
+            <input 
+              type="checkbox" 
+              id="crafEmRenovacao"
+              checked={form.crafEmRenovacao} 
+              onChange={e => setForm({...form, crafEmRenovacao: e.target.checked})}
+              className="rounded border-brand-dark-5 bg-brand-dark-4 text-brand-blue focus:ring-0 w-3 h-3" 
+            />
+            <label htmlFor="crafEmRenovacao" className="text-[11px] text-gray-400 cursor-pointer select-none">
+              Aguardando liberação da Polícia Federal / Exército (CRAF em Renovação)
+            </label>
+          </div>
+
+          {/* Anexo do CRAF */}
           <div>
-            <label className="label">Anexo do CRAF (PDF ou Imagem)</label>
+            <label className="label text-xs">Anexo do CRAF (PDF ou Imagem)</label>
             <div className="flex items-center gap-3">
               <input 
                 type="file" 
@@ -1217,7 +1422,7 @@ export function ModalArma({ armaParaEditar, onFechar, onSalvar }: { armaParaEdit
               />
               <label 
                 htmlFor="craf-attachment" 
-                className="btn-ghost flex items-center gap-2 cursor-pointer text-xs h-10 border border-brand-dark-5 rounded-lg px-3"
+                className="btn-ghost flex items-center gap-2 cursor-pointer text-xs h-9 border border-brand-dark-5 rounded-lg px-3"
               >
                 <Upload size={14} /> {form.crafUrl ? 'Alterar Anexo' : 'Anexar Documento'}
               </label>
@@ -1225,7 +1430,7 @@ export function ModalArma({ armaParaEditar, onFechar, onSalvar }: { armaParaEdit
               <button
                 type="button"
                 onClick={() => setCameraModalAberto(true)}
-                className="btn-ghost flex items-center gap-2 text-xs h-10 border border-brand-dark-5 rounded-lg px-3 hover:bg-brand-blue/10 hover:border-brand-blue/30"
+                className="btn-ghost flex items-center gap-2 text-xs h-9 border border-brand-dark-5 rounded-lg px-3 hover:bg-brand-blue/10 hover:border-brand-blue/30"
               >
                 <Camera size={14} /> Tirar Foto
               </button>
@@ -1233,14 +1438,14 @@ export function ModalArma({ armaParaEditar, onFechar, onSalvar }: { armaParaEdit
               {form.crafUrl && (
                 <>
                   <button 
-                    type="button"
+                    type="button" 
                     onClick={() => visualizarDocumentoBase64(form.crafUrl!, `CRAF-${form.numeroSerie || 'arma'}`)}
                     className="text-brand-blue hover:text-brand-blue-light text-xs font-semibold"
                   >
                     Visualizar
                   </button>
                   <button 
-                    type="button"
+                    type="button" 
                     onClick={() => setForm({...form, crafUrl: ''})}
                     className="text-red-400 hover:text-red-300 text-xs font-semibold"
                   >
@@ -1257,9 +1462,9 @@ export function ModalArma({ armaParaEditar, onFechar, onSalvar }: { armaParaEdit
           </div>
         </div>
 
-        <div className="flex gap-3 pt-6 border-t border-slate-800/60 mt-4">
-          <button type="button" onClick={onFechar} className="btn-ghost flex-1">Cancelar</button>
-          <button type="button" onClick={() => onSalvar(form)} className="btn-primary flex-1">
+        <div className="flex gap-3 pt-4 border-t border-slate-800/60 mt-4">
+          <button type="button" onClick={onFechar} className="btn-ghost flex-1 text-xs">Cancelar</button>
+          <button type="button" onClick={handleSalvar} className="btn-primary flex-1 text-xs font-bold">
             {armaParaEditar ? 'Salvar Alterações' : 'Salvar Arma'}
           </button>
         </div>

@@ -509,6 +509,13 @@ export interface OpcaoArma {
   criadoEm?: string;
 }
 
+export interface ItemCatalogoArma {
+  tipo: string;
+  fabricante: string;
+  modelo: string;
+  calibrePadrao?: string;
+}
+
 export interface LocalLaudo {
   id: string;
   empresaId: string;
