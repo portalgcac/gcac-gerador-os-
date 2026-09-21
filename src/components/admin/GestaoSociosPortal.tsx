@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Shield, UserPlus, Trash2, Edit2, CheckCircle, Crown, Lock, Mail, Phone, FileText, AlertTriangle, UserCheck } from 'lucide-react';
+import { Shield, UserPlus, Trash2, Edit2, CheckCircle, Crown, Lock, Mail, Phone, FileText, AlertTriangle, UserCheck, FileDown } from 'lucide-react';
 import { supabase } from '../../db/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { Notificacao, useNotificacao } from '../common/Notificacao';
 import { DialogConfirmacao } from '../common/DialogConfirmacao';
 import { formatarCPF } from '../../utils/formatters';
+import { baixarRelatorioSegurancaPdf } from '../../services/geradorPdfSeguranca';
 
 interface SocioItem {
   id: string;
@@ -25,7 +26,22 @@ export function GestaoSociosPortal() {
   const [modalAberto, setModalAberto] = useState(false);
   const [socioParaExcluir, setSocioParaExcluir] = useState<SocioItem | null>(null);
   const [editandoSocio, setEditandoSocio] = useState<SocioItem | null>(null);
+  const [gerandoPdf, setGerandoPdf] = useState(false);
   const { estado: notif, mostrar, fechar } = useNotificacao();
+
+  const handleBaixarPdf = async () => {
+    if (socios.length === 0) return;
+    setGerandoPdf(true);
+    try {
+      await baixarRelatorioSegurancaPdf(socios);
+      mostrar('sucesso', 'Relatório Executivo de Segurança baixado com sucesso!');
+    } catch (err: any) {
+      console.error('Erro ao gerar PDF de segurança:', err);
+      mostrar('erro', 'Erro ao gerar o relatório em PDF.');
+    } finally {
+      setGerandoPdf(false);
+    }
+  };
 
   const [form, setForm] = useState({
     nome: '',
@@ -254,16 +270,29 @@ export function GestaoSociosPortal() {
           </div>
         </div>
 
-        {ehGestorPrincipal && (
+        <div className="flex flex-wrap items-center gap-2.5 shrink-0">
           <button
             type="button"
-            onClick={handleAbrirNovo}
-            className="btn-primary py-2.5 px-4 text-xs font-bold flex items-center gap-2 shrink-0 bg-purple-600 hover:bg-purple-500 shadow-purple-900/30 shadow-lg border-purple-400/30"
+            onClick={handleBaixarPdf}
+            disabled={gerandoPdf || socios.length === 0}
+            className="px-3.5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 bg-brand-dark-4 hover:bg-brand-dark-5 text-gray-200 border border-brand-dark-5 hover:border-cyan-500/40 transition-all shadow-sm disabled:opacity-50"
+            title="Baixar Relatório Executivo de Cibersegurança atualizado com todos os sócios cadastrados"
           >
-            <UserPlus size={16} />
-            + Adicionar Sócio do App
+            <FileDown size={16} className="text-cyan-400" />
+            {gerandoPdf ? 'Gerando PDF...' : 'Baixar Relatório de Segurança (PDF)'}
           </button>
-        )}
+
+          {ehGestorPrincipal && (
+            <button
+              type="button"
+              onClick={handleAbrirNovo}
+              className="btn-primary py-2.5 px-4 text-xs font-bold flex items-center gap-2 shrink-0 bg-purple-600 hover:bg-purple-500 shadow-purple-900/30 shadow-lg border-purple-400/30"
+            >
+              <UserPlus size={16} />
+              + Adicionar Sócio do App
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Card Informativo de Governança */}
