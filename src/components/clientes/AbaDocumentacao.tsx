@@ -1040,7 +1040,9 @@ export function ModalArma({ armaParaEditar, onFechar, onSalvar }: { armaParaEdit
     obterTiposDeArma,
     obterFabricantesPorTipo,
     obterModelosPorTipoEFabricante,
-    obterCalibreSugerido
+    obterCalibreSugerido,
+    obterCalibresCompativeis,
+    obterDadosPorModelo
   } = useClientes();
 
   const [form, setForm] = useState({
@@ -1060,6 +1062,7 @@ export function ModalArma({ armaParaEditar, onFechar, onSalvar }: { armaParaEdit
   const [cameraModalAberto, setCameraModalAberto] = useState(false);
   const [modoManualModelo, setModoManualModelo] = useState(false);
   const [modoManualFabricante, setModoManualFabricante] = useState(false);
+  const [modoManualCalibre, setModoManualCalibre] = useState(false);
   const [calibreAutoSugerido, setCalibreAutoSugerido] = useState<string | null>(null);
 
   // Tipos disponíveis (Base + Aprendidos)
@@ -1071,29 +1074,29 @@ export function ModalArma({ armaParaEditar, onFechar, onSalvar }: { armaParaEdit
   // Modelos disponíveis filtrados por tipo e fabricante
   const modelosFiltrados = obterModelosPorTipoEFabricante(form.tipo, form.fabricante);
 
-  // Lista de calibres combinados (Configurados + Registrados + Padrões)
-  const calibresConfigurados = opcoesArmas.filter(o => o.tipo === 'calibre').map(o => o.nome);
-  const calibresCombinados = Array.from(
-    new Set([
-      ...(calibreAutoSugerido ? [calibreAutoSugerido] : []),
-      ...calibresConfigurados,
-      ...calibresRegistrados,
-      '.22 LR', '.22 WMR', '.223 REM / 5.56 NATO', '.308 WIN / 7.62 NATO',
-      '.357 MAG', '.38 SPL', '.380 ACP', '9mm LUGER', '.40 S&W', '.44 MAG',
-      '.45 ACP', '12 GA', '20 GA', '28 GA', '36 GA'
-    ])
-  ).map(normalizarCalibre).filter(Boolean) as string[];
+  // Calibres compatíveis estritamente filtrados pelo tipo e modelo
+  const calibresCompativeis = obterCalibresCompativeis(form.tipo, form.modelo);
 
-  // Mudança do tipo de arma (Cascata)
+  // Mudança do tipo de arma (Cascata com limpeza inteligente)
   const handleTipoChange = (novoTipo: string) => {
     const tipoNorm = normalizarTipoArma(novoTipo);
     setForm(prev => {
       const novosModelos = obterModelosPorTipoEFabricante(tipoNorm, prev.fabricante);
       const modeloAindaValido = novosModelos.includes(prev.modelo);
+      const novoModelo = modeloAindaValido ? prev.modelo : '';
+
+      const novosCalibres = obterCalibresCompativeis(tipoNorm, novoModelo);
+      const calibreAindaValido = novosCalibres.includes(prev.calibre);
+      const calSug = novoModelo ? obterCalibreSugerido(tipoNorm, prev.fabricante, novoModelo) : undefined;
+      const novoCalibre = calSug || (calibreAindaValido ? prev.calibre : '');
+
+      setCalibreAutoSugerido(calSug || null);
+
       return {
         ...prev,
         tipo: tipoNorm,
-        modelo: modeloAindaValido ? prev.modelo : ''
+        modelo: novoModelo,
+        calibre: novoCalibre
       };
     });
   };
@@ -1120,28 +1123,50 @@ export function ModalArma({ armaParaEditar, onFechar, onSalvar }: { armaParaEdit
     });
   };
 
-  // Mudança do modelo (Preenchimento inteligente de calibre)
+  // Mudança do modelo (Preenchimento inteligente em cascata bidirecional)
   const handleModeloChange = (novoModelo: string) => {
     if (novoModelo === '__NOVO__') {
       setModoManualModelo(true);
       return;
     }
     const modNorm = normalizarModelo(novoModelo);
-    const calSug = obterCalibreSugerido(form.tipo, form.fabricante, modNorm);
-    if (calSug) {
-      setCalibreAutoSugerido(calSug);
+    const dadosModelo = obterDadosPorModelo(modNorm);
+
+    if (dadosModelo) {
+      const tipoFinal = dadosModelo.tipo || form.tipo;
+      const fabFinal = form.fabricante || dadosModelo.fabricante || '';
+      const calSug = dadosModelo.calibrePadrao || obterCalibreSugerido(tipoFinal, fabFinal, modNorm);
+
+      if (calSug) setCalibreAutoSugerido(calSug);
+      else setCalibreAutoSugerido(null);
+
+      setForm(prev => ({
+        ...prev,
+        tipo: tipoFinal,
+        fabricante: prev.fabricante || dadosModelo.fabricante || prev.fabricante,
+        modelo: modNorm,
+        calibre: calSug || prev.calibre
+      }));
+    } else {
+      const calSug = obterCalibreSugerido(form.tipo, form.fabricante, modNorm);
+      if (calSug) setCalibreAutoSugerido(calSug);
+      else setCalibreAutoSugerido(null);
+
       setForm(prev => ({
         ...prev,
         modelo: modNorm,
-        calibre: calSug
-      }));
-    } else {
-      setCalibreAutoSugerido(null);
-      setForm(prev => ({
-        ...prev,
-        modelo: modNorm
+        calibre: calSug || prev.calibre
       }));
     }
+  };
+
+  const handleCalibreChange = (novoCal: string) => {
+    if (novoCal === '__NOVO__') {
+      setModoManualCalibre(true);
+      return;
+    }
+    setForm(prev => ({ ...prev, calibre: novoCal }));
+    setCalibreAutoSugerido(null);
   };
 
   const handleSalvar = () => {
@@ -1282,7 +1307,9 @@ export function ModalArma({ armaParaEditar, onFechar, onSalvar }: { armaParaEdit
                   onChange={e => handleModeloChange(e.target.value)}
                 >
                   <option value="">
-                    {form.fabricante ? 'SELECIONE O MODELO...' : 'ESCOLHA A MARCA PRIMEIRO'}
+                    {form.fabricante 
+                      ? `MODELOS ${form.fabricante.toUpperCase()}...` 
+                      : `SELECIONE O MODELO (${form.tipo || 'ARMA'})...`}
                   </option>
                   {modelosFiltrados.map(m => (
                     <option key={m} value={m} className="bg-brand-dark-4 text-white">
@@ -1304,27 +1331,54 @@ export function ModalArma({ armaParaEditar, onFechar, onSalvar }: { armaParaEdit
             <div>
               <div className="flex justify-between items-center mb-1">
                 <label className="label text-xs m-0">4. Calibre</label>
-                {calibreAutoSugerido && (
-                  <span className="text-[9px] text-emerald-400 font-semibold flex items-center gap-0.5 animate-fade-in">
-                    ✓ Sugerido
-                  </span>
-                )}
+                <div className="flex items-center gap-2">
+                  {calibreAutoSugerido && (
+                    <span className="text-[9px] text-emerald-400 font-semibold flex items-center gap-0.5 animate-fade-in">
+                      ✓ Sugerido
+                    </span>
+                  )}
+                  {modoManualCalibre && (
+                    <button 
+                      type="button" 
+                      onClick={() => setModoManualCalibre(false)}
+                      className="text-[10px] text-brand-blue hover:underline"
+                    >
+                      Ver Lista
+                    </button>
+                  )}
+                </div>
               </div>
-              <select 
-                className={`input uppercase font-bold text-xs ${calibreAutoSugerido ? 'border-emerald-500/50 bg-emerald-500/5' : ''}`} 
-                value={form.calibre} 
-                onChange={e => {
-                  setForm({...form, calibre: e.target.value});
-                  setCalibreAutoSugerido(null);
-                }}
-              >
-                <option value="" disabled>SELECIONE...</option>
-                {calibresCombinados.map(c => (
-                  <option key={c} value={c} className="bg-brand-dark-4 text-white">
-                    {c.toUpperCase()}
+              {modoManualCalibre ? (
+                <input 
+                  type="text" 
+                  className="input uppercase font-bold text-xs"
+                  placeholder="Ex: 9mm LUGER, .380 ACP..."
+                  value={form.calibre}
+                  onChange={e => setForm({ ...form, calibre: normalizarCalibre(e.target.value) })}
+                  autoFocus
+                />
+              ) : (
+                <select 
+                  className={`input uppercase font-bold text-xs ${calibreAutoSugerido ? 'border-emerald-500/50 bg-emerald-500/5' : ''}`} 
+                  value={form.calibre} 
+                  onChange={e => handleCalibreChange(e.target.value)}
+                >
+                  <option value="">SELECIONE O CALIBRE...</option>
+                  {calibresCompativeis.map(c => (
+                    <option key={c} value={c} className="bg-brand-dark-4 text-white">
+                      {c === calibreAutoSugerido ? `✓ ${c.toUpperCase()} (PADRÃO)` : c.toUpperCase()}
+                    </option>
+                  ))}
+                  {form.calibre && !calibresCompativeis.includes(form.calibre) && (
+                    <option key={form.calibre} value={form.calibre} className="bg-brand-dark-4 text-white">
+                      {form.calibre.toUpperCase()}
+                    </option>
+                  )}
+                  <option value="__NOVO__" className="bg-brand-blue/20 text-brand-blue-light font-bold">
+                    + OUTRO CALIBRE (DIGITAR)...
                   </option>
-                ))}
-              </select>
+                </select>
+              )}
             </div>
           </div>
 

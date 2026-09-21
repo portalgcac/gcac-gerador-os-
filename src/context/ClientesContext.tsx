@@ -4,7 +4,7 @@ import { Cliente, Arma, GuiaTrafego, AutorizacaoManejo, CreditoCliente, ModeloDe
 import { supabase } from '../db/supabase';
 import { uploadBase64File } from '../utils/fileUtils';
 import { normalizarCalibre, normalizarModelo, normalizarFabricante } from '../utils/formatters';
-import { CATALOGO_BASE_ARMAS, normalizarTipoArma } from '../data/catalogoArmas';
+import { CATALOGO_BASE_ARMAS, normalizarTipoArma, obterCalibresCompativeis, obterDadosPorModelo } from '../data/catalogoArmas';
 
 import { useAuth } from './AuthContext';
 
@@ -57,6 +57,8 @@ interface ClientesContextType {
   obterFabricantesPorTipo: (tipo?: string) => string[];
   obterModelosPorTipoEFabricante: (tipo?: string, fabricante?: string) => string[];
   obterCalibreSugerido: (tipo?: string, fabricante?: string, modelo?: string) => string | undefined;
+  obterCalibresCompativeis: (tipo?: string, modelo?: string) => string[];
+  obterDadosPorModelo: (modelo: string) => { tipo?: string; fabricante?: string; calibrePadrao?: string } | null;
   aprenderItemArma: (tipo: string, fabricante: string, modelo: string, calibre?: string) => Promise<void>;
   
   // Opções Cadastradas (Modo Trancado)
@@ -317,6 +319,14 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
     if (porModelo?.calibrePadrao) return normalizarCalibre(porModelo.calibrePadrao);
 
     return undefined;
+  }, [catalogoArmas]);
+
+  const obterCalibresCompativeisContext = useCallback((tipo?: string, modelo?: string): string[] => {
+    return obterCalibresCompativeis(tipo, modelo, catalogoArmas, calibresRegistrados);
+  }, [catalogoArmas, calibresRegistrados]);
+
+  const obterDadosPorModeloContext = useCallback((modelo: string) => {
+    return obterDadosPorModelo(modelo, catalogoArmas);
   }, [catalogoArmas]);
 
   const aprenderItemArma = useCallback(async (tipo: string, fabricante: string, modelo: string, calibre?: string) => {
@@ -1244,6 +1254,8 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
       obterFabricantesPorTipo,
       obterModelosPorTipoEFabricante,
       obterCalibreSugerido,
+      obterCalibresCompativeis: obterCalibresCompativeisContext,
+      obterDadosPorModelo: obterDadosPorModeloContext,
       aprenderItemArma,
       opcoesArmas,
       carregandoOpcoes,

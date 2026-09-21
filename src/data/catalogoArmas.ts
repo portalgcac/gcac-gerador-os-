@@ -285,3 +285,130 @@ export function normalizarTipoArma(tipo?: string | null): string {
   if (t.includes('ESPINGARDA')) return 'ESPINGARDA';
   return t;
 }
+
+export const CALIBRES_COMPATIVEIS_POR_TIPO: Record<string, string[]> = {
+  'PISTOLA': [
+    '9mm LUGER',
+    '.380 ACP',
+    '.40 S&W',
+    '.45 ACP',
+    '.22 LR',
+    '10mm AUTO',
+    '.38 SPL',
+    '.357 SIG',
+    '.32 AUTO',
+    '6.35mm / .25 AUTO',
+    '5.7x28mm'
+  ],
+  'REVÓLVER': [
+    '.38 SPL',
+    '.357 MAG',
+    '.44 MAG',
+    '.22 LR',
+    '.22 WMR',
+    '.454 CASULL',
+    '.45 COLT',
+    '.44-40 WIN',
+    '.32 S&W',
+    '.32 S&W LONG',
+    '36 GA',
+    '9mm LUGER'
+  ],
+  'CARABINA / FUZIL': [
+    '.22 LR',
+    '.22 WMR',
+    '.17 HMR',
+    '.223 REM / 5.56 NATO',
+    '.308 WIN / 7.62 NATO',
+    '.30-06 SPRG',
+    '.357 MAG',
+    '.38 SPL',
+    '.44 MAG',
+    '.44-40 WIN',
+    '9mm LUGER',
+    '.40 S&W',
+    '.45 ACP',
+    '6.5 CREEDMOOR',
+    '.300 BLACKOUT',
+    '7.62x39mm',
+    '7.62x54R'
+  ],
+  'ESPINGARDA': [
+    '12 GA',
+    '20 GA',
+    '28 GA',
+    '36 GA',
+    '16 GA',
+    '24 GA',
+    '32 GA',
+    '40 GA'
+  ]
+};
+
+export function obterCalibresCompativeis(
+  tipo?: string | null,
+  modelo?: string | null,
+  catalogo: ItemCatalogoArma[] = CATALOGO_BASE_ARMAS,
+  calibresExtras: string[] = []
+): string[] {
+  const tipoNorm = normalizarTipoArma(tipo);
+  const modNorm = modelo?.trim().toUpperCase() || '';
+
+  // 1. Descobrir se há um calibre padrão conhecido para o modelo
+  let calibreDoModelo: string | undefined;
+  if (modNorm) {
+    const itemEncontrado = catalogo.find(i => 
+      i.modelo.toUpperCase() === modNorm && 
+      (!tipoNorm || normalizarTipoArma(i.tipo) === tipoNorm) &&
+      i.calibrePadrao
+    );
+    if (itemEncontrado?.calibrePadrao) {
+      calibreDoModelo = itemEncontrado.calibrePadrao;
+    }
+  }
+
+  // 2. Base de calibres compatíveis por tipo
+  const baseCalibres = tipoNorm && CALIBRES_COMPATIVEIS_POR_TIPO[tipoNorm] 
+    ? [...CALIBRES_COMPATIVEIS_POR_TIPO[tipoNorm]]
+    : [
+        '9mm LUGER', '.380 ACP', '.40 S&W', '.45 ACP', '.22 LR', 
+        '.38 SPL', '.357 MAG', '.44 MAG', '.223 REM / 5.56 NATO', 
+        '.308 WIN / 7.62 NATO', '12 GA', '20 GA', '28 GA', '36 GA'
+      ];
+
+  // 3. Montar conjunto com prioridade para o calibre do modelo
+  const lista = new Set<string>();
+  if (calibreDoModelo) {
+    lista.add(calibreDoModelo);
+  }
+
+  baseCalibres.forEach(c => lista.add(c));
+
+  // Se houver calibres cadastrados extras compatíveis
+  if (calibresExtras && calibresExtras.length > 0) {
+    calibresExtras.forEach(c => {
+      if (c) {
+        if (!tipoNorm || baseCalibres.includes(c)) {
+          lista.add(c);
+        }
+      }
+    });
+  }
+
+  return Array.from(lista).filter(Boolean);
+}
+
+export function obterDadosPorModelo(
+  modelo: string,
+  catalogo: ItemCatalogoArma[] = CATALOGO_BASE_ARMAS
+): { tipo?: string; fabricante?: string; calibrePadrao?: string } | null {
+  if (!modelo) return null;
+  const modNorm = modelo.trim().toUpperCase();
+  const item = catalogo.find(i => i.modelo.toUpperCase() === modNorm);
+  if (!item) return null;
+  return {
+    tipo: normalizarTipoArma(item.tipo),
+    fabricante: item.fabricante,
+    calibrePadrao: item.calibrePadrao || undefined
+  };
+}
