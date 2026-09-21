@@ -63,9 +63,10 @@ const RECURSOS_SISTEMA = [
 import { PainelAtiradores } from '../admin/PainelAtiradores';
 import { EditorSitePortal } from '../admin/EditorSitePortal';
 import { PainelChamadosSite } from '../admin/PainelChamadosSite';
+import { GestaoSociosPortal } from '../admin/GestaoSociosPortal';
 
 interface GestaoUsuariosProps {
-  abaInicial?: 'empresas' | 'cacs' | 'equipe_interna' | 'faturamento' | 'leads' | 'monitor_cacs' | 'broadcast' | 'site' | 'vinculos' | 'chamados';
+  abaInicial?: 'empresas' | 'cacs' | 'equipe_interna' | 'faturamento' | 'leads' | 'monitor_cacs' | 'broadcast' | 'site' | 'vinculos' | 'chamados' | 'socios';
 }
 
 const PROMPTS_RAPIDOS = [
@@ -175,10 +176,10 @@ const parseGeminiResponse = (text: string) => {
 
 export function GestaoUsuarios({ abaInicial }: GestaoUsuariosProps = {}) {
   const { usuario } = useAuth();
-  const isMasterAdmin = usuario?.email === 'gui.gomesassis@gmail.com';
+  const isMasterAdmin = usuario?.email === 'gui.gomesassis@gmail.com' || Boolean(usuario?.ehSocioPortal);
 
-  // Sub-painel ativo para Master Admin
-  const [subPainelAtivo, setSubPainelAtivo] = useState<'empresas' | 'cacs' | 'equipe_interna' | 'faturamento' | 'leads' | 'monitor_cacs' | 'broadcast' | 'site' | 'vinculos' | 'chamados'>(abaInicial || 'empresas');
+  // Sub-painel ativo para Master Admin / Sócios Portal
+  const [subPainelAtivo, setSubPainelAtivo] = useState<'empresas' | 'cacs' | 'equipe_interna' | 'faturamento' | 'leads' | 'monitor_cacs' | 'broadcast' | 'site' | 'vinculos' | 'chamados' | 'socios'>(abaInicial || 'empresas');
 
   useEffect(() => {
     if (abaInicial) {
@@ -1996,6 +1997,18 @@ Você pode adicionar comentários, observações ou explicações adicionais ant
               >
                 <Link2 size={14} />
                 Clientes CAC
+              </button>
+              <button
+                type="button"
+                onClick={() => { setSubPainelAtivo('socios'); setBuscaUsuario(''); }}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all border ${
+                  subPainelAtivo === 'socios'
+                    ? 'bg-purple-500/20 border-purple-500/40 text-purple-300 font-bold shadow-lg shadow-purple-500/10'
+                    : 'bg-brand-dark-3 border-brand-dark-5 text-gray-400 hover:text-white'
+                }`}
+              >
+                <Shield size={14} className="text-purple-400" />
+                Sócios do Portal
               </button>
             </div>
           )}
@@ -3874,6 +3887,13 @@ Você pode adicionar comentários, observações ou explicações adicionais ant
                 <p className="text-xs text-gray-400 mt-0.5">Gerencie as solicitações de serviço de despachante enviadas pelos clientes no site e converta-as em clientes cadastrados</p>
               </div>
               <PainelChamadosSite />
+            </div>
+          )}
+
+          {/* ABA 11: SÓCIOS DO PORTAL G CAC */}
+          {subPainelAtivo === 'socios' && (
+            <div className="animate-fade-in">
+              <GestaoSociosPortal />
             </div>
           )}
         </div>

@@ -324,6 +324,8 @@ export interface DadosEmpresa {
   ocultarIbama?: boolean;
 }
 
+export type ContextoAtivo = 'escritorio' | 'portal_saas';
+
 export interface UsuarioGoogle {
   id: string;
   nome: string;
@@ -339,6 +341,9 @@ export interface UsuarioGoogle {
   cpf?: string;
   contato?: string;
   dadosEmpresa?: DadosEmpresa;
+  ehGestorPrincipal?: boolean;
+  ehSocioPortal?: boolean;
+  contextoAtivo?: ContextoAtivo;
 }
 
 export interface Empresa {

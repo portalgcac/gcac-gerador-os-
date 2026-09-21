@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { UsuarioGoogle } from '../types';
+import { UsuarioGoogle, ContextoAtivo } from '../types';
 import { supabase } from '../db/supabase';
 import { registrarAcesso } from '../services/adminCacService';
 
@@ -11,6 +11,10 @@ interface AuthContextType {
   logout: () => void;
   refreshUsuario: () => Promise<void>;
   temAcessoRecurso: (recurso: string) => boolean;
+  contextoAtivo: ContextoAtivo;
+  setContextoAtivo: (ctx: ContextoAtivo) => void;
+  ehGestorPrincipal: boolean;
+  ehSocioPortal: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -18,6 +22,16 @@ const AuthContext = createContext<AuthContextType | null>(null);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [usuario, setUsuario] = useState<UsuarioGoogle | null>(null);
   const [estaCarregando, setEstaCarregando] = useState(true);
+  const [contextoAtivo, setContextoAtivoState] = useState<ContextoAtivo>(() => {
+    const salvo = localStorage.getItem('gcac_contexto_ativo') as ContextoAtivo | null;
+    return salvo === 'portal_saas' ? 'portal_saas' : 'escritorio';
+  });
+
+  const setContextoAtivo = useCallback((ctx: ContextoAtivo) => {
+    setContextoAtivoState(ctx);
+    localStorage.setItem('gcac_contexto_ativo', ctx);
+    setUsuario(prev => prev ? { ...prev, contextoAtivo: ctx } : null);
+  }, []);
 
   const logout = useCallback(() => {
     setUsuario(null);
@@ -224,7 +238,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
-      const usuarioAtualizado = { 
+      const ehSocio = ehMasterAdmin || 
+        (data?.permissoes?.includes('socio_portal') ?? false) || 
+        data?.role === 'socio_portal' || 
+        emailLower === 'hectoruk80@gmail.com';
+
+      const usuarioAtualizado: UsuarioGoogle = { 
         ...u, 
         role, 
         permissoes, 
@@ -235,7 +254,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         fotoPerfil,
         cpf: data?.cpf || undefined,
         contato: data?.contato || undefined,
-        dadosEmpresa
+        dadosEmpresa,
+        ehGestorPrincipal: ehMasterAdmin,
+        ehSocioPortal: ehSocio,
+        contextoAtivo: ehSocio ? contextoAtivo : 'escritorio'
       };
       
       // Só atualiza se houver mudança real para evitar loops/re-renders desnecessários
@@ -247,7 +269,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         u.tipoConta !== tipoConta ||
         JSON.stringify(u.modulosAtivos) !== JSON.stringify(modulosAtivos) ||
         u.fotoPerfil !== fotoPerfil ||
-        JSON.stringify(u.dadosEmpresa) !== JSON.stringify(dadosEmpresa)
+        JSON.stringify(u.dadosEmpresa) !== JSON.stringify(dadosEmpresa) ||
+        u.ehGestorPrincipal !== ehMasterAdmin ||
+        u.ehSocioPortal !== ehSocio ||
+        u.contextoAtivo !== (ehSocio ? contextoAtivo : 'escritorio')
       ) {
         setUsuario(usuarioAtualizado);
         localStorage.setItem('gcac_usuario', JSON.stringify(usuarioAtualizado));
@@ -416,6 +441,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Google OAuth access token is in session.provider_token
       const googleAccessToken = session.provider_token || sessionStorage.getItem('gcac_token') || '';
 
+      const ehSocio = ehMasterAdmin || 
+        (whitelistData?.permissoes?.includes('socio_portal') ?? false) || 
+        whitelistData?.role === 'socio_portal' || 
+        emailLower === 'hectoruk80@gmail.com';
+
       const novoUsuario: UsuarioGoogle = {
         id: meta.sub || session.user.id,
         nome: meta.name || meta.full_name || '',
@@ -430,7 +460,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         modulosAtivos,
         cpf: whitelistData?.cpf || undefined,
         contato: whitelistData?.contato || undefined,
-        dadosEmpresa
+        dadosEmpresa,
+        ehGestorPrincipal: ehMasterAdmin,
+        ehSocioPortal: ehSocio,
+        contextoAtivo: ehSocio ? contextoAtivo : 'escritorio'
       };
 
       setUsuario(novoUsuario);
@@ -511,7 +544,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       login,
       logout,
       refreshUsuario,
-      temAcessoRecurso
+      temAcessoRecurso,
+      contextoAtivo: usuario?.ehSocioPortal ? contextoAtivo : 'escritorio',
+      setContextoAtivo,
+      ehGestorPrincipal: !!usuario?.ehGestorPrincipal,
+      ehSocioPortal: !!usuario?.ehSocioPortal
     }}>
       {children}
     </AuthContext.Provider>

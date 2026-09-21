@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
-  LayoutDashboard, FileText, Plus, Settings, LogOut, Cloud, CloudOff, Loader, X, Users, Receipt, Calendar, BarChart3, ListTodo, Bell, Shield, Link2, FileSpreadsheet
+  LayoutDashboard, FileText, Plus, Settings, LogOut, Cloud, CloudOff, Loader, X, Users, Receipt, Calendar, BarChart3, ListTodo, Bell, Shield, Link2, FileSpreadsheet, Building2, UserPlus, Crosshair, MessageSquare, BadgeDollarSign, Sparkles
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../db/supabase';
@@ -10,6 +10,7 @@ import { useStatusConexao } from '../../hooks/useStatusConexao';
 import { useLembretes } from '../../context/LembretesContext';
 import { useNotificacoesSistema } from '../../context/NotificacoesSistemaContext';
 import { NotificacoesDropdown } from './NotificacoesDropdown';
+import { WorkspaceSwitcher } from './WorkspaceSwitcher';
 
 const links = [
   { to: '/dashboard', label: 'Painel',          icon: LayoutDashboard, slug: 'painel' },
@@ -25,6 +26,18 @@ const links = [
   { to: '/configuracoes', label: 'Configurações', icon: Settings,      slug: 'config' },
   { to: '/declaracoes', label: 'Declarações',     icon: FileText,      slug: 'declaracoes' },
 ].sort((a, b) => a.label.localeCompare(b.label));
+
+const linksPortalSaaS = [
+  { to: '/portal-admin?tab=empresas', label: 'Despachantes Assinantes', icon: Building2, tab: 'empresas' },
+  { to: '/portal-admin?tab=faturamento', label: 'Faturamento de Licenças', icon: BadgeDollarSign, tab: 'faturamento' },
+  { to: '/portal-admin?tab=leads', label: 'Pré-Cadastros (Leads)', icon: UserPlus, tab: 'leads' },
+  { to: '/portal-admin?tab=monitor_cacs', label: 'Monitor de Atiradores', icon: Crosshair, tab: 'monitor_cacs' },
+  { to: '/portal-admin?tab=broadcast', label: 'Central de Notificações', icon: Bell, tab: 'broadcast' },
+  { to: '/portal-admin?tab=chamados', label: 'Chamados do Site', icon: MessageSquare, tab: 'chamados' },
+  { to: '/portal-admin?tab=site', label: 'Site Portal G CAC', icon: Settings, tab: 'site' },
+  { to: '/portal-admin?tab=vinculos', label: 'Vínculos Clientes CAC', icon: Link2, tab: 'vinculos' },
+  { to: '/portal-admin?tab=socios', label: 'Sócios do Portal', icon: Shield, tab: 'socios' },
+];
 
 const temAcessoLink = (link: typeof links[0], usuario: any, temAcessoRecurso: (r: string) => boolean) => {
   if (usuario?.tipoConta === 'cac_individual') {
@@ -94,12 +107,15 @@ const getLinkLabel = (link: typeof links[0], usuario: any) => {
 };
 
 export function Sidebar() {
-  const { usuario, logout, temAcessoRecurso } = useAuth();
+  const { usuario, logout, temAcessoRecurso, contextoAtivo, ehSocioPortal, ehGestorPrincipal } = useAuth();
   const { ordens, itensFila, sincronizarPendentes } = useOrdens();
   const { lembretes } = useLembretes();
   const { naoLidas } = useNotificacoesSistema();
   const online = useStatusConexao();
   const navigate = useNavigate();
+  const location = useLocation();
+  const searchParams = new URLSearchParams(location.search);
+  const currentTab = searchParams.get('tab') || 'empresas';
 
   const [despachanteVinculado, setDespachanteVinculado] = useState<string | null>(null);
 
@@ -146,7 +162,6 @@ export function Sidebar() {
   };
 
   const linksFiltrados = filtrarLinks(usuario, temAcessoRecurso);
-
   const isAdmin = usuario?.role === 'admin';
 
   return (
@@ -161,7 +176,16 @@ export function Sidebar() {
             onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} 
           />
           <div className="w-full">
-            {usuario?.tipoConta === 'cac_individual' ? (
+            {contextoAtivo === 'portal_saas' ? (
+              <>
+                <p className="text-purple-400 text-xs font-bold tracking-wider uppercase mb-1">
+                  Portal G CAC
+                </p>
+                <p className="font-black text-white text-base leading-tight break-words px-2">
+                  Gestão SaaS & App
+                </p>
+              </>
+            ) : usuario?.tipoConta === 'cac_individual' ? (
               <>
                 <p className="text-brand-blue-light text-xs font-bold tracking-wider uppercase mb-1">
                   Portal G CAC
@@ -206,64 +230,84 @@ export function Sidebar() {
         )}
       </div>
 
+      {/* Alternador de Espaço de Trabalho (Escritório vs Portal SaaS) */}
+      <WorkspaceSwitcher />
+
       {/* Nav */}
       <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
-        {linksFiltrados.map((link) => {
-          const Icon = link.icon;
-          return (
-            <NavLink
-              key={link.to}
-              to={link.to}
-              className={({ isActive }) => isActive ? 'nav-link-active' : 'nav-link'}
-            >
-              <Icon size={18} />
-              <span className="flex-1">{getLinkLabel(link, usuario)}</span>
-              {link.to === '/rotina' && totalRotina > 0 && (
-                <span className="bg-orange-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-md animate-pulse">
-                  {totalRotina}
-                </span>
-              )}
-              {link.to === '/agenda' && tarefasPendentesHoje > 0 && (
-                <span className="bg-brand-blue text-white text-[10px] font-black px-1.5 py-0.5 rounded-md animate-pulse">
-                  {tarefasPendentesHoje}
-                </span>
-              )}
-            </NavLink>
-          );
-        })}
-
-        {usuario?.email === 'gui.gomesassis@gmail.com' && (
-          <div className="pt-2 space-y-1">
-            <NavLink
-              to="/portal-admin"
-              className={({ isActive }) =>
-                `nav-link w-full ${
-                  isActive
-                    ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
-                    : 'text-purple-400/80 hover:bg-purple-500/10 hover:text-purple-300 border border-purple-500/10'
-                }`
-              }
-            >
-              <Shield size={16} className="text-purple-400" />
-              <span className="flex-1 text-[13px] font-bold">Painel Portal GCAC</span>
-              <span className="text-[9px] bg-purple-500/20 text-purple-300 border border-purple-500/20 px-1.5 py-0.5 rounded-md font-black uppercase tracking-widest">
-                Master
+        {contextoAtivo === 'portal_saas' ? (
+          <>
+            <div className="px-3 py-1.5 mb-1 flex items-center justify-between">
+              <span className="text-[10px] font-black uppercase tracking-widest text-purple-400">
+                Menu Portal SaaS
               </span>
-            </NavLink>
-          </div>
-        )}
+              <span className="text-[9px] bg-purple-500/20 text-purple-300 border border-purple-500/30 px-1.5 py-0.2 rounded font-bold uppercase">
+                Admin
+              </span>
+            </div>
+            {linksPortalSaaS.map((link) => {
+              const Icon = link.icon;
+              const isAbaAtiva = location.pathname === '/portal-admin' && currentTab === link.tab;
+              return (
+                <NavLink
+                  key={link.to}
+                  to={link.to}
+                  className={
+                    isAbaAtiva
+                      ? 'flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold bg-purple-500/20 text-purple-200 border border-purple-500/30 shadow-md shadow-purple-950/20 transition-all'
+                      : 'flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium text-gray-400 hover:text-white hover:bg-brand-dark-3 transition-all'
+                  }
+                >
+                  <Icon size={17} className={isAbaAtiva ? 'text-purple-300' : 'text-gray-400'} />
+                  <span className="flex-1 truncate">{link.label}</span>
+                  {link.tab === 'socios' && (
+                    <span className="text-[9px] bg-purple-500/30 text-purple-200 px-1.5 py-0.5 rounded font-bold uppercase">
+                      Sócios
+                    </span>
+                  )}
+                </NavLink>
+              );
+            })}
+          </>
+        ) : (
+          <>
+            {linksFiltrados.map((link) => {
+              const Icon = link.icon;
+              return (
+                <NavLink
+                  key={link.to}
+                  to={link.to}
+                  className={({ isActive }) => isActive ? 'nav-link-active' : 'nav-link'}
+                >
+                  <Icon size={18} />
+                  <span className="flex-1">{getLinkLabel(link, usuario)}</span>
+                  {link.to === '/rotina' && totalRotina > 0 && (
+                    <span className="bg-orange-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-md animate-pulse">
+                      {totalRotina}
+                    </span>
+                  )}
+                  {link.to === '/agenda' && tarefasPendentesHoje > 0 && (
+                    <span className="bg-brand-blue text-white text-[10px] font-black px-1.5 py-0.5 rounded-md animate-pulse">
+                      {tarefasPendentesHoje}
+                    </span>
+                  )}
+                </NavLink>
+              );
+            })}
 
-        {isAdmin && usuario?.tipoConta !== 'cac_individual' && (
-          <div className="pt-2 space-y-1">
-            {/* Botão: Nova OS */}
-            <button
-              onClick={() => navigate('/ordens/nova')}
-              className="nav-link w-full text-brand-green-light hover:bg-brand-green/10 hover:text-brand-green border border-brand-green/20"
-            >
-              <Plus size={18} />
-              Nova OS
-            </button>
-          </div>
+            {isAdmin && usuario?.tipoConta !== 'cac_individual' && (
+              <div className="pt-2 space-y-1">
+                {/* Botão: Nova OS */}
+                <button
+                  onClick={() => navigate('/ordens/nova')}
+                  className="nav-link w-full text-brand-green-light hover:bg-brand-green/10 hover:text-brand-green border border-brand-green/20"
+                >
+                  <Plus size={18} />
+                  Nova OS
+                </button>
+              </div>
+            )}
+          </>
         )}
       </nav>
 
@@ -331,6 +375,10 @@ export function Sidebar() {
                   <p className="text-[10px] text-brand-blue-light uppercase font-bold tracking-tighter opacity-80">
                     Atirador CAC
                   </p>
+                ) : contextoAtivo === 'portal_saas' ? (
+                  <p className="text-[10px] text-purple-400 uppercase font-bold tracking-tighter">
+                    {ehGestorPrincipal ? '👑 Gestor Principal' : '🛡️ Sócio do Portal'}
+                  </p>
                 ) : (
                   <p className="text-[10px] text-brand-green uppercase font-bold tracking-tighter opacity-70">
                     {usuario.role === 'admin' ? 'Administrador' : 'Colaborador'}
@@ -355,8 +403,11 @@ export function Sidebar() {
 
 export function NavegacaoInferior() {
   const { itensFila } = useOrdens();
+  const { usuario, temAcessoRecurso, contextoAtivo, ehSocioPortal } = useAuth();
+  const location = useLocation();
+  const searchParams = new URLSearchParams(location.search);
+  const currentTab = searchParams.get('tab') || 'empresas';
 
-  const { usuario, temAcessoRecurso } = useAuth();
   const linksFiltrados = filtrarLinks(usuario, temAcessoRecurso);
   const isAdmin = usuario?.role === 'admin';
 
@@ -372,51 +423,60 @@ export function NavegacaoInferior() {
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-40 bg-brand-dark-2 border-t border-brand-dark-5 flex sm:hidden overflow-x-auto no-scrollbar scroll-smooth px-2">
-      {linksFiltrados.map((link) => {
-        const Icon = link.icon;
-        return (
-          <NavLink
-            key={link.to}
-            to={link.to}
-            className={({ isActive }) =>
-              `flex-shrink-0 min-w-[75px] flex flex-col items-center gap-1 py-3 text-[10px] font-medium transition-colors ${
-                isActive ? 'text-brand-blue-light' : 'text-gray-500 hover:text-gray-300'
-              }`
-            }
-          >
-            {({ isActive }) => (
-              <>
-                <div className="relative">
-                  <Icon size={20} className={isActive ? 'scale-110 transition-transform' : ''} />
-                  {link.to === '/ordens' && itensFila > 0 && (
-                    <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-brand-blue" />
-                  )}
-                </div>
-                <span className="leading-none whitespace-nowrap">{getShortLabel(getLinkLabel(link, usuario))}</span>
-                {isActive && (
-                  <div className="absolute bottom-1 w-1 h-1 rounded-full bg-brand-blue-light" />
+      {contextoAtivo === 'portal_saas' ? (
+        linksPortalSaaS.map((link) => {
+          const Icon = link.icon;
+          const isAbaAtiva = location.pathname === '/portal-admin' && currentTab === link.tab;
+          return (
+            <NavLink
+              key={link.to}
+              to={link.to}
+              className={`flex-shrink-0 min-w-[75px] flex flex-col items-center gap-1 py-3 text-[10px] font-medium transition-colors ${
+                isAbaAtiva ? 'text-purple-300' : 'text-gray-500 hover:text-gray-300'
+              }`}
+            >
+              <div className="relative">
+                <Icon size={20} className={isAbaAtiva ? 'scale-110 transition-transform text-purple-300' : ''} />
+              </div>
+              <span className="leading-none whitespace-nowrap">{link.label.split(' ')[0]}</span>
+              {isAbaAtiva && (
+                <div className="absolute bottom-1 w-1 h-1 rounded-full bg-purple-400" />
+              )}
+            </NavLink>
+          );
+        })
+      ) : (
+        <>
+          {linksFiltrados.map((link) => {
+            const Icon = link.icon;
+            return (
+              <NavLink
+                key={link.to}
+                to={link.to}
+                className={({ isActive }) =>
+                  `flex-shrink-0 min-w-[75px] flex flex-col items-center gap-1 py-3 text-[10px] font-medium transition-colors ${
+                    isActive ? 'text-brand-blue-light' : 'text-gray-500 hover:text-gray-300'
+                  }`
+                }
+              >
+                {({ isActive }) => (
+                  <>
+                    <div className="relative">
+                      <Icon size={20} className={isActive ? 'scale-110 transition-transform' : ''} />
+                      {link.to === '/ordens' && itensFila > 0 && (
+                        <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-brand-blue" />
+                      )}
+                    </div>
+                    <span className="leading-none whitespace-nowrap">{getShortLabel(getLinkLabel(link, usuario))}</span>
+                    {isActive && (
+                      <div className="absolute bottom-1 w-1 h-1 rounded-full bg-brand-blue-light" />
+                    )}
+                  </>
                 )}
-              </>
-            )}
-          </NavLink>
-        );
-      })}
-      {usuario?.email === 'gui.gomesassis@gmail.com' && (
-        <NavLink
-          to="/portal-admin"
-          className={({ isActive }) =>
-            `flex-shrink-0 min-w-[75px] flex flex-col items-center gap-1 py-3 text-[10px] font-medium transition-colors ${
-              isActive ? 'text-purple-400' : 'text-purple-500/60 hover:text-purple-400'
-            }`
-          }
-        >
-          {({ isActive }) => (
-            <>
-              <Shield size={20} className={isActive ? 'scale-110 transition-transform' : ''} />
-              <span className="leading-none whitespace-nowrap">Portal GCAC</span>
-            </>
-          )}
-        </NavLink>
+              </NavLink>
+            );
+          })}
+        </>
       )}
     </nav>
   );

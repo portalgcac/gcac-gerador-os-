@@ -22,7 +22,7 @@ export default function PortalAdminPage() {
       </div>
 
       <div className="bg-brand-dark-2 border border-brand-dark-5 rounded-2xl p-5 shadow-2xl">
-        <GestaoUsuarios abaInicial={tab || undefined} />
+        <GestaoUsuarios abaInicial={tab || undefined} key={tab || 'padrao'} />
       </div>
     </div>
   );

@@ -244,7 +244,7 @@ function RotaProtegida({ children, modulo }: { children: React.ReactNode, modulo
 }
 
 function RotaMasterAdmin({ children }: { children: React.ReactNode }) {
-  const { usuario, estaAutenticado, estaCarregando } = useAuth();
+  const { usuario, estaAutenticado, estaCarregando, ehSocioPortal } = useAuth();
   if (estaCarregando) {
     return (
       <div className="min-h-screen bg-brand-dark flex items-center justify-center p-6">
@@ -256,7 +256,7 @@ function RotaMasterAdmin({ children }: { children: React.ReactNode }) {
     );
   }
   if (!estaAutenticado || !usuario) return <Navigate to="/login" replace />;
-  if (usuario.email !== 'gui.gomesassis@gmail.com') return <Navigate to="/" replace />;
+  if (usuario.email !== 'gui.gomesassis@gmail.com' && !ehSocioPortal) return <Navigate to="/" replace />;
   return <>{children}</>;
 }
 
