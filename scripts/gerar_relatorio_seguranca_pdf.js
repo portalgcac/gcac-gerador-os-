@@ -27,16 +27,28 @@ function criarDocumentoSeguranca() {
   const larguraUtil = largura - (margem * 2);          // 174 mm
   const totalPaginas = 5;
 
-  // Carregar Logo Oficial se disponível
-  let logoBase64 = null;
+  // Carregar Logos Oficiais do PORTAL G CAC (Software House / App SaaS)
+  let logoPortalComFrase = null;
+  let logoPortalSemFrase = null;
+
   try {
-    const caminhoLogo = path.resolve('public/Logo oficial.png');
-    if (fs.existsSync(caminhoLogo)) {
-      const buffer = fs.readFileSync(caminhoLogo);
-      logoBase64 = 'data:image/png;base64,' + buffer.toString('base64');
+    const pComFrase = path.resolve('public/usar no site/LOGO PORTAL COM FRASE.png');
+    if (fs.existsSync(pComFrase)) {
+      const b = fs.readFileSync(pComFrase);
+      logoPortalComFrase = 'data:image/png;base64,' + b.toString('base64');
     }
   } catch (err) {
-    console.warn('Logo não carregada:', err.message);
+    console.warn('Logo com frase não carregada:', err.message);
+  }
+
+  try {
+    const pSemFrase = path.resolve('public/usar no site/LOGO PORTAL SEM FRASE.png');
+    if (fs.existsSync(pSemFrase)) {
+      const b = fs.readFileSync(pSemFrase);
+      logoPortalSemFrase = 'data:image/png;base64,' + b.toString('base64');
+    }
+  } catch (err) {
+    console.warn('Logo sem frase não carregada:', err.message);
   }
 
   // ── CABEÇALHO PADRÃO (PÁGINAS 2 A 5) ───────────────────────────────────────
@@ -47,25 +59,25 @@ function criarDocumentoSeguranca() {
     doc.setFillColor(...CORES.accentCyan);
     doc.rect(margem, 5, 45, 1.5, 'F');
 
-    // Logo miniatura no cabeçalho com moldura arredondada
-    if (logoBase64) {
-      doc.setFillColor(255, 255, 255);
+    // Logo miniatura no cabeçalho com a marca oficial do PORTAL G CAC
+    if (logoPortalSemFrase) {
+      doc.setFillColor(11, 19, 43);
       doc.roundedRect(margem, 8, 12, 12, 1.5, 1.5, 'F');
-      doc.setDrawColor(...CORES.cardBorder);
-      doc.setLineWidth(0.3);
+      doc.setDrawColor(...CORES.accentCyan);
+      doc.setLineWidth(0.4);
       doc.roundedRect(margem, 8, 12, 12, 1.5, 1.5, 'D');
-      doc.addImage(logoBase64, 'PNG', margem + 1, 9, 10, 10);
+      doc.addImage(logoPortalSemFrase, 'PNG', margem + 0.5, 8.5, 11, 11);
     }
 
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8.5);
     doc.setTextColor(...CORES.primaryDark);
-    doc.text('PORTAL G CAC • GESTÃO BÉLICA & PLATAFORMA SAAS', margem + (logoBase64 ? 15 : 0), 13);
+    doc.text('PORTAL G CAC • PLATAFORMA SAAS & SOFTWARE HOUSE', margem + (logoPortalSemFrase ? 15 : 0), 13);
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7);
     doc.setTextColor(...CORES.textMuted);
-    doc.text('RELATÓRIO DE GOVERNANÇA, CIBERSEGURANÇA & INTELIGÊNCIA ARTIFICIAL', margem + (logoBase64 ? 15 : 0), 17.5);
+    doc.text('RELATÓRIO DE GOVERNANÇA, CIBERSEGURANÇA & INTELIGÊNCIA ARTIFICIAL', margem + (logoPortalSemFrase ? 15 : 0), 17.5);
 
     // Badge de Confidencial
     doc.setFillColor(254, 242, 242);
@@ -91,7 +103,7 @@ function criarDocumentoSeguranca() {
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7);
     doc.setTextColor(...CORES.textMuted);
-    doc.text('Portal G CAC Tecnologia © 2026 • Documento Estratégico Societário • Proteção sob LGPD e RLS', margem, yRodape + 1.5);
+    doc.text('Portal G CAC Tecnologia © 2026 • Documento Estratégico do Aplicativo SaaS • Proteção sob LGPD e RLS', margem, yRodape + 1.5);
 
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(...CORES.primary);
@@ -113,85 +125,93 @@ function criarDocumentoSeguranca() {
   // Linhas de acento tecnológicas (Cyan e Brand Blue)
   doc.setDrawColor(...CORES.accentCyan);
   doc.setLineWidth(1);
-  doc.line(margem, 42, margem + 30, 42);
+  doc.line(margem, 40, margem + 30, 40);
 
   doc.setDrawColor(...CORES.accentBlue);
   doc.setLineWidth(0.5);
-  doc.line(margem + 33, 42, margem + 50, 42);
+  doc.line(margem + 33, 40, margem + 50, 40);
 
-  // Logo Oficial no Centro com container arredondado profissional
-  if (logoBase64) {
-    const logoDim = 40;
-    const pad = 4;
-    doc.setFillColor(255, 255, 255);
-    doc.roundedRect(margem, 50, logoDim + (pad * 2), logoDim + (pad * 2), 3, 3, 'F');
+  // Logo Oficial do PORTAL G CAC no Centro da Capa
+  if (logoPortalComFrase) {
+    const logoW = 56;
+    const logoH = 42; // Aspect ratio 4:3
+    doc.setFillColor(0, 0, 0);
+    doc.roundedRect(margem, 46, logoW + 4, logoH + 4, 2.5, 2.5, 'F');
     doc.setDrawColor(...CORES.accentCyan);
-    doc.setLineWidth(0.8);
-    doc.roundedRect(margem, 50, logoDim + (pad * 2), logoDim + (pad * 2), 3, 3, 'D');
-    doc.addImage(logoBase64, 'PNG', margem + pad, 50 + pad, logoDim, logoDim);
+    doc.setLineWidth(0.6);
+    doc.roundedRect(margem, 46, logoW + 4, logoH + 4, 2.5, 2.5, 'D');
+    doc.addImage(logoPortalComFrase, 'PNG', margem + 2, 48, logoW, logoH);
+  } else if (logoPortalSemFrase) {
+    const logoDim = 42;
+    doc.setFillColor(0, 0, 0);
+    doc.roundedRect(margem, 46, logoDim + 4, logoDim + 4, 2.5, 2.5, 'F');
+    doc.setDrawColor(...CORES.accentCyan);
+    doc.setLineWidth(0.6);
+    doc.roundedRect(margem, 46, logoDim + 4, logoDim + 4, 2.5, 2.5, 'D');
+    doc.addImage(logoPortalSemFrase, 'PNG', margem + 2, 48, logoDim, logoDim);
   }
 
   // Tag de Versão
   doc.setFillColor(...CORES.accentCyan);
-  doc.roundedRect(margem, 110, 42, 6, 1.5, 1.5, 'F');
+  doc.roundedRect(margem, 106, 46, 6, 1.5, 1.5, 'F');
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(7);
+  doc.setFontSize(6.8);
   doc.setTextColor(...CORES.primaryDark);
-  doc.text('PLANO DIRETOR TÉCNICO 2026', margem + 21, 114.2, { align: 'center' });
+  doc.text('PLANO DIRETOR SAAS 2026', margem + 23, 110.2, { align: 'center' });
 
   // Título Principal
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(21);
   doc.setTextColor(255, 255, 255);
-  doc.text('RELATÓRIO EXECUTIVO DE', margem, 128);
+  doc.text('RELATÓRIO EXECUTIVO DE', margem, 124);
   doc.setTextColor(6, 182, 212); // Cyan Neon
-  doc.text('CIBERSEGURANÇA &', margem, 137);
+  doc.text('CIBERSEGURANÇA &', margem, 133);
   doc.setTextColor(255, 255, 255);
-  doc.text('SENTINELA COM INTELIGÊNCIA ARTIFICIAL', margem, 146);
+  doc.text('SENTINELA COM INTELIGÊNCIA ARTIFICIAL', margem, 142);
 
   // Subtítulo
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);
   doc.setTextColor(148, 163, 184); // Slate 400
-  const subtitulo = 'Diagnóstico do Ecossistema Portal G CAC, Arquitetura de Proteção de Dados Bélicos (SIGMA/SINARM), Blindagem LGPD e Sentinela de Monitoramento Contínuo com Google Gemini.';
+  const subtitulo = 'Diagnóstico da Plataforma Portal G CAC (Software House SaaS), Arquitetura Multi-Tenant de Proteção de Dados Bélicos (SIGMA/SINARM), Blindagem LGPD e Sentinela Contínua com Google Gemini.';
   const linhasSub = doc.splitTextToSize(subtitulo, larguraUtil);
-  doc.text(linhasSub, margem, 156);
+  doc.text(linhasSub, margem, 152);
 
   // Linha divisória
   doc.setDrawColor(51, 65, 85);
   doc.setLineWidth(0.4);
-  doc.line(margem, 172, largura - margem, 172);
+  doc.line(margem, 168, largura - margem, 168);
 
   // Box de Destinatários e Metadados Societários
   doc.setFillColor(15, 23, 42);
   doc.setDrawColor(30, 41, 59);
   doc.setLineWidth(0.5);
-  doc.roundedRect(margem, 180, larguraUtil, 74, 3, 3, 'FD');
+  doc.roundedRect(margem, 176, larguraUtil, 78, 3, 3, 'FD');
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8.5);
   doc.setTextColor(...CORES.accentCyan);
-  doc.text('METADADOS DE GOVERNANÇA SOCIETÁRIA', margem + 6, 188);
+  doc.text('METADADOS DE GOVERNANÇA SOCIETÁRIA (PORTAL G CAC)', margem + 6, 184);
 
   const dadosMeta = [
-    { rotulo: 'EMPRESA / ECOSSISTEMA:', valor: 'Portal G CAC Tecnologia & GCAC Despachante Bélico' },
+    { rotulo: 'EMPRESA / SOFTWARE HOUSE:', valor: 'Portal G CAC Tecnologia (Plataforma SaaS de Gestão Bélica)' },
     { rotulo: 'FUNDADOR & GESTOR PRINCIPAL:', valor: 'Guilherme Gomes de Assis (gui.gomesassis@gmail.com)' },
-    { rotulo: 'SÓCIO & GESTÃO DE OPERAÇÕES:', valor: 'Hector Henrique Furtado Meira (hectoruk80@gmail.com)' },
-    { rotulo: 'CLASSIFICAÇÃO DE RISCO:', valor: 'ESTRITAMENTE CONFIDENCIAL • ACERVO DE SEGURANÇA BÉLICA' },
-    { rotulo: 'OBJETIVO DO DOCUMENTO:', valor: 'Alinhamento societário e expansão comercial segura das licenças' },
-    { rotulo: 'DATA DE EMISSÃO & STATUS:', valor: 'Setembro de 2026 • Versão 1.0 Oficial (Aprovado)' }
+    { rotulo: 'SÓCIO DO APP & OPERAÇÕES:', valor: 'Hector Henrique Furtado Meira (hectoruk80@gmail.com)' },
+    { rotulo: 'CLASSIFICAÇÃO DO ATIVO:', valor: 'ESTRITAMENTE CONFIDENCIAL • QUADRO SOCIETÁRIO DO APP' },
+    { rotulo: 'OBJETIVO ESTRATÉGICO:', valor: 'Blindagem e preparação para venda nacional de licenças' },
+    { rotulo: 'DATA DE EMISSÃO & STATUS:', valor: 'Setembro de 2026 • Versão 1.1 Oficial (Aprovado)' }
   ];
 
-  let yMeta = 196;
+  let yMeta = 192;
   dadosMeta.forEach(m => {
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(7.5);
+    doc.setFontSize(7.2);
     doc.setTextColor(148, 163, 184);
     doc.text(m.rotulo, margem + 6, yMeta);
 
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(255, 255, 255);
-    doc.text(m.valor, margem + 60, yMeta);
+    doc.text(m.valor, margem + 58, yMeta);
     yMeta += 7.8;
   });
 
@@ -199,7 +219,7 @@ function criarDocumentoSeguranca() {
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7);
   doc.setTextColor(100, 116, 139);
-  doc.text('Desenvolvido para auditoria societária e preparação para comercialização nacional das licenças SaaS.', largura / 2, altura - 15, { align: 'center' });
+  doc.text('Desenvolvido para auditoria societária e expansão comercial das licenças do aplicativo Portal G CAC.', largura / 2, altura - 15, { align: 'center' });
 
   // ===========================================================================
   // PÁGINA 2: O ALICERCE INSTALADO & MATRIZ DE PROTEÇÃO
@@ -214,13 +234,13 @@ function criarDocumentoSeguranca() {
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(13);
   doc.setTextColor(...CORES.primaryDark);
-  doc.text('1. O Cenário Bélico e o Alicerce Já Instalado', margem, y);
+  doc.text('1. O Cenário da Plataforma SaaS e o Alicerce Instalado', margem, y);
 
   y += 6;
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
   doc.setTextColor(...CORES.textMain);
-  const textoIntro = 'A comercialização do software Portal G CAC exige o mais alto padrão de segurança do mercado de tecnologia. Nosso sistema custodia dados estratégicos de Segurança de Estado: números de série de armas, calibres, Certificados de Registro (CR Exército), CRAFs (Polícia Federal), Guias de Tráfego, endereços de acervos e credenciais de acesso governamental (Gov.br).';
+  const textoIntro = 'A comercialização das licenças do aplicativo Portal G CAC para escritórios de despachantes e clubes de tiro em todo o Brasil exige o mais alto padrão de segurança do mercado de tecnologia. A plataforma custodia informações de Segurança de Estado: números de série de armas, calibres, Certificados de Registro (CR Exército), CRAFs (Polícia Federal), Guias de Tráfego, endereços de acervos e credenciais de acesso governamental (Gov.br).';
   const linhasIntro = doc.splitTextToSize(textoIntro, larguraUtil);
   doc.text(linhasIntro, margem, y);
   y += (linhasIntro.length * 4) + 4;
@@ -252,10 +272,10 @@ function criarDocumentoSeguranca() {
   const camadas = [
     {
       num: '01',
-      nome: 'PostgreSQL Row Level Security (RLS)',
+      nome: 'PostgreSQL Row Level Security (RLS) Multi-Tenant',
       status: 'ATIVO',
       corStatus: CORES.success,
-      desc: 'Todas as tabelas de dados (Ordens, Clientes, Armas, Recibos) possuem filtros nativos no motor do banco de dados (empresa_id = get_auth_empresa_id()). Um escritório parceiro jamais visualiza os dados de outro, mesmo se tentar forçar consultas via código ou API externa.'
+      desc: 'O motor do banco de dados isola rigidamente cada escritório assinante (tenants B2B) e atiradores individuais (B2C) via empresa_id = get_auth_empresa_id(). Um escritório parceiro jamais visualiza os dados ou acervos de outro, mesmo se tentar forçar consultas via código ou API externa.'
     },
     {
       num: '02',
@@ -273,10 +293,10 @@ function criarDocumentoSeguranca() {
     },
     {
       num: '04',
-      nome: 'Trava Inviolável de Governança Societária',
+      nome: 'Trava Inviolável de Governança Societária do App',
       status: 'ATIVO',
       corStatus: CORES.success,
-      desc: 'Blindagem de código que protege o Gestor Principal (Guilherme Gomes) contra exclusão acidental ou desativação. Sistema de sócios exclusivo que integra Hector Meira com credencial dupla.'
+      desc: 'Blindagem de código que protege o Fundador & Gestor Principal (Guilherme Gomes) contra exclusão acidental ou desativação. Sistema societário exclusivo que integra Hector Meira com credenciais de Sócio do Portal.'
     },
     {
       num: '05',
@@ -297,7 +317,7 @@ function criarDocumentoSeguranca() {
       nome: 'Custódia Redundante & Backup Isolado (Google Drive)',
       status: 'ATIVO',
       corStatus: CORES.success,
-      desc: 'Sincronização opcional com o Google Drive do despachante na pasta restrita G_CAC_BACKUPS via escopo estrito drive.file, garantindo redundância de dados sob custódia do próprio cliente.'
+      desc: 'Sincronização opcional com o Google Drive do cliente na pasta restrita G_CAC_BACKUPS via escopo estrito drive.file, garantindo redundância de dados sob custódia do próprio usuário.'
     }
   ];
 
@@ -357,7 +377,7 @@ function criarDocumentoSeguranca() {
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
   doc.setTextColor(...CORES.textMain);
-  const textoP2 = 'Para comercializar com autoridade e garantir total conformidade com a LGPD e fiscalizações de órgãos oficiais, mapeamos 5 pilares estratégicos de evolução da segurança que eliminarão as brechas remanescentes:';
+  const textoP2 = 'Para comercializar as licenças do aplicativo Portal G CAC com autoridade e garantir total conformidade com a LGPD e fiscalizações de órgãos oficiais, mapeamos 5 pilares estratégicos de evolução da segurança que eliminarão as brechas remanescentes:';
   const linhasP2 = doc.splitTextToSize(textoP2, larguraUtil);
   doc.text(linhasP2, margem, y);
   y += (linhasP2.length * 4) + 4;
@@ -384,7 +404,7 @@ function criarDocumentoSeguranca() {
       prioridade: 'MÉDIA PRIORIDADE',
       corPrioridade: CORES.warning,
       situacao: 'Situação Atual: O login depende exclusivamente da conta Google ou e-mail cadastrado.',
-      proposta: 'Blindagem: Exigir segundo fator de autenticação com código de 6 dígitos (Google Authenticator / Microsoft Authenticator) para sócios e administradores dos escritórios contratantes.',
+      proposta: 'Blindagem: Exigir segundo fator de autenticação com código de 6 dígitos (Google Authenticator / Microsoft Authenticator) para sócios do portal e administradores dos escritórios contratantes.',
       beneficio: 'Mesmo se a senha do e-mail do usuário for comprometida, o invasor não consegue invadir o Portal.'
     },
     {
@@ -438,7 +458,7 @@ function criarDocumentoSeguranca() {
     const linhasProp = doc.splitTextToSize('• ' + m.proposta, larguraUtil - 8);
     doc.text(linhasProp, margem + 4, y + 17);
 
-    // Benefício (Sem caracteres especiais incompatíveis)
+    // Benefício
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(6.8);
     doc.setTextColor(...CORES.primary);
@@ -465,7 +485,7 @@ function criarDocumentoSeguranca() {
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
   doc.setTextColor(...CORES.textMain);
-  const textoIA = 'A grande inovação para o Portal G CAC é transformar a Inteligência Artificial (Google Gemini), já integrada à nossa plataforma, em um Sentinela Ativo 24/7. Em vez de depender de inspeção manual, a IA monitorará os padrões de uso e emitirá diagnósticos em linguagem simples e clara.';
+  const textoIA = 'A grande inovação que colocará o Portal G CAC anos-luz à frente de qualquer concorrente é transformar a Inteligência Artificial (Google Gemini), já integrada à nossa plataforma, em um Sentinela Ativo 24/7. Em vez de depender de inspeção manual, a IA monitorará os padrões de uso em todos os clientes e emitirá diagnósticos em linguagem simples e clara.';
   const linhasIA = doc.splitTextToSize(textoIA, larguraUtil);
   doc.text(linhasIA, margem, y);
   y += (linhasIA.length * 4) + 4;
@@ -523,7 +543,7 @@ function criarDocumentoSeguranca() {
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(10);
   doc.setTextColor(...CORES.primary);
-  doc.text('Como a IA Protegerá Nossos Clientes no Dia a Dia:', margem, y);
+  doc.text('Como a IA Protegerá o Ecossistema Portal G CAC no Dia a Dia:', margem, y);
   y += 5;
 
   const pilaresIA = [
@@ -537,7 +557,7 @@ function criarDocumentoSeguranca() {
       badge: 'DEFESA',
       corBadge: CORES.accentBlue,
       titulo: 'Prevenção Contra Exfiltração & Cópia em Massa de Armas',
-      detalhe: 'Se um funcionário ou terceiro tentar consultar ou baixar 30 cadastros de armas consecutivamente fora do expediente comercial, a IA aciona sinal vermelho imediatamente.'
+      detalhe: 'Se um operador ou terceiro tentar consultar ou baixar 30 cadastros de armas consecutivamente fora do expediente comercial, a IA aciona sinal vermelho imediatamente.'
     },
     {
       badge: 'SCORE',
@@ -624,7 +644,7 @@ function criarDocumentoSeguranca() {
       prazo: '1 a 2 semanas',
       corBadge: CORES.primaryDark,
       larguraBadge: 36,
-      acoes: '• Autenticação em dois fatores (2FA TOTP) para sócios e administradores de escritórios.\n• Varredura automatizada agendada (Cron Job) com resumo semanal por e-mail/notificação.'
+      acoes: '• Autenticação em dois fatores (2FA TOTP) para sócios do portal e administradores dos escritórios.\n• Varredura automatizada agendada (Cron Job) com resumo semanal por e-mail/notificação.'
     }
   ];
 
@@ -670,7 +690,7 @@ function criarDocumentoSeguranca() {
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7);
   doc.setTextColor(...CORES.textMain);
-  const textoFinanceiro = 'Todas as tecnologias propostas utilizam recursos já contratados e disponíveis: o motor PostgreSQL e Storage do Supabase, o CDN da Vercel e a cota do Google Gemini que já temos ativa. Nenhum novo custo mensal de software será gerado. A segurança reforçada e o selo de IA serão nossos maiores argumentos de vendas para novos escritórios.';
+  const textoFinanceiro = 'Todas as tecnologias propostas utilizam recursos já contratados e disponíveis: o motor PostgreSQL e Storage do Supabase, o CDN da Vercel e a cota do Google Gemini que já temos ativa. Nenhum novo custo mensal de software será gerado. A segurança reforçada e o selo de IA serão nossos maiores argumentos de vendas de licenças do app para novos escritórios.';
   const linhasFin = doc.splitTextToSize(textoFinanceiro, larguraUtil - 8);
   doc.text(linhasFin, margem + 4, y + 10.5);
 
@@ -689,7 +709,7 @@ function criarDocumentoSeguranca() {
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7);
   doc.setTextColor(...CORES.textMuted);
-  const textoTermo = 'Os sócios signatários manifestam ciência sobre o diagnóstico de segurança da informação do ecossistema Portal G CAC e aprovam o cronograma de implementação da Sentinela com Inteligência Artificial e blindagem de dados.';
+  const textoTermo = 'Os sócios signatários manifestam ciência sobre o diagnóstico de segurança da informação da plataforma Portal G CAC e aprovam o cronograma de implementação da Sentinela com Inteligência Artificial e blindagem de dados.';
   const linhasTermo = doc.splitTextToSize(textoTermo, larguraUtil - 8);
   doc.text(linhasTermo, margem + 4, y + 11);
 
@@ -709,7 +729,7 @@ function criarDocumentoSeguranca() {
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(6.5);
   doc.setTextColor(...CORES.textMuted);
-  doc.text('Fundador & Gestor Principal', margem + 10 + (larguraAss / 2), yAssinatura + 7.5, { align: 'center' });
+  doc.text('Fundador & Gestor Principal (Portal G CAC)', margem + 10 + (larguraAss / 2), yAssinatura + 7.5, { align: 'center' });
 
   // Assinatura Hector
   const xAssHector = largura - margem - 10 - larguraAss;
@@ -722,7 +742,7 @@ function criarDocumentoSeguranca() {
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(6.5);
   doc.setTextColor(...CORES.textMuted);
-  doc.text('Sócio & Gestão de Operações', xAssHector + (larguraAss / 2), yAssinatura + 7.5, { align: 'center' });
+  doc.text('Sócio do App & Gestão de Operações', xAssHector + (larguraAss / 2), yAssinatura + 7.5, { align: 'center' });
 
   return doc;
 }
