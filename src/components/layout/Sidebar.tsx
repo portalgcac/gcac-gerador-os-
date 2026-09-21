@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
-  LayoutDashboard, FileText, Plus, Settings, LogOut, Cloud, CloudOff, Loader, X, Users, Receipt, Calendar, BarChart3, ListTodo, Bell, Shield, Link2, FileSpreadsheet, Building2, UserPlus, Crosshair, MessageSquare, BadgeDollarSign, Sparkles
+  LayoutDashboard, FileText, Plus, Settings, LogOut, Cloud, CloudOff, Loader, X, Users, Receipt, Calendar, BarChart3, ListTodo, Bell, Shield, Link2, FileSpreadsheet, Building2, UserPlus, Crosshair, MessageSquare, BadgeDollarSign, Sparkles, Target
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../db/supabase';
@@ -28,14 +28,13 @@ const links = [
 ].sort((a, b) => a.label.localeCompare(b.label));
 
 const linksPortalSaaS = [
-  { to: '/portal-admin?tab=empresas', label: 'Despachantes Assinantes', icon: Building2, tab: 'empresas' },
+  { to: '/portal-admin?tab=empresas', label: 'Despachantes & Clubes (B2B)', icon: Building2, tab: 'empresas' },
+  { to: '/portal-admin?tab=cacs', label: 'Atiradores & CACs (B2C)', icon: Target, tab: 'cacs' },
   { to: '/portal-admin?tab=faturamento', label: 'Faturamento de Licenças', icon: BadgeDollarSign, tab: 'faturamento' },
   { to: '/portal-admin?tab=leads', label: 'Pré-Cadastros (Leads)', icon: UserPlus, tab: 'leads' },
-  { to: '/portal-admin?tab=monitor_cacs', label: 'Monitor de Atiradores', icon: Crosshair, tab: 'monitor_cacs' },
   { to: '/portal-admin?tab=broadcast', label: 'Central de Notificações', icon: Bell, tab: 'broadcast' },
   { to: '/portal-admin?tab=chamados', label: 'Chamados do Site', icon: MessageSquare, tab: 'chamados' },
-  { to: '/portal-admin?tab=site', label: 'Site Portal G CAC', icon: Settings, tab: 'site' },
-  { to: '/portal-admin?tab=vinculos', label: 'Vínculos Clientes CAC', icon: Link2, tab: 'vinculos' },
+  { to: '/portal-admin?tab=site', label: 'Site Institucional', icon: Settings, tab: 'site' },
   { to: '/portal-admin?tab=socios', label: 'Sócios do Portal', icon: Shield, tab: 'socios' },
 ];
 
@@ -247,7 +246,10 @@ export function Sidebar() {
             </div>
             {linksPortalSaaS.map((link) => {
               const Icon = link.icon;
-              const isAbaAtiva = location.pathname === '/portal-admin' && currentTab === link.tab;
+              const isAbaAtiva = location.pathname === '/portal-admin' && (
+                currentTab === link.tab ||
+                (link.tab === 'cacs' && (currentTab === 'vinculos' || currentTab === 'monitor_cacs'))
+              );
               return (
                 <NavLink
                   key={link.to}
@@ -426,7 +428,10 @@ export function NavegacaoInferior() {
       {contextoAtivo === 'portal_saas' ? (
         linksPortalSaaS.map((link) => {
           const Icon = link.icon;
-          const isAbaAtiva = location.pathname === '/portal-admin' && currentTab === link.tab;
+          const isAbaAtiva = location.pathname === '/portal-admin' && (
+            currentTab === link.tab ||
+            (link.tab === 'cacs' && (currentTab === 'vinculos' || currentTab === 'monitor_cacs'))
+          );
           return (
             <NavLink
               key={link.to}

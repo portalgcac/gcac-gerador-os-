@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { UserPlus, Shield, Mail, User, Trash2, Edit2, CheckCircle, XCircle, ChevronDown, ChevronUp, Lock, Building, ArrowLeft, Settings2, BadgeDollarSign, Calendar, CreditCard, Crosshair, ShieldAlert, Bell, Sparkles, X, Link2, MessageSquare } from 'lucide-react';
+import { UserPlus, Shield, Mail, User, Trash2, Edit2, CheckCircle, XCircle, ChevronDown, ChevronUp, Lock, Building, ArrowLeft, Settings2, BadgeDollarSign, Calendar, CreditCard, Crosshair, ShieldAlert, Bell, Sparkles, X, Link2, MessageSquare, Target } from 'lucide-react';
 import { supabase } from '../../db/supabase';
 import { PainelClientesCAC } from '../vinculos/PainelClientesCAC';
 import { Notificacao, useNotificacao } from '../common/Notificacao';
@@ -175,15 +175,36 @@ const parseGeminiResponse = (text: string) => {
 };
 
 export function GestaoUsuarios({ abaInicial }: GestaoUsuariosProps = {}) {
-  const { usuario } = useAuth();
-  const isMasterAdmin = usuario?.email === 'gui.gomesassis@gmail.com' || Boolean(usuario?.ehSocioPortal);
+  const { usuario, contextoAtivo } = useAuth();
+  // No contexto do Escritório (Despachante), renderiza diretamente a gestão da equipe local do escritório
+  const isMasterAdmin = (usuario?.email === 'gui.gomesassis@gmail.com' || Boolean(usuario?.ehSocioPortal)) && contextoAtivo !== 'escritorio';
 
   // Sub-painel ativo para Master Admin / Sócios Portal
-  const [subPainelAtivo, setSubPainelAtivo] = useState<'empresas' | 'cacs' | 'equipe_interna' | 'faturamento' | 'leads' | 'monitor_cacs' | 'broadcast' | 'site' | 'vinculos' | 'chamados' | 'socios'>(abaInicial || 'empresas');
+  const [subPainelAtivo, setSubPainelAtivo] = useState<'empresas' | 'cacs' | 'equipe_interna' | 'faturamento' | 'leads' | 'monitor_cacs' | 'broadcast' | 'site' | 'vinculos' | 'chamados' | 'socios'>(
+    abaInicial === 'vinculos' || abaInicial === 'monitor_cacs' ? 'cacs' : (abaInicial || 'empresas')
+  );
+
+  // Sub-aba interna do módulo unificado de CACs
+  const [subAbaCac, setSubAbaCac] = useState<'usuarios' | 'vinculos' | 'monitor'>(
+    abaInicial === 'vinculos' ? 'vinculos' : abaInicial === 'monitor_cacs' ? 'monitor' : 'usuarios'
+  );
 
   useEffect(() => {
     if (abaInicial) {
-      setSubPainelAtivo(abaInicial);
+      if (abaInicial === 'vinculos') {
+        setSubPainelAtivo('cacs');
+        setSubAbaCac('vinculos');
+      } else if (abaInicial === 'monitor_cacs') {
+        setSubPainelAtivo('cacs');
+        setSubAbaCac('monitor');
+      } else if ((abaInicial as any) === 'equipe_interna') {
+        setSubPainelAtivo('empresas');
+      } else {
+        setSubPainelAtivo(abaInicial);
+        if (abaInicial === 'cacs') {
+          setSubAbaCac('usuarios');
+        }
+      }
     }
   }, [abaInicial]);
   const [leads, setLeads] = useState<any[]>([]);
@@ -1876,128 +1897,108 @@ Você pode adicionar comentários, observações ou explicações adicionais ant
       {isMasterAdmin && (
         <div className="space-y-4">
           {/* Seletor de Perfis no topo (apenas se nenhuma empresa estiver sendo gerenciada no detalhe) */}
+          {/* Seletor de Módulos Estratégicos SaaS (apenas se nenhuma empresa estiver sendo gerenciada no detalhe) */}
           {!empresaGerenciada && (
             <div className="flex flex-wrap gap-2 pb-4 border-b border-brand-dark-5">
+              {/* 1. B2B: Despachantes & Clubes Assinantes */}
               <button
                 type="button"
                 onClick={() => { setSubPainelAtivo('empresas'); setBuscaUsuario(''); }}
                 className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all border ${
                   subPainelAtivo === 'empresas'
-                    ? 'bg-brand-blue/15 border-brand-blue/30 text-white font-bold'
+                    ? 'bg-brand-blue/15 border-brand-blue/30 text-white font-bold shadow-md shadow-brand-blue/10'
                     : 'bg-brand-dark-3 border-brand-dark-5 text-gray-400 hover:text-white'
                 }`}
               >
-                <Building size={14} />
-                Usuários Empresa (B2B Tenants)
+                <Building size={14} className={subPainelAtivo === 'empresas' ? 'text-brand-blue-light' : ''} />
+                Despachantes & Clubes (B2B)
               </button>
+
+              {/* 2. B2C: Atiradores & CACs Unificado */}
               <button
                 type="button"
                 onClick={() => { setSubPainelAtivo('cacs'); setBuscaUsuario(''); }}
                 className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all border ${
                   subPainelAtivo === 'cacs'
-                    ? 'bg-brand-blue/15 border-brand-blue/30 text-white font-bold'
+                    ? 'bg-brand-blue/15 border-brand-blue/30 text-white font-bold shadow-md shadow-brand-blue/10'
                     : 'bg-brand-dark-3 border-brand-dark-5 text-gray-400 hover:text-white'
                 }`}
               >
-                <User size={14} />
-                Atiradores e Caçadores (CAC Individual)
+                <Target size={14} className={subPainelAtivo === 'cacs' ? 'text-brand-blue-light' : ''} />
+                Atiradores & CACs (B2C)
               </button>
-              <button
-                type="button"
-                onClick={() => { setSubPainelAtivo('equipe_interna'); setBuscaUsuario(''); }}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all border ${
-                  subPainelAtivo === 'equipe_interna'
-                    ? 'bg-brand-blue/15 border-brand-blue/30 text-white font-bold'
-                    : 'bg-brand-dark-3 border-brand-dark-5 text-gray-400 hover:text-white'
-                }`}
-              >
-                <Shield size={14} />
-                Equipe do Escritório (Staff)
-              </button>
+
+              {/* 3. Comercial & Faturamento de Licenças */}
               <button
                 type="button"
                 onClick={() => { setSubPainelAtivo('faturamento'); setBuscaUsuario(''); }}
                 className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all border ${
                   subPainelAtivo === 'faturamento'
-                    ? 'bg-brand-blue/15 border-brand-blue/30 text-white font-bold'
+                    ? 'bg-brand-blue/15 border-brand-blue/30 text-white font-bold shadow-md shadow-brand-blue/10'
                     : 'bg-brand-dark-3 border-brand-dark-5 text-gray-400 hover:text-white'
                 }`}
               >
-                <BadgeDollarSign size={14} />
+                <BadgeDollarSign size={14} className={subPainelAtivo === 'faturamento' ? 'text-emerald-400' : ''} />
                 Faturamento & Licenças
               </button>
+
+              {/* 4. Pré-Cadastros & Leads */}
               <button
                 type="button"
                 onClick={() => { setSubPainelAtivo('leads'); setBuscaUsuario(''); }}
                 className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all border ${
                   subPainelAtivo === 'leads'
-                    ? 'bg-brand-blue/15 border-brand-blue/30 text-white font-bold'
+                    ? 'bg-brand-blue/15 border-brand-blue/30 text-white font-bold shadow-md shadow-brand-blue/10'
                     : 'bg-brand-dark-3 border-brand-dark-5 text-gray-400 hover:text-white'
                 }`}
               >
-                <UserPlus size={14} />
+                <UserPlus size={14} className={subPainelAtivo === 'leads' ? 'text-amber-400' : ''} />
                 Pré-Cadastros (Leads)
               </button>
-              <button
-                type="button"
-                onClick={() => { setSubPainelAtivo('monitor_cacs'); setBuscaUsuario(''); }}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all border ${
-                  subPainelAtivo === 'monitor_cacs'
-                    ? 'bg-brand-blue/15 border-brand-blue/30 text-white font-bold'
-                    : 'bg-brand-dark-3 border-brand-dark-5 text-gray-400 hover:text-white'
-                }`}
-              >
-                <Crosshair size={14} />
-                Monitor de Atiradores (Acervo)
-              </button>
+
+              {/* 5. Central de Notificações / Broadcast */}
               <button
                 type="button"
                 onClick={() => { setSubPainelAtivo('broadcast'); setBuscaUsuario(''); }}
                 className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all border ${
                   subPainelAtivo === 'broadcast'
-                    ? 'bg-brand-blue/15 border-brand-blue/30 text-white font-bold'
+                    ? 'bg-brand-blue/15 border-brand-blue/30 text-white font-bold shadow-md shadow-brand-blue/10'
                     : 'bg-brand-dark-3 border-brand-dark-5 text-gray-400 hover:text-white'
                 }`}
               >
-                <Bell size={14} />
-                Lançar Notificações (Broadcast)
+                <Bell size={14} className={subPainelAtivo === 'broadcast' ? 'text-brand-blue-light' : ''} />
+                Notificações (Broadcast)
               </button>
-              <button
-                type="button"
-                onClick={() => { setSubPainelAtivo('site'); setBuscaUsuario(''); }}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all border ${
-                  subPainelAtivo === 'site'
-                    ? 'bg-brand-blue/15 border-brand-blue/30 text-white font-bold'
-                    : 'bg-brand-dark-3 border-brand-dark-5 text-gray-400 hover:text-white'
-                }`}
-              >
-                <Settings2 size={14} />
-                Site Portal G CAC
-              </button>
+
+              {/* 6. Chamados do Site */}
               <button
                 type="button"
                 onClick={() => { setSubPainelAtivo('chamados'); setBuscaUsuario(''); }}
                 className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all border ${
                   subPainelAtivo === 'chamados'
-                    ? 'bg-brand-blue/15 border-brand-blue/30 text-white font-bold'
+                    ? 'bg-brand-blue/15 border-brand-blue/30 text-white font-bold shadow-md shadow-brand-blue/10'
                     : 'bg-brand-dark-3 border-brand-dark-5 text-gray-400 hover:text-white'
                 }`}
               >
-                <MessageSquare size={14} />
+                <MessageSquare size={14} className={subPainelAtivo === 'chamados' ? 'text-sky-400' : ''} />
                 Chamados do Site
               </button>
+
+              {/* 7. Site Institucional */}
               <button
                 type="button"
-                onClick={() => { setSubPainelAtivo('vinculos'); setBuscaUsuario(''); }}
+                onClick={() => { setSubPainelAtivo('site'); setBuscaUsuario(''); }}
                 className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all border ${
-                  subPainelAtivo === 'vinculos'
-                    ? 'bg-brand-blue/15 border-brand-blue/30 text-white font-bold'
+                  subPainelAtivo === 'site'
+                    ? 'bg-brand-blue/15 border-brand-blue/30 text-white font-bold shadow-md shadow-brand-blue/10'
                     : 'bg-brand-dark-3 border-brand-dark-5 text-gray-400 hover:text-white'
                 }`}
               >
-                <Link2 size={14} />
-                Clientes CAC
+                <Settings2 size={14} className={subPainelAtivo === 'site' ? 'text-gray-300' : ''} />
+                Site Institucional
               </button>
+
+              {/* 8. Sócios do Portal G CAC */}
               <button
                 type="button"
                 onClick={() => { setSubPainelAtivo('socios'); setBuscaUsuario(''); }}
@@ -2020,9 +2021,9 @@ Você pode adicionar comentários, observações ou explicações adicionais ant
                 <div>
                   <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
                     <Building size={16} className="text-brand-blue" />
-                    Empresas & Clientes Contratantes (B2B)
+                    Despachantes & Clubes de Tiro (B2B Tenants)
                   </h3>
-                  <p className="text-xs text-gray-500 mt-1">Crie e configure workspaces para escritórios de despachantes externos</p>
+                  <p className="text-xs text-gray-400 mt-1">Gerencie os escritórios e clubes parceiros assinantes da plataforma, configure licenças, ferramentas e equipes autorizadas.</p>
                 </div>
               </div>
 
@@ -2395,197 +2396,168 @@ Você pode adicionar comentários, observações ou explicações adicionais ant
             </div>
           )}
 
-          {/* ABA 2: ATIRADORES E CAÇADORES (CAC INDIVIDUAL - B2C) */}
+          {/* ABA 2: ATIRADORES E CACS (B2C) - UNIFICADO */}
           {subPainelAtivo === 'cacs' && (
-            <div className="card space-y-4 animate-fade-in">
-              <div className="flex items-center justify-between pb-2 border-b border-brand-dark-5">
-                <div>
-                  <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
-                    <User size={16} className="text-brand-blue" />
-                    Atiradores e Caçadores (CAC Individual)
-                  </h3>
-                  <p className="text-xs text-gray-400 mt-0.5">Gerencie os usuários finais CPF que usam o portal de forma autônoma</p>
+            <div className="space-y-4 animate-fade-in">
+              {/* Seletor de Sub-Abas do Ecossistema CAC */}
+              <div className="flex flex-wrap items-center justify-between gap-3 bg-brand-dark-3/60 p-2.5 rounded-2xl border border-brand-dark-5">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => { setSubAbaCac('usuarios'); setBuscaUsuario(''); }}
+                    className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all ${
+                      subAbaCac === 'usuarios'
+                        ? 'bg-brand-blue text-white shadow-md shadow-brand-blue/20'
+                        : 'text-gray-400 hover:text-white hover:bg-brand-dark-4'
+                    }`}
+                  >
+                    <User size={14} />
+                    Contas de Atiradores (CAC Individual)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setSubAbaCac('vinculos'); setBuscaUsuario(''); }}
+                    className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all ${
+                      subAbaCac === 'vinculos'
+                        ? 'bg-brand-blue text-white shadow-md shadow-brand-blue/20'
+                        : 'text-gray-400 hover:text-white hover:bg-brand-dark-4'
+                    }`}
+                  >
+                    <Link2 size={14} />
+                    Vínculos com Despachantes
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setSubAbaCac('monitor'); setBuscaUsuario(''); }}
+                    className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all ${
+                      subAbaCac === 'monitor'
+                        ? 'bg-brand-blue text-white shadow-md shadow-brand-blue/20'
+                        : 'text-gray-400 hover:text-white hover:bg-brand-dark-4'
+                    }`}
+                  >
+                    <Crosshair size={14} />
+                    Monitor de Acervo & Alertas
+                  </button>
                 </div>
-                <button 
-                  onClick={() => handleAbrirModal()} 
-                  className="btn-primary btn-sm px-3 flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider"
-                >
-                  <UserPlus size={13} /> Cadastrar CAC Manual
-                </button>
+
+                {subAbaCac === 'usuarios' && (
+                  <button 
+                    onClick={() => handleAbrirModal()} 
+                    className="btn-primary btn-sm px-3 flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider"
+                  >
+                    <UserPlus size={13} /> Cadastrar CAC Manual
+                  </button>
+                )}
               </div>
 
-              <div className="flex items-center gap-2">
-                <input
-                  type="text"
-                  value={buscaUsuario}
-                  onChange={e => setBuscaUsuario(e.target.value)}
-                  placeholder="Buscar atirador por nome, e-mail ou CPF..."
-                  className="input w-full text-xs"
-                />
-              </div>
+              {/* Sub-Aba 1: Contas de Usuários CAC */}
+              {subAbaCac === 'usuarios' && (
+                <div className="card space-y-4 animate-fade-in">
+                  <div className="flex items-center justify-between pb-2 border-b border-brand-dark-5">
+                    <div>
+                      <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                        <User size={16} className="text-brand-blue" />
+                        Atiradores e Caçadores (CAC Individual - B2C)
+                      </h3>
+                      <p className="text-xs text-gray-400 mt-0.5">Gerencie os usuários finais CPF que usam o portal de forma autônoma</p>
+                    </div>
+                  </div>
 
-              {getUsuariosExibidos().length === 0 ? (
-                <p className="text-sm text-gray-500 italic text-center py-8">Nenhum atirador ou caçador individual cadastrado no sistema.</p>
-              ) : (
-                <div className="overflow-x-auto rounded-2xl border border-brand-dark-5">
-                  <table className="w-full text-left border-collapse min-w-[850px]">
-                    <thead>
-                      <tr className="bg-brand-dark-3 border-b border-brand-dark-5">
-                        <th className="p-3 text-xs font-black text-gray-400 uppercase tracking-wider">Atirador / Caçador</th>
-                        <th className="p-3 text-xs font-black text-gray-400 uppercase tracking-wider">Vínculo de Sistema (ID Workspace)</th>
-                        <th className="p-3 text-xs font-black text-gray-400 uppercase tracking-wider">Contatos / CPF</th>
-                        <th className="p-3 text-xs font-black text-gray-400 uppercase tracking-wider">Status</th>
-                        <th className="p-3 text-xs font-black text-gray-400 uppercase tracking-wider text-right">Ações</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-brand-dark-5">
-                      {getUsuariosExibidos().map(u => (
-                        <tr key={u.id} className="bg-brand-dark-4/40 hover:bg-brand-dark-4 transition-colors">
-                          <td className="p-3">
-                            <p className="font-bold text-white text-sm">{u.nome}</p>
-                            <p className="text-xs text-gray-400 font-mono mt-0.5">{u.email}</p>
-                          </td>
-                          <td className="p-3 text-xs font-mono text-gray-400">
-                            {u.empresa_id ? (
-                              <span className="bg-brand-dark-3 px-2 py-1 rounded text-xs select-all hover:text-white transition-colors animate-fade-in" title={u.empresa_id}>
-                                {u.empresa_id.substring(0, 8)}...
-                              </span>
-                            ) : (
-                              <span className="text-gray-600 italic">Não Vinculado</span>
-                            )}
-                          </td>
-                          <td className="p-3 text-xs text-gray-300">
-                            {u.cpf ? <p className="font-mono">{u.cpf}</p> : <p className="text-gray-500 italic">Sem CPF</p>}
-                            {u.contato && <p className="text-gray-400 mt-0.5">{u.contato}</p>}
-                          </td>
-                          <td className="p-3">
-                            <button
-                              type="button"
-                              onClick={() => toggleStatus(u)}
-                              className="flex items-center gap-1 text-[10px] font-black uppercase transition-all px-2.5 py-1 rounded-lg bg-brand-dark-3 border border-brand-dark-5 hover:border-gray-600"
-                            >
-                              <span className={u.ativo ? 'text-brand-green' : 'text-red-400'}>
-                                {u.ativo ? 'Ativo' : 'Inativo'}
-                              </span>
-                            </button>
-                          </td>
-                          <td className="p-3 text-right">
-                            <div className="flex items-center justify-end gap-1">
-                              <button
-                                type="button"
-                                onClick={() => handleAbrirModal(u)}
-                                className="p-1.5 text-gray-400 hover:text-brand-blue-light hover:bg-brand-dark-3 rounded-xl transition-all"
-                                title="Editar Acessos"
-                              >
-                                <Edit2 size={14} />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setConfirmandoDeleteUsuario({ id: u.id, nome: u.nome, empresa_id: u.empresa_id })}
-                                className="p-1.5 text-gray-400 hover:text-red-400 hover:bg-brand-dark-3 rounded-xl transition-all"
-                                title="Excluir Usuário"
-                              >
-                                <Trash2 size={14} />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={buscaUsuario}
+                      onChange={e => setBuscaUsuario(e.target.value)}
+                      placeholder="Buscar atirador por nome, e-mail ou CPF..."
+                      className="input w-full text-xs"
+                    />
+                  </div>
+
+                  {getUsuariosExibidos().length === 0 ? (
+                    <p className="text-sm text-gray-500 italic text-center py-8">Nenhum atirador ou caçador individual cadastrado no sistema.</p>
+                  ) : (
+                    <div className="overflow-x-auto rounded-2xl border border-brand-dark-5">
+                      <table className="w-full text-left border-collapse min-w-[850px]">
+                        <thead>
+                          <tr className="bg-brand-dark-3 border-b border-brand-dark-5">
+                            <th className="p-3 text-xs font-black text-gray-400 uppercase tracking-wider">Atirador / Caçador</th>
+                            <th className="p-3 text-xs font-black text-gray-400 uppercase tracking-wider">Vínculo de Sistema (ID Workspace)</th>
+                            <th className="p-3 text-xs font-black text-gray-400 uppercase tracking-wider">Contatos / CPF</th>
+                            <th className="p-3 text-xs font-black text-gray-400 uppercase tracking-wider">Status</th>
+                            <th className="p-3 text-xs font-black text-gray-400 uppercase tracking-wider text-right">Ações</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-brand-dark-5">
+                          {getUsuariosExibidos().map(u => (
+                            <tr key={u.id} className="bg-brand-dark-4/40 hover:bg-brand-dark-4 transition-colors">
+                              <td className="p-3">
+                                <p className="font-bold text-white text-sm">{u.nome}</p>
+                                <p className="text-xs text-gray-400 font-mono mt-0.5">{u.email}</p>
+                              </td>
+                              <td className="p-3 text-xs font-mono text-gray-400">
+                                {u.empresa_id ? (
+                                  <span className="bg-brand-dark-3 px-2 py-1 rounded text-xs select-all hover:text-white transition-colors animate-fade-in" title={u.empresa_id}>
+                                    {u.empresa_id.substring(0, 8)}...
+                                  </span>
+                                ) : (
+                                  <span className="text-gray-600 italic">Não Vinculado</span>
+                                )}
+                              </td>
+                              <td className="p-3 text-xs text-gray-300">
+                                {u.cpf ? <p className="font-mono">{u.cpf}</p> : <p className="text-gray-500 italic">Sem CPF</p>}
+                                {u.contato && <p className="text-gray-400 mt-0.5">{u.contato}</p>}
+                              </td>
+                              <td className="p-3">
+                                <button
+                                  type="button"
+                                  onClick={() => toggleStatus(u)}
+                                  className="flex items-center gap-1 text-[10px] font-black uppercase transition-all px-2.5 py-1 rounded-lg bg-brand-dark-3 border border-brand-dark-5 hover:border-gray-600"
+                                >
+                                  <span className={u.ativo ? 'text-brand-green' : 'text-red-400'}>
+                                    {u.ativo ? 'Ativo' : 'Inativo'}
+                                  </span>
+                                </button>
+                              </td>
+                              <td className="p-3 text-right">
+                                <div className="flex items-center justify-end gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleAbrirModal(u)}
+                                    className="p-1.5 text-gray-400 hover:text-brand-blue-light hover:bg-brand-dark-3 rounded-xl transition-all"
+                                    title="Editar Acessos"
+                                  >
+                                    <Edit2 size={14} />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setConfirmandoDeleteUsuario({ id: u.id, nome: u.nome, empresa_id: u.empresa_id })}
+                                    className="p-1.5 text-gray-400 hover:text-red-400 hover:bg-brand-dark-3 rounded-xl transition-all"
+                                    title="Excluir Usuário"
+                                  >
+                                    <Trash2 size={14} />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </div>
               )}
-            </div>
-          )}
 
-          {/* ABA 3: EQUIPE INTERNA DO ESCRITÓRIO MÃE (STAFF) */}
-          {subPainelAtivo === 'equipe_interna' && (
-            <div className="card space-y-4 animate-fade-in">
-              <div className="flex items-center justify-between pb-2 border-b border-brand-dark-5">
-                <div>
-                  <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
-                    <Shield size={16} className="text-brand-blue" />
-                    Equipe do Escritório (Staff Interno)
-                  </h3>
-                  <p className="text-xs text-gray-400 mt-0.5">Gerencie os colaboradores da matriz do G CAC Despachante Bélico</p>
+              {/* Sub-Aba 2: Vínculos com Despachantes */}
+              {subAbaCac === 'vinculos' && (
+                <div className="animate-fade-in">
+                  <PainelClientesCAC />
                 </div>
-                <button 
-                  onClick={() => handleAbrirModal()} 
-                  className="btn-primary btn-sm px-3 flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider"
-                >
-                  <UserPlus size={13} /> Novo Colaborador
-                </button>
-              </div>
+              )}
 
-              <div className="flex items-center gap-2">
-                <input
-                  type="text"
-                  value={buscaUsuario}
-                  onChange={e => setBuscaUsuario(e.target.value)}
-                  placeholder="Buscar colaborador por nome, e-mail ou CPF..."
-                  className="input w-full text-xs"
-                />
-              </div>
-
-              {getUsuariosExibidos().length === 0 ? (
-                <p className="text-sm text-gray-500 italic text-center py-8">Nenhum funcionário cadastrado no escritório central.</p>
-              ) : (
-                <div className="overflow-x-auto rounded-2xl border border-brand-dark-5">
-                  <table className="w-full text-left border-collapse min-w-[850px]">
-                    <thead>
-                      <tr className="bg-brand-dark-3 border-b border-brand-dark-5">
-                        <th className="p-3 text-xs font-black text-gray-400 uppercase tracking-wider">Colaborador</th>
-                        <th className="p-3 text-xs font-black text-gray-400 uppercase tracking-wider">Nível de Staff</th>
-                        <th className="p-3 text-xs font-black text-gray-400 uppercase tracking-wider">Identificação</th>
-                        <th className="p-3 text-xs font-black text-gray-400 uppercase tracking-wider">Status</th>
-                        <th className="p-3 text-xs font-black text-gray-400 uppercase tracking-wider text-right">Ações</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-brand-dark-5">
-                      {getUsuariosExibidos().map(u => (
-                        <tr key={u.id} className="bg-brand-dark-4/40 hover:bg-brand-dark-4 transition-colors">
-                          <td className="p-3">
-                            <p className="font-bold text-white text-sm">{u.nome}</p>
-                            <p className="text-xs text-gray-400 font-mono mt-0.5">{u.email}</p>
-                          </td>
-                          <td className="p-3">
-                            <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full tracking-wider ${
-                              u.role === 'admin' 
-                                ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' 
-                                : 'bg-brand-blue/10 text-brand-blue-light border border-brand-blue/20'
-                            }`}>
-                              {u.role === 'admin' ? 'Admin Mestre' : 'Colaborador Matriz'}
-                            </span>
-                          </td>
-                          <td className="p-3 text-xs text-gray-300">
-                            {u.cpf ? <p className="font-mono">{u.cpf}</p> : <p className="text-gray-500 italic">Sem CPF</p>}
-                            {u.contato && <p className="text-gray-400 mt-0.5">{u.contato}</p>}
-                          </td>
-                          <td className="p-3">
-                            <button
-                              type="button"
-                              onClick={() => toggleStatus(u)}
-                              className="flex items-center gap-1 text-[10px] font-black uppercase transition-all px-2.5 py-1 rounded-lg bg-brand-dark-3 border border-brand-dark-5 hover:border-gray-600"
-                            >
-                              <span className={u.ativo ? 'text-brand-green' : 'text-red-400'}>
-                                {u.ativo ? 'Ativo' : 'Inativo'}
-                              </span>
-                            </button>
-                          </td>
-                          <td className="p-3 text-right">
-                            <button
-                              type="button"
-                              onClick={() => handleAbrirModal(u)}
-                              className="p-1.5 text-gray-400 hover:text-brand-blue-light hover:bg-brand-dark-3 rounded-xl transition-all"
-                              title="Editar Permissões"
-                            >
-                              <Edit2 size={14} />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+              {/* Sub-Aba 3: Monitor de Acervo & Alertas */}
+              {subAbaCac === 'monitor' && (
+                <div className="animate-fade-in pt-1">
+                  <PainelAtiradores />
                 </div>
               )}
             </div>
@@ -3365,14 +3337,8 @@ Você pode adicionar comentários, observações ou explicações adicionais ant
               )}
             </div>
           )}
-          {/* ABA 6: MONITOR GLOBAL DE ATIRADORES CAC */}
-          {subPainelAtivo === 'monitor_cacs' && (
-            <div className="animate-fade-in pt-2">
-              <PainelAtiradores />
-            </div>
-          )}
 
-          {/* ABA 7: ENVIO DE NOTIFICAÇÕES (BROADCAST) */}
+          {/* ABA 5: ENVIO DE NOTIFICAÇÕES (BROADCAST) */}
           {subPainelAtivo === 'broadcast' && (
             <div className="card space-y-6 animate-fade-in">
               <div className="pb-2 border-b border-brand-dark-5">
@@ -3871,12 +3837,7 @@ Você pode adicionar comentários, observações ou explicações adicionais ant
             </div>
           )}
 
-          {/* ABA 9: VÍNCULOS CLIENTES CAC */}
-          {subPainelAtivo === 'vinculos' && (
-            <PainelClientesCAC />
-          )}
-
-          {/* ABA 10: CHAMADOS DO SITE */}
+          {/* ABA 6: CHAMADOS DO SITE */}
           {subPainelAtivo === 'chamados' && (
             <div className="card space-y-6 animate-fade-in">
               <div className="pb-2 border-b border-brand-dark-5">
