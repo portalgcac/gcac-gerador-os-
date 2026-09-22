@@ -163,16 +163,32 @@ export function Sidebar() {
   const linksFiltrados = filtrarLinks(usuario, temAcessoRecurso);
   const isAdmin = usuario?.role === 'admin';
 
+  const logoSrc = contextoAtivo === 'portal_saas'
+    ? "/LOGO PORTAL G CAC 2 SEM FRASE.png"
+    : (usuario?.dadosEmpresa?.logoUrl || (usuario?.tipoConta === 'cac_individual' ? "/LOGO PORTAL G CAC 2 SEM FRASE.png" : "/Logo oficial.png"));
+
+  const logoAlt = contextoAtivo === 'portal_saas'
+    ? "Portal G CAC"
+    : (usuario?.empresaNome || "GCAC");
+
   return (
     <aside className="w-64 bg-brand-dark-2 border-r border-brand-dark-5 flex flex-col h-full relative">
       {/* Logo */}
       <div className="p-5 border-b border-brand-dark-5 flex flex-col items-center text-center gap-3 relative">
         <div className="flex flex-col items-center w-full">
           <img 
-            src={usuario?.dadosEmpresa?.logoUrl || "/LOGO PORTAL G CAC 2 SEM FRASE.png"} 
-            alt="GCAC" 
-            className="w-28 h-28 object-contain mb-2"
-            onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} 
+            key={contextoAtivo}
+            src={logoSrc} 
+            alt={logoAlt} 
+            className="w-28 h-28 object-contain mb-2 transition-all duration-300"
+            onError={e => { 
+              const target = e.target as HTMLImageElement;
+              if (contextoAtivo === 'portal_saas') {
+                target.src = "/usar no site/LOGO PORTAL SEM FRASE.png";
+              } else {
+                target.src = "/Logo oficial.png";
+              }
+            }} 
           />
           <div className="w-full">
             {contextoAtivo === 'portal_saas' ? (
@@ -354,7 +370,7 @@ export function Sidebar() {
                 </span>
               </div>
             )}
-            {usuario?.dadosEmpresa?.logoUrl && (
+            {usuario?.dadosEmpresa?.logoUrl && contextoAtivo !== 'portal_saas' && (
               <div className="mb-1 p-2 bg-brand-dark-3/30 border border-brand-dark-5/50 rounded-xl flex items-center justify-center gap-2">
                 <span className="text-[8px] text-gray-500 font-black uppercase tracking-widest">Plataforma</span>
                 <img 
