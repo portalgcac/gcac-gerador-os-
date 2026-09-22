@@ -12,6 +12,7 @@ import { useFinanceiro } from '../../context/FinanceiroContext';
 import { BriefingDiario } from './BriefingDiario';
 import { WidgetLembretes } from './WidgetLembretes';
 import { WidgetVencimentos } from './WidgetVencimentos';
+import { WidgetAlertasRegulatorios } from './WidgetAlertasRegulatorios';
 
 export function Dashboard() {
   const navigate = useNavigate();
@@ -179,9 +180,12 @@ export function Dashboard() {
         </div>
       )}
 
-      {/* ── Widget de Lembretes ── */}
+      {/* ── Widget de Lembretes e Vencimentos ── */}
       {temAcessoRecurso('dash_lembretes') && <WidgetLembretes />}
       {temAcessoRecurso('dash_alertas_vencimento') && <WidgetVencimentos />}
+
+      {/* ── Widget de Alertas Regulatórios Oficiais (Exército, PF, Decretos) ── */}
+      <WidgetAlertasRegulatorios />
 
       {/* ── Cards de Estatísticas ── */}
       {temAcessoRecurso('dash_resumo_os') && (

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
-  LayoutDashboard, FileText, Plus, Settings, LogOut, Cloud, CloudOff, Loader, X, Users, Receipt, Calendar, BarChart3, ListTodo, Bell, Shield, Link2, FileSpreadsheet, Building2, UserPlus, Crosshair, MessageSquare, BadgeDollarSign, Sparkles, Target
+  LayoutDashboard, FileText, Plus, Settings, LogOut, Cloud, CloudOff, Loader, X, Users, Receipt, Calendar, BarChart3, ListTodo, Bell, Shield, Link2, FileSpreadsheet, Building2, UserPlus, Crosshair, MessageSquare, BadgeDollarSign, Sparkles, Target, Scale
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../db/supabase';
@@ -32,6 +32,7 @@ const linksPortalSaaS = [
   { to: '/portal-admin?tab=cacs', label: 'Atiradores & CACs (B2C)', icon: Target, tab: 'cacs' },
   { to: '/portal-admin?tab=faturamento', label: 'Faturamento de Licenças', icon: BadgeDollarSign, tab: 'faturamento' },
   { to: '/portal-admin?tab=relatorios', label: 'Relatórios & Métricas', icon: BarChart3, tab: 'relatorios' },
+  { to: '/portal-admin?tab=regulatorio', label: 'Alertas Regulatórios', icon: Scale, tab: 'regulatorio' },
   { to: '/portal-admin?tab=leads', label: 'Pré-Cadastros (Leads)', icon: UserPlus, tab: 'leads' },
   { to: '/portal-admin?tab=broadcast', label: 'Central de Notificações', icon: Bell, tab: 'broadcast' },
   { to: '/portal-admin?tab=chamados', label: 'Chamados do Site', icon: MessageSquare, tab: 'chamados' },

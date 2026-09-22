@@ -26,7 +26,11 @@ import {
   ArrowUpRight,
   ShieldAlert,
   HelpCircle,
-  Lock
+  Lock,
+  Activity,
+  HeartPulse,
+  Zap,
+  Phone
 } from 'lucide-react';
 import { supabase } from '../../db/supabase';
 import { useAuth } from '../../context/AuthContext';
@@ -44,12 +48,13 @@ export function PainelRelatoriosPortal() {
   const [exportandoCsv, setExportandoCsv] = useState(false);
 
   // Aba ativa interna de relatórios
-  const [abaRelatorio, setAbaRelatorio] = useState<'geral' | 'b2b' | 'financeiro' | 'acervo' | 'leads'>('geral');
+  const [abaRelatorio, setAbaRelatorio] = useState<'geral' | 'b2b' | 'financeiro' | 'acervo' | 'leads' | 'churn'>('geral');
 
   // Filtros
   const [periodoFiltro, setPeriodoFiltro] = useState<'tudo' | 'mes_atual' | 'ultimos_30' | 'ultimos_90' | 'ano_atual'>('tudo');
   const [filtroStatus, setFiltroStatus] = useState<string>('todos');
   const [filtroPlano, setFiltroPlano] = useState<string>('todos');
+  const [filtroRiscoChurn, setFiltroRiscoChurn] = useState<'todos' | 'critico' | 'atencao' | 'saudavel'>('todos');
   const [busca, setBusca] = useState('');
 
   // Dados brutos carregados do banco de dados
@@ -62,6 +67,9 @@ export function PainelRelatoriosPortal() {
   const [totalGts, setTotalGts] = useState<number>(0);
   const [totalManejos, setTotalManejos] = useState<number>(0);
   const [socios, setSocios] = useState<any[]>([]);
+  const [usuariosAutorizados, setUsuariosAutorizados] = useState<any[]>([]);
+  const [ordensList, setOrdensList] = useState<any[]>([]);
+  const [clientesList, setClientesList] = useState<any[]>([]);
 
   // Carrega todas as informações estratégicas da plataforma
   const carregarDados = async () => {
@@ -132,19 +140,36 @@ export function PainelRelatoriosPortal() {
 
       setTotalManejos(manejosCount || 0);
 
-      // 9. Carregar Sócios para o relatório executivo
-      const { data: dataSocios } = await supabase
+      // 9. Carregar Ordens de Serviço para análise operacional
+      const { data: dataOrdens, error: errOrdens } = await supabase
+        .from('ordens')
+        .select('id, empresa_id');
+      if (errOrdens) console.warn('Aviso ao carregar ordens:', errOrdens);
+      setOrdensList(dataOrdens || []);
+
+      // 10. Carregar Clientes da carteira operacional
+      const { data: dataClientes, error: errClientes } = await supabase
+        .from('clientes')
+        .select('id, empresa_id');
+      if (errClientes) console.warn('Aviso ao carregar clientes:', errClientes);
+      setClientesList(dataClientes || []);
+
+      // 11. Carregar Todos os Usuários Autorizados (para último acesso de cada escritório e sócios)
+      const { data: dataUsuarios, error: errUsuarios } = await supabase
         .from('usuarios_autorizados')
         .select('*');
+      if (errUsuarios) console.warn('Aviso ao carregar usuarios:', errUsuarios);
+      setUsuariosAutorizados(dataUsuarios || []);
 
+      // 12. Carregar Sócios para o relatório executivo
       const listaSocios = [
         { nome: 'Guilherme Gomes', cargo: 'Fundador & Gestor Principal', ehGestorPrincipal: true },
         { nome: 'Gabriel Dias Benevides', cargo: 'Sócio do App / Co-Administrador' },
         { nome: 'Hector Henrique Furtado Meira', cargo: 'Sócio do App / Gestão de Operações' },
       ];
 
-      if (dataSocios) {
-        dataSocios.forEach(u => {
+      if (dataUsuarios) {
+        dataUsuarios.forEach(u => {
           const emailLower = (u.email || '').trim().toLowerCase();
           if (emailLower === 'gui.gomesassis@gmail.com') return;
           if (emailLower === 'hectoruk80@gmail.com' || (u.permissoes && u.permissoes.includes('socio_portal')) || u.role === 'socio_portal') {
@@ -235,16 +260,106 @@ export function PainelRelatoriosPortal() {
         statusFormatado = 'Isento / Gratuito';
       }
 
+      // ── Indicadores de Customer Success (CS) & Saúde Anti-Churn ──────────
+      const usuariosDaEmpresa = usuariosAutorizados.filter(u => u.empresa_id === emp.id);
+      
+      let ultimoAcessoDate: Date | null = null;
+      usuariosDaEmpresa.forEach(u => {
+        if (u.ultimo_acesso) {
+          const d = new Date(u.ultimo_acesso);
+          if (!ultimoAcessoDate || d.getTime() > ultimoAcessoDate.getTime()) {
+            ultimoAcessoDate = d;
+          }
+        }
+      });
+      if (emp.ultimo_acesso) {
+        const d = new Date(emp.ultimo_acesso);
+        if (!ultimoAcessoDate || d.getTime() > (ultimoAcessoDate as Date).getTime()) {
+          ultimoAcessoDate = d;
+        }
+      }
+
+      let diasSemAcesso: number | null = null;
+      if (ultimoAcessoDate) {
+        const diffMs = hoje.getTime() - (ultimoAcessoDate as Date).getTime();
+        diasSemAcesso = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
+      }
+
+      const totalOrdens = ordensList.filter(o => o.empresa_id === emp.id).length;
+      const totalClientes = clientesList.filter(c => c.empresa_id === emp.id).length;
+
+      // Cálculo do Health Score (0 a 100)
+      // 1. Recência de Acesso (até 40 pts)
+      let ptsAcesso = 0;
+      if (diasSemAcesso === null) {
+        const criadoEm = emp.criado_em ? new Date(emp.criado_em) : null;
+        const diasDesdeCriacao = criadoEm ? Math.floor((hoje.getTime() - criadoEm.getTime()) / (1000 * 60 * 60 * 24)) : 30;
+        ptsAcesso = diasDesdeCriacao <= 3 ? 20 : 0;
+      } else if (diasSemAcesso <= 2) {
+        ptsAcesso = 40;
+      } else if (diasSemAcesso <= 5) {
+        ptsAcesso = 35;
+      } else if (diasSemAcesso <= 10) {
+        ptsAcesso = 25;
+      } else if (diasSemAcesso <= 20) {
+        ptsAcesso = 15;
+      } else if (diasSemAcesso <= 30) {
+        ptsAcesso = 5;
+      } else {
+        ptsAcesso = 0;
+      }
+
+      // 2. Volume de Emissão de OS (até 35 pts)
+      let ptsOrdens = 0;
+      if (totalOrdens >= 15) ptsOrdens = 35;
+      else if (totalOrdens >= 8) ptsOrdens = 28;
+      else if (totalOrdens >= 3) ptsOrdens = 20;
+      else if (totalOrdens >= 1) ptsOrdens = 12;
+      else ptsOrdens = 0;
+
+      // 3. Base de Clientes (até 25 pts)
+      let ptsClientes = 0;
+      if (totalClientes >= 15) ptsClientes = 25;
+      else if (totalClientes >= 8) ptsClientes = 20;
+      else if (totalClientes >= 3) ptsClientes = 14;
+      else if (totalClientes >= 1) ptsClientes = 8;
+      else ptsClientes = 0;
+
+      const healthScore = Math.min(100, Math.round(ptsAcesso + ptsOrdens + ptsClientes));
+
+      let healthStatus: 'saudavel' | 'atencao' | 'critico' = 'saudavel';
+      let diagnosticoChurn = 'Uso frequente e operação saudável';
+      let acaoRecomendada = 'Manter relacionamento cordial e apresentar novos recursos';
+
+      if (healthScore < 40 || (diasSemAcesso !== null && diasSemAcesso >= 15) || (diasSemAcesso === null && totalOrdens === 0)) {
+        healthStatus = 'critico';
+        diagnosticoChurn = diasSemAcesso === null ? 'Sem acessos registrados após cadastro' : `Inativo há ${diasSemAcesso} dias sem emissões`;
+        acaoRecomendada = 'Contato prioritário de CS via WhatsApp para resgate e treinamento';
+      } else if (healthScore < 70 || (diasSemAcesso !== null && diasSemAcesso >= 7) || totalOrdens <= 2) {
+        healthStatus = 'atencao';
+        diagnosticoChurn = 'Baixo engajamento ou ritmo lento de novas ordens';
+        acaoRecomendada = 'Oferecer suporte ativo e dicas de produtividade';
+      }
+
       return {
         ...emp,
         diasAteVencer,
         estaAtrasado,
         venceEmBreve,
         statusFormatado,
-        valorMensalidade
+        valorMensalidade,
+        usuariosCount: usuariosDaEmpresa.length,
+        ultimoAcessoDate,
+        diasSemAcesso,
+        totalOrdens,
+        totalClientes,
+        healthScore,
+        healthStatus,
+        diagnosticoChurn,
+        acaoRecomendada
       };
     });
-  }, [empresasB2B, hoje]);
+  }, [empresasB2B, hoje, usuariosAutorizados, ordensList, clientesList]);
 
   // Empresas filtradas pela busca e pelos selects
   const empresasFiltradas = useMemo(() => {
@@ -324,6 +439,14 @@ export function PainelRelatoriosPortal() {
     const leadsConvertidos = leads.filter(l => l.status === 'convertido').length;
     const taxaConversaoLeads = totalLeads > 0 ? (leadsConvertidos / totalLeads) * 100 : 0;
 
+    // Métricas de Saúde & Customer Success (Anti-Churn)
+    const totalSaudaveis = empresasProcessadas.filter(e => e.healthStatus === 'saudavel').length;
+    const totalAtencao = empresasProcessadas.filter(e => e.healthStatus === 'atencao').length;
+    const totalCriticos = empresasProcessadas.filter(e => e.healthStatus === 'critico').length;
+    const mrrEmRisco = empresasProcessadas
+      .filter(e => e.healthStatus === 'critico')
+      .reduce((acc, cur) => acc + (cur.valorMensalidade || 0), 0);
+
     return {
       totalEmpresas,
       empresasAtivas,
@@ -344,7 +467,11 @@ export function PainelRelatoriosPortal() {
       totalManejos,
       totalLeads,
       leadsConvertidos,
-      taxaConversaoLeads
+      taxaConversaoLeads,
+      totalSaudaveis,
+      totalAtencao,
+      totalCriticos,
+      mrrEmRisco
     };
   }, [empresasB2B, empresasProcessadas, pagamentos, vinculos, totalCacs, totalArmas, totalGts, totalManejos, leads, hoje]);
 
@@ -352,6 +479,34 @@ export function PainelRelatoriosPortal() {
   const inadimplentes = useMemo(() => {
     return empresasProcessadas.filter(e => e.estaAtrasado || e.plano_status === 'suspenso');
   }, [empresasProcessadas]);
+
+  // Empresas filtradas para a aba do Termômetro de Churn
+  const empresasChurnFiltradas = useMemo(() => {
+    return empresasFiltradas.filter(emp => {
+      if (filtroRiscoChurn === 'critico') return emp.healthStatus === 'critico';
+      if (filtroRiscoChurn === 'atencao') return emp.healthStatus === 'atencao';
+      if (filtroRiscoChurn === 'saudavel') return emp.healthStatus === 'saudavel';
+      return true;
+    }).sort((a, b) => {
+      const ordemRisco: Record<string, number> = { critico: 1, atencao: 2, saudavel: 3 };
+      const prioridadeA = ordemRisco[a.healthStatus] || 4;
+      const prioridadeB = ordemRisco[b.healthStatus] || 4;
+      if (prioridadeA !== prioridadeB) {
+        return prioridadeA - prioridadeB;
+      }
+      return (a.healthScore || 0) - (b.healthScore || 0);
+    });
+  }, [empresasFiltradas, filtroRiscoChurn]);
+
+  // Gerador de mensagem estratégica de Customer Success para WhatsApp
+  const gerarLinkWhatsappResgate = (emp: any) => {
+    const rawTel = emp.contato || emp.telefone || '';
+    const tel = rawTel.replace(/\D/g, '');
+    if (!tel) return null;
+    const saudacao = emp.responsavel ? `Olá, ${emp.responsavel}!` : `Olá, equipe da ${emp.nome}!`;
+    const texto = `${saudacao} Tudo bem?\n\nSou da equipe de Sucesso do Cliente (CS) do Portal G CAC.\nEstamos acompanhando os escritórios parceiros e gostaríamos de saber se vocês precisam de algum apoio técnico, tirar dúvidas sobre o sistema ou treinamento rápido para sua equipe emitir Ordens de Serviço com máxima agilidade.\n\nEstamos à sua total disposição para ajudar seu escritório a economizar tempo!`;
+    return `https://wa.me/55${tel}?text=${encodeURIComponent(texto)}`;
+  };
 
   // ── Ações de Exportação ───────────────────────────────────────────────────
 
@@ -739,6 +894,24 @@ export function PainelRelatoriosPortal() {
         >
           <TrendingUp size={14} />
           Expansão & Leads
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setAbaRelatorio('churn')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all border ${
+            abaRelatorio === 'churn'
+              ? 'bg-rose-500/20 border-rose-500/40 text-rose-300 font-bold shadow-md shadow-rose-500/10'
+              : 'bg-brand-dark-3 border-brand-dark-5 text-gray-400 hover:text-white'
+          }`}
+        >
+          <Activity size={14} className={kpis.totalCriticos > 0 ? 'text-rose-400 animate-pulse' : 'text-gray-400'} />
+          Termômetro Anti-Churn & Saúde (CS)
+          {kpis.totalCriticos > 0 && (
+            <span className="ml-1 px-1.5 py-0.2 rounded-full text-[9px] bg-rose-500/30 text-rose-300 font-bold border border-rose-500/40">
+              {kpis.totalCriticos} em risco
+            </span>
+          )}
         </button>
       </div>
 
@@ -1238,6 +1411,354 @@ export function PainelRelatoriosPortal() {
                       </tr>
                     );
                   })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── ABA 6: TERMÔMETRO DE ENGAJAMENTO & PREVENÇÃO DE CHURN (CS) ──────── */}
+      {abaRelatorio === 'churn' && (
+        <div className="space-y-6 animate-fade-in">
+          {/* Header e Cartões de Resumo CS */}
+          <div className="bg-gradient-to-r from-rose-950/40 via-brand-dark-2 to-amber-950/20 border border-rose-500/30 p-5 rounded-2xl shadow-xl">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-brand-dark-5/80 pb-4 mb-5">
+              <div className="flex items-center gap-3.5">
+                <div className="p-3 bg-rose-500/10 border border-rose-500/30 text-rose-400 rounded-xl shrink-0 shadow-lg shadow-rose-500/10">
+                  <HeartPulse size={24} className="animate-pulse" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base sm:text-lg font-black text-white uppercase tracking-tight">
+                      Customer Success (CS) & Saúde da Carteira B2B
+                    </h3>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                      Prevenção de Churn
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-0.5 font-medium">
+                    Índice de engajamento operacional baseado na recência de acessos e volume de Ordens de Serviço emitidas.
+                  </p>
+                </div>
+              </div>
+
+              {/* Botão de contato rápido ou métrica de atenção */}
+              <div className="flex items-center gap-2 text-xs text-gray-300 bg-brand-dark-3/80 px-3.5 py-2 rounded-xl border border-brand-dark-5">
+                <ShieldAlert size={16} className={kpis.totalCriticos > 0 ? 'text-rose-400' : 'text-emerald-400'} />
+                <span>
+                  {kpis.totalCriticos > 0 ? (
+                    <strong className="text-rose-400">{kpis.totalCriticos} escritório(s) em risco imediato</strong>
+                  ) : (
+                    <strong className="text-emerald-400">Nenhum escritório em risco crítico!</strong>
+                  )}
+                </span>
+              </div>
+            </div>
+
+            {/* 4 Cards de Métricas CS */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="bg-brand-dark-3/80 border border-brand-dark-5 p-4 rounded-xl">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-emerald-400">
+                    🟢 Saudáveis & Ativos
+                  </span>
+                  <span className="text-[10px] text-gray-500">Score ≥ 70</span>
+                </div>
+                <div className="text-2xl font-black text-white">
+                  {kpis.totalSaudaveis}
+                  <span className="text-xs text-gray-400 font-normal"> escritórios</span>
+                </div>
+                <p className="text-[11px] text-gray-400 mt-1">
+                  Acessos recentes e produção contínua de OS.
+                </p>
+              </div>
+
+              <div className="bg-brand-dark-3/80 border border-brand-dark-5 p-4 rounded-xl">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-amber-400">
+                    🟡 Em Desaceleração
+                  </span>
+                  <span className="text-[10px] text-gray-500">Score 40-69</span>
+                </div>
+                <div className="text-2xl font-black text-amber-300">
+                  {kpis.totalAtencao}
+                  <span className="text-xs text-gray-400 font-normal"> escritórios</span>
+                </div>
+                <p className="text-[11px] text-gray-400 mt-1">
+                  Poucas ordens ou acessos esparsos na semana.
+                </p>
+              </div>
+
+              <div className="bg-brand-dark-3/80 border border-rose-500/40 p-4 rounded-xl bg-rose-950/10">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-rose-400">
+                    🔴 Risco Crítico
+                  </span>
+                  <span className="text-[10px] text-rose-400 font-bold">Score &lt; 40</span>
+                </div>
+                <div className="text-2xl font-black text-rose-400">
+                  {kpis.totalCriticos}
+                  <span className="text-xs text-gray-400 font-normal"> escritórios</span>
+                </div>
+                <p className="text-[11px] text-rose-300/80 mt-1">
+                  Sem acessos recentes ou zero ordens emitidas.
+                </p>
+              </div>
+
+              <div className="bg-brand-dark-3/80 border border-brand-dark-5 p-4 rounded-xl">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-purple-400">
+                    MRR sob Alerta
+                  </span>
+                  <span className="text-[10px] text-gray-500">Receita em Risco</span>
+                </div>
+                <div className="text-2xl font-black text-white">
+                  {formatarMoeda(kpis.mrrEmRisco)}
+                  <span className="text-xs text-gray-400 font-normal"> /mês</span>
+                </div>
+                <p className="text-[11px] text-gray-400 mt-1">
+                  Receita mensal suscetível a cancelamento.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Filtros da Tabela */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-brand-dark-2 border border-brand-dark-5 p-4 rounded-2xl">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs text-gray-400 font-bold flex items-center gap-1.5 mr-1">
+                <Filter size={14} />
+                Filtrar por Saúde:
+              </span>
+              <button
+                type="button"
+                onClick={() => setFiltroRiscoChurn('todos')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${
+                  filtroRiscoChurn === 'todos'
+                    ? 'bg-purple-600 text-white border-purple-500 shadow-sm'
+                    : 'bg-brand-dark-3 text-gray-400 border-brand-dark-5 hover:text-white'
+                }`}
+              >
+                Todos ({empresasFiltradas.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setFiltroRiscoChurn('critico')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${
+                  filtroRiscoChurn === 'critico'
+                    ? 'bg-rose-600 text-white border-rose-500 shadow-sm'
+                    : 'bg-brand-dark-3 text-rose-400 border-rose-500/30 hover:bg-rose-500/10'
+                }`}
+              >
+                🚨 Risco Crítico ({kpis.totalCriticos})
+              </button>
+              <button
+                type="button"
+                onClick={() => setFiltroRiscoChurn('atencao')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${
+                  filtroRiscoChurn === 'atencao'
+                    ? 'bg-amber-600 text-white border-amber-500 shadow-sm'
+                    : 'bg-brand-dark-3 text-amber-400 border-amber-500/30 hover:bg-amber-500/10'
+                }`}
+              >
+                ⚠️ Em Desaceleração ({kpis.totalAtencao})
+              </button>
+              <button
+                type="button"
+                onClick={() => setFiltroRiscoChurn('saudavel')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${
+                  filtroRiscoChurn === 'saudavel'
+                    ? 'bg-emerald-600 text-white border-emerald-500 shadow-sm'
+                    : 'bg-brand-dark-3 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/10'
+                }`}
+              >
+                🟢 Saudáveis ({kpis.totalSaudaveis})
+              </button>
+            </div>
+
+            <div className="relative min-w-[200px]">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+              <input
+                type="text"
+                placeholder="Buscar parceiro..."
+                value={busca}
+                onChange={(e) => setBusca(e.target.value)}
+                className="w-full bg-brand-dark-3 border border-brand-dark-5 rounded-xl pl-9 pr-3 py-1.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
+              />
+            </div>
+          </div>
+
+          {/* Tabela de Inteligência de Customer Success */}
+          <div className="bg-brand-dark-2 border border-brand-dark-5 rounded-2xl shadow-xl overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs text-gray-300">
+                <thead className="bg-brand-dark-3 text-gray-400 uppercase text-[10px] tracking-wider">
+                  <tr>
+                    <th className="py-3 px-4">Escritório & Responsável</th>
+                    <th className="py-3 px-4">Plano & Mensalidade</th>
+                    <th className="py-3 px-4">Último Acesso</th>
+                    <th className="py-3 px-4">Atividade (OS / Clientes)</th>
+                    <th className="py-3 px-4">Health Score (CS)</th>
+                    <th className="py-3 px-4">Diagnóstico & Recomendação</th>
+                    <th className="py-3 px-4 text-center">Ação Preventiva</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-brand-dark-5">
+                  {empresasChurnFiltradas.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="py-8 text-center text-gray-500">
+                        Nenhum escritório encontrado para os critérios selecionados.
+                      </td>
+                    </tr>
+                  ) : (
+                    empresasChurnFiltradas.map((emp) => {
+                      const linkWhatsapp = gerarLinkWhatsappResgate(emp);
+                      const isCritico = emp.healthStatus === 'critico';
+                      const isAtencao = emp.healthStatus === 'atencao';
+
+                      return (
+                        <tr
+                          key={emp.id}
+                          className={`hover:bg-brand-dark-3/40 transition-colors ${
+                            isCritico ? 'bg-rose-950/10' : isAtencao ? 'bg-amber-950/5' : ''
+                          }`}
+                        >
+                          {/* Escritório & Responsável */}
+                          <td className="py-3 px-4">
+                            <div className="font-bold text-white text-sm">{emp.nome}</div>
+                            <div className="text-[11px] text-gray-400">
+                              {emp.responsavel || 'Sem responsável cadastrado'}
+                            </div>
+                            <div className="text-[10px] text-gray-500">
+                              {emp.cidade && emp.estado ? `${emp.cidade}/${emp.estado}` : emp.cidade || emp.estado || 'Brasil'}
+                            </div>
+                          </td>
+
+                          {/* Plano & Mensalidade */}
+                          <td className="py-3 px-4 whitespace-nowrap">
+                            <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-purple-500/10 text-purple-300 border border-purple-500/20 block w-fit mb-1">
+                              {emp.plano || 'Bronze'}
+                            </span>
+                            <span className="font-bold text-gray-200">
+                              {formatarMoeda(emp.valorMensalidade)}
+                              <span className="text-[10px] text-gray-500 font-normal"> /mês</span>
+                            </span>
+                          </td>
+
+                          {/* Último Acesso */}
+                          <td className="py-3 px-4 whitespace-nowrap">
+                            {emp.diasSemAcesso === null ? (
+                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                                🚨 Nunca acessou
+                              </span>
+                            ) : emp.diasSemAcesso === 0 ? (
+                              <span className="text-emerald-400 font-semibold flex items-center gap-1">
+                                <CheckCircle2 size={13} />
+                                Hoje
+                              </span>
+                            ) : (
+                              <div>
+                                <span className={`font-semibold ${
+                                  emp.diasSemAcesso > 14
+                                    ? 'text-rose-400'
+                                    : emp.diasSemAcesso > 6
+                                    ? 'text-amber-400'
+                                    : 'text-gray-300'
+                                }`}>
+                                  Há {emp.diasSemAcesso} {emp.diasSemAcesso === 1 ? 'dia' : 'dias'}
+                                </span>
+                                {emp.ultimoAcessoDate && (
+                                  <div className="text-[10px] text-gray-500">
+                                    {new Date(emp.ultimoAcessoDate).toLocaleDateString('pt-BR')}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </td>
+
+                          {/* Atividade Real */}
+                          <td className="py-3 px-4 whitespace-nowrap">
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-white">{emp.totalOrdens}</span>
+                              <span className="text-gray-400 text-[11px]">ordens</span>
+                              <span className="text-gray-600">|</span>
+                              <span className="font-bold text-white">{emp.totalClientes}</span>
+                              <span className="text-gray-400 text-[11px]">clientes</span>
+                            </div>
+                          </td>
+
+                          {/* Health Score */}
+                          <td className="py-3 px-4 min-w-[140px]">
+                            <div className="flex items-center justify-between mb-1">
+                              <span className={`text-xs font-black ${
+                                isCritico ? 'text-rose-400' : isAtencao ? 'text-amber-400' : 'text-emerald-400'
+                              }`}>
+                                {emp.healthScore}/100
+                              </span>
+                              <span className={`text-[9px] font-bold uppercase px-1.5 py-0.2 rounded ${
+                                isCritico
+                                  ? 'bg-rose-500/20 text-rose-300'
+                                  : isAtencao
+                                  ? 'bg-amber-500/20 text-amber-300'
+                                  : 'bg-emerald-500/20 text-emerald-300'
+                              }`}>
+                                {isCritico ? 'Risco Alto' : isAtencao ? 'Atenção' : 'Saudável'}
+                              </span>
+                            </div>
+                            <div className="w-full bg-brand-dark-4 rounded-full h-2 overflow-hidden border border-brand-dark-5">
+                              <div
+                                className={`h-full transition-all rounded-full ${
+                                  isCritico
+                                    ? 'bg-gradient-to-r from-rose-600 to-red-500'
+                                    : isAtencao
+                                    ? 'bg-gradient-to-r from-amber-600 to-yellow-500'
+                                    : 'bg-gradient-to-r from-emerald-600 to-teal-400'
+                                }`}
+                                style={{ width: `${Math.max(5, emp.healthScore)}%` }}
+                              />
+                            </div>
+                          </td>
+
+                          {/* Diagnóstico & Recomendação */}
+                          <td className="py-3 px-4 max-w-xs">
+                            <div className="font-medium text-gray-200 text-[11px]">
+                              {emp.diagnosticoChurn}
+                            </div>
+                            <div className="text-[10px] text-gray-400 mt-0.5">
+                              💡 {emp.acaoRecomendada}
+                            </div>
+                          </td>
+
+                          {/* Ação Preventiva */}
+                          <td className="py-3 px-4 text-center whitespace-nowrap">
+                            {linkWhatsapp ? (
+                              <a
+                                href={linkWhatsapp}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-sm ${
+                                  isCritico
+                                    ? 'bg-rose-600 hover:bg-rose-500 text-white shadow-rose-600/30'
+                                    : isAtencao
+                                    ? 'bg-amber-600 hover:bg-amber-500 text-white shadow-amber-600/30'
+                                    : 'bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/30'
+                                }`}
+                                title="Enviar mensagem cordial de acompanhamento de Sucesso do Cliente"
+                              >
+                                <MessageCircle size={13} />
+                                <span>Resgatar CS</span>
+                              </a>
+                            ) : (
+                              <span className="text-[11px] text-gray-500 italic">
+                                Sem WhatsApp
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
                 </tbody>
               </table>
             </div>
