@@ -72,7 +72,7 @@ export function PainelRelatoriosPortal() {
         .from('empresas')
         .select('*')
         .neq('id', '00000000-0000-0000-0000-000000000001')
-        .order('created_at', { ascending: false });
+        .order('nome');
 
       if (errEmpresas) throw errEmpresas;
       setEmpresas(dataEmpresas || []);
@@ -81,7 +81,7 @@ export function PainelRelatoriosPortal() {
       const { data: dataPagtos, error: errPagtos } = await supabase
         .from('historico_pagamentos_empresa')
         .select('*')
-        .order('created_at', { ascending: false });
+        .order('data_pagamento', { ascending: false });
 
       if (errPagtos) console.warn('Aviso ao carregar pagamentos:', errPagtos);
       setPagamentos(dataPagtos || []);
@@ -90,7 +90,7 @@ export function PainelRelatoriosPortal() {
       const { data: dataLeads, error: errLeads } = await supabase
         .from('leads_pre_cadastro')
         .select('*')
-        .order('created_at', { ascending: false });
+        .order('criado_em', { ascending: false });
 
       if (errLeads) console.warn('Aviso ao carregar leads:', errLeads);
       setLeads(dataLeads || []);
@@ -107,7 +107,7 @@ export function PainelRelatoriosPortal() {
       const { count: cacsCount, error: errCacs } = await supabase
         .from('empresas')
         .select('*', { count: 'exact', head: true })
-        .eq('tipo', 'cac_individual');
+        .eq('tipo_conta', 'cac_individual');
 
       setTotalCacs(cacsCount || 0);
 
@@ -178,7 +178,7 @@ export function PainelRelatoriosPortal() {
 
   // Empresas B2B (exclui cac_individual para focar em despachantes e clubes)
   const empresasB2B = useMemo(() => {
-    return empresas.filter(e => e.tipo !== 'cac_individual');
+    return empresas.filter(e => e.tipo_conta !== 'cac_individual');
   }, [empresas]);
 
   // Processamento detalhado das empresas com dias até o vencimento e status calculado
@@ -187,7 +187,27 @@ export function PainelRelatoriosPortal() {
       const planoStatus = emp.plano_status || 'ativo';
       const dataVenc = emp.data_vencimento;
       const isGratis = Boolean(emp.is_gratis);
-      const valorMensalidade = Number(emp.valor_mensalidade || 0);
+
+      // Cálculo preciso do valor da mensalidade seguindo os planos e personalizações da plataforma
+      let valorMensalidade = 30.00;
+      if (isGratis) {
+        valorMensalidade = 0;
+      } else if (emp.valor_assinatura_personalizado != null && !isNaN(parseFloat(emp.valor_assinatura_personalizado))) {
+        valorMensalidade = parseFloat(emp.valor_assinatura_personalizado);
+      } else if (emp.valor_mensalidade != null && !isNaN(Number(emp.valor_mensalidade)) && Number(emp.valor_mensalidade) > 0) {
+        valorMensalidade = Number(emp.valor_mensalidade);
+      } else if (emp.plano === '.357mag') {
+        valorMensalidade = 50.00;
+      } else if (emp.plano === '.308win') {
+        valorMensalidade = 100.00;
+      }
+
+      if (emp.frequencia_pagamento === 'semestral') {
+        valorMensalidade = valorMensalidade / 6;
+      } else if (emp.frequencia_pagamento === 'anual') {
+        valorMensalidade = valorMensalidade / 12;
+      }
+      valorMensalidade = isNaN(valorMensalidade) ? 0 : valorMensalidade;
 
       let diasAteVencer: number | null = null;
       let estaAtrasado = false;
@@ -288,10 +308,10 @@ export function PainelRelatoriosPortal() {
     // Faturamento realizado no mês corrente
     const mesAtualStr = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}`;
     const pagamentosMes = pagamentos.filter(p => {
-      const dt = p.data_pagamento || p.created_at || '';
-      return dt.startsWith(mesAtualStr) && (p.status === 'aprovado' || p.status === 'pago');
+      const dt = p.data_pagamento || p.criado_em || p.created_at || '';
+      return dt.startsWith(mesAtualStr);
     });
-    const faturamentoMesRealizado = pagamentosMes.reduce((acc, cur) => acc + Number(cur.valor || 0), 0);
+    const faturamentoMesRealizado = pagamentosMes.reduce((acc, cur) => acc + Number(cur.valor_pago != null ? cur.valor_pago : (cur.valor || 0)), 0);
 
     const ticketMedio = empresasAtivas > 0 ? mrrTotal / empresasAtivas : 0;
 
@@ -1096,12 +1116,12 @@ export function PainelRelatoriosPortal() {
                 <tbody className="divide-y divide-brand-dark-5">
                   {pagamentos.slice(0, 10).map((pg, idx) => (
                     <tr key={idx} className="hover:bg-brand-dark-3/30">
-                      <td className="py-2.5 px-3 font-mono">{formatarData(pg.data_pagamento || pg.created_at)}</td>
-                      <td className="py-2.5 px-3 font-bold text-emerald-400">{formatarMoeda(pg.valor)}</td>
-                      <td className="py-2.5 px-3 uppercase text-gray-400">{pg.forma_pagamento || 'PIX'}</td>
+                      <td className="py-2.5 px-3 font-mono">{formatarData(pg.data_pagamento || pg.criado_em || pg.created_at || '')}</td>
+                      <td className="py-2.5 px-3 font-bold text-emerald-400">{formatarMoeda(pg.valor_pago != null ? pg.valor_pago : (pg.valor || 0))}</td>
+                      <td className="py-2.5 px-3 uppercase text-gray-400">{pg.meio_pagamento || pg.forma_pagamento || 'PIX'}</td>
                       <td className="py-2.5 px-3">
                         <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
-                          {pg.status || 'Aprovado'}
+                          {pg.status || 'Confirmado'}
                         </span>
                       </td>
                     </tr>
