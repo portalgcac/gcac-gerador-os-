@@ -30,6 +30,12 @@ export function formatarCPF(cpf: string): string {
   return numeros.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
 }
 
+export function formatarCNPJ(cnpj: string): string {
+  const numeros = cnpj.replace(/\D/g, '');
+  if (numeros.length <= 11) return formatarCPF(cnpj);
+  return numeros.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
+}
+
 export function formatarTelefone(tel: string): string {
   const numeros = tel.replace(/\D/g, '');
   if (numeros.length === 11) {

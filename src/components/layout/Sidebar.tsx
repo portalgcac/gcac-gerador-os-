@@ -31,6 +31,7 @@ const linksPortalSaaS = [
   { to: '/portal-admin?tab=empresas', label: 'Despachantes & Clubes (B2B)', icon: Building2, tab: 'empresas' },
   { to: '/portal-admin?tab=cacs', label: 'Atiradores & CACs (B2C)', icon: Target, tab: 'cacs' },
   { to: '/portal-admin?tab=faturamento', label: 'Faturamento de Licenças', icon: BadgeDollarSign, tab: 'faturamento' },
+  { to: '/portal-admin?tab=relatorios', label: 'Relatórios & Métricas', icon: BarChart3, tab: 'relatorios' },
   { to: '/portal-admin?tab=leads', label: 'Pré-Cadastros (Leads)', icon: UserPlus, tab: 'leads' },
   { to: '/portal-admin?tab=broadcast', label: 'Central de Notificações', icon: Bell, tab: 'broadcast' },
   { to: '/portal-admin?tab=chamados', label: 'Chamados do Site', icon: MessageSquare, tab: 'chamados' },

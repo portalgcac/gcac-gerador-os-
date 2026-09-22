@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { UserPlus, Shield, Mail, User, Trash2, Edit2, CheckCircle, XCircle, ChevronDown, ChevronUp, Lock, Building, ArrowLeft, Settings2, BadgeDollarSign, Calendar, CreditCard, Crosshair, ShieldAlert, Bell, Sparkles, X, Link2, MessageSquare, Target } from 'lucide-react';
+import { UserPlus, Shield, Mail, User, Trash2, Edit2, CheckCircle, XCircle, ChevronDown, ChevronUp, Lock, Building, ArrowLeft, Settings2, BadgeDollarSign, Calendar, CreditCard, Crosshair, ShieldAlert, Bell, Sparkles, X, Link2, MessageSquare, Target, BarChart3 } from 'lucide-react';
 import { supabase } from '../../db/supabase';
 import { PainelClientesCAC } from '../vinculos/PainelClientesCAC';
 import { Notificacao, useNotificacao } from '../common/Notificacao';
@@ -64,9 +64,10 @@ import { PainelAtiradores } from '../admin/PainelAtiradores';
 import { EditorSitePortal } from '../admin/EditorSitePortal';
 import { PainelChamadosSite } from '../admin/PainelChamadosSite';
 import { GestaoSociosPortal } from '../admin/GestaoSociosPortal';
+import { PainelRelatoriosPortal } from '../admin/PainelRelatoriosPortal';
 
 interface GestaoUsuariosProps {
-  abaInicial?: 'empresas' | 'cacs' | 'equipe_interna' | 'faturamento' | 'leads' | 'monitor_cacs' | 'broadcast' | 'site' | 'vinculos' | 'chamados' | 'socios';
+  abaInicial?: 'empresas' | 'cacs' | 'equipe_interna' | 'faturamento' | 'leads' | 'monitor_cacs' | 'broadcast' | 'site' | 'vinculos' | 'chamados' | 'socios' | 'relatorios';
 }
 
 const PROMPTS_RAPIDOS = [
@@ -180,7 +181,7 @@ export function GestaoUsuarios({ abaInicial }: GestaoUsuariosProps = {}) {
   const isMasterAdmin = (usuario?.email === 'gui.gomesassis@gmail.com' || Boolean(usuario?.ehSocioPortal)) && contextoAtivo !== 'escritorio';
 
   // Sub-painel ativo para Master Admin / Sócios Portal
-  const [subPainelAtivo, setSubPainelAtivo] = useState<'empresas' | 'cacs' | 'equipe_interna' | 'faturamento' | 'leads' | 'monitor_cacs' | 'broadcast' | 'site' | 'vinculos' | 'chamados' | 'socios'>(
+  const [subPainelAtivo, setSubPainelAtivo] = useState<'empresas' | 'cacs' | 'equipe_interna' | 'faturamento' | 'leads' | 'monitor_cacs' | 'broadcast' | 'site' | 'vinculos' | 'chamados' | 'socios' | 'relatorios'>(
     abaInicial === 'vinculos' || abaInicial === 'monitor_cacs' ? 'cacs' : (abaInicial || 'empresas')
   );
 
@@ -1942,7 +1943,21 @@ Você pode adicionar comentários, observações ou explicações adicionais ant
                 Faturamento & Licenças
               </button>
 
-              {/* 4. Pré-Cadastros & Leads */}
+              {/* 4. Relatórios Executivos & BI */}
+              <button
+                type="button"
+                onClick={() => { setSubPainelAtivo('relatorios'); setBuscaUsuario(''); }}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all border ${
+                  subPainelAtivo === 'relatorios'
+                    ? 'bg-purple-500/20 border-purple-500/40 text-purple-300 font-bold shadow-lg shadow-purple-500/10'
+                    : 'bg-brand-dark-3 border-brand-dark-5 text-gray-400 hover:text-white'
+                }`}
+              >
+                <BarChart3 size={14} className={subPainelAtivo === 'relatorios' ? 'text-purple-400' : ''} />
+                Relatórios & Métricas
+              </button>
+
+              {/* 5. Pré-Cadastros & Leads */}
               <button
                 type="button"
                 onClick={() => { setSubPainelAtivo('leads'); setBuscaUsuario(''); }}
@@ -3855,6 +3870,13 @@ Você pode adicionar comentários, observações ou explicações adicionais ant
           {subPainelAtivo === 'socios' && (
             <div className="animate-fade-in">
               <GestaoSociosPortal />
+            </div>
+          )}
+
+          {/* ABA 12: RELATÓRIOS E INTELIGÊNCIA EXECUTIVA (BI) */}
+          {subPainelAtivo === 'relatorios' && (
+            <div className="animate-fade-in">
+              <PainelRelatoriosPortal />
             </div>
           )}
         </div>
