@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
-  LayoutDashboard, FileText, Plus, Settings, LogOut, Cloud, CloudOff, Loader, X, Users, Receipt, Calendar, BarChart3, ListTodo, Bell, Shield, Link2, FileSpreadsheet, Building2, UserPlus, Crosshair, MessageSquare, BadgeDollarSign, Sparkles, Target, Scale
+  LayoutDashboard, FileText, Plus, Settings, LogOut, Cloud, CloudOff, Loader, X, Users, Receipt, Calendar, BarChart3, ListTodo, Bell, Shield, Link2, FileSpreadsheet, Building2, UserPlus, Crosshair, MessageSquare, BadgeDollarSign, Sparkles, Target, Scale, ArrowRightLeft, Menu
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../db/supabase';
@@ -107,7 +107,12 @@ const getLinkLabel = (link: typeof links[0], usuario: any) => {
   return link.label;
 };
 
-export function Sidebar() {
+interface SidebarProps {
+  onClose?: () => void;
+  isMobile?: boolean;
+}
+
+export function Sidebar({ onClose, isMobile }: SidebarProps = {}) {
   const { usuario, logout, temAcessoRecurso, contextoAtivo, ehSocioPortal, ehGestorPrincipal } = useAuth();
   const { ordens, itensFila, sincronizarPendentes } = useOrdens();
   const { lembretes } = useLembretes();
@@ -174,7 +179,19 @@ export function Sidebar() {
     : (usuario?.empresaNome || "GCAC");
 
   return (
-    <aside className="w-64 bg-brand-dark-2 border-r border-brand-dark-5 flex flex-col h-full relative">
+    <aside className={`w-64 bg-brand-dark-2 border-r border-brand-dark-5 flex flex-col h-full relative ${isMobile ? 'shadow-2xl' : ''}`}>
+      {/* Botão de Fechar no topo se for Mobile Drawer */}
+      {isMobile && (
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute top-3 right-3 z-30 p-2 rounded-xl text-gray-400 hover:text-white bg-brand-dark-3/80 hover:bg-brand-dark-4 border border-brand-dark-5 transition-colors"
+          title="Fechar menu"
+        >
+          <X size={18} />
+        </button>
+      )}
+
       {/* Logo */}
       <div className="p-5 border-b border-brand-dark-5 flex flex-col items-center text-center gap-3 relative">
         <div className="flex flex-col items-center w-full">
@@ -224,7 +241,7 @@ export function Sidebar() {
           </div>
         </div>
         
-        {isAdmin && (
+        {isAdmin && !isMobile && (
           <div className="absolute top-4 right-4">
             <button 
               onClick={() => setDropdownAberto(!dropdownAberto)}
@@ -248,7 +265,7 @@ export function Sidebar() {
       </div>
 
       {/* Alternador de Espaço de Trabalho (Escritório vs Portal SaaS) */}
-      <WorkspaceSwitcher />
+      <WorkspaceSwitcher onTrocar={onClose} />
 
       {/* Nav */}
       <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
@@ -272,6 +289,7 @@ export function Sidebar() {
                 <NavLink
                   key={link.to}
                   to={link.to}
+                  onClick={onClose}
                   className={
                     isAbaAtiva
                       ? 'flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold bg-purple-500/20 text-purple-200 border border-purple-500/30 shadow-md shadow-purple-950/20 transition-all'
@@ -297,6 +315,7 @@ export function Sidebar() {
                 <NavLink
                   key={link.to}
                   to={link.to}
+                  onClick={onClose}
                   className={({ isActive }) => isActive ? 'nav-link-active' : 'nav-link'}
                 >
                   <Icon size={18} />
@@ -319,7 +338,10 @@ export function Sidebar() {
               <div className="pt-2 space-y-1">
                 {/* Botão: Nova OS */}
                 <button
-                  onClick={() => navigate('/ordens/nova')}
+                  onClick={() => {
+                    navigate('/ordens/nova');
+                    onClose?.();
+                  }}
                   className="nav-link w-full text-brand-green-light hover:bg-brand-green/10 hover:text-brand-green border border-brand-green/20"
                 >
                   <Plus size={18} />
@@ -406,13 +428,26 @@ export function Sidebar() {
                 )}
                 <p className="text-[10px] text-gray-500 truncate">{usuario.email}</p>
               </div>
-              <button onClick={logout} title="Sair" className="text-gray-500 hover:text-red-400 transition-colors p-1">
+              <button 
+                onClick={() => {
+                  logout();
+                  onClose?.();
+                }} 
+                title="Sair" 
+                className="text-gray-500 hover:text-red-400 transition-colors p-1"
+              >
                 <LogOut size={15} />
               </button>
             </div>
           </div>
         ) : (
-          <button onClick={() => navigate('/login')} className="btn-ghost btn-sm w-full justify-center">
+          <button 
+            onClick={() => {
+              navigate('/login');
+              onClose?.();
+            }} 
+            className="btn-ghost btn-sm w-full justify-center"
+          >
             Fazer login
           </button>
         )}
@@ -421,15 +456,19 @@ export function Sidebar() {
   );
 }
 
-export function NavegacaoInferior() {
+interface NavegacaoInferiorProps {
+  onAbrirMenu?: () => void;
+}
+
+export function NavegacaoInferior({ onAbrirMenu }: NavegacaoInferiorProps = {}) {
   const { itensFila } = useOrdens();
-  const { usuario, temAcessoRecurso, contextoAtivo, ehSocioPortal } = useAuth();
+  const { usuario, temAcessoRecurso, contextoAtivo, ehSocioPortal, setContextoAtivo } = useAuth();
+  const navigate = useNavigate();
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
   const currentTab = searchParams.get('tab') || 'empresas';
 
   const linksFiltrados = filtrarLinks(usuario, temAcessoRecurso);
-  const isAdmin = usuario?.role === 'admin';
 
   const getShortLabel = (label: string) => {
     if (label === 'Rotina Diária') return 'Rotina';
@@ -441,8 +480,54 @@ export function NavegacaoInferior() {
     return label;
   };
 
+  const handleTrocarAmbiente = () => {
+    const novoCtx = contextoAtivo === 'escritorio' ? 'portal_saas' : 'escritorio';
+    setContextoAtivo(novoCtx);
+    if (novoCtx === 'portal_saas') {
+      navigate('/portal-admin');
+    } else {
+      navigate('/dashboard');
+    }
+  };
+
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-40 bg-brand-dark-2 border-t border-brand-dark-5 flex sm:hidden overflow-x-auto no-scrollbar scroll-smooth px-2">
+    <nav className="fixed bottom-0 left-0 right-0 z-40 bg-brand-dark-2/95 backdrop-blur-md border-t border-brand-dark-5 flex sm:hidden overflow-x-auto no-scrollbar scroll-smooth px-2 items-center">
+      {/* Botão de Menu para abrir Drawer lateral completo no mobile */}
+      {onAbrirMenu && (
+        <button
+          type="button"
+          onClick={onAbrirMenu}
+          className="flex-shrink-0 min-w-[65px] flex flex-col items-center gap-1 py-3 text-[10px] font-bold text-gray-400 hover:text-white transition-colors border-r border-brand-dark-5/50 pr-1 mr-1"
+          title="Abrir menu lateral completo"
+        >
+          <div className="relative">
+            <Menu size={20} />
+          </div>
+          <span className="leading-none whitespace-nowrap">Menu</span>
+        </button>
+      )}
+
+      {/* Botão de Alternância Rápida de Layout (Escritório vs Gestor Portal) */}
+      {ehSocioPortal && (
+        <button
+          type="button"
+          onClick={handleTrocarAmbiente}
+          className={`flex-shrink-0 min-w-[76px] flex flex-col items-center gap-1 py-3 text-[10px] font-black transition-all border-r border-brand-dark-5/50 pr-1.5 mr-1 ${
+            contextoAtivo === 'escritorio' 
+              ? 'text-purple-300 hover:text-purple-200' 
+              : 'text-emerald-400 hover:text-emerald-300'
+          }`}
+          title={contextoAtivo === 'escritorio' ? 'Toque para ir ao Portal SaaS' : 'Toque para ir ao Escritório'}
+        >
+          <div className="relative">
+            <ArrowRightLeft size={18} className="animate-pulse" />
+          </div>
+          <span className="leading-none whitespace-nowrap">
+            {contextoAtivo === 'escritorio' ? 'Ir p/ Portal' : 'Ir p/ Escritório'}
+          </span>
+        </button>
+      )}
+
       {contextoAtivo === 'portal_saas' ? (
         linksPortalSaaS.map((link) => {
           const Icon = link.icon;

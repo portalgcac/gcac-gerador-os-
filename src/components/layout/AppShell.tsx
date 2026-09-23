@@ -1,21 +1,25 @@
 import React from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { Sidebar, NavegacaoInferior } from './Sidebar';
+import { WorkspaceSwitcher } from './WorkspaceSwitcher';
+import { NotificacoesDropdown } from './NotificacoesDropdown';
 import { useAuth } from '../../context/AuthContext';
 import { useStatusConexao } from '../../hooks/useStatusConexao';
 import { useOrdens } from '../../context/OrdensContext';
+import { useNotificacoesSistema } from '../../context/NotificacoesSistemaContext';
 import { OnboardingCAC } from '../common/OnboardingCAC';
 import { OnboardingEmpresa } from '../common/OnboardingEmpresa';
 import { buscarVinculosPendentesCAC, VinculoDespachanteCac } from '../../services/vinculosService';
 import { NotificacaoVinculo } from '../vinculos/NotificacaoVinculo';
 import { supabase } from '../../db/supabase';
 import { InstallPwaPrompt } from '../common/InstallPwaPrompt';
-import { Lock, MessageCircle, Check } from 'lucide-react';
+import { Lock, MessageCircle, Check, Menu, Bell } from 'lucide-react';
 import { getDebugLogs, subscribeToLogs, clearDebugLogs, DebugLog } from '../../utils/debugLogger';
 
 export function AppShell() {
-  const { estaAutenticado, usuario, logout } = useAuth();
+  const { estaAutenticado, usuario, logout, contextoAtivo, ehSocioPortal } = useAuth();
   const { itensFila, sincronizarPendentes } = useOrdens();
+  const { naoLidas } = useNotificacoesSistema();
   const online = useStatusConexao();
   const location = useLocation();
   const [jaSincronizou, setJaSincronizou] = React.useState(false);
@@ -23,6 +27,10 @@ export function AppShell() {
   const [modalVinculoAberto, setModalVinculoAberto] = React.useState(false);
   const [logs, setLogs] = React.useState<DebugLog[]>([]);
   const [painelDebugAberto, setPainelDebugAberto] = React.useState(false);
+  const [drawerAberto, setDrawerAberto] = React.useState(false);
+  const [dropdownNotifAberto, setDropdownNotifAberto] = React.useState(false);
+
+  const isAdmin = usuario?.role === 'admin';
 
   React.useEffect(() => {
     setLogs(getDebugLogs());
@@ -241,6 +249,79 @@ export function AppShell() {
 
       {/* Conteúdo principal */}
       <main id="scroll-main" className="flex-1 overflow-y-auto">
+        {/* Header Superior Mobile — Visível apenas no Celular */}
+        <header className="sticky top-0 z-30 sm:hidden bg-brand-dark-2/95 backdrop-blur-md border-b border-brand-dark-5 px-3 py-2 flex items-center justify-between gap-2 shadow-md">
+          {/* Esquerda: Botão Menu Gaveta + Logo + Nome do Ambiente */}
+          <div className="flex items-center gap-2 min-w-0">
+            <button
+              type="button"
+              onClick={() => setDrawerAberto(true)}
+              className="p-1.5 rounded-lg bg-brand-dark-3 text-gray-400 hover:text-white border border-brand-dark-5 transition-colors shrink-0"
+              title="Abrir menu lateral"
+            >
+              <Menu size={20} />
+            </button>
+
+            <div className="flex items-center gap-2 min-w-0">
+              <img
+                key={contextoAtivo}
+                src={
+                  contextoAtivo === 'portal_saas'
+                    ? "/LOGO PORTAL G CAC 2 SEM FRASE.png"
+                    : (usuario?.dadosEmpresa?.logoUrl || (usuario?.tipoConta === 'cac_individual' ? "/LOGO PORTAL G CAC 2 SEM FRASE.png" : "/Logo oficial.png"))
+                }
+                alt="Logo"
+                className="w-7 h-7 object-contain rounded shrink-0"
+                onError={e => { 
+                  const target = e.target as HTMLImageElement;
+                  target.src = contextoAtivo === 'portal_saas' ? "/usar no site/LOGO PORTAL SEM FRASE.png" : "/Logo oficial.png";
+                }}
+              />
+              <div className="flex flex-col min-w-0 leading-tight">
+                <span className="text-[10px] uppercase font-black tracking-wider text-gray-300 truncate max-w-[105px] xs:max-w-none">
+                  {contextoAtivo === 'portal_saas' ? 'Portal G CAC' : (usuario?.empresaNome || 'GCAC')}
+                </span>
+                <span className={`text-[10px] font-black uppercase tracking-tight truncate ${
+                  contextoAtivo === 'portal_saas' ? 'text-purple-400' : 'text-emerald-400'
+                }`}>
+                  {contextoAtivo === 'portal_saas' ? 'Gestão SaaS' : 'Escritório'}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Direita: Switcher de Layout + Notificações */}
+          <div className="flex items-center gap-1.5 shrink-0">
+            {ehSocioPortal && (
+              <WorkspaceSwitcher variant="compact" />
+            )}
+
+            {isAdmin && (
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setDropdownNotifAberto(!dropdownNotifAberto)}
+                  className={`p-1.5 rounded-xl transition-all h-8 w-8 flex items-center justify-center relative ${
+                    dropdownNotifAberto ? 'bg-brand-blue/20 text-brand-blue-light' : 'bg-brand-dark-3 text-gray-400 hover:text-white border border-brand-dark-5'
+                  }`}
+                  title="Notificações"
+                >
+                  <Bell size={16} />
+                  {naoLidas > 0 && (
+                    <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-brand-blue text-white text-[8px] font-bold rounded-full border border-brand-dark-2 flex items-center justify-center animate-pulse">
+                      {naoLidas}
+                    </span>
+                  )}
+                </button>
+                <NotificacoesDropdown
+                  aberto={dropdownNotifAberto}
+                  onClose={() => setDropdownNotifAberto(false)}
+                />
+              </div>
+            )}
+          </div>
+        </header>
+
         {/* Banner offline */}
         {!online && (
           <div className="bg-yellow-500/20 border-b border-yellow-500/30 px-4 py-2 text-center">
@@ -303,8 +384,21 @@ export function AppShell() {
         </div>
       </main>
 
+      {/* Drawer Lateral Mobile com Sidebar */}
+      {drawerAberto && (
+        <div className="fixed inset-0 z-50 flex sm:hidden animate-fade-in">
+          <div
+            className="fixed inset-0 bg-black/70 backdrop-blur-sm transition-opacity"
+            onClick={() => setDrawerAberto(false)}
+          />
+          <div className="relative z-10 w-72 max-w-[85vw] h-full shadow-2xl flex flex-col animate-slide-right">
+            <Sidebar isMobile onClose={() => setDrawerAberto(false)} />
+          </div>
+        </div>
+      )}
+
       {/* Navegação inferior — apenas mobile */}
-      <NavegacaoInferior />
+      <NavegacaoInferior onAbrirMenu={() => setDrawerAberto(true)} />
 
       {/* Prompt de instalação do PWA */}
       <InstallPwaPrompt />
