@@ -23,6 +23,7 @@ const links = [
   { to: '/agendamentos', label: 'Agendamentos',   icon: Calendar,      slug: 'agendamentos' },
   { to: '/clientes',   label: 'Meus Clientes',     icon: Users,         slug: 'clientes' },
   { to: '/relatorios', label: 'Relatórios',       icon: FileSpreadsheet, slug: 'relatorios' },
+  { to: '/equipe',     label: 'Equipe do Escritório', icon: Shield,     slug: 'equipe' },
   { to: '/configuracoes', label: 'Configurações', icon: Settings,      slug: 'config' },
   { to: '/declaracoes', label: 'Declarações',     icon: FileText,      slug: 'declaracoes' },
 ].sort((a, b) => a.label.localeCompare(b.label));
@@ -43,6 +44,10 @@ const linksPortalSaaS = [
 const temAcessoLink = (link: typeof links[0], usuario: any, temAcessoRecurso: (r: string) => boolean) => {
   if (usuario?.tipoConta === 'cac_individual') {
     return (link.slug === 'clientes' && link.to === '/clientes') || link.slug === 'agenda' || link.slug === 'config';
+  }
+
+  if (link.slug === 'equipe') {
+    return usuario?.role === 'admin' && usuario?.tipoConta !== 'cac_individual';
   }
 
   // Verificar permissão no nível de usuário
@@ -477,6 +482,7 @@ export function NavegacaoInferior({ onAbrirMenu }: NavegacaoInferiorProps = {}) 
     if (label === 'Meus Clientes') return 'Clientes';
     if (label === 'Configurações') return 'Config';
     if (label === 'Agendamentos') return 'Agenda';
+    if (label === 'Equipe do Escritório') return 'Equipe';
     return label;
   };
 

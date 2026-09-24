@@ -1695,8 +1695,8 @@ export function Configuracoes() {
       </div>
       )}
 
-      {/* ── Painel de Controle de Usuários (Apenas Admin da Empresa) ── */}
-      {usuario?.role === 'admin' && usuario?.email !== 'gui.gomesassis@gmail.com' && (
+      {/* ── Equipe & Colaboradores do Escritório (Apenas Admin) ── */}
+      {usuario?.role === 'admin' && (
         <div className="card space-y-4">
           <div 
             className="flex items-center justify-between cursor-pointer group"
@@ -1708,11 +1708,11 @@ export function Configuracoes() {
               </div>
               <div>
                 <h2 className="text-sm font-bold text-white tracking-wider">
-                  Painel de Controle de Usuários
+                  Equipe & Colaboradores do Escritório
                 </h2>
                 {!usuariosExpandido && (
                   <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">
-                    Gerencie as empresas despachantes, atiradores e caçadores individuais CAC e a equipe do seu escritório central • Clique para expandir
+                    Gerencie os colaboradores autorizados e seus acessos no seu escritório central • Clique para expandir
                   </p>
                 )}
               </div>

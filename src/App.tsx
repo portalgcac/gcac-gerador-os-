@@ -13,6 +13,8 @@ import { ListaOrdens } from './components/ordens/ListaOrdens';
 import { FormularioOrdem } from './components/ordens/FormularioOrdem';
 import { DetalheOrdem } from './components/ordens/DetalheOrdem';
 import { Configuracoes } from './components/config/Configuracoes';
+import { GestaoUsuarios } from './components/config/GestaoUsuarios';
+import { Shield } from 'lucide-react';
 import { ClientesProvider, useClientes } from './context/ClientesContext';
 import { ServicosProvider } from './context/ServicosContext';
 import { ListaClientes } from './components/clientes/ListaClientes';
@@ -327,6 +329,24 @@ export default function App() {
                               <Route path="relatorios" element={<RotaProtegida modulo="relatorios"><Relatorios /></RotaProtegida>} />
                               <Route path="rotina" element={<RotaProtegida modulo="rotina"><RotinaDiaria /></RotaProtegida>} />
                               <Route path="agenda" element={<RotaProtegida modulo="agenda"><ListaLembretes /></RotaProtegida>} />
+                              <Route path="equipe" element={
+                                <RotaProtegida modulo="config">
+                                  <div className="max-w-6xl mx-auto space-y-6 animate-fade-in p-1">
+                                    <div className="flex items-center gap-3">
+                                      <div className="p-2.5 bg-brand-blue/10 border border-brand-blue/20 text-brand-blue-light rounded-xl">
+                                        <Shield size={22} />
+                                      </div>
+                                      <div>
+                                        <h1 className="text-2xl font-black text-white uppercase tracking-tight">Equipe & Colaboradores</h1>
+                                        <p className="text-xs text-gray-500 mt-0.5 uppercase font-bold tracking-wider">
+                                          Gestão de colaboradores autorizados, cargos e permissões de acesso do escritório
+                                        </p>
+                                      </div>
+                                    </div>
+                                    <GestaoUsuarios />
+                                  </div>
+                                </RotaProtegida>
+                              } />
                               <Route path="configuracoes" element={<RotaProtegida modulo="config"><Configuracoes /></RotaProtegida>} />
                               <Route path="declaracoes" element={<RotaProtegida modulo="declaracoes"><GerenciadorDeclaracoes /></RotaProtegida>} />
                               
