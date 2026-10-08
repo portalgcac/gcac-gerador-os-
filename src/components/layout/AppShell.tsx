@@ -279,12 +279,20 @@ export function AppShell() {
               />
               <div className="flex flex-col min-w-0 leading-tight">
                 <span className="text-[10px] uppercase font-black tracking-wider text-gray-300 truncate max-w-[105px] xs:max-w-none">
-                  {contextoAtivo === 'portal_saas' ? 'Portal G CAC' : (usuario?.empresaNome || 'GCAC')}
+                  {contextoAtivo === 'portal_saas' 
+                    ? 'Portal G CAC' 
+                    : (usuario?.tipoConta === 'cac_individual'
+                        ? (usuario?.nome || usuario?.empresaNome?.replace(/^CAC\s*-\s*/i, '') || 'Atirador CAC')
+                        : (usuario?.empresaNome || 'GCAC'))}
                 </span>
                 <span className={`text-[10px] font-black uppercase tracking-tight truncate ${
-                  contextoAtivo === 'portal_saas' ? 'text-purple-400' : 'text-emerald-400'
+                  contextoAtivo === 'portal_saas' 
+                    ? 'text-purple-400' 
+                    : (usuario?.tipoConta === 'cac_individual' ? 'text-brand-blue-light' : 'text-emerald-400')
                 }`}>
-                  {contextoAtivo === 'portal_saas' ? 'Gestão SaaS' : 'Escritório'}
+                  {contextoAtivo === 'portal_saas' 
+                    ? 'Gestão SaaS' 
+                    : (usuario?.tipoConta === 'cac_individual' ? 'Atirador CAC' : 'Escritório')}
                 </span>
               </div>
             </div>

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { v4 as uuidv4 } from 'uuid';
 import { UserPlus, Shield, Mail, User, Trash2, Edit2, CheckCircle, XCircle, ChevronDown, ChevronUp, Lock, Building, ArrowLeft, Settings2, BadgeDollarSign, Calendar, CreditCard, Crosshair, ShieldAlert, Bell, Sparkles, X, Link2, MessageSquare, Target, BarChart3, Scale } from 'lucide-react';
 import { supabase } from '../../db/supabase';
 import { PainelClientesCAC } from '../vinculos/PainelClientesCAC';
@@ -768,6 +769,22 @@ Você pode adicionar comentários, observações ou explicações adicionais ant
 
       if (errUser) throw errUser;
 
+      // 2b. Se for CAC Individual, provisionar registro na tabela 'clientes' para o novo workspace
+      if (isCac) {
+        const novoClienteId = uuidv4();
+        await supabase
+          .from('clientes')
+          .insert([{
+            id: novoClienteId,
+            nome: lead.nome.toUpperCase(),
+            cpf: lead.cpf || null,
+            email: lead.email ? lead.email.trim().toLowerCase() : null,
+            contato: lead.contato || null,
+            empresa_id: novaEmp.id,
+            observacoes: 'PERFIL INDIVIDUAL CAC (Ativado via Lead)'
+          }]);
+      }
+
       // 3. Registrar o pagamento inicial se solicitado e não for isento
       if (ativacaoRegistrarPagamento && !ativacaoIsento) {
         const valorPagamento = parseFloat(ativacaoValorPagamento);
@@ -1085,6 +1102,22 @@ Você pode adicionar comentários, observações ou explicações adicionais ant
           .insert([payload]);
         
         if (error) throw error;
+
+        // Se foi um CAC Individual criado pelo Master Admin, criar também o registro na tabela 'clientes'
+        if (isMasterAdmin && subPainelAtivo === 'cacs' && targetEmpresaId) {
+          await supabase
+            .from('clientes')
+            .insert([{
+              id: uuidv4(),
+              nome: formData.nome.toUpperCase(),
+              cpf: formData.cpf || null,
+              email: formData.email ? formData.email.trim().toLowerCase() : null,
+              contato: formData.contato || null,
+              empresa_id: targetEmpresaId,
+              observacoes: 'PERFIL INDIVIDUAL CAC (Criado via Gestão SaaS)'
+            }]);
+        }
+
         mostrar('sucesso', 'Usuário cadastrado com sucesso.');
       }
       setModalAberto(false);

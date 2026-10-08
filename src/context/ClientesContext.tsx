@@ -39,6 +39,9 @@ export const MODELOS_BASE = [
 
 interface ClientesContextType {
   clientes: Cliente[];
+  carregado: boolean;
+  carregarClientes: () => Promise<void>;
+  garantirClienteCac: () => Promise<Cliente | null>;
   criarCliente: (dados: Omit<Cliente, 'id' | 'criadoEm' | 'atualizadoEm'>) => Promise<string>;
   atualizarCliente: (id: string, dados: Partial<Cliente>, overrideEmpresaId?: string) => Promise<void>;
   deletarCliente: (id: string) => Promise<void>;
@@ -174,20 +177,26 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
 
   const carregarClientes = useCallback(async () => {
     if (!usuario?.empresaId || !estaAutenticado) return;
-    const { data, error } = await supabase
-      .from('clientes')
-      .select('*')
-      .eq('empresa_id', usuario.empresaId)
-      .order('nome', { ascending: true });
-    
-    if (error) {
-      console.error('Erro ao buscar clientes no supabase:', error);
-      return;
+    try {
+      const { data, error } = await supabase
+        .from('clientes')
+        .select('*')
+        .eq('empresa_id', usuario.empresaId)
+        .order('nome', { ascending: true });
+      
+      if (error) {
+        console.error('Erro ao buscar clientes no supabase:', error);
+        setCarregado(true);
+        return;
+      }
+      
+      setClientes(data.map(mapFromDB));
+      setCarregado(true);
+    } catch (err) {
+      console.error('Erro inesperado em carregarClientes:', err);
+      setCarregado(true);
     }
-    
-    setClientes(data.map(mapFromDB));
-    setCarregado(true);
-  }, [usuario]);
+  }, [usuario?.empresaId, estaAutenticado]);
 
   const [modelosRegistrados, setModelosRegistrados] = useState<string[]>([]);
   const [calibresRegistrados, setCalibresRegistrados] = useState<string[]>([]);
@@ -1194,52 +1203,227 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
     if (error) throw error;
   }, []);
 
+  const garantirClienteCac = useCallback(async (): Promise<Cliente | null> => {
+    if (!usuario?.empresaId || usuario?.tipoConta !== 'cac_individual') return null;
+
+    try {
+      // 1. Verifica se já existe cliente cadastrado no tenant do CAC
+      const { data: existenteLocal, error: errLocal } = await supabase
+        .from('clientes')
+        .select('*')
+        .eq('empresa_id', usuario.empresaId)
+        .order('criado_em', { ascending: false })
+        .limit(1);
+
+      if (!errLocal && existenteLocal && existenteLocal.length > 0) {
+        const clienteEncontrado = mapFromDB(existenteLocal[0]);
+        setClientes([clienteEncontrado]);
+        setCarregado(true);
+        return clienteEncontrado;
+      }
+
+      // 2. Se não existe no tenant atual, buscar se já existe cadastro deste atirador
+      // por CPF ou email em qualquer tabela (ex: cadastro prévio do Despachante ou Vínculo)
+      let dadosOrigem: any = null;
+      let clienteOrigemId: string | null = null;
+
+      const { data: vinculo } = await supabase
+        .from('vinculos_despachante_cac')
+        .select('despachante_empresa_id, cac_cpf')
+        .eq('cac_empresa_id', usuario.empresaId)
+        .maybeSingle();
+
+      const cpfLimpo = usuario.cpf ? usuario.cpf.replace(/\D/g, '') : (vinculo?.cac_cpf ? vinculo.cac_cpf.replace(/\D/g, '') : '');
+      const cpfFormatado = cpfLimpo ? cpfLimpo.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4') : '';
+
+      if (cpfLimpo) {
+        const { data: clientePorCpf } = await supabase
+          .from('clientes')
+          .select('*')
+          .or(`cpf.eq.${cpfLimpo},cpf.eq.${cpfFormatado}`)
+          .order('atualizado_em', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (clientePorCpf) {
+          dadosOrigem = clientePorCpf;
+          clienteOrigemId = clientePorCpf.id;
+        }
+      }
+
+      if (!dadosOrigem && usuario.email) {
+        const { data: clientePorEmail } = await supabase
+          .from('clientes')
+          .select('*')
+          .eq('email', usuario.email.trim().toLowerCase())
+          .order('atualizado_em', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (clientePorEmail) {
+          dadosOrigem = clientePorEmail;
+          clienteOrigemId = clientePorEmail.id;
+        }
+      }
+
+      // 3. Montar dados para inserção do perfil individual do CAC
+      const novoClienteId = uuidv4();
+      const nomeFinal = (
+        dadosOrigem?.nome || 
+        usuario.nome || 
+        usuario.empresaNome?.replace(/^CAC\s*-\s*/i, '') || 
+        usuario.email?.split('@')[0] || 
+        'ATIRADOR CAC'
+      ).toUpperCase();
+
+      const dadosParaInserir = {
+        id: novoClienteId,
+        empresa_id: usuario.empresaId,
+        nome: nomeFinal,
+        cpf: dadosOrigem?.cpf || usuario.cpf || '',
+        contato: dadosOrigem?.contato || usuario.contato || '',
+        email: usuario.email || dadosOrigem?.email || '',
+        senha_gov: dadosOrigem?.senha_gov || '',
+        filiado_pro_tiro: !!dadosOrigem?.filiado_pro_tiro,
+        clube_filiado: dadosOrigem?.clube_filiado || '',
+        observacoes: dadosOrigem?.observacoes || 'PERFIL INDIVIDUAL CAC (Acervo Pessoal)',
+        endereco: dadosOrigem?.endereco || '',
+        numero_cr: dadosOrigem?.numero_cr || '',
+        vencimento_cr: dadosOrigem?.vencimento_cr || null,
+        numero_cr_ibama: dadosOrigem?.numero_cr_ibama || '',
+        vencimento_cr_ibama: dadosOrigem?.vencimento_cr_ibama || null,
+        cr_em_renovacao: !!dadosOrigem?.cr_em_renovacao,
+        cr_ibama_em_renovacao: !!dadosOrigem?.cr_ibama_em_renovacao,
+        foto_url: dadosOrigem?.foto_url || null,
+        cr_url: dadosOrigem?.cr_url || null,
+        cr_ibama_url: dadosOrigem?.cr_ibama_url || null,
+        rg: dadosOrigem?.rg || '',
+        data_nascimento: dadosOrigem?.data_nascimento || null,
+        nome_pai: dadosOrigem?.nome_pai || '',
+        nome_mae: dadosOrigem?.nome_mae || '',
+        cr_tiro_desportivo: !!dadosOrigem?.cr_tiro_desportivo,
+        cr_caca: !!dadosOrigem?.cr_caca,
+        cr_colecionamento: !!dadosOrigem?.cr_colecionamento,
+        atirador_nivel: dadosOrigem?.atirador_nivel || undefined,
+        responsavel_id: dadosOrigem?.responsavel_id || null,
+        ignorar_mensagens_alertas: !!dadosOrigem?.ignorar_mensagens_alertas,
+      };
+
+      const { data: inserido, error: insErr } = await supabase
+        .from('clientes')
+        .insert([dadosParaInserir])
+        .select()
+        .single();
+
+      if (insErr) {
+        console.error('Erro ao inserir cliente individual CAC:', insErr);
+        throw insErr;
+      }
+
+      const clienteCriado = mapFromDB(inserido || dadosParaInserir);
+
+      // 4. Se encontrou dados de origem em outro cliente (ex: despachante), clonar armas e GTs para a nova workspace
+      if (clienteOrigemId) {
+        try {
+          const { data: armasOrigem } = await supabase
+            .from('armas')
+            .select('*')
+            .eq('cliente_id', clienteOrigemId);
+
+          if (armasOrigem && armasOrigem.length > 0) {
+            for (const arma of armasOrigem) {
+              const novaArmaId = uuidv4();
+              const { error: erroArma } = await supabase
+                .from('armas')
+                .insert([{
+                  id: novaArmaId,
+                  cliente_id: novoClienteId,
+                  tipo: arma.tipo || '',
+                  modelo: arma.modelo,
+                  calibre: arma.calibre,
+                  fabricante: arma.fabricante,
+                  numero_serie: arma.numero_serie,
+                  numero_sigma: arma.numero_sigma,
+                  acervo: arma.acervo,
+                  vencimento_craf: arma.vencimento_craf || null,
+                  craf_url: arma.craf_url || null,
+                  craf_em_renovacao: !!arma.craf_em_renovacao,
+                  empresa_id: usuario.empresaId,
+                }]);
+
+              if (!erroArma) {
+                const { data: gtsOrigem } = await supabase
+                  .from('guias_trafego')
+                  .select('*')
+                  .eq('arma_id', arma.id);
+
+                if (gtsOrigem && gtsOrigem.length > 0) {
+                  const gtsParaInserir = gtsOrigem.map(gt => ({
+                    id: uuidv4(),
+                    arma_id: novaArmaId,
+                    tipo: gt.tipo,
+                    vencimento: gt.vencimento,
+                    destino: gt.destino,
+                    arquivo_url: gt.arquivo_url || null,
+                    empresa_id: usuario.empresaId,
+                  }));
+                  await supabase.from('guias_trafego').insert(gtsParaInserir);
+                }
+              }
+            }
+          }
+
+          const { data: manejosOrigem } = await supabase
+            .from('autorizacoes_manejo')
+            .select('*')
+            .eq('cliente_id', clienteOrigemId);
+
+          if (manejosOrigem && manejosOrigem.length > 0) {
+            const manejosParaInserir = manejosOrigem.map(m => ({
+              id: uuidv4(),
+              cliente_id: novoClienteId,
+              numero_car: m.numero_car,
+              nome_fazenda: m.nome_fazenda,
+              nome_proprietario: m.nome_proprietario,
+              cidade: m.cidade,
+              vencimento: m.vencimento,
+              status: m.status || 'Ativo',
+              arquivo_url: m.arquivo_url || null,
+              empresa_id: usuario.empresaId,
+            }));
+            await supabase.from('autorizacoes_manejo').insert(manejosParaInserir);
+          }
+        } catch (errClone) {
+          console.warn('Aviso: Armas/documentos prévios não puderam ser clonados:', errClone);
+        }
+      }
+
+      setClientes([clienteCriado]);
+      setCarregado(true);
+      return clienteCriado;
+    } catch (e) {
+      console.error('Erro em garantirClienteCac:', e);
+      setCarregado(true);
+      throw e;
+    }
+  }, [usuario]);
+
   useEffect(() => {
     if (usuario?.tipoConta === 'cac_individual' && usuario?.empresaId && carregado) {
       if (clientes.length === 0) {
-        const autoCreate = async () => {
-          try {
-            // Consulta direta no banco de dados para evitar qualquer race condition local
-            const { data, error } = await supabase
-              .from('clientes')
-              .select('id')
-              .eq('empresa_id', usuario.empresaId)
-              .limit(1);
-
-            if (error) throw error;
-
-            if (!data || data.length === 0) {
-              await criarCliente({
-                nome: usuario.nome.toUpperCase(),
-                cpf: usuario.cpf || '',
-                contato: usuario.contato || '',
-                email: usuario.email || '',
-                senhaGov: '',
-                filiadoProTiro: false,
-                clubeFiliado: '',
-                observacoes: 'CLIENTE AUTOMÁTICO (PERFIL INDIVIDUAL CAC)',
-                endereco: '',
-                numeroCr: '',
-                vencimentoCr: '',
-                numeroCrIbama: '',
-                vencimentoCrIbama: '',
-              });
-            } else {
-              // Se já existe no banco mas não na lista local por delay, recarrega
-              await carregarClientes();
-            }
-          } catch (e) {
-            console.error('Erro ao criar cliente individual automático:', e);
-          }
-        };
-        autoCreate();
+        garantirClienteCac().catch(e => {
+          console.error('Erro ao garantir cliente individual automático no efeito:', e);
+        });
       }
     }
-  }, [clientes, usuario, criarCliente, carregado, carregarClientes]);
+  }, [clientes.length, usuario?.tipoConta, usuario?.empresaId, carregado, garantirClienteCac]);
 
   return (
     <ClientesContext.Provider value={{
       clientes,
+      carregado,
+      carregarClientes,
+      garantirClienteCac,
       criarCliente,
       atualizarCliente,
       deletarCliente,

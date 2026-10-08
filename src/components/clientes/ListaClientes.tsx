@@ -14,9 +14,21 @@ import { supabase } from '../../db/supabase';
 export function ListaClientes() {
   const navigate = useNavigate();
   const { usuario } = useAuth();
-  const { clientes, deletarCliente } = useClientes();
+  const { clientes, deletarCliente, carregarClientes, garantirClienteCac } = useClientes();
   const [vinculosPortal, setVinculosPortal] = useState<Record<string, { status: string; permiteEdicao: boolean }>>({});
   const [cadastradosNoPortal, setCadastradosNoPortal] = useState<Set<string>>(new Set());
+  const { estado: notif, mostrar, fechar } = useNotificacao();
+  const [busca, setBusca] = useState('');
+  const [clienteEditando, setClienteEditando] = useState<Cliente | null>(null);
+  const [clienteVisualizando, setClienteVisualizando] = useState<Cliente | null>(null);
+  const [modalAberto, setModalAberto] = useState(false);
+  const [copiou, setCopiou] = useState(false);
+  const [confirmandoDelete, setConfirmandoDelete] = useState<Cliente | null>(null);
+
+  // Estados de recuperação para CAC individual
+  const [tentandoInicializar, setTentandoInicializar] = useState(false);
+  const [erroInicializacao, setErroInicializacao] = useState<string | null>(null);
+  const [tempoEsgotado, setTempoEsgotado] = useState(false);
 
   useEffect(() => {
     async function carregarVinculos() {
@@ -81,25 +93,103 @@ export function ListaClientes() {
     carregarCadastradosNoPortal();
   }, [clientes, usuario]);
 
+  // Efeito de proteção contra loading infinito para CAC Individual
+  useEffect(() => {
+    if (usuario?.tipoConta !== 'cac_individual') return;
+    if (clientes.length > 0) return;
+
+    const timer = setTimeout(() => {
+      setTempoEsgotado(true);
+    }, 4000);
+
+    garantirClienteCac().catch(err => {
+      console.error('Erro ao inicializar acervo individual:', err);
+      setErroInicializacao(err?.message || 'Falha ao sincronizar acervo');
+    });
+
+    return () => clearTimeout(timer);
+  }, [usuario?.tipoConta, clientes.length, garantirClienteCac]);
+
+  const handleInicializarManual = async () => {
+    setTentandoInicializar(true);
+    setErroInicializacao(null);
+    try {
+      await garantirClienteCac();
+      await carregarClientes();
+    } catch (err: any) {
+      setErroInicializacao(err?.message || 'Não foi possível carregar o acervo. Tente novamente.');
+    } finally {
+      setTentandoInicializar(false);
+    }
+  };
+
   if (usuario?.tipoConta === 'cac_individual') {
     if (clientes.length > 0) {
       const clienteReal = clientes.find(c => c.cpf && c.cpf.trim() !== '') || clientes[0];
       return <DetalheCliente cliente={clienteReal} />;
     }
+
+    if (!tempoEsgotado && !erroInicializacao) {
+      return (
+        <div className="flex flex-col items-center justify-center min-h-[50vh] text-center px-4 py-16 animate-fade-in">
+          <div className="w-12 h-12 border-2 border-brand-blue border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <h3 className="text-white font-bold text-base mb-1">Carregando acervo pessoal...</h3>
+          <p className="text-gray-400 text-xs max-w-sm">
+            Sincronizando seus documentos, CR e armas cadastradas.
+          </p>
+        </div>
+      );
+    }
+
     return (
-      <div className="text-center py-20">
-        <div className="w-12 h-12 border-2 border-brand-blue border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-        <p className="text-gray-400 text-sm">Carregando acervo pessoal...</p>
+      <div className="flex flex-col items-center justify-center min-h-[55vh] text-center px-4 py-12 animate-fade-in">
+        <div className="w-16 h-16 rounded-2xl bg-brand-blue/10 border border-brand-blue/20 flex items-center justify-center text-brand-blue-light mb-4 shadow-lg shadow-brand-blue/5">
+          <Shield size={32} />
+        </div>
+        
+        <h3 className="text-lg font-black text-white uppercase tracking-wide mb-2">
+          Meu Acervo Pessoal & CR
+        </h3>
+
+        <p className="text-gray-400 text-xs sm:text-sm max-w-md mb-6 leading-relaxed">
+          {erroInicializacao ? (
+            <span className="text-red-400 font-medium block mb-2">{erroInicializacao}</span>
+          ) : null}
+          Não localizamos documentos ou o carregamento automático expirou. Clique no botão abaixo para inicializar o seu acervo pessoal agora.
+        </p>
+
+        <div className="flex flex-col sm:flex-row gap-3 w-full max-w-xs">
+          <button
+            type="button"
+            onClick={handleInicializarManual}
+            disabled={tentandoInicializar}
+            className="w-full flex items-center justify-center gap-2 bg-brand-blue hover:bg-brand-blue-light text-white text-xs font-black uppercase tracking-wider py-3.5 px-5 rounded-xl border border-brand-blue-light/30 transition-all shadow-lg shadow-brand-blue/25 disabled:opacity-50"
+          >
+            {tentandoInicializar ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                <span>Inicializando...</span>
+              </>
+            ) : (
+              <>
+                <Shield size={16} />
+                <span>Inicializar Meu Acervo</span>
+              </>
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => carregarClientes()}
+            disabled={tentandoInicializar}
+            className="w-full bg-brand-dark-3 hover:bg-brand-dark-4 text-gray-300 hover:text-white text-xs font-bold uppercase tracking-wider py-3 px-4 rounded-xl border border-brand-dark-5 transition-all"
+          >
+            Recarregar Dados
+          </button>
+        </div>
       </div>
     );
   }
-  const { estado: notif, mostrar, fechar } = useNotificacao();
-  const [busca, setBusca] = useState('');
-  const [clienteEditando, setClienteEditando] = useState<Cliente | null>(null);
-  const [clienteVisualizando, setClienteVisualizando] = useState<Cliente | null>(null);
-  const [modalAberto, setModalAberto] = useState(false);
-  const [copiou, setCopiou] = useState(false);
-  const [confirmandoDelete, setConfirmandoDelete] = useState<Cliente | null>(null);
 
   const clientesFiltrados = clientes.filter(c => {
     const termo = removerAcentos(busca.toLowerCase());
