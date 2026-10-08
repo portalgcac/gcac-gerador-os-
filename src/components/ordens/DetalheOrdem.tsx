@@ -667,9 +667,23 @@ export function DetalheOrdem({ ordem }: DetalheOrdemProps) {
           <div className="space-y-3">
             {servicos.map((serv) => (
               <div key={serv.id} className="bg-brand-dark-4 rounded-lg p-4 border border-brand-dark-5 relative">
-                <div className="flex items-start justify-between gap-4 mb-2">
-                  <div className="flex flex-col items-start gap-1">
-                    <p className="font-bold text-white text-base leading-tight">• {serv.nome}</p>
+                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 mb-2.5">
+                  <div className="flex flex-col items-start gap-1.5 flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-bold text-white text-base leading-tight">• {serv.nome}</p>
+                      
+                      {/* Valor Individual do Serviço */}
+                      <span className="text-xs sm:text-sm font-black text-brand-green-light bg-brand-green/10 border border-brand-green/20 px-2.5 py-0.5 rounded-lg shadow-sm whitespace-nowrap flex items-center gap-1.5">
+                        <span className="text-[10px] text-gray-400 font-semibold uppercase">Valor:</span>
+                        <span>{formatarMoeda(serv.valor || 0)}</span>
+                      </span>
+
+                      {serv.pagoDireto && (
+                        <span className="text-[10px] font-bold text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded uppercase tracking-wider" title="Valor pago diretamente ao parceiro / terceiro">
+                          Pago Direto
+                        </span>
+                      )}
+                    </div>
                     
                     {/* Selo de GRU */}
                     {(serv.exigeGRU === true || (serv.exigeGRU === undefined && (serv.taxaPF || 0) > 0)) && (
@@ -687,12 +701,15 @@ export function DetalheOrdem({ ordem }: DetalheOrdemProps) {
                         ) : (
                           <><span>❌</span> GRU PENDENTE</>
                         )}
+                        {(serv.taxaPF || 0) > 0 && (
+                          <span className="opacity-80">({formatarMoeda(serv.taxaPF || 0)})</span>
+                        )}
                       </button>
                     )}
                   </div>
                   
                   {/* Dropdown de status */}
-                  <div className="relative flex-shrink-0">
+                  <div className="relative flex-shrink-0 self-start sm:self-auto">
                     <button 
                       onClick={() => setStatusAberto(statusAberto === serv.id ? null : serv.id)}
                       className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[10px] font-bold border transition-all uppercase tracking-wider ${classeStatusExecucao(serv.statusExecucao)}`}
@@ -783,10 +800,16 @@ export function DetalheOrdem({ ordem }: DetalheOrdemProps) {
             ))}
           </div>
         ) : (
-          <p className="text-sm text-gray-200 whitespace-pre-wrap leading-relaxed bg-brand-dark-4 rounded-lg p-4 border border-brand-dark-5">
-            {/* Fallback caso antiga O.S. tenha texto legado */}
-            {(ordem as any).servico || 'Nenhum serviço registrado.'}
-          </p>
+          <div className="bg-brand-dark-4 rounded-lg p-4 border border-brand-dark-5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+            <p className="text-sm text-gray-200 whitespace-pre-wrap leading-relaxed">
+              {/* Fallback caso antiga O.S. tenha texto legado */}
+              {(ordem as any).servico || 'Nenhum serviço registrado.'}
+            </p>
+            <span className="text-xs sm:text-sm font-black text-brand-green-light bg-brand-green/10 border border-brand-green/20 px-2.5 py-0.5 rounded-lg shadow-sm whitespace-nowrap flex items-center gap-1.5 flex-shrink-0">
+              <span className="text-[10px] text-gray-400 font-semibold uppercase">Valor:</span>
+              <span>{formatarMoeda(ordem.valor || 0)}</span>
+            </span>
+          </div>
         )}
       </div>
 
