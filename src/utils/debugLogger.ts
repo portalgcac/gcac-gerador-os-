@@ -49,13 +49,24 @@ try {
   if (saved) logs = JSON.parse(saved);
 } catch {}
 
+const isNetworkFailure = (text: string) => {
+  return text.includes('Failed to fetch') || 
+         text.includes('NetworkError') || 
+         text.includes('Load failed') ||
+         text.includes('net::ERR_');
+};
+
 if (typeof window !== 'undefined') {
   window.onerror = (message, source, lineno, colno, error) => {
-    addDebugLog('error', `Erro Global: ${message} em ${source}:${lineno}:${colno}`, error?.stack);
+    const msg = `Erro Global: ${message} em ${source}:${lineno}:${colno}`;
+    const logType = isNetworkFailure(String(message)) ? 'warn' : 'error';
+    addDebugLog(logType, msg, error?.stack);
   };
 
   window.addEventListener('unhandledrejection', (event) => {
-    addDebugLog('error', `Rejeição Não Tratada: ${event.reason?.message || event.reason}`, event.reason?.stack);
+    const reasonText = event.reason?.message || String(event.reason || '');
+    const logType = isNetworkFailure(reasonText) ? 'warn' : 'error';
+    addDebugLog(logType, `Rejeição Não Tratada: ${reasonText}`, event.reason?.stack);
   });
 
   const originalConsoleError = console.error;
@@ -65,7 +76,9 @@ if (typeof window !== 'undefined') {
       if (arg instanceof Error) return arg.message + (arg.stack ? '\n' + arg.stack : '');
       return typeof arg === 'object' ? JSON.stringify(arg) : String(arg);
     }).join(' ');
-    addDebugLog('error', msg);
+    // Falhas transitórias de rede/Wi-Fi não devem alarmar como erro crítico de RLS
+    const logType = isNetworkFailure(msg) ? 'warn' : 'error';
+    addDebugLog(logType, msg);
   };
 
   const originalConsoleWarn = console.warn;

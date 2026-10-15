@@ -106,7 +106,29 @@ const mapToDB = (dados: any) => {
 export function OrdensProvider({ children }: { children: React.ReactNode }) {
   const { usuario, estaAutenticado } = useAuth();
   const online = useStatusConexao();
-  const [ordens, setOrdens] = useState<OrdemDeServico[]>([]);
+  const [ordens, setOrdens] = useState<OrdemDeServico[]>(() => {
+    try {
+      const empresaId = usuario?.empresaId;
+      if (empresaId) {
+        const salvo = localStorage.getItem(`gcac_ordens_cache_${empresaId}`);
+        if (salvo) return JSON.parse(salvo);
+      }
+    } catch {}
+    return [];
+  });
+
+  // Carregar cache local ao logar/obter empresaId
+  useEffect(() => {
+    if (usuario?.empresaId) {
+      try {
+        const salvo = localStorage.getItem(`gcac_ordens_cache_${usuario.empresaId}`);
+        if (salvo) {
+          const parsed = JSON.parse(salvo);
+          setOrdens(prev => (prev.length === 0 ? parsed : prev));
+        }
+      } catch {}
+    }
+  }, [usuario?.empresaId]);
 
   const adicionarEvento = useCallback((historico: any[] = [], tipo: any, descricao: string, valorAnterior?: string, valorNovo?: string) => {
     const novoEvento = {
@@ -121,27 +143,67 @@ export function OrdensProvider({ children }: { children: React.ReactNode }) {
     return [...historico, novoEvento];
   }, [usuario]);
 
-  const carregarOrdens = useCallback(async () => {
+  const carregarOrdens = useCallback(async (tentativa = 1) => {
     if (!usuario?.empresaId || !estaAutenticado) return;
-    const { data, error } = await supabase
-      .from('ordens')
-      .select('*')
-      .eq('empresa_id', usuario.empresaId)
-      .order('numero', { ascending: false });
-    
-    if (error) {
-      console.error('[DEBUG Ordens] Erro ao buscar ordens no supabase:', error);
+
+    // Se estiver explicitamente sem internet, utiliza os dados já cacheados
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      console.warn('[DEBUG Ordens] Navegador offline. Mantendo cache local de ordens de serviço.');
       return;
     }
-    
-    if (data) {
-      setOrdens(data.map(mapFromDB));
+
+    try {
+      const { data, error } = await supabase
+        .from('ordens')
+        .select('*')
+        .eq('empresa_id', usuario.empresaId)
+        .order('numero', { ascending: false });
+      
+      if (error) {
+        const isNetwork = error.message?.includes('Failed to fetch') || error.message?.includes('NetworkError');
+        
+        // Retentativa automática com backoff em caso de oscilação momentânea de rede
+        if (isNetwork && tentativa <= 2) {
+          console.warn(`[DEBUG Ordens] Oscilação transitória de conexão ao carregar ordens. Retentando em 2s (tentativa ${tentativa})...`);
+          setTimeout(() => carregarOrdens(tentativa + 1), 2000);
+          return;
+        }
+
+        if (isNetwork) {
+          console.warn('[DEBUG Ordens] Conexão indisponível ao buscar ordens no Supabase (usando dados locais):', error.message);
+        } else {
+          console.error('[DEBUG Ordens] Erro ao buscar ordens no supabase:', error);
+        }
+        return;
+      }
+      
+      if (data) {
+        const ordensMapeadas = data.map(mapFromDB);
+        setOrdens(ordensMapeadas);
+        try {
+          localStorage.setItem(`gcac_ordens_cache_${usuario.empresaId}`, JSON.stringify(ordensMapeadas));
+        } catch {}
+      }
+    } catch (err: any) {
+      const isNetwork = err?.message?.includes('Failed to fetch') || err?.message?.includes('NetworkError');
+      if (isNetwork) {
+        console.warn('[DEBUG Ordens] Oscilação de rede ao requisitar ordens:', err?.message || err);
+      } else {
+        console.error('[DEBUG Ordens] Erro inesperado ao buscar ordens:', err);
+      }
     }
-  }, [usuario, estaAutenticado]);
+  }, [usuario?.empresaId, estaAutenticado]);
 
   useEffect(() => {
     carregarOrdens();
   }, [carregarOrdens]);
+
+  // Recarregar ordens automaticamente quando o dispositivo reconectar à internet
+  useEffect(() => {
+    if (online && estaAutenticado && usuario?.empresaId) {
+      carregarOrdens();
+    }
+  }, [online, estaAutenticado, usuario?.empresaId, carregarOrdens]);
 
   const totalPendentes = ordens.filter(o => o.status === 'Aguardando Pagamento').length;
 

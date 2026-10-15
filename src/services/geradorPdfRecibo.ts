@@ -82,33 +82,79 @@ export async function gerarPdfReciboBlob(recibo: Recibo, numeroOS?: string | num
   doc.line(12, 45, largura - 12, 45);
   doc.setLineWidth(0.1); // reset
 
-  y = 55;
+  y = 52;
 
-  // 2. Texto Principal (Box Azul)
+  // 2. Texto Principal (Box Azul Corporativo)
+  const boxAltura = 28;
   doc.setFillColor(AZUL_FUNDO);
-  doc.rect(12, y, largura - 24, 28, 'F');
+  doc.roundedRect(12, y, largura - 24, boxAltura, 2, 2, 'F');
   doc.setDrawColor(AZUL_BRAND);
-  doc.setLineWidth(1);
-  doc.line(12, y, 12, y + 28); // Borda lateral azul
+  doc.setLineWidth(1.2);
+  doc.line(12, y, 12, y + boxAltura); // Borda lateral azul
   doc.setLineWidth(0.1);
 
+  // Divisor vertical sutil separando os dados do valor
+  const xDivisor = largura - 70;
+  doc.setDrawColor('#D0E2F5');
+  doc.setLineWidth(0.3);
+  doc.line(xDivisor, y + 4, xDivisor, y + boxAltura - 4);
+  doc.setLineWidth(0.1);
+
+  // Textos da esquerda (Identificação do Cliente e Referência)
+  const maxLarguraTexto = xDivisor - 18 - 4;
   doc.setTextColor(ESCURO_BRAND);
-  doc.setFontSize(14);
+
+  // Linha 1: Recebemos de [Nome]
+  doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');
-  const textoRecibo = `Recebemos de ${recibo.clienteNome}, `;
-  const textoCpf = `inscrito no CPF/CNPJ ${recibo.clienteCPF}, `;
-  const textoImportancia = `a importância de: ${numeroOS ? `(ref. OS #${String(numeroOS).padStart(4, '0')})` : ''}`;
+  doc.text('Recebemos de ', 18, y + 8);
+  const wRecebemos = doc.getTextWidth('Recebemos de ');
   
-  doc.text(textoRecibo, 18, y + 10);
-  doc.text(textoCpf, 18, y + 16);
-  doc.text(textoImportancia, 18, y + 22);
+  // Ajuste automático caso o nome do cliente seja longo
+  const nomeClienteStr = (recibo.clienteNome || '').toUpperCase();
+  let fontNome = 10;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(fontNome);
+  if (doc.getTextWidth(nomeClienteStr) > maxLarguraTexto - wRecebemos) {
+    fontNome = 8.5;
+    doc.setFontSize(fontNome);
+  }
+  const nomeTruncado = doc.splitTextToSize(nomeClienteStr, maxLarguraTexto - wRecebemos);
+  doc.text(nomeTruncado[0] || '', 18 + wRecebemos, y + 8);
+
+  // Linha 2: inscrito(a) no CPF/CNPJ [Documento]
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  doc.text('inscrito(a) no CPF/CNPJ ', 18, y + 14.5);
+  const wInscrito = doc.getTextWidth('inscrito(a) no CPF/CNPJ ');
+  doc.setFont('helvetica', 'bold');
+  doc.text(recibo.clienteCPF || 'NÃO INFORMADO', 18 + wInscrito, y + 14.5);
+
+  // Linha 3: referente à [Ordem de Serviço # / Serviços descritos abaixo]
+  const numOS = numeroOS || (recibo as any).ordemNumero;
+  doc.setFont('helvetica', 'normal');
+  const prefixoRef = numOS ? 'referente à ' : 'referente aos ';
+  doc.text(prefixoRef, 18, y + 21);
+  const wRef = doc.getTextWidth(prefixoRef);
+  doc.setFont('helvetica', 'bold');
+  const textoRefValor = numOS 
+    ? `Ordem de Serviço #${String(numOS).padStart(4, '0')}` 
+    : 'serviços discriminados abaixo';
+  doc.text(textoRefValor, 18 + wRef, y + 21);
+
+  // Bloco da direita: Valor Recebido em Destaque
+  const centroDireita = (xDivisor + (largura - 12)) / 2;
+  doc.setTextColor(CINZA_TEXTO);
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'bold');
+  doc.text('VALOR RECEBIDO', centroDireita, y + 9.5, { align: 'center' });
 
   doc.setTextColor(AZUL_BRAND);
-  doc.setFontSize(22);
+  doc.setFontSize(18);
   doc.setFont('helvetica', 'bold');
-  doc.text(formatarMoeda(recibo.valorTotal), largura - 18, y + 18, { align: 'right' });
+  doc.text(formatarMoeda(recibo.valorTotal), centroDireita, y + 19.5, { align: 'center' });
 
-  y += 45;
+  y += boxAltura + 10;
 
   // 3. Tabela de Servicos
   doc.setTextColor(CINZA_TEXTO);
