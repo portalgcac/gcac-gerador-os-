@@ -228,7 +228,7 @@ export function GestaoUsuarios({ abaInicial }: GestaoUsuariosProps = {}) {
   
   const [empresaEditando, setEmpresaEditando] = useState<any | null>(null);
   const [confirmandoDeleteEmpresa, setConfirmandoDeleteEmpresa] = useState<{ id: string; nome: string } | null>(null);
-  const [confirmandoDeleteUsuario, setConfirmandoDeleteUsuario] = useState<{ id: string; nome: string; empresa_id?: string } | null>(null);
+  const [confirmandoDeleteUsuario, setConfirmandoDeleteUsuario] = useState<{ id: string; nome: string; email?: string; empresa_id?: string } | null>(null);
 
   // Estados para Gestão de Faturamento & Mensalidades
   const [empresaFaturamentoSelecionada, setEmpresaFaturamentoSelecionada] = useState<any | null>(null);
@@ -727,35 +727,9 @@ Você pode adicionar comentários, observações ou explicações adicionais ant
         }
       }
 
-      // 0. Verificar previamente se e-mail ou CPF já existem em usuarios_autorizados
-      if (emailLimpo) {
-        const { data: emailDup, error: errEmailCheck } = await supabase
-          .from('usuarios_autorizados')
-          .select('id, nome, email')
-          .ilike('email', emailLimpo)
-          .limit(1);
-
-        if (errEmailCheck) throw errEmailCheck;
-        if (emailDup && emailDup.length > 0) {
-          throw new Error(
-            `Não foi possível ativar: o e-mail "${emailLimpo}" já está em uso pelo usuário "${emailDup[0].nome}" no sistema. Remova ou altere o cadastro existente antes de ativar este lead.`
-          );
-        }
-      }
-
-      if (cpfLimpo) {
-        const { data: cpfDup, error: errCpfCheck } = await supabase
-          .from('usuarios_autorizados')
-          .select('id, nome, cpf')
-          .or(`cpf.eq.${cpfLimpo},cpf.eq.${lead.cpf}`)
-          .limit(1);
-
-        if (errCpfCheck) throw errCpfCheck;
-        if (cpfDup && cpfDup.length > 0) {
-          throw new Error(
-            `Não foi possível ativar: o CPF/CNPJ "${formatarCpfExibicao(cpfLimpo)}" já está vinculado ao usuário "${cpfDup[0].nome}" no sistema.`
-          );
-        }
+      // 0. Proteger conta Master Admin
+      if (emailLimpo === 'gui.gomesassis@gmail.com') {
+        throw new Error('Não é permitido sobrescrever o e-mail do Administrador Mestre na ativação de lead.');
       }
 
       // Limpar eventuais empresas órfãs com o mesmo nome criadas por tentativas anteriores que falharam
@@ -814,10 +788,10 @@ Você pode adicionar comentários, observações ou explicações adicionais ant
       if (errEmp || !novaEmp) throw new Error(errEmp?.message || 'Erro ao criar empresa/tenant no banco.');
       empresaCriadaId = novaEmp.id;
 
-      // 2. Criar o usuário administrador no banco
+      // 2. Criar ou atualizar o usuário administrador no banco (upsert por email evita erro de chave duplicada em reativações/testes)
       const { error: errUser } = await supabase
         .from('usuarios_autorizados')
-        .insert([{
+        .upsert([{
           nome: lead.nome,
           email: emailLimpo,
           cpf: cpfLimpo || lead.cpf,
@@ -828,14 +802,9 @@ Você pode adicionar comentários, observações ou explicações adicionais ant
             ? ['painel', 'agenda', 'clientes', 'config']
             : ['painel', 'rotina', 'agenda', 'financeiro', 'orcamentos', 'ordens', 'recibos', 'agendamentos', 'clientes', 'config'],
           empresa_id: novaEmp.id
-        }]);
+        }], { onConflict: 'email' });
 
-      if (errUser) {
-        if (errUser.message?.includes('usuarios_autorizados_email_key')) {
-          throw new Error(`O e-mail "${emailLimpo}" já está cadastrado em outra conta ativa no sistema.`);
-        }
-        throw errUser;
-      }
+      if (errUser) throw errUser;
 
       // 2b. Se for CAC Individual, provisionar registro na tabela 'clientes' para o novo workspace
       if (isCac) {
