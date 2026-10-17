@@ -700,6 +700,7 @@ Você pode adicionar comentários, observações ou explicações adicionais ant
     if (!leadSelecionadoAtivacao) return;
     
     setCarregando(true);
+    let empresaCriadaId: string | null = null;
     try {
       const lead = leadSelecionadoAtivacao;
       const isCac = lead.tipo_usuario === 'cac_individual';
@@ -707,11 +708,72 @@ Você pode adicionar comentários, observações ou explicações adicionais ant
         ? `CAC - ${lead.nome.toUpperCase()}`
         : lead.nome.toUpperCase();
 
+      const emailLimpo = (lead.email || '').trim().toLowerCase();
+      const cpfLimpo = (lead.cpf || '').replace(/\D/g, '');
+
       const valorAssinatura = parseFloat(ativacaoValorAssinatura);
       const valorSetup = parseFloat(ativacaoValorSetup);
 
-      if (isNaN(valorAssinatura) || isNaN(valorSetup)) {
-        throw new Error('Por favor, informe valores de cobrança válidos.');
+      if (!ativacaoIsento && isNaN(valorAssinatura)) {
+        throw new Error('Por favor, informe um valor de mensalidade válido.');
+      }
+      if (isNaN(valorSetup)) {
+        throw new Error('Por favor, informe um valor de taxa de setup válido.');
+      }
+      if (ativacaoRegistrarPagamento && !ativacaoIsento) {
+        const valorPagamento = parseFloat(ativacaoValorPagamento);
+        if (isNaN(valorPagamento) || valorPagamento <= 0) {
+          throw new Error('Por favor, insira um valor de pagamento inicial válido.');
+        }
+      }
+
+      // 0. Verificar previamente se e-mail ou CPF já existem em usuarios_autorizados
+      if (emailLimpo) {
+        const { data: emailDup, error: errEmailCheck } = await supabase
+          .from('usuarios_autorizados')
+          .select('id, nome, email')
+          .ilike('email', emailLimpo)
+          .limit(1);
+
+        if (errEmailCheck) throw errEmailCheck;
+        if (emailDup && emailDup.length > 0) {
+          throw new Error(
+            `Não foi possível ativar: o e-mail "${emailLimpo}" já está em uso pelo usuário "${emailDup[0].nome}" no sistema. Remova ou altere o cadastro existente antes de ativar este lead.`
+          );
+        }
+      }
+
+      if (cpfLimpo) {
+        const { data: cpfDup, error: errCpfCheck } = await supabase
+          .from('usuarios_autorizados')
+          .select('id, nome, cpf')
+          .or(`cpf.eq.${cpfLimpo},cpf.eq.${lead.cpf}`)
+          .limit(1);
+
+        if (errCpfCheck) throw errCpfCheck;
+        if (cpfDup && cpfDup.length > 0) {
+          throw new Error(
+            `Não foi possível ativar: o CPF/CNPJ "${formatarCpfExibicao(cpfLimpo)}" já está vinculado ao usuário "${cpfDup[0].nome}" no sistema.`
+          );
+        }
+      }
+
+      // Limpar eventuais empresas órfãs com o mesmo nome criadas por tentativas anteriores que falharam
+      const { data: empresasMesmoNome } = await supabase
+        .from('empresas')
+        .select('id')
+        .eq('nome', nomeEmpresa);
+
+      if (empresasMesmoNome && empresasMesmoNome.length > 0) {
+        for (const empOrfa of empresasMesmoNome) {
+          const { count } = await supabase
+            .from('usuarios_autorizados')
+            .select('*', { count: 'exact', head: true })
+            .eq('empresa_id', empOrfa.id);
+          if (count === 0) {
+            await supabase.from('empresas').delete().eq('id', empOrfa.id);
+          }
+        }
       }
 
       // 1. Criar a empresa/tenant no banco
@@ -743,21 +805,22 @@ Você pode adicionar comentários, observações ou explicações adicionais ant
           data_vencimento: ativacaoIsento ? null : ativacaoDataVencimento,
           taxa_implementacao_paga: ativacaoSetupPaga,
           valor_implementacao: valorSetup,
-          valor_assinatura_personalizado: valorAssinatura,
+          valor_assinatura_personalizado: ativacaoIsento ? 0 : valorAssinatura,
           is_gratis: ativacaoIsento
         }])
         .select()
         .single();
 
       if (errEmp || !novaEmp) throw new Error(errEmp?.message || 'Erro ao criar empresa/tenant no banco.');
+      empresaCriadaId = novaEmp.id;
 
       // 2. Criar o usuário administrador no banco
       const { error: errUser } = await supabase
         .from('usuarios_autorizados')
         .insert([{
           nome: lead.nome,
-          email: lead.email,
-          cpf: lead.cpf,
+          email: emailLimpo,
+          cpf: cpfLimpo || lead.cpf,
           contato: lead.contato,
           role: 'admin',
           ativo: true,
@@ -767,7 +830,12 @@ Você pode adicionar comentários, observações ou explicações adicionais ant
           empresa_id: novaEmp.id
         }]);
 
-      if (errUser) throw errUser;
+      if (errUser) {
+        if (errUser.message?.includes('usuarios_autorizados_email_key')) {
+          throw new Error(`O e-mail "${emailLimpo}" já está cadastrado em outra conta ativa no sistema.`);
+        }
+        throw errUser;
+      }
 
       // 2b. Se for CAC Individual, provisionar registro na tabela 'clientes' para o novo workspace
       if (isCac) {
@@ -777,8 +845,8 @@ Você pode adicionar comentários, observações ou explicações adicionais ant
           .insert([{
             id: novoClienteId,
             nome: lead.nome.toUpperCase(),
-            cpf: lead.cpf || null,
-            email: lead.email ? lead.email.trim().toLowerCase() : null,
+            cpf: cpfLimpo || lead.cpf || null,
+            email: emailLimpo || null,
             contato: lead.contato || null,
             empresa_id: novaEmp.id,
             observacoes: 'PERFIL INDIVIDUAL CAC (Ativado via Lead)'
@@ -788,9 +856,6 @@ Você pode adicionar comentários, observações ou explicações adicionais ant
       // 3. Registrar o pagamento inicial se solicitado e não for isento
       if (ativacaoRegistrarPagamento && !ativacaoIsento) {
         const valorPagamento = parseFloat(ativacaoValorPagamento);
-        if (isNaN(valorPagamento) || valorPagamento <= 0) {
-          throw new Error('Por favor, insira um valor de pagamento inicial válido.');
-        }
 
         const { error: errHist } = await supabase
           .from('historico_pagamentos_empresa')
@@ -816,6 +881,9 @@ Você pode adicionar comentários, observações ou explicações adicionais ant
 
       if (errLead) throw errLead;
 
+      // Sucesso completo — não fazer rollback da empresa criada
+      empresaCriadaId = null;
+
       mostrar('sucesso', `Cadastro ativado e acesso liberado com sucesso! Workspace "${nomeEmpresa}" criada.`);
       setModalAtivacaoAberto(false);
       setLeadSelecionadoAtivacao(null);
@@ -823,6 +891,12 @@ Você pode adicionar comentários, observações ou explicações adicionais ant
       carregarEmpresas();
       carregarUsuarios();
     } catch (err: any) {
+      // Rollback: se a empresa chegou a ser criada mas houve erro nos passos seguintes, removê-la para não deixar órfã
+      if (empresaCriadaId) {
+        await supabase.from('clientes').delete().eq('empresa_id', empresaCriadaId);
+        await supabase.from('usuarios_autorizados').delete().eq('empresa_id', empresaCriadaId);
+        await supabase.from('empresas').delete().eq('id', empresaCriadaId);
+      }
       mostrar('erro', err.message || 'Erro ao ativar cadastro.');
     } finally {
       setCarregando(false);
@@ -1272,6 +1346,12 @@ Você pode adicionar comentários, observações ou explicações adicionais ant
           .delete()
           .eq('empresa_id', empresaId);
 
+        // 6b. Deleta histórico de pagamentos da empresa CAC
+        await supabase
+          .from('historico_pagamentos_empresa')
+          .delete()
+          .eq('empresa_id', empresaId);
+
         // 7. Deleta o usuário da tabela usuarios_autorizados
         const { error: errUser } = await supabase
           .from('usuarios_autorizados')
@@ -1297,11 +1377,21 @@ Você pode adicionar comentários, observações ou explicações adicionais ant
         if (errUser) throw errUser;
       }
 
+      // Se havia pré-cadastro já 'ativado' com o e-mail deste usuário excluído, remover para liberar novo teste/cadastro
+      if (confirmandoDeleteUsuario.email) {
+        await supabase
+          .from('leads_pre_cadastro')
+          .delete()
+          .ilike('email', confirmandoDeleteUsuario.email.trim())
+          .eq('status', 'ativado');
+      }
+
       mostrar('sucesso', 'Usuário excluído com sucesso.');
       setConfirmandoDeleteUsuario(null);
       carregarUsuarios();
       if (isMasterAdmin) {
         carregarEmpresas();
+        carregarLeads();
       }
     } catch (err: any) {
       mostrar('erro', err.message || 'Erro ao excluir usuário.');

@@ -138,6 +138,50 @@ export function PreCadastroPage() {
     if (carregando) return;
     if (!validarPasso()) return;
 
+    if (step === 2) {
+      const emailLimpo = email.toLowerCase().trim();
+      if (emailLimpo) {
+        setCarregando(true);
+        setErro('');
+        try {
+          // 1. Verificar e-mail em leads_pre_cadastro
+          const { data: leadEmailExistente, error: errLeadEmail } = await supabase
+            .from('leads_pre_cadastro')
+            .select('status')
+            .ilike('email', emailLimpo)
+            .in('status', ['pendente', 'contatado', 'ativado'])
+            .limit(1);
+
+          if (errLeadEmail) throw errLeadEmail;
+          if (leadEmailExistente && leadEmailExistente.length > 0) {
+            setErro('Este e-mail já possui um pré-cadastro ativo ou pendente no portal.');
+            setCarregando(false);
+            return;
+          }
+
+          // 2. Verificar e-mail em usuarios_autorizados
+          const { data: usuarioEmailExistente, error: errUserEmail } = await supabase
+            .from('usuarios_autorizados')
+            .select('id')
+            .ilike('email', emailLimpo)
+            .limit(1);
+
+          if (errUserEmail) throw errUserEmail;
+          if (usuarioEmailExistente && usuarioEmailExistente.length > 0) {
+            setErro('Este e-mail já está cadastrado em uma conta ativa no portal.');
+            setCarregando(false);
+            return;
+          }
+        } catch (err) {
+          console.error(err);
+          setErro('Erro ao verificar disponibilidade do e-mail. Tente novamente.');
+          setCarregando(false);
+          return;
+        }
+        setCarregando(false);
+      }
+    }
+
     if (step === 3) {
       const docLimpo = cpf.replace(/\D/g, '');
       if (docLimpo) {
@@ -196,32 +240,33 @@ export function PreCadastroPage() {
 
     try {
       const docLimpo = cpf.replace(/\D/g, '');
+      const emailLimpo = email.toLowerCase().trim();
 
-      // 1. Verificar em leads_pre_cadastro
+      // 1. Verificar CPF e E-mail em leads_pre_cadastro
       const { data: leadExistente, error: errLead } = await supabase
         .from('leads_pre_cadastro')
-        .select('status')
-        .eq('cpf', docLimpo)
+        .select('status, cpf, email')
+        .or(`cpf.eq.${docLimpo},email.ilike.${emailLimpo}`)
         .in('status', ['pendente', 'contatado', 'ativado'])
         .limit(1);
 
       if (errLead) throw errLead;
       if (leadExistente && leadExistente.length > 0) {
-        setErro('Este CPF/CNPJ já possui um pré-cadastro ativo ou pendente.');
+        setErro('Este CPF/CNPJ ou e-mail já possui um pré-cadastro ativo ou pendente.');
         setCarregando(false);
         return;
       }
 
-      // 2. Verificar em usuarios_autorizados
+      // 2. Verificar CPF e E-mail em usuarios_autorizados
       const { data: usuarioExistente, error: errUser } = await supabase
         .from('usuarios_autorizados')
         .select('id')
-        .or(`cpf.eq.${docLimpo},cpf.eq.${cpf}`)
+        .or(`cpf.eq.${docLimpo},cpf.eq.${cpf},email.ilike.${emailLimpo}`)
         .limit(1);
 
       if (errUser) throw errUser;
       if (usuarioExistente && usuarioExistente.length > 0) {
-        setErro('Este CPF/CNPJ já está cadastrado em uma conta ativa.');
+        setErro('Este CPF/CNPJ ou e-mail já está cadastrado em uma conta ativa.');
         setCarregando(false);
         return;
       }
