@@ -226,37 +226,65 @@ export function FormularioOrdem({ ordemExistente }: FormularioOrdemProps) {
     descontoTexto:     ordemExistente?.desconto ? String(ordemExistente.desconto).replace('.', ',') : '',
   });
 
-  const clienteEncontrado = clientes.find(c => 
-    (c.cpf && form.cpf && c.cpf.replace(/\D/g, '') === form.cpf.replace(/\D/g, '')) ||
-    (c.nome && form.nomeCliente && c.nome.trim().toUpperCase() === form.nomeCliente.trim().toUpperCase())
-  );
+  const [clienteSelecionadoId, setClienteSelecionadoId] = useState<string | null>(() => {
+    const state = location.state as { clientePreDefinido?: Cliente } | null;
+    return state?.clientePreDefinido?.id || null;
+  });
 
-  console.log('[DEBUG] FormularioOrdem render - clienteEncontrado:', clienteEncontrado?.id, 'armasCliente:', armasCliente, 'novasArmas:', novasArmas);
+  const cpfFormLimpo = (form.cpf || '').replace(/\D/g, '');
+  const nomeFormNorm = removerAcentos((form.nomeCliente || '').trim().toUpperCase().replace(/\s+/g, ' '));
+
+  const clienteEncontrado = React.useMemo(() => {
+    if (clienteSelecionadoId) {
+      const porId = clientes.find(c => c.id === clienteSelecionadoId);
+      if (porId) {
+        const porIdCpf = (porId.cpf || '').replace(/\D/g, '');
+        const porIdNome = removerAcentos((porId.nome || '').trim().toUpperCase().replace(/\s+/g, ' '));
+        if (
+          (cpfFormLimpo.length >= 11 && porIdCpf === cpfFormLimpo) ||
+          (nomeFormNorm.length > 0 && porIdNome === nomeFormNorm)
+        ) {
+          return porId;
+        }
+      }
+    }
+
+    return clientes.find(c => {
+      const cCpf = (c.cpf || '').replace(/\D/g, '');
+      const cNome = removerAcentos((c.nome || '').trim().toUpperCase().replace(/\s+/g, ' '));
+      return (
+        (cpfFormLimpo.length >= 11 && cCpf === cpfFormLimpo) ||
+        (nomeFormNorm.length > 0 && cNome === nomeFormNorm)
+      );
+    });
+  }, [clientes, clienteSelecionadoId, cpfFormLimpo, nomeFormNorm]);
 
   useEffect(() => {
+    let cancelado = false;
     const carregarArmas = async () => {
       if (clienteEncontrado?.id) {
-        console.log('[DEBUG] carregarArmas - buscando para cliente:', clienteEncontrado.id);
         try {
           const list = await buscarArmas(clienteEncontrado.id, clienteEncontrado.empresaId);
-          console.log('[DEBUG] carregarArmas - resultado:', list);
-          setArmasCliente(list);
+          if (!cancelado) setArmasCliente(list);
         } catch (err) {
-          console.error('[DEBUG] Erro ao buscar armas do cliente:', err);
+          console.error('[FormularioOrdem] Erro ao buscar armas do cliente:', err);
         }
       } else {
-        console.log('[DEBUG] carregarArmas - limpando lista de armas');
         setArmasCliente([]);
       }
     };
     carregarArmas();
-  }, [clienteEncontrado, buscarArmas]);
+    return () => {
+      cancelado = true;
+    };
+  }, [clienteEncontrado?.id, clienteEncontrado?.empresaId, buscarArmas]);
 
   // Preenchimento automático vindo do perfil do cliente
   useEffect(() => {
     const state = location.state as { clientePreDefinido?: Cliente };
     if (state?.clientePreDefinido && !ordemExistente) {
       const c = state.clientePreDefinido;
+      if (c.id) setClienteSelecionadoId(c.id);
       setForm(f => ({
         ...f,
         nomeCliente: c.nome,
@@ -276,8 +304,15 @@ export function FormularioOrdem({ ordemExistente }: FormularioOrdemProps) {
   // Se estiver editando uma ordem existente, garantir que os dados do cliente reflitam o perfil atual do cadastro
   useEffect(() => {
     if (ordemExistente && clientes.length > 0) {
-      const c = clientes.find(cli => cli.cpf === ordemExistente.cpf);
+      const ordemCpfLimpo = (ordemExistente.cpf || '').replace(/\D/g, '');
+      const ordemNomeNorm = removerAcentos((ordemExistente.nomeCliente || '').trim().toUpperCase().replace(/\s+/g, ' '));
+      const c = clientes.find(cli => {
+        const cliCpf = (cli.cpf || '').replace(/\D/g, '');
+        const cliNome = removerAcentos((cli.nome || '').trim().toUpperCase().replace(/\s+/g, ' '));
+        return (ordemCpfLimpo.length >= 11 && cliCpf === ordemCpfLimpo) || (ordemNomeNorm.length > 0 && cliNome === ordemNomeNorm);
+      });
       if (c) {
+        setClienteSelecionadoId(c.id);
         setForm(f => ({
           ...f,
           nomeCliente: c.nome,
@@ -311,6 +346,7 @@ export function FormularioOrdem({ ordemExistente }: FormularioOrdemProps) {
   };
 
   const selecionarCliente = (c: Cliente) => {
+    setClienteSelecionadoId(c.id);
     setForm(f => ({
       ...f,
       nomeCliente: c.nome,

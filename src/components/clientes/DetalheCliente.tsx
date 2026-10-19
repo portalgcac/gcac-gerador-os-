@@ -263,62 +263,51 @@ export function DetalheCliente({ cliente }: DetalheClienteProps) {
 
         // 4. Sincronização profunda de acervo (Armas, GTs e Manejos)
         try {
-          const { data: localArmas } = await supabase.from('armas').select('*').eq('cliente_id', cliente.id);
-          const { data: portalArmas } = await supabase.from('armas').select('*').eq('empresa_id', vinculo.cac_empresa_id);
+          // Corrigir eventuais registros locais que foram salvos com empresa_id do portal CAC
+          if (cliente.id !== clienteCac.id) {
+            await supabase
+              .from('armas')
+              .update({ empresa_id: despachanteEmpresaId })
+              .eq('cliente_id', cliente.id)
+              .eq('empresa_id', vinculo.cac_empresa_id);
+          }
 
-          const portalArmasBySerie = new Map();
+          const { data: localArmas } = await supabase.from('armas').select('*').eq('cliente_id', cliente.id);
+          const { data: portalArmas } = await supabase.from('armas').select('*').eq('empresa_id', vinculo.cac_empresa_id).neq('cliente_id', cliente.id);
+
+          const portalArmasBySerie = new Map<string, any>();
           portalArmas?.forEach(a => {
             if (a.numero_serie) portalArmasBySerie.set(a.numero_serie.trim().toUpperCase(), a);
           });
 
-          const localArmasBySerie = new Map();
+          const localArmasBySerie = new Map<string, any>();
           localArmas?.forEach(a => {
             if (a.numero_serie) localArmasBySerie.set(a.numero_serie.trim().toUpperCase(), a);
           });
 
-          // Sincronizar Armas (Alinhamento de IDs)
+          // Sincronizar Armas (sem deletar registros locais nem colidir chave primária)
           for (const localArma of (localArmas || [])) {
             const serie = localArma.numero_serie?.trim().toUpperCase();
             if (!serie) continue;
             const pArma = portalArmasBySerie.get(serie);
 
             if (pArma) {
-              if (localArma.id !== pArma.id) {
-                await supabase.from('armas').delete().eq('id', localArma.id);
-                const payload = {
-                  id: pArma.id,
-                  cliente_id: cliente.id,
-                  tipo: pArma.tipo || localArma.tipo,
-                  modelo: pArma.modelo || localArma.modelo,
-                  calibre: pArma.calibre || localArma.calibre,
-                  fabricante: pArma.fabricante || localArma.fabricante,
-                  numero_serie: pArma.numero_serie || localArma.numero_serie,
-                  numero_sigma: pArma.numero_sigma || localArma.numero_sigma,
-                  acervo: pArma.acervo || localArma.acervo,
-                  vencimento_craf: pArma.vencimento_craf || localArma.vencimento_craf,
-                  craf_url: pArma.craf_url || localArma.craf_url,
-                  craf_em_renovacao: pArma.craf_em_renovacao !== undefined ? pArma.craf_em_renovacao : localArma.craf_em_renovacao,
-                  empresa_id: despachanteEmpresaId
-                };
-                await supabase.from('armas').insert([payload]);
-                await supabase.from('guias_trafego').update({ arma_id: pArma.id }).eq('arma_id', localArma.id);
-              } else {
-                const payload = {
-                  tipo: pArma.tipo || localArma.tipo,
-                  modelo: pArma.modelo || localArma.modelo,
-                  calibre: pArma.calibre || localArma.calibre,
-                  fabricante: pArma.fabricante || localArma.fabricante,
-                  numero_sigma: pArma.numero_sigma || localArma.numero_sigma,
-                  acervo: pArma.acervo || localArma.acervo,
-                  vencimento_craf: pArma.vencimento_craf || localArma.vencimento_craf,
-                  craf_url: pArma.craf_url || localArma.craf_url,
-                  craf_em_renovacao: pArma.craf_em_renovacao !== undefined ? pArma.craf_em_renovacao : localArma.craf_em_renovacao,
-                };
-                await supabase.from('armas').update(payload).eq('id', localArma.id);
-              }
-            } else {
               const payload = {
-                id: localArma.id,
+                tipo: pArma.tipo || localArma.tipo,
+                modelo: pArma.modelo || localArma.modelo,
+                calibre: pArma.calibre || localArma.calibre,
+                fabricante: pArma.fabricante || localArma.fabricante,
+                numero_sigma: pArma.numero_sigma || localArma.numero_sigma,
+                acervo: pArma.acervo || localArma.acervo,
+                vencimento_craf: pArma.vencimento_craf || localArma.vencimento_craf,
+                craf_url: pArma.craf_url || localArma.craf_url,
+                craf_em_renovacao: pArma.craf_em_renovacao !== undefined ? pArma.craf_em_renovacao : localArma.craf_em_renovacao,
+                empresa_id: despachanteEmpresaId
+              };
+              await supabase.from('armas').update(payload).eq('id', localArma.id);
+            } else if (clienteCac.id && clienteCac.id !== cliente.id) {
+              const novaPortalArma = {
+                id: uuidv4(),
                 cliente_id: clienteCac.id,
                 tipo: localArma.tipo,
                 modelo: localArma.modelo,
@@ -332,7 +321,10 @@ export function DetalheCliente({ cliente }: DetalheClienteProps) {
                 craf_em_renovacao: !!localArma.craf_em_renovacao,
                 empresa_id: vinculo.cac_empresa_id
               };
-              await supabase.from('armas').insert([payload]);
+              const { error: insErr } = await supabase.from('armas').insert([novaPortalArma]);
+              if (!insErr) {
+                portalArmasBySerie.set(serie, novaPortalArma);
+              }
             }
           }
 
@@ -340,8 +332,8 @@ export function DetalheCliente({ cliente }: DetalheClienteProps) {
             const serie = pArma.numero_serie?.trim().toUpperCase();
             if (!serie) continue;
             if (!localArmasBySerie.has(serie)) {
-              const payload = {
-                id: pArma.id,
+              const novaLocalArma = {
+                id: uuidv4(),
                 cliente_id: cliente.id,
                 tipo: pArma.tipo,
                 modelo: pArma.modelo,
@@ -355,105 +347,126 @@ export function DetalheCliente({ cliente }: DetalheClienteProps) {
                 craf_em_renovacao: !!pArma.craf_em_renovacao,
                 empresa_id: despachanteEmpresaId
               };
-              await supabase.from('armas').insert([payload]);
+              const { error: insErr } = await supabase.from('armas').insert([novaLocalArma]);
+              if (!insErr) {
+                localArmasBySerie.set(serie, novaLocalArma);
+              }
             }
           }
 
-          // Sincronizar GTs
-          const { data: currentLocalArmas } = await supabase.from('armas').select('id').eq('cliente_id', cliente.id);
-          const currentArmaIds = currentLocalArmas?.map(a => a.id) || [];
-          if (currentArmaIds.length > 0) {
-            const { data: localGts } = await supabase
-              .from('guias_trafego')
-              .select('*')
-              .in('arma_id', currentArmaIds)
-              .eq('empresa_id', despachanteEmpresaId);
+          // Sincronizar GTs por número de série da arma
+          const localArmaIdToSerie = new Map<string, string>();
+          localArmasBySerie.forEach((a, serie) => localArmaIdToSerie.set(a.id, serie));
 
-            const { data: portalGts } = await supabase
-              .from('guias_trafego')
-              .select('*')
-              .in('arma_id', currentArmaIds)
-              .eq('empresa_id', vinculo.cac_empresa_id);
+          const portalArmaIdToSerie = new Map<string, string>();
+          portalArmasBySerie.forEach((a, serie) => portalArmaIdToSerie.set(a.id, serie));
 
-            const matchGtKey = (g: any) => `${g.arma_id}_${g.destino?.trim().toUpperCase()}_${g.vencimento}`;
+          const localArmaIds = Array.from(localArmaIdToSerie.keys());
+          const portalArmaIds = Array.from(portalArmaIdToSerie.keys());
 
-            const portalGtsByKey = new Map();
-            portalGts?.forEach(g => portalGtsByKey.set(matchGtKey(g), g));
+          if (localArmaIds.length > 0 || portalArmaIds.length > 0) {
+            const [localGtsRes, portalGtsRes] = await Promise.all([
+              localArmaIds.length > 0
+                ? supabase.from('guias_trafego').select('*').in('arma_id', localArmaIds)
+                : Promise.resolve({ data: [] as any[] }),
+              portalArmaIds.length > 0
+                ? supabase.from('guias_trafego').select('*').in('arma_id', portalArmaIds)
+                : Promise.resolve({ data: [] as any[] })
+            ]);
 
-            const localGtsByKey = new Map();
-            localGts?.forEach(g => localGtsByKey.set(matchGtKey(g), g));
+            const localGts = localGtsRes.data || [];
+            const portalGts = portalGtsRes.data || [];
 
-            for (const lGt of (localGts || [])) {
-              const key = matchGtKey(lGt);
+            const matchGtKeyBySerie = (serie: string | undefined, g: any) =>
+              `${serie || ''}_${(g.destino || '').trim().toUpperCase()}_${g.vencimento || ''}`;
+
+            const portalGtsByKey = new Map<string, any>();
+            portalGts.forEach(g => {
+              const serie = portalArmaIdToSerie.get(g.arma_id);
+              if (serie) portalGtsByKey.set(matchGtKeyBySerie(serie, g), g);
+            });
+
+            const localGtsByKey = new Map<string, any>();
+            localGts.forEach(g => {
+              const serie = localArmaIdToSerie.get(g.arma_id);
+              if (serie) localGtsByKey.set(matchGtKeyBySerie(serie, g), g);
+            });
+
+            for (const lGt of localGts) {
+              const serie = localArmaIdToSerie.get(lGt.arma_id);
+              if (!serie) continue;
+              const key = matchGtKeyBySerie(serie, lGt);
               const pGt = portalGtsByKey.get(key);
 
               if (pGt) {
-                if (lGt.id !== pGt.id) {
-                  await supabase.from('guias_trafego').delete().eq('id', lGt.id);
+                const payload = {
+                  tipo: pGt.tipo || lGt.tipo,
+                  vencimento: pGt.vencimento || lGt.vencimento,
+                  destino: pGt.destino || lGt.destino,
+                  arquivo_url: pGt.arquivo_url || lGt.arquivo_url,
+                  gt_em_renovacao: pGt.gt_em_renovacao !== undefined ? pGt.gt_em_renovacao : lGt.gt_em_renovacao,
+                  empresa_id: despachanteEmpresaId
+                };
+                await supabase.from('guias_trafego').update(payload).eq('id', lGt.id);
+              } else {
+                const targetPortalArma = portalArmasBySerie.get(serie);
+                if (targetPortalArma && targetPortalArma.id !== lGt.arma_id) {
                   const payload = {
-                    id: pGt.id,
-                    arma_id: lGt.arma_id,
-                    tipo: pGt.tipo || lGt.tipo,
-                    vencimento: pGt.vencimento || lGt.vencimento,
-                    destino: pGt.destino || lGt.destino,
-                    arquivo_url: pGt.arquivo_url || lGt.arquivo_url,
-                    gt_em_renovacao: pGt.gt_em_renovacao !== undefined ? pGt.gt_em_renovacao : lGt.gt_em_renovacao,
-                    empresa_id: despachanteEmpresaId
+                    id: uuidv4(),
+                    arma_id: targetPortalArma.id,
+                    tipo: lGt.tipo,
+                    vencimento: lGt.vencimento,
+                    destino: lGt.destino,
+                    arquivo_url: lGt.arquivo_url,
+                    gt_em_renovacao: !!lGt.gt_em_renovacao,
+                    empresa_id: vinculo.cac_empresa_id
                   };
                   await supabase.from('guias_trafego').insert([payload]);
-                } else {
-                  const payload = {
-                    tipo: pGt.tipo || lGt.tipo,
-                    vencimento: pGt.vencimento || lGt.vencimento,
-                    destino: pGt.destino || lGt.destino,
-                    arquivo_url: pGt.arquivo_url || lGt.arquivo_url,
-                    gt_em_renovacao: pGt.gt_em_renovacao !== undefined ? pGt.gt_em_renovacao : lGt.gt_em_renovacao,
-                  };
-                  await supabase.from('guias_trafego').update(payload).eq('id', lGt.id);
                 }
-              } else {
-                const payload = {
-                  id: lGt.id,
-                  arma_id: lGt.arma_id,
-                  tipo: lGt.tipo,
-                  vencimento: lGt.vencimento,
-                  destino: lGt.destino,
-                  arquivo_url: lGt.arquivo_url,
-                  gt_em_renovacao: !!lGt.gt_em_renovacao,
-                  empresa_id: vinculo.cac_empresa_id
-                };
-                await supabase.from('guias_trafego').insert([payload]);
               }
             }
 
-            for (const pGt of (portalGts || [])) {
-              const key = matchGtKey(pGt);
+            for (const pGt of portalGts) {
+              const serie = portalArmaIdToSerie.get(pGt.arma_id);
+              if (!serie) continue;
+              const key = matchGtKeyBySerie(serie, pGt);
               if (!localGtsByKey.has(key)) {
-                const payload = {
-                  id: pGt.id,
-                  arma_id: pGt.arma_id,
-                  tipo: pGt.tipo,
-                  vencimento: pGt.vencimento,
-                  destino: pGt.destino,
-                  arquivo_url: pGt.arquivo_url,
-                  gt_em_renovacao: !!pGt.gt_em_renovacao,
-                  empresa_id: despachanteEmpresaId
-                };
-                await supabase.from('guias_trafego').insert([payload]);
+                const targetLocalArma = localArmasBySerie.get(serie);
+                if (targetLocalArma) {
+                  const payload = {
+                    id: uuidv4(),
+                    arma_id: targetLocalArma.id,
+                    tipo: pGt.tipo,
+                    vencimento: pGt.vencimento,
+                    destino: pGt.destino,
+                    arquivo_url: pGt.arquivo_url,
+                    gt_em_renovacao: !!pGt.gt_em_renovacao,
+                    empresa_id: despachanteEmpresaId
+                  };
+                  await supabase.from('guias_trafego').insert([payload]);
+                }
               }
             }
           }
 
           // Sincronizar Manejos
+          if (cliente.id !== clienteCac.id) {
+            await supabase
+              .from('autorizacoes_manejo')
+              .update({ empresa_id: despachanteEmpresaId })
+              .eq('cliente_id', cliente.id)
+              .eq('empresa_id', vinculo.cac_empresa_id);
+          }
+
           const { data: localManejos } = await supabase.from('autorizacoes_manejo').select('*').eq('cliente_id', cliente.id);
-          const { data: portalManejos } = await supabase.from('autorizacoes_manejo').select('*').eq('empresa_id', vinculo.cac_empresa_id);
+          const { data: portalManejos } = await supabase.from('autorizacoes_manejo').select('*').eq('empresa_id', vinculo.cac_empresa_id).neq('cliente_id', cliente.id);
 
           const matchManejoKey = (m: any) => `${m.nome_fazenda?.trim().toUpperCase()}_${m.numero_car?.trim().toUpperCase()}`;
 
-          const portalManejosByKey = new Map();
+          const portalManejosByKey = new Map<string, any>();
           portalManejos?.forEach(m => portalManejosByKey.set(matchManejoKey(m), m));
 
-          const localManejosByKey = new Map();
+          const localManejosByKey = new Map<string, any>();
           localManejos?.forEach(m => localManejosByKey.set(matchManejoKey(m), m));
 
           for (const lManejo of (localManejos || [])) {
@@ -461,39 +474,22 @@ export function DetalheCliente({ cliente }: DetalheClienteProps) {
             const pManejo = portalManejosByKey.get(key);
 
             if (pManejo) {
-              if (lManejo.id !== pManejo.id) {
-                await supabase.from('autorizacoes_manejo').delete().eq('id', lManejo.id);
-                const payload = {
-                  id: pManejo.id,
-                  cliente_id: cliente.id,
-                  numero_car: pManejo.numero_car || lManejo.numero_car,
-                  nome_fazenda: pManejo.nome_fazenda || lManejo.nome_fazenda,
-                  nome_proprietario: pManejo.nome_proprietario || lManejo.nome_proprietario,
-                  cidade: pManejo.cidade || lManejo.cidade,
-                  vencimento: pManejo.vencimento || lManejo.vencimento,
-                  status: pManejo.status || lManejo.status,
-                  arquivo_url: pManejo.arquivo_url || lManejo.arquivo_url,
-                  manejo_em_renovacao: pManejo.manejo_em_renovacao !== undefined ? pManejo.manejo_em_renovacao : lManejo.manejo_em_renovacao,
-                  empresa_id: despachanteEmpresaId
-                };
-                await supabase.from('autorizacoes_manejo').insert([payload]);
-              } else {
-                const payload = {
-                  cliente_id: cliente.id,
-                  numero_car: pManejo.numero_car || lManejo.numero_car,
-                  nome_fazenda: pManejo.nome_fazenda || lManejo.nome_fazenda,
-                  nome_proprietario: pManejo.nome_proprietario || lManejo.nome_proprietario,
-                  cidade: pManejo.cidade || lManejo.cidade,
-                  vencimento: pManejo.vencimento || lManejo.vencimento,
-                  status: pManejo.status || lManejo.status,
-                  arquivo_url: pManejo.arquivo_url || lManejo.arquivo_url,
-                  manejo_em_renovacao: pManejo.manejo_em_renovacao !== undefined ? pManejo.manejo_em_renovacao : lManejo.manejo_em_renovacao,
-                };
-                await supabase.from('autorizacoes_manejo').update(payload).eq('id', lManejo.id);
-              }
-            } else {
               const payload = {
-                id: lManejo.id,
+                cliente_id: cliente.id,
+                numero_car: pManejo.numero_car || lManejo.numero_car,
+                nome_fazenda: pManejo.nome_fazenda || lManejo.nome_fazenda,
+                nome_proprietario: pManejo.nome_proprietario || lManejo.nome_proprietario,
+                cidade: pManejo.cidade || lManejo.cidade,
+                vencimento: pManejo.vencimento || lManejo.vencimento,
+                status: pManejo.status || lManejo.status,
+                arquivo_url: pManejo.arquivo_url || lManejo.arquivo_url,
+                manejo_em_renovacao: pManejo.manejo_em_renovacao !== undefined ? pManejo.manejo_em_renovacao : lManejo.manejo_em_renovacao,
+                empresa_id: despachanteEmpresaId
+              };
+              await supabase.from('autorizacoes_manejo').update(payload).eq('id', lManejo.id);
+            } else if (clienteCac.id && clienteCac.id !== cliente.id) {
+              const payload = {
+                id: uuidv4(),
                 cliente_id: clienteCac.id,
                 numero_car: lManejo.numero_car,
                 nome_fazenda: lManejo.nome_fazenda,
@@ -513,7 +509,7 @@ export function DetalheCliente({ cliente }: DetalheClienteProps) {
             const key = matchManejoKey(pManejo);
             if (!localManejosByKey.has(key)) {
               const payload = {
-                id: pManejo.id,
+                id: uuidv4(),
                 cliente_id: cliente.id,
                 numero_car: pManejo.numero_car,
                 nome_fazenda: pManejo.nome_fazenda,

@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { Cliente, Arma, GuiaTrafego, AutorizacaoManejo, CreditoCliente, ModeloDeclaracao, OpcaoArma, ItemCatalogoArma } from '../types';
 import { supabase } from '../db/supabase';
 import { uploadBase64File } from '../utils/fileUtils';
-import { normalizarCalibre, normalizarModelo, normalizarFabricante } from '../utils/formatters';
+import { normalizarCalibre, normalizarModelo, normalizarFabricante, removerAcentos } from '../utils/formatters';
 import { CATALOGO_BASE_ARMAS, normalizarTipoArma, obterCalibresCompativeis, obterDadosPorModelo } from '../data/catalogoArmas';
 
 import { useAuth } from './AuthContext';
@@ -854,17 +854,145 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
 
   // --- Gestão de Armas ---
   const buscarArmas = useCallback(async (clienteId: string, overrideEmpresaId?: string) => {
-    if (!usuario?.empresaId) return [];
-    const empresaId = overrideEmpresaId || usuario.empresaId;
-    const { data, error } = await supabase
+    if (!usuario?.empresaId || !clienteId) return [];
+
+    const clienteIds = new Set<string>([clienteId]);
+    const cacEmpresaIds = new Set<string>();
+
+    if (overrideEmpresaId && overrideEmpresaId !== usuario.empresaId) {
+      cacEmpresaIds.add(overrideEmpresaId);
+    }
+
+    // 1. Identificar dados do cliente (CPF / Nome) para localizar possíveis vínculos ou cadastros correlatos
+    let clienteAlvo = clientes.find(c => c.id === clienteId);
+    if (!clienteAlvo) {
+      try {
+        const { data: cliRow } = await supabase
+          .from('clientes')
+          .select('id, nome, cpf, empresa_id')
+          .eq('id', clienteId)
+          .maybeSingle();
+        if (cliRow) {
+          clienteAlvo = {
+            id: cliRow.id,
+            nome: cliRow.nome || '',
+            cpf: cliRow.cpf || '',
+            empresaId: cliRow.empresa_id || undefined
+          } as Cliente;
+        }
+      } catch {
+        // Ignorar erro silencioso na busca auxiliar
+      }
+    }
+
+    if (clienteAlvo) {
+      const cpfLimpo = (clienteAlvo.cpf || '').replace(/\D/g, '');
+      const nomeNorm = removerAcentos((clienteAlvo.nome || '').trim().toUpperCase().replace(/\s+/g, ' '));
+
+      // Incluir outros registros em memória do mesmo cliente (mesmo CPF ou mesmo nome normalizado)
+      clientes.forEach(c => {
+        const cCpf = (c.cpf || '').replace(/\D/g, '');
+        const cNome = removerAcentos((c.nome || '').trim().toUpperCase().replace(/\s+/g, ' '));
+        if ((cpfLimpo.length >= 11 && cCpf === cpfLimpo) || (nomeNorm.length > 0 && cNome === nomeNorm)) {
+          clienteIds.add(c.id);
+        }
+      });
+
+      if (cpfLimpo.length >= 11) {
+        const cpfFormatado = cpfLimpo.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+        try {
+          const [clientesMesmoCpfRes, vinculoRes] = await Promise.all([
+            supabase
+              .from('clientes')
+              .select('id, empresa_id')
+              .or(`cpf.eq.${cpfLimpo},cpf.eq.${cpfFormatado}`),
+            supabase
+              .from('vinculos_despachante_cac')
+              .select('cac_empresa_id')
+              .eq('despachante_empresa_id', usuario.empresaId)
+              .eq('status', 'ativo')
+              .or(`cac_cpf.eq.${cpfLimpo},cac_cpf.eq.${cpfFormatado}`)
+              .maybeSingle()
+          ]);
+
+          if (clientesMesmoCpfRes.data) {
+            clientesMesmoCpfRes.data.forEach(row => {
+              if (row.id) clienteIds.add(row.id);
+            });
+          }
+          if (vinculoRes.data?.cac_empresa_id) {
+            cacEmpresaIds.add(vinculoRes.data.cac_empresa_id);
+          }
+        } catch {
+          // Ignorar falha de rede/RLS nas consultas complementares
+        }
+      }
+    }
+
+    // 2. Buscar armas pelos cliente_ids (sem restringir empresa_id para não ocultar armas salvas sob empresa_id vinculado)
+    const { data: armasPorCliente, error } = await supabase
       .from('armas')
       .select('*')
-      .eq('cliente_id', clienteId)
-      .eq('empresa_id', empresaId)
+      .in('cliente_id', Array.from(clienteIds))
       .order('modelo', { ascending: true });
-    
+
     if (error) throw error;
-    return data.map(row => ({
+
+    let todasRows: any[] = [...(armasPorCliente || [])];
+
+    // 3. Se houver workspace CAC vinculado, buscar também armas registradas diretamente no cac_empresa_id
+    if (cacEmpresaIds.size > 0) {
+      const { data: armasPorEmpresaCac } = await supabase
+        .from('armas')
+        .select('*')
+        .in('empresa_id', Array.from(cacEmpresaIds))
+        .order('modelo', { ascending: true });
+
+      if (armasPorEmpresaCac && armasPorEmpresaCac.length > 0) {
+        todasRows = [...todasRows, ...armasPorEmpresaCac];
+      }
+    }
+
+    // 4. Ordenar priorizando o registro local do cliente e deduplicar por ID e por Número de Série
+    todasRows.sort((a, b) => {
+      const scoreA = (a.cliente_id === clienteId ? 2 : 0) + (a.empresa_id === usuario.empresaId ? 1 : 0);
+      const scoreB = (b.cliente_id === clienteId ? 2 : 0) + (b.empresa_id === usuario.empresaId ? 1 : 0);
+      return scoreB - scoreA;
+    });
+
+    const vistosId = new Set<string>();
+    const mapaPorSerie = new Map<string, any>();
+    const resultadoRows: any[] = [];
+
+    for (const row of todasRows) {
+      if (!row || vistosId.has(row.id)) continue;
+      vistosId.add(row.id);
+
+      const serieNorm = (row.numero_serie || '').trim().toUpperCase();
+      const temSerieValida = serieNorm.length > 0 && serieNorm !== 'NÃO INFORMADO' && serieNorm !== 'NAO INFORMADO' && serieNorm !== 'N/I' && serieNorm !== '-';
+
+      if (temSerieValida) {
+        const existente = mapaPorSerie.get(serieNorm);
+        if (existente) {
+          // Mesclar campos complementares caso o registro secundário tenha informações mais completas
+          if (!existente.tipo && row.tipo) existente.tipo = row.tipo;
+          if (!existente.numero_sigma && row.numero_sigma) existente.numero_sigma = row.numero_sigma;
+          if (!existente.vencimento_craf && row.vencimento_craf) existente.vencimento_craf = row.vencimento_craf;
+          if (!existente.craf_url && row.craf_url) existente.craf_url = row.craf_url;
+          if (!existente.craf_em_renovacao && row.craf_em_renovacao) existente.craf_em_renovacao = row.craf_em_renovacao;
+          continue;
+        }
+        const copia = { ...row };
+        mapaPorSerie.set(serieNorm, copia);
+        resultadoRows.push(copia);
+      } else {
+        resultadoRows.push({ ...row });
+      }
+    }
+
+    resultadoRows.sort((a, b) => (a.modelo || '').localeCompare(b.modelo || ''));
+
+    return resultadoRows.map(row => ({
       id: row.id,
       clienteId: row.cliente_id,
       tipo: row.tipo || '',
@@ -879,17 +1007,18 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
       crafEmRenovacao: !!row.craf_em_renovacao,
       criadoEm: row.criado_em
     }));
-  }, [usuario]);
+  }, [usuario, clientes]);
 
   const salvarArma = useCallback(async (dados: Partial<Arma> & { clienteId: string }, overrideEmpresaId?: string) => {
     if (!usuario?.empresaId) throw new Error('Usuário não autenticado');
-    const empresaId = overrideEmpresaId || usuario.empresaId;
+    const isClienteLocal = clientes.some(c => c.id === dados.clienteId);
+    const empresaIdPrincipal = isClienteLocal ? usuario.empresaId : (overrideEmpresaId || usuario.empresaId);
     const armaId = dados.id || uuidv4();
 
     let crafUrl = (dados as any).crafUrl;
     if (crafUrl && crafUrl.startsWith('data:')) {
       const ext = crafUrl.split(';base64,')[0].split(':')[1].split('/')[1] || 'pdf';
-      const path = `${empresaId}/clientes/${dados.clienteId}/armas/${armaId}/craf_${uuidv4()}.${ext}`;
+      const path = `${empresaIdPrincipal}/clientes/${dados.clienteId}/armas/${armaId}/craf_${uuidv4()}.${ext}`;
       crafUrl = await uploadBase64File(crafUrl, 'documentos-clientes', path) || '';
     }
 
@@ -905,13 +1034,52 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
       vencimento_craf: dados.vencimentoCraf || null,
       craf_url: crafUrl || null,
       craf_em_renovacao: dados.crafEmRenovacao !== undefined ? dados.crafEmRenovacao : false,
-      empresa_id: empresaId
+      empresa_id: empresaIdPrincipal
     };
 
     const { error } = await supabase
       .from('armas')
       .upsert({ id: armaId, ...payload });
     if (error) throw error;
+
+    // Se houver vínculo ativo com CAC (overrideEmpresaId diferente da empresa local), espelhar no workspace do CAC com ID próprio
+    if (isClienteLocal && overrideEmpresaId && overrideEmpresaId !== usuario.empresaId) {
+      try {
+        const { data: clienteCac } = await supabase
+          .from('clientes')
+          .select('id')
+          .eq('empresa_id', overrideEmpresaId)
+          .limit(1)
+          .maybeSingle();
+
+        if (clienteCac?.id && clienteCac.id !== dados.clienteId) {
+          const serieNorm = (dados.numeroSerie || '').trim().toUpperCase();
+          let portalArmaId: string | undefined;
+          if (serieNorm) {
+            const { data: existentePortal } = await supabase
+              .from('armas')
+              .select('id')
+              .eq('empresa_id', overrideEmpresaId)
+              .ilike('numero_serie', serieNorm)
+              .limit(1)
+              .maybeSingle();
+            if (existentePortal?.id && existentePortal.id !== armaId) {
+              portalArmaId = existentePortal.id;
+            }
+          }
+          await supabase
+            .from('armas')
+            .upsert({
+              id: portalArmaId || uuidv4(),
+              ...payload,
+              cliente_id: clienteCac.id,
+              empresa_id: overrideEmpresaId
+            });
+        }
+      } catch (syncErr) {
+        console.warn('Aviso ao sincronizar arma com portal CAC:', syncErr);
+      }
+    }
     
     if (dados.modelo && dados.fabricante) {
       await aprenderItemArma(
@@ -923,7 +1091,7 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
     }
 
     await carregarMetadadosArmas();
-  }, [carregarMetadadosArmas, aprenderItemArma, usuario]);
+  }, [carregarMetadadosArmas, aprenderItemArma, usuario, clientes]);
 
   const deletarArma = useCallback(async (id: string, overrideEmpresaId?: string) => {
     const { error } = await supabase.from('armas').delete().eq('id', id);
@@ -932,17 +1100,16 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
   }, [carregarMetadadosArmas]);
 
   // --- Gestão de GTs ---
-  const buscarGts = useCallback(async (armaId: string) => {
-    if (!usuario?.empresaId) return [];
+  const buscarGts = useCallback(async (armaId: string, _overrideEmpresaId?: string) => {
+    if (!usuario?.empresaId || !armaId) return [];
     const { data, error } = await supabase
       .from('guias_trafego')
       .select('*')
       .eq('arma_id', armaId)
-      .eq('empresa_id', usuario.empresaId)
       .order('vencimento', { ascending: true });
     
     if (error) throw error;
-    return data.map(row => ({
+    return (data || []).map(row => ({
       id: row.id,
       armaId: row.arma_id,
       tipo: row.tipo,
@@ -996,17 +1163,41 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   // --- Gestão de Manejo ---
-  const buscarManejos = useCallback(async (clienteId: string) => {
-    if (!usuario?.empresaId) return [];
+  const buscarManejos = useCallback(async (clienteId: string, overrideEmpresaId?: string) => {
+    if (!usuario?.empresaId || !clienteId) return [];
     const { data, error } = await supabase
       .from('autorizacoes_manejo')
       .select('*')
       .eq('cliente_id', clienteId)
-      .eq('empresa_id', usuario.empresaId)
       .order('vencimento', { ascending: true });
     
     if (error) throw error;
-    return data.map(row => ({
+
+    let todasRows: any[] = [...(data || [])];
+    if (overrideEmpresaId && overrideEmpresaId !== usuario.empresaId) {
+      const { data: portalManejos } = await supabase
+        .from('autorizacoes_manejo')
+        .select('*')
+        .eq('empresa_id', overrideEmpresaId)
+        .order('vencimento', { ascending: true });
+      if (portalManejos && portalManejos.length > 0) {
+        todasRows = [...todasRows, ...portalManejos];
+      }
+    }
+
+    const vistosId = new Set<string>();
+    const vistosChave = new Set<string>();
+    const filtrados: any[] = [];
+    for (const row of todasRows) {
+      if (!row || vistosId.has(row.id)) continue;
+      vistosId.add(row.id);
+      const chave = `${(row.nome_fazenda || '').trim().toUpperCase()}_${(row.numero_car || '').trim().toUpperCase()}`;
+      if (chave !== '_' && vistosChave.has(chave)) continue;
+      if (chave !== '_') vistosChave.add(chave);
+      filtrados.push(row);
+    }
+
+    return filtrados.map(row => ({
       id: row.id,
       clienteId: row.cliente_id,
       numeroCar: row.numero_car,

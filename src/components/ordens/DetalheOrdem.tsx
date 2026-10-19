@@ -13,7 +13,7 @@ import { DialogConfirmacao } from '../common/DialogConfirmacao';
 import { Notificacao, useNotificacao } from '../common/Notificacao';
 import { useClientes } from '../../context/ClientesContext';
 import { ModalArma } from '../clientes/AbaDocumentacao';
-import { formatarMoeda, formatarData, formatarDataHora, formatarNumeroOS, classeStatus, classeStatusExecucao, iconeStatusExecucao, calcularProgressoServicos } from '../../utils/formatters';
+import { formatarMoeda, formatarData, formatarDataHora, formatarNumeroOS, classeStatus, classeStatusExecucao, iconeStatusExecucao, calcularProgressoServicos, removerAcentos } from '../../utils/formatters';
 import { ModalEscolhaWhatsApp } from '../common/ModalEscolhaWhatsApp';
 import { Modal } from '../common/Modal';
 import { visualizarDocumentoBase64, fileToBase64, uploadBase64File } from '../../utils/fileUtils';
@@ -86,7 +86,15 @@ export function DetalheOrdem({ ordem }: DetalheOrdemProps) {
     }
   };
   
-  const clienteDaOS = clientes.find(c => c.cpf === ordem.cpf);
+  const clienteDaOS = React.useMemo(() => {
+    const ordemCpfLimpo = (ordem.cpf || '').replace(/\D/g, '');
+    const ordemNomeNorm = removerAcentos((ordem.nomeCliente || '').trim().toUpperCase().replace(/\s+/g, ' '));
+    return clientes.find(c => {
+      const cCpf = (c.cpf || '').replace(/\D/g, '');
+      const cNome = removerAcentos((c.nome || '').trim().toUpperCase().replace(/\s+/g, ' '));
+      return (ordemCpfLimpo.length >= 11 && cCpf === ordemCpfLimpo) || (ordemNomeNorm.length > 0 && cNome === ordemNomeNorm);
+    });
+  }, [clientes, ordem.cpf, ordem.nomeCliente]);
   const [saldoCredito, setSaldoCredito] = useState(0);
 
   React.useEffect(() => {
