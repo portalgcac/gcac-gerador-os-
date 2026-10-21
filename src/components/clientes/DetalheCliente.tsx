@@ -291,7 +291,7 @@ export function DetalheCliente({ cliente }: DetalheClienteProps) {
         // 2. Busca o perfil do cliente no workspace dele
         const { data: clienteCac } = await supabase
           .from('clientes')
-          .select('id, numero_cr, vencimento_cr, numero_cr_ibama, vencimento_cr_ibama, foto_url, cr_url, cr_ibama_url, endereco, contato, cr_tiro_desportivo, cr_caca, cr_colecionamento, atirador_nivel')
+          .select('id, numero_cr, vencimento_cr, numero_cr_ibama, vencimento_cr_ibama, foto_url, cr_url, cr_ibama_url, endereco, contato, data_nascimento, cr_tiro_desportivo, cr_caca, cr_colecionamento, atirador_nivel')
           .eq('empresa_id', vinculo.cac_empresa_id)
           .maybeSingle();
 
@@ -308,6 +308,7 @@ export function DetalheCliente({ cliente }: DetalheClienteProps) {
         if (clienteCac.cr_ibama_url && clienteCac.cr_ibama_url !== cliente.crIbamaUrl) mudancas.crIbamaUrl = clienteCac.cr_ibama_url;
         if (clienteCac.endereco && clienteCac.endereco !== cliente.endereco) mudancas.endereco = clienteCac.endereco;
         if (clienteCac.contato && clienteCac.contato !== cliente.contato) mudancas.contato = clienteCac.contato;
+        if (clienteCac.data_nascimento && clienteCac.data_nascimento !== cliente.dataNascimento) mudancas.dataNascimento = clienteCac.data_nascimento;
         if (clienteCac.cr_tiro_desportivo !== undefined && !!clienteCac.cr_tiro_desportivo !== !!cliente.crTiroDesportivo) mudancas.crTiroDesportivo = !!clienteCac.cr_tiro_desportivo;
         if (clienteCac.cr_caca !== undefined && !!clienteCac.cr_caca !== !!cliente.crCaca) mudancas.crCaca = !!clienteCac.cr_caca;
         if (clienteCac.cr_colecionamento !== undefined && !!clienteCac.cr_colecionamento !== !!cliente.crColecionamento) mudancas.crColecionamento = !!clienteCac.cr_colecionamento;
@@ -988,6 +989,12 @@ export function DetalheCliente({ cliente }: DetalheClienteProps) {
                   <p className="text-white font-medium">{formatarTelefone(cliente.contato)}</p>
                 </div>
               </div>
+              {cliente.dataNascimento && (
+                <div>
+                  <p className="text-[10px] text-gray-500 font-bold uppercase mb-1">Data de Nascimento</p>
+                  <p className="text-white font-medium">{formatarData(cliente.dataNascimento)}</p>
+                </div>
+              )}
               {cliente.email && (
                 <div>
                   <p className="text-[10px] text-gray-500 font-bold uppercase mb-1">E-mail</p>
