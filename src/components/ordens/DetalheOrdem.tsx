@@ -97,13 +97,52 @@ export function DetalheOrdem({ ordem }: DetalheOrdemProps) {
   }, [clientes, ordem.cpf, ordem.nomeCliente]);
   const [saldoCredito, setSaldoCredito] = useState(0);
 
-  React.useEffect(() => {
-    if (clienteDaOS) {
-      buscarCreditos(clienteDaOS.id).then(creds => {
-        setSaldoCredito(creds.reduce((acc, c) => acc + (c.tipo === 'entrada' ? c.valor : -c.valor), 0));
-      });
+  const recarregarSaldoEReconciliar = React.useCallback(async () => {
+    if (!clienteDaOS) return;
+    try {
+      let creds = await buscarCreditos(clienteDaOS.id);
+
+      const pagsCredito = (ordem.historicoPagamentos || []).filter(p => p.metodo === 'Crédito de Cliente');
+      let totalPagoComCreditoNaOS = pagsCredito.reduce((acc, p) => acc + (Number(p.valor) || 0), 0);
+      if (totalPagoComCreditoNaOS === 0 && ordem.formaPagamento === 'Crédito de Cliente' && ordem.status === 'Pago') {
+        totalPagoComCreditoNaOS = ordem.valorPago || Math.max(0, ordem.valor - (ordem.desconto || 0));
+      }
+
+      if (totalPagoComCreditoNaOS > 0) {
+        const numFormatado = formatarNumeroOS(ordem.numero);
+        const movsDaOS = creds.filter(
+          c => c.origemId === ordem.id || (c.descricao && c.descricao.includes(numFormatado))
+        );
+        const totalSaidas = movsDaOS.filter(c => c.tipo === 'saida').reduce((acc, c) => acc + c.valor, 0);
+        const totalEstornos = movsDaOS
+          .filter(c => c.tipo === 'entrada' && c.descricao.toLowerCase().includes('estorno'))
+          .reduce((acc, c) => acc + c.valor, 0);
+        const jaAbatido = Math.max(0, totalSaidas - totalEstornos);
+        const diferenca = Number((totalPagoComCreditoNaOS - jaAbatido).toFixed(2));
+
+        if (diferenca > 0) {
+          const nomesServicos = (ordem.servicos || []).map(s => s.nome).join(', ');
+          await adicionarCredito({
+            clienteId: clienteDaOS.id,
+            tipo: 'saida',
+            valor: diferenca,
+            descricao: `Baixa referente à ${numFormatado}${nomesServicos ? ` — ${nomesServicos}` : ''}`,
+            origemId: ordem.id,
+            criadoPorNome: ordem.concluidoPorNome || ordem.criadoPorNome || usuario?.nome
+          });
+          creds = await buscarCreditos(clienteDaOS.id);
+        }
+      }
+
+      setSaldoCredito(creds.reduce((acc, c) => acc + (c.tipo === 'entrada' ? c.valor : -c.valor), 0));
+    } catch (err) {
+      console.error('[DetalheOrdem] Erro ao carregar/reconciliar saldo em haver:', err);
     }
-  }, [clienteDaOS, buscarCreditos, ordem.historicoPagamentos]);
+  }, [clienteDaOS, buscarCreditos, adicionarCredito, ordem.id, ordem.numero, ordem.historicoPagamentos, ordem.formaPagamento, ordem.status, ordem.valorPago, ordem.valor, ordem.desconto, ordem.servicos, ordem.concluidoPorNome, ordem.criadoPorNome, usuario?.nome]);
+
+  React.useEffect(() => {
+    recarregarSaldoEReconciliar();
+  }, [recarregarSaldoEReconciliar]);
 
   React.useEffect(() => {
     if (clienteDaOS && (
@@ -925,9 +964,88 @@ export function DetalheOrdem({ ordem }: DetalheOrdemProps) {
               
               <div className="flex gap-2 items-center flex-wrap justify-end">
                 {clienteDaOS && saldoCredito > 0 && (
-                  <span className="text-[10px] font-bold text-brand-green bg-brand-green/10 border border-brand-green/20 px-2 py-1 rounded">
-                    SALDO: {formatarMoeda(saldoCredito)}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-bold text-brand-green bg-brand-green/10 border border-brand-green/20 px-2.5 py-1 rounded">
+                      SALDO EM HAVER: {formatarMoeda(saldoCredito)}
+                    </span>
+                    {(ordem.valor - (ordem.desconto || 0)) > (ordem.valorPago || 0) ? (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const saldoDevedorAtual = Math.max(0, (ordem.valor - (ordem.desconto || 0)) - (ordem.valorPago || 0));
+                          const valorAbater = Math.min(saldoDevedorAtual, saldoCredito);
+                          if (valorAbater <= 0) return;
+                          try {
+                            const numFormatado = formatarNumeroOS(ordem.numero);
+                            const nomesServicos = (ordem.servicos || []).map(s => s.nome).join(', ');
+                            await adicionarCredito({
+                              clienteId: clienteDaOS.id,
+                              tipo: 'saida',
+                              valor: valorAbater,
+                              descricao: `Baixa referente à ${numFormatado}${nomesServicos ? ` — ${nomesServicos}` : ''}`,
+                              origemId: ordem.id,
+                              criadoPorNome: usuario?.nome
+                            });
+                            await registrarPagamento(ordem.id, valorAbater, 'Crédito de Cliente');
+                            await recarregarSaldoEReconciliar();
+                            mostrar('sucesso', `Baixa de ${formatarMoeda(valorAbater)} realizada no Saldo em Haver!`);
+                          } catch {
+                            mostrar('erro', 'Erro ao registrar baixa no Saldo em Haver.');
+                          }
+                        }}
+                        className="bg-brand-green hover:bg-brand-green-light text-white text-[10px] font-bold px-2.5 py-1 rounded transition-colors uppercase"
+                      >
+                        Abater com Haver
+                      </button>
+                    ) : (
+                      ordem.status === 'Pago' &&
+                      ordem.formaPagamento !== 'Crédito de Cliente' &&
+                      !(ordem.historicoPagamentos || []).some(p => p.metodo === 'Crédito de Cliente') &&
+                      Math.max(0, ordem.valor - (ordem.desconto || 0)) <= saldoCredito && (
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            const valorLiquido = Math.max(0, ordem.valor - (ordem.desconto || 0));
+                            if (valorLiquido <= 0) return;
+                            if (!window.confirm(`Deseja converter o pagamento desta O.S. (${formatarMoeda(valorLiquido)}) para Saldo em Haver e dar baixa no saldo do cliente?`)) return;
+                            try {
+                              const numFormatado = formatarNumeroOS(ordem.numero);
+                              const nomesServicos = (ordem.servicos || []).map(s => s.nome).join(', ');
+                              await adicionarCredito({
+                                clienteId: clienteDaOS.id,
+                                tipo: 'saida',
+                                valor: valorLiquido,
+                                descricao: `Baixa referente à ${numFormatado}${nomesServicos ? ` — ${nomesServicos}` : ''}`,
+                                origemId: ordem.id,
+                                criadoPorNome: usuario?.nome
+                              });
+                              const novoHistorico = (ordem.historicoPagamentos && ordem.historicoPagamentos.length > 0)
+                                ? ordem.historicoPagamentos.map((p, i) => i === 0 ? { ...p, metodo: 'Crédito de Cliente' as FormaPagamento } : p)
+                                : [{
+                                    id: crypto.randomUUID(),
+                                    valor: valorLiquido,
+                                    metodo: 'Crédito de Cliente' as FormaPagamento,
+                                    data: new Date().toISOString()
+                                  }];
+                              await atualizarOrdem(ordem.id, {
+                                formaPagamento: 'Crédito de Cliente',
+                                historicoPagamentos: novoHistorico,
+                                valorPago: valorLiquido,
+                                status: 'Pago'
+                              });
+                              await recarregarSaldoEReconciliar();
+                              mostrar('sucesso', `Pagamento convertido para Saldo em Haver e baixa de ${formatarMoeda(valorLiquido)} realizada!`);
+                            } catch {
+                              mostrar('erro', 'Erro ao converter pagamento para Saldo em Haver.');
+                            }
+                          }}
+                          className="bg-brand-green/20 hover:bg-brand-green/30 text-brand-green-light border border-brand-green/30 text-[10px] font-bold px-2.5 py-1 rounded transition-colors uppercase"
+                        >
+                          Usar Saldo em Haver nesta O.S.
+                        </button>
+                      )
+                    )}
+                  </div>
                 )}
               {(ordem.valor - (ordem.desconto || 0)) > (ordem.valorPago || 0) && (
                 <div className="flex gap-2">
@@ -942,43 +1060,48 @@ export function DetalheOrdem({ ordem }: DetalheOrdemProps) {
                     className="bg-brand-dark-3 border border-brand-dark-5 rounded px-2 py-1 text-xs text-white focus:border-brand-blue outline-none transition-colors"
                   >
                     {FORMAS_PAGAMENTO.filter(f => f !== 'Pendente').map(f => (
-                      <option key={f} value={f}>{f}</option>
+                      <option key={f} value={f}>
+                        {f === 'Crédito de Cliente' ? 'Crédito de Cliente (Saldo em Haver)' : f}
+                      </option>
                     ))}
                   </select>
                     <button 
-                      onClick={() => {
+                      onClick={async () => {
                         const input = document.getElementById('quick-pag-valor') as HTMLInputElement;
                         const metodo = (document.getElementById('quick-pag-metodo') as HTMLSelectElement).value as FormaPagamento;
-                        const valor = parseFloat(input.value);
+                        const saldoDevedorAtual = Math.max(0, (ordem.valor - (ordem.desconto || 0)) - (ordem.valorPago || 0));
+                        const valor = parseFloat(input.value) || (metodo === 'Crédito de Cliente' ? Math.min(saldoDevedorAtual, saldoCredito) : saldoDevedorAtual);
                         if (valor > 0) {
                           if (metodo === 'Crédito de Cliente' && valor > saldoCredito) {
-                            mostrar('erro', 'Saldo insuficiente para este pagamento.');
+                            mostrar('erro', 'Saldo em Haver insuficiente para este pagamento.');
                             return;
                           }
                           
+                          const numFormatado = formatarNumeroOS(ordem.numero);
+                          const nomesServicos = (ordem.servicos || []).map(s => s.nome).join(', ');
+
                           if (metodo === 'Crédito de Cliente' && clienteDaOS) {
-                            adicionarCredito({
+                            await adicionarCredito({
                               clienteId: clienteDaOS.id,
                               tipo: 'saida',
                               valor: valor,
-                              descricao: `Pagamento da O.S. #${formatarNumeroOS(ordem.numero)}`,
+                              descricao: `Baixa referente à ${numFormatado}${nomesServicos ? ` — ${nomesServicos}` : ''}`,
                               origemId: ordem.id,
                               criadoPorNome: usuario?.nome
                             });
                           }
 
-                          registrarPagamento(ordem.id, valor, metodo);
+                          await registrarPagamento(ordem.id, valor, metodo);
                           
                           // Verifica se sobrou troco para gerar crédito
-                          const saldoDevedorAtual = (ordem.valor - (ordem.desconto || 0)) - (ordem.valorPago || 0);
                           if (valor > saldoDevedorAtual && clienteDaOS && metodo !== 'Crédito de Cliente') {
                             const troco = valor - saldoDevedorAtual;
                             if (window.confirm(`Este pagamento gera um troco de ${formatarMoeda(troco)}. Deseja adicionar este troco como crédito (Haver) para o cliente?`)) {
-                              adicionarCredito({
+                              await adicionarCredito({
                                 clienteId: clienteDaOS.id,
                                 tipo: 'entrada',
                                 valor: troco,
-                                descricao: `Troco O.S. #${formatarNumeroOS(ordem.numero)}`,
+                                descricao: `Troco ${numFormatado}`,
                                 origemId: ordem.id,
                                 criadoPorNome: usuario?.nome
                               });
@@ -986,6 +1109,7 @@ export function DetalheOrdem({ ordem }: DetalheOrdemProps) {
                           }
                           
                           input.value = '';
+                          await recarregarSaldoEReconciliar();
                         }
                       }}
                       className="bg-brand-blue hover:bg-brand-blue-light text-white text-[10px] font-bold px-3 py-1 rounded transition-colors"
@@ -1012,25 +1136,84 @@ export function DetalheOrdem({ ordem }: DetalheOrdemProps) {
                     ordem.historicoPagamentos.map((p) => (
                       <tr key={p.id} className="hover:bg-white/5 transition-colors">
                         <td className="px-4 py-3 text-gray-400">{new Date(p.data).toLocaleDateString('pt-BR')}</td>
-                        <td className="px-4 py-3 font-bold text-white uppercase">{p.metodo}</td>
+                        <td className="px-4 py-3 font-bold text-white uppercase">
+                          <select
+                            value={p.metodo}
+                            onChange={async (e) => {
+                              const novoMetodo = e.target.value as FormaPagamento;
+                              const metodoAntigo = p.metodo;
+                              if (novoMetodo === metodoAntigo) return;
+
+                              if (novoMetodo === 'Crédito de Cliente' && p.valor > saldoCredito) {
+                                mostrar('erro', `Saldo em Haver insuficiente (${formatarMoeda(saldoCredito)} disponível).`);
+                                return;
+                              }
+
+                              try {
+                                const numFormatado = formatarNumeroOS(ordem.numero);
+                                const nomesServicos = (ordem.servicos || []).map(s => s.nome).join(', ');
+
+                                if (novoMetodo === 'Crédito de Cliente' && clienteDaOS) {
+                                  await adicionarCredito({
+                                    clienteId: clienteDaOS.id,
+                                    tipo: 'saida',
+                                    valor: p.valor,
+                                    descricao: `Baixa referente à ${numFormatado}${nomesServicos ? ` — ${nomesServicos}` : ''}`,
+                                    origemId: ordem.id,
+                                    criadoPorNome: usuario?.nome
+                                  });
+                                } else if (metodoAntigo === 'Crédito de Cliente' && clienteDaOS) {
+                                  await adicionarCredito({
+                                    clienteId: clienteDaOS.id,
+                                    tipo: 'entrada',
+                                    valor: p.valor,
+                                    descricao: `Estorno de pagamento ${numFormatado}`,
+                                    origemId: ordem.id,
+                                    criadoPorNome: usuario?.nome
+                                  });
+                                }
+
+                                const novoHistorico = (ordem.historicoPagamentos || []).map(item =>
+                                  item.id === p.id ? { ...item, metodo: novoMetodo } : item
+                                );
+                                await atualizarOrdem(ordem.id, {
+                                  historicoPagamentos: novoHistorico,
+                                  formaPagamento: novoMetodo
+                                });
+                                await recarregarSaldoEReconciliar();
+                                mostrar('sucesso', 'Forma de pagamento atualizada com sucesso!');
+                              } catch {
+                                mostrar('erro', 'Erro ao alterar forma de pagamento.');
+                              }
+                            }}
+                            className="bg-brand-dark-2 border border-brand-dark-5 rounded px-2 py-1 text-xs font-bold text-white outline-none focus:border-brand-blue"
+                          >
+                            {FORMAS_PAGAMENTO.filter(f => f !== 'Pendente').map(f => (
+                              <option key={f} value={f}>
+                                {f === 'Crédito de Cliente' ? 'Crédito de Cliente (Saldo em Haver)' : f}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
                         <td className="px-4 py-3 font-black text-brand-green text-right">{formatarMoeda(p.valor)}</td>
                         <td className="px-4 py-3 text-right">
                           <button 
-                            onClick={() => {
+                            onClick={async () => {
                               if (window.confirm(`Tem certeza que deseja excluir o pagamento de ${formatarMoeda(p.valor)}?`)) {
                                 if (p.metodo === 'Crédito de Cliente' && clienteDaOS) {
                                   if (window.confirm('Este pagamento usou créditos do cliente. Deseja estornar esse valor de volta para a carteira do cliente?')) {
-                                    adicionarCredito({
+                                    await adicionarCredito({
                                       clienteId: clienteDaOS.id,
                                       tipo: 'entrada',
                                       valor: p.valor,
-                                      descricao: `Estorno de pagamento O.S. #${formatarNumeroOS(ordem.numero)}`,
+                                      descricao: `Estorno de pagamento ${formatarNumeroOS(ordem.numero)}`,
                                       origemId: ordem.id,
                                       criadoPorNome: usuario?.nome
                                     });
                                   }
                                 }
-                                removerPagamento(ordem.id, p.id);
+                                await removerPagamento(ordem.id, p.id);
+                                await recarregarSaldoEReconciliar();
                               }
                             }}
                             className="p-1 text-gray-500 hover:text-red-400 transition-colors"

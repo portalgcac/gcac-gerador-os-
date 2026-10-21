@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Save, X, Eye, EyeOff, MessageCircle, Users, Phone, Search,
   Mail, HelpCircle, CheckCircle, ChevronDown, List, Trash2, DollarSign,
-  AlertTriangle
+  AlertTriangle, Wallet
 } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import {
@@ -16,7 +16,7 @@ import { useClientes } from '../../context/ClientesContext';
 import { useServicos } from '../../context/ServicosContext';
 import { Cliente } from '../../types';
 import { Notificacao, useNotificacao } from '../common/Notificacao';
-import { classeStatusExecucao, iconeStatusExecucao, formatarMoeda, removerAcentos } from '../../utils/formatters';
+import { classeStatusExecucao, iconeStatusExecucao, formatarMoeda, formatarNumeroOS, removerAcentos } from '../../utils/formatters';
 import { supabase } from '../../db/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { isLaudoExame } from '../../utils/categoriaHelper';
@@ -147,11 +147,12 @@ function SeletorServico({ onSelecionar }: { onSelecionar: (s: ServicoConfig) => 
 export function FormularioOrdem({ ordemExistente }: FormularioOrdemProps) {
   const navigate = useNavigate();
   const location = useLocation();
-  const { criarOrdem, atualizarOrdem } = useOrdens();
+  const { criarOrdem, atualizarOrdem, buscarOrdem } = useOrdens();
   const { servicos } = useServicos();
   const { 
     clientes, criarCliente, atualizarCliente, buscarClientePorNomeExato, 
-    clubesRegistrados, buscarArmas, salvarArma, criarOpcaoArma
+    clubesRegistrados, buscarArmas, salvarArma, criarOpcaoArma,
+    buscarCreditos, adicionarCredito
   } = useClientes();
   const { estado: notif, mostrar, fechar } = useNotificacao();
   const { usuario } = useAuth();
@@ -163,6 +164,8 @@ export function FormularioOrdem({ ordemExistente }: FormularioOrdemProps) {
   const [usuarios, setUsuarios] = useState<{ id: string; nome: string }[]>([]);
   
   const [armasCliente, setArmasCliente] = useState<Arma[]>([]);
+  const [saldoCredito, setSaldoCredito] = useState(0);
+  const [creditoJaAbatidoNestaOS, setCreditoJaAbatidoNestaOS] = useState(0);
   const [novasArmas, setNovasArmas] = useState<any[]>([]);
   const [modalArmaAberto, setModalArmaAberto] = useState(false);
   const [servicoIndexParaArma, setServicoIndexParaArma] = useState<number | null>(null);
@@ -278,6 +281,43 @@ export function FormularioOrdem({ ordemExistente }: FormularioOrdemProps) {
       cancelado = true;
     };
   }, [clienteEncontrado?.id, clienteEncontrado?.empresaId, buscarArmas]);
+
+  useEffect(() => {
+    let cancelado = false;
+    const carregarSaldoHaver = async () => {
+      if (clienteEncontrado?.id) {
+        try {
+          const creds = await buscarCreditos(clienteEncontrado.id);
+          if (cancelado) return;
+          const saldoAtual = creds.reduce((acc, c) => acc + (c.tipo === 'entrada' ? c.valor : -c.valor), 0);
+          setSaldoCredito(saldoAtual);
+
+          if (ordemExistente?.id) {
+            const numFormatado = formatarNumeroOS(ordemExistente.numero);
+            const movsOS = creds.filter(
+              c => c.origemId === ordemExistente.id || (c.descricao && c.descricao.includes(numFormatado))
+            );
+            const saidas = movsOS.filter(c => c.tipo === 'saida').reduce((acc, c) => acc + c.valor, 0);
+            const estornos = movsOS
+              .filter(c => c.tipo === 'entrada' && c.descricao.toLowerCase().includes('estorno'))
+              .reduce((acc, c) => acc + c.valor, 0);
+            setCreditoJaAbatidoNestaOS(Math.max(0, saidas - estornos));
+          } else {
+            setCreditoJaAbatidoNestaOS(0);
+          }
+        } catch (err) {
+          console.error('[FormularioOrdem] Erro ao buscar créditos do cliente:', err);
+        }
+      } else {
+        setSaldoCredito(0);
+        setCreditoJaAbatidoNestaOS(0);
+      }
+    };
+    carregarSaldoHaver();
+    return () => {
+      cancelado = true;
+    };
+  }, [clienteEncontrado?.id, buscarCreditos, ordemExistente?.id, ordemExistente?.numero]);
 
   // Preenchimento automático vindo do perfil do cliente
   useEffect(() => {
@@ -631,6 +671,11 @@ export function FormularioOrdem({ ordemExistente }: FormularioOrdemProps) {
         });
       }
 
+      const ultimaFormaPagamento: FormaPagamento =
+        form.historicoPagamentos.length > 0
+          ? form.historicoPagamentos[form.historicoPagamentos.length - 1].metodo
+          : form.formaPagamento;
+
       const dados = {
         nomeCliente:       form.nomeCliente.trim().toUpperCase(),
         contato:           form.contato.trim(),
@@ -643,7 +688,7 @@ export function FormularioOrdem({ ordemExistente }: FormularioOrdemProps) {
         valor:             form.valor,
         desconto:          form.desconto,
         taxaPFTotal:       (form.servicos as any[]).reduce((acc: number, s: any) => acc + (s.taxaPF || 0), 0),
-        formaPagamento:    form.formaPagamento,
+        formaPagamento:    ultimaFormaPagamento,
         status:            form.status,
         canalAtendimento:  form.canalAtendimento,
         observacaoContato: form.observacaoContato.trim(),
@@ -652,14 +697,71 @@ export function FormularioOrdem({ ordemExistente }: FormularioOrdemProps) {
         historicoPagamentos: form.historicoPagamentos,
       };
 
+      let osId = '';
       if (ordemExistente) {
         await atualizarOrdem(ordemExistente.id, dados);
+        osId = ordemExistente.id;
+      } else {
+        osId = await criarOrdem(dados);
+      }
+
+      // 4. Sincronizar baixa/estorno no Saldo em Haver (Crédito de Cliente)
+      const targetClienteId = realClienteId || clienteEncontrado?.id;
+      if (targetClienteId && osId) {
+        try {
+          const totalCreditoNaOS =
+            (dados.historicoPagamentos || [])
+              .filter(p => p.metodo === 'Crédito de Cliente')
+              .reduce((acc, p) => acc + (Number(p.valor) || 0), 0) ||
+            (dados.status === 'Pago' && dados.formaPagamento === 'Crédito de Cliente'
+              ? Math.max(0, dados.valor - (dados.desconto || 0))
+              : 0);
+
+          const credsAtuais = await buscarCreditos(targetClienteId);
+          const osSalva = ordemExistente || (await buscarOrdem(osId));
+          const numFormatado = osSalva?.numero ? formatarNumeroOS(osSalva.numero) : 'O.S.';
+          const nomesServicos = servicosProcessados.map((s: any) => s.nome).join(', ');
+
+          const movsDaOS = credsAtuais.filter(
+            c => c.origemId === osId || (osSalva?.numero && c.descricao?.includes(formatarNumeroOS(osSalva.numero)))
+          );
+          const totalSaidas = movsDaOS.filter(c => c.tipo === 'saida').reduce((acc, c) => acc + c.valor, 0);
+          const totalEstornos = movsDaOS
+            .filter(c => c.tipo === 'entrada' && c.descricao.toLowerCase().includes('estorno'))
+            .reduce((acc, c) => acc + c.valor, 0);
+          const jaAbatido = Math.max(0, totalSaidas - totalEstornos);
+          const diferenca = Number((totalCreditoNaOS - jaAbatido).toFixed(2));
+
+          if (diferenca > 0) {
+            await adicionarCredito({
+              clienteId: targetClienteId,
+              tipo: 'saida',
+              valor: diferenca,
+              descricao: `Baixa referente à ${numFormatado}${nomesServicos ? ` — ${nomesServicos}` : ''}`,
+              origemId: osId,
+              criadoPorNome: usuario?.nome
+            });
+          } else if (diferenca < 0) {
+            await adicionarCredito({
+              clienteId: targetClienteId,
+              tipo: 'entrada',
+              valor: Math.abs(diferenca),
+              descricao: `Estorno de pagamento ${numFormatado}`,
+              origemId: osId,
+              criadoPorNome: usuario?.nome
+            });
+          }
+        } catch (err) {
+          console.error('Erro ao sincronizar saldo em haver da OS:', err);
+        }
+      }
+
+      if (ordemExistente) {
         mostrar('sucesso', 'Ordem de Serviço atualizada com sucesso!');
         setTimeout(() => navigate(`/ordens/${ordemExistente.id}`, { replace: true }), 1200);
       } else {
-        const id = await criarOrdem(dados);
         mostrar('sucesso', 'Ordem de Serviço criada com sucesso!');
-        setTimeout(() => navigate(`/ordens/${id}`, { replace: true }), 1200);
+        setTimeout(() => navigate(`/ordens/${osId}`, { replace: true }), 1200);
       }
     } catch {
       mostrar('erro', 'Erro ao salvar a OS. Tente novamente.');
@@ -1267,10 +1369,53 @@ export function FormularioOrdem({ ordemExistente }: FormularioOrdemProps) {
         {/* Gerenciamento de Pagamentos (Apenas na Edição ou se já tiver valor) */}
         {form.valor > 0 && form.status !== 'Gratuidade' && (
           <div className="space-y-3 mb-6 p-4 bg-brand-dark-3 rounded-xl border border-brand-dark-5">
-            <h4 className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-2 flex items-center gap-2">
-              <DollarSign size={14} className="text-brand-green" />
-              Histórico de Pagamentos
-            </h4>
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+              <h4 className="text-xs font-bold text-gray-500 uppercase tracking-widest flex items-center gap-2">
+                <DollarSign size={14} className="text-brand-green" />
+                Histórico de Pagamentos
+              </h4>
+              {clienteEncontrado && (saldoCredito + creditoJaAbatidoNestaOS) > 0 && (
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] font-bold text-brand-green bg-brand-green/10 border border-brand-green/20 px-2.5 py-1 rounded-lg flex items-center gap-1.5">
+                    <Wallet size={12} />
+                    Saldo em Haver: {formatarMoeda(Math.max(0, (saldoCredito + creditoJaAbatidoNestaOS) - form.historicoPagamentos.filter(p => p.metodo === 'Crédito de Cliente').reduce((acc, p) => acc + p.valor, 0)))}
+                  </span>
+                  {Math.max(0, (form.valor - (form.desconto || 0)) - form.valorPago) > 0 &&
+                    Math.max(0, (saldoCredito + creditoJaAbatidoNestaOS) - form.historicoPagamentos.filter(p => p.metodo === 'Crédito de Cliente').reduce((acc, p) => acc + p.valor, 0)) > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const valorLiquidoOS = Math.max(0, form.valor - (form.desconto || 0));
+                        const pendenteOS = Math.max(0, valorLiquidoOS - form.valorPago);
+                        const creditoUsadoNoForm = form.historicoPagamentos
+                          .filter(p => p.metodo === 'Crédito de Cliente')
+                          .reduce((acc, p) => acc + p.valor, 0);
+                        const haverDisponivel = Math.max(0, (saldoCredito + creditoJaAbatidoNestaOS) - creditoUsadoNoForm);
+                        const valorAbater = Math.min(pendenteOS, haverDisponivel);
+                        if (valorAbater <= 0) return;
+
+                        const novoP = {
+                          id: crypto.randomUUID(),
+                          valor: valorAbater,
+                          metodo: 'Crédito de Cliente' as FormaPagamento,
+                          data: new Date().toISOString()
+                        };
+                        const novoHist = [...form.historicoPagamentos, novoP];
+                        const novoTotal = novoHist.reduce((acc, curr) => acc + curr.valor, 0);
+                        atualizar('historicoPagamentos', novoHist);
+                        atualizar('valorPago', novoTotal);
+                        atualizar('formaPagamento', 'Crédito de Cliente');
+                        if (novoTotal >= valorLiquidoOS) atualizar('status', 'Pago');
+                        else atualizar('status', 'Parcialmente Pago');
+                      }}
+                      className="px-2.5 py-1 rounded-lg text-[10px] font-black uppercase bg-brand-green text-white hover:bg-brand-green-light transition-colors"
+                    >
+                      Usar Saldo em Haver
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
             
             {form.historicoPagamentos.length > 0 ? (
               <div className="space-y-2">
@@ -1278,7 +1423,34 @@ export function FormularioOrdem({ ordemExistente }: FormularioOrdemProps) {
                   <div key={p.id} className="flex items-center justify-between p-2 bg-brand-dark-2 rounded border border-brand-dark-5 text-xs">
                     <div className="flex items-center gap-3">
                       <span className="text-gray-500">{new Date(p.data).toLocaleDateString('pt-BR')}</span>
-                      <span className="font-bold text-white">{p.metodo}</span>
+                      <select
+                        value={p.metodo}
+                        onChange={e => {
+                          const novoMetodo = e.target.value as FormaPagamento;
+                          if (novoMetodo === 'Crédito de Cliente') {
+                            const outrosCreditos = form.historicoPagamentos
+                              .filter((item, i) => i !== idx && item.metodo === 'Crédito de Cliente')
+                              .reduce((acc, item) => acc + item.valor, 0);
+                            const disponivel = (saldoCredito + creditoJaAbatidoNestaOS) - outrosCreditos;
+                            if (p.valor > disponivel) {
+                              mostrar('erro', `Saldo em Haver insuficiente (${formatarMoeda(Math.max(0, disponivel))} disponível).`);
+                              return;
+                            }
+                          }
+                          const novoHist = form.historicoPagamentos.map((item, i) =>
+                            i === idx ? { ...item, metodo: novoMetodo } : item
+                          );
+                          atualizar('historicoPagamentos', novoHist);
+                          atualizar('formaPagamento', novoMetodo);
+                        }}
+                        className="bg-brand-dark-3 border border-brand-dark-5 rounded px-2 py-1 text-xs font-bold text-white outline-none focus:border-brand-blue"
+                      >
+                        {FORMAS_PAGAMENTO.filter(f => f !== 'Pendente').map(f => (
+                          <option key={f} value={f}>
+                            {f === 'Crédito de Cliente' ? 'Crédito de Cliente (Saldo em Haver)' : f}
+                          </option>
+                        ))}
+                      </select>
                     </div>
                     <div className="flex items-center gap-3">
                       <span className="font-bold text-brand-green">{formatarMoeda(p.valor)}</span>
@@ -1287,10 +1459,12 @@ export function FormularioOrdem({ ordemExistente }: FormularioOrdemProps) {
                         onClick={() => {
                           const novoHist = form.historicoPagamentos.filter((_, i) => i !== idx);
                           const novoTotal = novoHist.reduce((acc, curr) => acc + curr.valor, 0);
+                          const valorLiquidoOS = Math.max(0, form.valor - (form.desconto || 0));
                           atualizar('historicoPagamentos', novoHist);
                           atualizar('valorPago', novoTotal);
+                          atualizar('formaPagamento', novoHist.length > 0 ? novoHist[novoHist.length - 1].metodo : 'Pendente');
                           // Atualiza status se necessário
-                          if (novoTotal >= form.valor) atualizar('status', 'Pago');
+                          if (novoTotal >= valorLiquidoOS && valorLiquidoOS > 0) atualizar('status', 'Pago');
                           else if (novoTotal > 0) atualizar('status', 'Parcialmente Pago');
                           else atualizar('status', 'Aguardando Pagamento');
                         }}
@@ -1317,15 +1491,28 @@ export function FormularioOrdem({ ordemExistente }: FormularioOrdemProps) {
                     if (e.key === 'Enter') {
                       e.preventDefault();
                       const input = e.currentTarget;
-                      const val = parseFloat(input.value);
                       const metodo = (document.getElementById('add-pag-metodo') as HTMLSelectElement).value as FormaPagamento;
+                      const valorLiquidoOS = Math.max(0, form.valor - (form.desconto || 0));
+                      const pendenteOS = Math.max(0, valorLiquidoOS - form.valorPago);
+                      const val = parseFloat(input.value) || pendenteOS;
                       if (val > 0) {
+                        if (metodo === 'Crédito de Cliente') {
+                          const creditoUsadoNoForm = form.historicoPagamentos
+                            .filter(p => p.metodo === 'Crédito de Cliente')
+                            .reduce((acc, p) => acc + p.valor, 0);
+                          const disponivel = (saldoCredito + creditoJaAbatidoNestaOS) - creditoUsadoNoForm;
+                          if (val > disponivel) {
+                            mostrar('erro', `Saldo em Haver insuficiente (${formatarMoeda(Math.max(0, disponivel))} disponível).`);
+                            return;
+                          }
+                        }
                         const novoP = { id: crypto.randomUUID(), valor: val, metodo, data: new Date().toISOString() };
                         const novoHist = [...form.historicoPagamentos, novoP];
                         const novoTotal = novoHist.reduce((acc, curr) => acc + curr.valor, 0);
                         atualizar('historicoPagamentos', novoHist);
                         atualizar('valorPago', novoTotal);
-                        if (novoTotal >= form.valor) atualizar('status', 'Pago');
+                        atualizar('formaPagamento', metodo);
+                        if (novoTotal >= valorLiquidoOS) atualizar('status', 'Pago');
                         else atualizar('status', 'Parcialmente Pago');
                         input.value = '';
                       }
@@ -1333,24 +1520,39 @@ export function FormularioOrdem({ ordemExistente }: FormularioOrdemProps) {
                   }}
                 />
               </div>
-              <select id="add-pag-metodo" className="select py-2 text-sm w-32">
+              <select id="add-pag-metodo" className="select py-2 text-sm w-48">
                 {FORMAS_PAGAMENTO.filter(f => f !== 'Pendente').map(f => (
-                  <option key={f} value={f}>{f}</option>
+                  <option key={f} value={f}>
+                    {f === 'Crédito de Cliente' ? 'Crédito de Cliente (Saldo em Haver)' : f}
+                  </option>
                 ))}
               </select>
               <button 
                 type="button"
                 onClick={() => {
                   const input = document.getElementById('add-pag-valor') as HTMLInputElement;
-                  const val = parseFloat(input.value);
                   const metodo = (document.getElementById('add-pag-metodo') as HTMLSelectElement).value as FormaPagamento;
+                  const valorLiquidoOS = Math.max(0, form.valor - (form.desconto || 0));
+                  const pendenteOS = Math.max(0, valorLiquidoOS - form.valorPago);
+                  const val = parseFloat(input.value) || pendenteOS;
                   if (val > 0) {
+                    if (metodo === 'Crédito de Cliente') {
+                      const creditoUsadoNoForm = form.historicoPagamentos
+                        .filter(p => p.metodo === 'Crédito de Cliente')
+                        .reduce((acc, p) => acc + p.valor, 0);
+                      const disponivel = (saldoCredito + creditoJaAbatidoNestaOS) - creditoUsadoNoForm;
+                      if (val > disponivel) {
+                        mostrar('erro', `Saldo em Haver insuficiente (${formatarMoeda(Math.max(0, disponivel))} disponível).`);
+                        return;
+                      }
+                    }
                     const novoP = { id: crypto.randomUUID(), valor: val, metodo, data: new Date().toISOString() };
                     const novoHist = [...form.historicoPagamentos, novoP];
                     const novoTotal = novoHist.reduce((acc, curr) => acc + curr.valor, 0);
                     atualizar('historicoPagamentos', novoHist);
                     atualizar('valorPago', novoTotal);
-                    if (novoTotal >= form.valor) atualizar('status', 'Pago');
+                    atualizar('formaPagamento', metodo);
+                    if (novoTotal >= valorLiquidoOS) atualizar('status', 'Pago');
                     else atualizar('status', 'Parcialmente Pago');
                     input.value = '';
                   }
@@ -1370,29 +1572,48 @@ export function FormularioOrdem({ ordemExistente }: FormularioOrdemProps) {
             {STATUS_OS.map((s: any) => (
               <button key={s} type="button"
                 onClick={() => {
-                  atualizar('status', s);
                   if (s === 'Aguardando Pagamento') {
+                    atualizar('status', s);
                     atualizar('valorPago', 0);
                     atualizar('historicoPagamentos', []);
+                    atualizar('formaPagamento', 'Pendente');
+                    return;
                   }
                   if (s === 'Pago') {
-                    atualizar('valorPago', form.valor);
-                    // Se não tiver histórico, cria um único
-                    if (form.historicoPagamentos.length === 0 && form.valor > 0) {
+                    const valorLiquidoOS = Math.max(0, form.valor - (form.desconto || 0));
+                    const selectEl = document.getElementById('add-pag-metodo') as HTMLSelectElement | null;
+                    const metodoSelecionado = (selectEl?.value as FormaPagamento) || (form.formaPagamento !== 'Pendente' ? form.formaPagamento : 'PIX');
+
+                    if (form.historicoPagamentos.length === 0 && valorLiquidoOS > 0) {
+                      if (metodoSelecionado === 'Crédito de Cliente') {
+                        const disponivel = saldoCredito + creditoJaAbatidoNestaOS;
+                        if (valorLiquidoOS > disponivel) {
+                          mostrar('erro', `Saldo em Haver insuficiente (${formatarMoeda(Math.max(0, disponivel))} disponível).`);
+                          return;
+                        }
+                      }
                       atualizar('historicoPagamentos', [{ 
                         id: crypto.randomUUID(), 
-                        valor: form.valor, 
-                        metodo: 'PIX', 
+                        valor: valorLiquidoOS, 
+                        metodo: metodoSelecionado, 
                         data: new Date().toISOString() 
                       }]);
+                      atualizar('formaPagamento', metodoSelecionado);
                     }
+                    atualizar('valorPago', valorLiquidoOS);
+                    atualizar('status', s);
+                    return;
                   }
                   if (s === 'Gratuidade') {
+                    atualizar('status', s);
                     atualizar('valor', 0);
                     atualizar('valorTexto', '');
                     atualizar('valorPago', 0);
                     atualizar('historicoPagamentos', []);
+                    atualizar('formaPagamento', 'A Combinar');
+                    return;
                   }
+                  atualizar('status', s);
                 }}
                 className={`py-2.5 px-2 rounded-lg text-xs font-semibold border transition-all text-center ${
                   form.status === s

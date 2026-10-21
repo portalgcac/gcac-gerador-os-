@@ -12,7 +12,7 @@ import { FormularioCliente } from './FormularioCliente';
 import { AbaDocumentacao } from './AbaDocumentacao';
 import { AbaCreditos } from './AbaCreditos';
 import { Cliente } from '../../types';
-import { formatarCPF, formatarTelefone, formatarMoeda, formatarData, isOrdemConcluida, obterResumoExecucao, iconeStatusExecucao } from '../../utils/formatters';
+import { formatarCPF, formatarTelefone, formatarMoeda, formatarData, formatarNumeroOS, isOrdemConcluida, obterResumoExecucao, iconeStatusExecucao } from '../../utils/formatters';
 import { calcularAlerta } from '../../utils/vencimentos';
 import { useOrdens } from '../../context/OrdensContext';
 import { useOrcamentos } from '../../context/OrcamentosContext';
@@ -144,15 +144,72 @@ export function DetalheCliente({ cliente }: DetalheClienteProps) {
   const recibosCliente = recibos.filter(r => r.clienteCPF === cliente.cpf);
   const agendamentosCliente = agendamentos.filter(a => a.clienteCPF === cliente.cpf && a.status === 'pendente');
 
-  const { buscarArmas, buscarManejos, buscarGts } = useClientes();
+  const { buscarArmas, buscarManejos, buscarGts, buscarCreditos, adicionarCredito } = useClientes();
+  const [saldoHaverCliente, setSaldoHaverCliente] = useState<number>(0);
+
+  useEffect(() => {
+    let cancelado = false;
+    async function carregarEReconciliarHaver() {
+      if (!cliente?.id) return;
+      try {
+        let data = await buscarCreditos(cliente.id);
+        let houveReconciliacao = false;
+
+        for (const os of todasOrdensCliente) {
+          const pagsCredito = (os.historicoPagamentos || []).filter(p => p.metodo === 'Crédito de Cliente');
+          let totalPagoComCreditoNaOS = pagsCredito.reduce((acc, p) => acc + (Number(p.valor) || 0), 0);
+          if (totalPagoComCreditoNaOS === 0 && os.formaPagamento === 'Crédito de Cliente' && os.status === 'Pago') {
+            totalPagoComCreditoNaOS = os.valorPago || Math.max(0, os.valor - (os.desconto || 0));
+          }
+          if (totalPagoComCreditoNaOS > 0) {
+            const numFormatado = formatarNumeroOS(os.numero);
+            const movsDaOS = data.filter(
+              c => c.origemId === os.id || (c.descricao && c.descricao.includes(numFormatado))
+            );
+            const totalSaidas = movsDaOS.filter(c => c.tipo === 'saida').reduce((acc, c) => acc + c.valor, 0);
+            const totalEstornos = movsDaOS
+              .filter(c => c.tipo === 'entrada' && c.descricao.toLowerCase().includes('estorno'))
+              .reduce((acc, c) => acc + c.valor, 0);
+            const jaAbatido = Math.max(0, totalSaidas - totalEstornos);
+            const diferenca = Number((totalPagoComCreditoNaOS - jaAbatido).toFixed(2));
+            if (diferenca > 0) {
+              const nomesServicos = (os.servicos || []).map(s => s.nome).join(', ');
+              await adicionarCredito({
+                clienteId: cliente.id,
+                tipo: 'saida',
+                valor: diferenca,
+                descricao: `Baixa referente à ${numFormatado}${nomesServicos ? ` — ${nomesServicos}` : ''}`,
+                origemId: os.id,
+                criadoPorNome: os.concluidoPorNome || os.criadoPorNome || usuario?.nome
+              });
+              houveReconciliacao = true;
+            }
+          }
+        }
+
+        if (houveReconciliacao) {
+          data = await buscarCreditos(cliente.id);
+        }
+        if (!cancelado) {
+          setSaldoHaverCliente(data.reduce((acc, c) => acc + (c.tipo === 'entrada' ? c.valor : -c.valor), 0));
+        }
+      } catch (err) {
+        console.error('Erro ao buscar/reconciliar saldo haver do cliente:', err);
+      }
+    }
+    carregarEReconciliarHaver();
+    return () => {
+      cancelado = true;
+    };
+  }, [cliente.id, todasOrdensCliente.length, buscarCreditos, adicionarCredito, usuario?.nome]);
 
   const tabsDisponiveis = [
-    { id: 'ordens', label: 'O.S.', slug: 'ordens', count: todasOrdensCliente.length },
-    { id: 'orcamentos', label: 'Orçamentos', slug: 'orcamentos', count: orcamentosCliente.length },
-    { id: 'recibos', label: 'Recibos', slug: 'recibos', count: recibosCliente.length },
-    { id: 'agendamentos', label: 'Agendamentos', slug: 'agendamentos', count: agendamentosCliente.length },
-    { id: 'documentos', label: 'Acervo & Docs', slug: null, count: alertasCount },
-    { id: 'creditos', label: 'Haver', slug: null, count: 0 },
+    { id: 'ordens', label: 'O.S.', slug: 'ordens', count: todasOrdensCliente.length, badgeText: undefined as string | undefined },
+    { id: 'orcamentos', label: 'Orçamentos', slug: 'orcamentos', count: orcamentosCliente.length, badgeText: undefined as string | undefined },
+    { id: 'recibos', label: 'Recibos', slug: 'recibos', count: recibosCliente.length, badgeText: undefined as string | undefined },
+    { id: 'agendamentos', label: 'Agendamentos', slug: 'agendamentos', count: agendamentosCliente.length, badgeText: undefined as string | undefined },
+    { id: 'documentos', label: 'Acervo & Docs', slug: null, count: alertasCount, badgeText: undefined as string | undefined },
+    { id: 'creditos', label: 'Haver', slug: null, count: 0, badgeText: saldoHaverCliente > 0 ? formatarMoeda(saldoHaverCliente) : undefined },
   ].filter(tab => {
     if (usuario?.tipoConta === 'cac_individual') {
       return tab.id === 'documentos';
@@ -1097,6 +1154,7 @@ export function DetalheCliente({ cliente }: DetalheClienteProps) {
                   onClick={() => setAbaAtiva(tab.id as any)} 
                   count={tab.id === 'ordens' && !mostrarTodasOrdens ? ordensClienteAbertas.length : tab.count}
                   isAlert={tab.id === 'documentos' && tab.count > 0}
+                  badgeText={tab.badgeText}
                 >
                   {tab.label}
                 </TabButton>
@@ -1122,8 +1180,10 @@ export function DetalheCliente({ cliente }: DetalheClienteProps) {
                       id: o.id, 
                       title: `OS #${String(o.numero).padStart(4, '0')}`, 
                       date: o.criadoEm, 
-                      value: o.valor, 
+                      value: o.valor - (o.desconto || 0), 
                       status: o.status,
+                      formaPagamento: o.formaPagamento,
+                      pagoComHaver: o.formaPagamento === 'Crédito de Cliente' || (o.historicoPagamentos || []).some(p => p.metodo === 'Crédito de Cliente'),
                       path: `/ordens/${o.id}`,
                       servicos: o.servicos ? o.servicos.map(s => ({
                         nome: s.nome,
@@ -1186,7 +1246,7 @@ export function DetalheCliente({ cliente }: DetalheClienteProps) {
               )}
               {abaAtiva === 'creditos' && (
                 <div className="pt-2">
-                  <AbaCreditos cliente={cliente} />
+                  <AbaCreditos cliente={cliente} onSaldoChange={setSaldoHaverCliente} />
                 </div>
               )}
             </div>
@@ -1368,7 +1428,7 @@ function ModalPromptCr({ cliente, onFechar, onSalvar }: ModalPromptCrProps) {
   );
 }
 
-function TabButton({ children, ativo, onClick, count, isAlert }: { children: React.ReactNode, ativo: boolean, onClick: () => void, count: number, isAlert?: boolean }) {
+function TabButton({ children, ativo, onClick, count, isAlert, badgeText }: { children: React.ReactNode, ativo: boolean, onClick: () => void, count: number, isAlert?: boolean, badgeText?: string }) {
   return (
     <button 
       onClick={onClick}
@@ -1377,7 +1437,11 @@ function TabButton({ children, ativo, onClick, count, isAlert }: { children: Rea
       }`}
     >
       {children}
-      {count > 0 && (
+      {badgeText ? (
+        <span className="px-1.5 py-0.5 rounded-full text-[9px] bg-brand-green/15 text-brand-green border border-brand-green/30 font-black">
+          {badgeText}
+        </span>
+      ) : count > 0 ? (
         <span className={`px-1.5 py-0.5 rounded-full text-[9px] ${
           isAlert 
             ? 'bg-red-500 text-white font-bold animate-pulse' 
@@ -1385,7 +1449,7 @@ function TabButton({ children, ativo, onClick, count, isAlert }: { children: Rea
         }`}>
           {count}
         </span>
-      )}
+      ) : null}
     </button>
   );
 }
@@ -1496,6 +1560,11 @@ function HistoryList({ items, emptyMsg }: { items: any[], emptyMsg: string }) {
                 item.status === 'Parcialmente Pago' ? 'text-orange-400' :
                 'text-gray-400'
               }`}>{item.status}</p>
+              {item.pagoComHaver && (
+                <span className="inline-block mt-0.5 px-1.5 py-0.2 rounded text-[8px] font-black uppercase bg-brand-blue/15 text-brand-blue-light border border-brand-blue/30">
+                  Saldo Haver
+                </span>
+              )}
             </div>
             <ChevronRight size={16} className="text-gray-600 transition-transform group-hover:translate-x-1" />
           </div>
