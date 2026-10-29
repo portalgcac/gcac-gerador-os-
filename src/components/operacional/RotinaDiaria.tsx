@@ -484,8 +484,8 @@ export function RotinaDiaria() {
                   }`}
                 >
                   {/* 1. O.S. Info & Cliente */}
-                  <div className="flex-1 min-w-[210px]">
-                    <div className="flex items-center gap-2 flex-wrap mb-1.5">
+                  <div className="w-full lg:w-[240px] xl:w-[270px] shrink-0">
+                    <div className="flex items-center gap-1.5 flex-wrap mb-1.5">
                       <span className="text-[10px] font-black text-red-300 bg-red-500/15 px-1.5 py-0.5 rounded border border-red-500/30 font-mono">
                         {String(index + 1).padStart(2, '0')}
                       </span>
@@ -520,31 +520,31 @@ export function RotinaDiaria() {
                         sessionStorage.setItem('last_os_id', o.id);
                         navigate(`/ordens/${o.id}`);
                       }}
-                      className="text-sm font-bold text-white hover:text-brand-blue-light cursor-pointer transition-colors"
+                      className="text-sm font-bold text-white hover:text-brand-blue-light cursor-pointer transition-colors break-words"
                     >
                       {o.nomeCliente}
                     </h3>
                   </div>
 
                   {/* 2. Credenciais Rápidas */}
-                  <div className="flex flex-wrap gap-2 items-center min-w-[260px]">
-                    <div className="flex items-center gap-1.5 bg-brand-dark-4 px-2 py-1.5 rounded-lg border border-white/5 flex-1 max-w-[155px]">
+                  <div className="flex flex-row lg:flex-col xl:flex-row gap-2 items-stretch lg:items-start xl:items-center w-full lg:w-[175px] xl:w-[300px] shrink-0">
+                    <div className="flex items-center gap-1.5 bg-brand-dark-4 px-2.5 py-1.5 rounded-lg border border-white/5 flex-1 min-w-0 w-full">
                       <User size={12} className="text-gray-500 shrink-0" />
                       <span className="text-[11px] font-mono text-gray-300 truncate flex-1">{o.cpf}</span>
                       <button
                         onClick={() => copiarParaTransferencia(o.cpf, 'CPF')}
-                        className="p-1 text-brand-blue hover:text-brand-blue-light transition-all"
+                        className="p-1 text-brand-blue hover:text-brand-blue-light transition-all shrink-0"
                         title="Copiar CPF"
                       >
                         <Copy size={12} />
                       </button>
                     </div>
-                    <div className="flex items-center gap-1.5 bg-brand-dark-4 px-2 py-1.5 rounded-lg border border-white/5 flex-1 max-w-[155px]">
+                    <div className="flex items-center gap-1.5 bg-brand-dark-4 px-2.5 py-1.5 rounded-lg border border-white/5 flex-1 min-w-0 w-full">
                       <Key size={12} className="text-gray-500 shrink-0" />
                       <span className="text-[11px] font-mono text-gray-300 truncate flex-1">{o.senhaGov || '---'}</span>
                       <button
                         onClick={() => copiarParaTransferencia(o.senhaGov, 'Senha GOV.br')}
-                        className="p-1 text-brand-blue hover:text-brand-blue-light transition-all"
+                        className="p-1 text-brand-blue hover:text-brand-blue-light transition-all shrink-0"
                         disabled={!o.senhaGov}
                         title="Copiar Senha GOV.br"
                       >
@@ -554,7 +554,7 @@ export function RotinaDiaria() {
                   </div>
 
                   {/* 3. Lista de Serviços Pendentes de Protocolar e Ações Rápidas */}
-                  <div className="flex-[1.8] min-w-[280px] flex flex-col gap-2">
+                  <div className="flex-1 min-w-0 w-full flex flex-col gap-2">
                     {o.servicosPendentes.map(s => {
                       const liberadoPorData =
                         s.statusExecucao === 'Aguardando Etapa / Programado' &&
@@ -564,39 +564,41 @@ export function RotinaDiaria() {
                       return (
                         <div
                           key={s.id}
-                          className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-black/25 p-2.5 rounded-lg border border-white/10"
+                          className="flex flex-col gap-2 bg-black/25 p-2.5 rounded-lg border border-white/10"
                         >
-                          <div className="flex flex-col pr-2 flex-1 min-w-0">
-                            <div className="flex items-center gap-1.5 flex-wrap">
+                          <div className="flex flex-col w-full min-w-0">
+                            <div className="flex items-center justify-between gap-2 flex-wrap">
                               <span className="text-xs font-bold text-white leading-tight">{s.nome}</span>
-                              <span className={`text-[9px] px-1.5 py-0.5 rounded border font-bold ${classeStatusExecucao(s.statusExecucao)}`}>
-                                {iconeStatusExecucao(s.statusExecucao)} {s.statusExecucao}
-                              </span>
-                              {liberadoPorData && (
-                                <span className="text-[9px] px-1.5 py-0.5 rounded bg-red-500/20 text-red-300 border border-red-500/40 font-black">
-                                  📅 Data atingida ({s.dataProgramada?.split('-').reverse().join('/')})
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className={`text-[9px] px-1.5 py-0.5 rounded border font-bold whitespace-nowrap ${classeStatusExecucao(s.statusExecucao)}`}>
+                                  {iconeStatusExecucao(s.statusExecucao)} {s.statusExecucao || 'Não Iniciado'}
                                 </span>
-                              )}
+                                {liberadoPorData && (
+                                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-red-500/20 text-red-300 border border-red-500/40 font-black whitespace-nowrap">
+                                    📅 Data atingida ({s.dataProgramada?.split('-').reverse().join('/')})
+                                  </span>
+                                )}
+                              </div>
                             </div>
                             {s.armaModelo && (
-                              <span className="text-[10px] text-amber-400 font-semibold mt-0.5">
+                              <span className="text-[10px] text-amber-400 font-semibold mt-1 break-words">
                                 ⚔️ {s.armaModelo}
                               </span>
                             )}
                             {s.detalhes && s.detalhes.trim() && (
-                              <span className="text-[10px] text-gray-400 leading-tight mt-0.5 break-words">
-                                Obs: {s.detalhes}
+                              <span className="text-[11px] text-gray-300 leading-snug mt-1 break-words">
+                                <strong className="text-gray-400 font-semibold">Obs:</strong> {s.detalhes}
                               </span>
                             )}
                           </div>
 
                           {/* Ações Rápidas em 1 Clique */}
-                          <div className="flex flex-wrap items-center gap-1.5 shrink-0">
+                          <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-white/5">
                             {s.statusExecucao !== 'Iniciado — Montando Processo' && (
                               <button
                                 type="button"
                                 onClick={() => handleAlterarStatusRapido(o.id, s.id, 'Iniciado — Montando Processo')}
-                                className="px-2 py-1 rounded text-[9px] font-bold bg-blue-500/15 hover:bg-blue-500/30 text-blue-300 border border-blue-500/30 flex items-center gap-1 transition-all"
+                                className="px-2 py-1 rounded text-[9px] font-bold bg-blue-500/15 hover:bg-blue-500/30 text-blue-300 border border-blue-500/30 flex items-center gap-1 transition-all whitespace-nowrap"
                                 title="Marcar como Iniciado — Montando Processo"
                               >
                                 <Hammer size={10} />
@@ -607,7 +609,7 @@ export function RotinaDiaria() {
                               <button
                                 type="button"
                                 onClick={() => handleAlterarStatusRapido(o.id, s.id, 'Aguardando Documentos')}
-                                className="px-2 py-1 rounded text-[9px] font-bold bg-yellow-500/15 hover:bg-yellow-500/30 text-yellow-300 border border-yellow-500/30 flex items-center gap-1 transition-all"
+                                className="px-2 py-1 rounded text-[9px] font-bold bg-yellow-500/15 hover:bg-yellow-500/30 text-yellow-300 border border-yellow-500/30 flex items-center gap-1 transition-all whitespace-nowrap"
                                 title="Marcar como Aguardando Documentos do cliente"
                               >
                                 <FileWarning size={10} />
@@ -627,7 +629,7 @@ export function RotinaDiaria() {
                                 });
                                 setProtocoloInput(s.protocolo || '');
                               }}
-                              className="px-2.5 py-1 rounded text-[9px] font-black uppercase bg-purple-500/20 hover:bg-purple-500 text-purple-200 hover:text-white border border-purple-500/40 flex items-center gap-1 transition-all"
+                              className="px-2.5 py-1 rounded text-[9px] font-black uppercase bg-purple-500/20 hover:bg-purple-500 text-purple-200 hover:text-white border border-purple-500/40 flex items-center gap-1 transition-all whitespace-nowrap"
                               title="Inserir protocolo e mover para Conferir na PF"
                             >
                               <Send size={10} />
@@ -646,7 +648,7 @@ export function RotinaDiaria() {
                                 });
                                 setDataEsperaInput(s.dataProgramada || '');
                               }}
-                              className="px-2 py-1 rounded text-[9px] font-bold bg-indigo-500/15 hover:bg-indigo-500/30 text-indigo-300 border border-indigo-500/30 flex items-center gap-1 transition-all"
+                              className="px-2 py-1 rounded text-[9px] font-bold bg-indigo-500/15 hover:bg-indigo-500/30 text-indigo-300 border border-indigo-500/30 flex items-center gap-1 transition-all whitespace-nowrap"
                               title="Adiar para 1-2 meses ou aguardar etapa anterior da PF"
                             >
                               <PauseCircle size={10} />
@@ -705,16 +707,26 @@ export function RotinaDiaria() {
                   className="card bg-brand-dark-3/50 border-brand-dark-5 hover:border-brand-blue/30 transition-all p-3 flex flex-col lg:flex-row lg:items-center justify-between gap-4 group animate-scale-up"
                 >
                   {/* 1. O.S. Info & Cliente */}
-                  <div className="flex-1 min-w-[200px]">
-                    <div className="flex items-center gap-2 flex-wrap mb-1">
-                      <span className="text-[10px] font-black text-brand-blue-light bg-brand-blue/10 px-1.5 py-0.5 rounded border border-brand-blue/20 font-mono">
+                  <div className="w-full lg:w-[240px] xl:w-[270px] shrink-0">
+                    <div className="flex items-center gap-1.5 flex-wrap mb-1.5">
+                      <span className="text-[10px] font-black text-purple-300 bg-purple-500/15 px-1.5 py-0.5 rounded border border-purple-500/30 font-mono">
                         {String(index + 1).padStart(2, '0')}
                       </span>
-                      <p className="text-[10px] font-bold text-gray-500 uppercase tracking-tighter">
-                        #{formatarNumeroOS(o.numero)}
-                      </p>
-                      <span className="text-[10px] text-gray-500 font-mono">
-                        • Aberta em {formatarData(o.criadoEm)}
+                      <span className="text-xs font-black text-white">
+                        {formatarNumeroOS(o.numero)}
+                      </span>
+                      {o.status === 'Pago' ? (
+                        <span className="text-[10px] bg-brand-green/20 text-brand-green-light border border-brand-green/40 px-2 py-0.5 rounded-full font-black uppercase tracking-wider">
+                          💰 JÁ PAGO
+                        </span>
+                      ) : (
+                        <span className="text-[10px] bg-yellow-500/15 text-yellow-300 border border-yellow-500/30 px-2 py-0.5 rounded-full font-bold uppercase">
+                          {o.status}
+                        </span>
+                      )}
+                      <span className="text-[10px] bg-brand-dark-4 text-gray-400 px-1.5 py-0.5 rounded font-bold flex items-center gap-1">
+                        <Clock size={10} />
+                        Aberta em {formatarData(o.criadoEm)}
                       </span>
                       {o.filiadoProTiro && (
                         <span className="text-[9px] bg-brand-blue/20 text-brand-blue-light px-1.5 py-0.5 rounded font-black uppercase">
@@ -727,31 +739,31 @@ export function RotinaDiaria() {
                         sessionStorage.setItem('last_os_id', o.id);
                         navigate(`/ordens/${o.id}`);
                       }}
-                      className="text-sm font-bold text-white hover:text-brand-blue-light cursor-pointer transition-colors"
+                      className="text-sm font-bold text-white hover:text-brand-blue-light cursor-pointer transition-colors break-words"
                     >
                       {o.nomeCliente}
                     </h3>
                   </div>
 
-                  {/* 2. Credenciais */}
-                  <div className="flex flex-wrap gap-2 items-center min-w-[280px]">
-                    <div className="flex items-center gap-1.5 bg-brand-dark-4 px-2 py-1.5 rounded-lg border border-white/5 flex-1 max-w-[160px]">
+                  {/* 2. Credenciais Rápidas */}
+                  <div className="flex flex-row lg:flex-col xl:flex-row gap-2 items-stretch lg:items-start xl:items-center w-full lg:w-[175px] xl:w-[300px] shrink-0">
+                    <div className="flex items-center gap-1.5 bg-brand-dark-4 px-2.5 py-1.5 rounded-lg border border-white/5 flex-1 min-w-0 w-full">
                       <User size={12} className="text-gray-500 shrink-0" />
                       <span className="text-[11px] font-mono text-gray-300 truncate flex-1">{o.cpf}</span>
                       <button 
                         onClick={() => copiarParaTransferencia(o.cpf, 'CPF')}
-                        className="p-1 text-brand-blue hover:text-brand-blue-light transition-all"
+                        className="p-1 text-brand-blue hover:text-brand-blue-light transition-all shrink-0"
                         title="Copiar CPF"
                       >
                         <Copy size={12} />
                       </button>
                     </div>
-                    <div className="flex items-center gap-1.5 bg-brand-dark-4 px-2 py-1.5 rounded-lg border border-white/5 flex-1 max-w-[160px]">
+                    <div className="flex items-center gap-1.5 bg-brand-dark-4 px-2.5 py-1.5 rounded-lg border border-white/5 flex-1 min-w-0 w-full">
                       <Key size={12} className="text-gray-500 shrink-0" />
                       <span className="text-[11px] font-mono text-gray-300 truncate flex-1">{o.senhaGov || '---'}</span>
                       <button 
                         onClick={() => copiarParaTransferencia(o.senhaGov, 'Senha GOV.br')}
-                        className="p-1 text-brand-blue hover:text-brand-blue-light transition-all"
+                        className="p-1 text-brand-blue hover:text-brand-blue-light transition-all shrink-0"
                         disabled={!o.senhaGov}
                         title="Copiar Senha"
                       >
@@ -761,27 +773,38 @@ export function RotinaDiaria() {
                   </div>
 
                   {/* 3. Lista de Serviços Protocolados e botões de Concluir */}
-                  <div className="flex-[1.5] min-w-[250px] flex flex-col gap-1.5">
+                  <div className="flex-1 min-w-0 w-full flex flex-col gap-2">
                     {o.servicosProtocolados.map(s => (
-                      <div key={s.id} className="flex items-center justify-between gap-3 bg-black/20 p-2 rounded-lg border border-white/5 hover:border-white/10 transition-colors">
-                        <div className="flex flex-col overflow-hidden pr-2 flex-1">
-                          <span className="text-[10px] font-bold text-white leading-tight">{s.nome}</span>
-                          {s.protocolo && (
-                            <span className="text-[9px] text-brand-blue-light font-mono mt-0.5">Prot: {s.protocolo}</span>
+                      <div key={s.id} className="flex flex-col gap-2 bg-black/25 p-2.5 rounded-lg border border-white/10 hover:border-white/15 transition-colors">
+                        <div className="flex flex-col w-full min-w-0">
+                          <div className="flex items-center justify-between gap-2 flex-wrap">
+                            <span className="text-xs font-bold text-white leading-tight">{s.nome}</span>
+                            {s.protocolo && (
+                              <span className="text-[10px] px-2 py-0.5 rounded bg-purple-500/20 text-purple-200 border border-purple-500/30 font-mono font-bold whitespace-nowrap">
+                                📤 Prot: {s.protocolo}
+                              </span>
+                            )}
+                          </div>
+                          {s.armaModelo && (
+                            <span className="text-[10px] text-amber-400 font-semibold mt-1 break-words">
+                              ⚔️ {s.armaModelo}
+                            </span>
                           )}
                           {s.detalhes && s.detalhes.trim() && (
-                            <span className="text-[9px] text-gray-400 font-sans leading-tight mt-0.5 break-words">
-                              Obs: {s.detalhes}
+                            <span className="text-[11px] text-gray-300 leading-snug mt-1 break-words">
+                              <strong className="text-gray-400 font-semibold">Obs:</strong> {s.detalhes}
                             </span>
                           )}
                         </div>
-                        <button 
-                          onClick={() => handleConcluirServico(o.id, s.id)}
-                          className="flex items-center gap-1 px-2.5 py-1 bg-brand-blue/10 hover:bg-brand-blue text-brand-blue-light hover:text-white text-[9px] font-black uppercase rounded border border-brand-blue/30 transition-all shrink-0"
-                        >
-                          <CheckCircle size={10} />
-                          Concluir
-                        </button>
+                        <div className="flex items-center justify-end gap-1.5 pt-1 border-t border-white/5">
+                          <button 
+                            onClick={() => handleConcluirServico(o.id, s.id)}
+                            className="flex items-center gap-1 px-2.5 py-1 bg-brand-blue/15 hover:bg-brand-blue text-brand-blue-light hover:text-white text-[9px] font-black uppercase rounded border border-brand-blue/30 transition-all whitespace-nowrap"
+                          >
+                            <CheckCircle size={10} />
+                            Concluir
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -834,62 +857,104 @@ export function RotinaDiaria() {
                   className="card bg-brand-dark-3/50 border-indigo-500/25 hover:border-indigo-500/50 transition-all p-3.5 flex flex-col lg:flex-row lg:items-center justify-between gap-4 animate-scale-up"
                 >
                   {/* 1. O.S. Info & Cliente */}
-                  <div className="flex-1 min-w-[200px]">
-                    <div className="flex items-center gap-2 flex-wrap mb-1">
+                  <div className="w-full lg:w-[240px] xl:w-[270px] shrink-0">
+                    <div className="flex items-center gap-1.5 flex-wrap mb-1.5">
                       <span className="text-[10px] font-black text-indigo-300 bg-indigo-500/15 px-1.5 py-0.5 rounded border border-indigo-500/30 font-mono">
                         {String(index + 1).padStart(2, '0')}
                       </span>
                       <span className="text-xs font-black text-white">
                         {formatarNumeroOS(o.numero)}
                       </span>
-                      {o.status === 'Pago' && (
-                        <span className="text-[10px] bg-brand-green/20 text-brand-green-light border border-brand-green/40 px-2 py-0.5 rounded-full font-black uppercase">
+                      {o.status === 'Pago' ? (
+                        <span className="text-[10px] bg-brand-green/20 text-brand-green-light border border-brand-green/40 px-2 py-0.5 rounded-full font-black uppercase tracking-wider">
                           💰 JÁ PAGO
                         </span>
+                      ) : (
+                        <span className="text-[10px] bg-yellow-500/15 text-yellow-300 border border-yellow-500/30 px-2 py-0.5 rounded-full font-bold uppercase">
+                          {o.status}
+                        </span>
                       )}
-                      <span className="text-[10px] text-gray-500 font-mono">
-                        • Aberta em {formatarData(o.criadoEm)}
+                      <span className="text-[10px] bg-brand-dark-4 text-gray-400 px-1.5 py-0.5 rounded font-bold flex items-center gap-1">
+                        <Clock size={10} />
+                        Aberta em {formatarData(o.criadoEm)}
                       </span>
+                      {o.filiadoProTiro && (
+                        <span className="text-[9px] bg-brand-blue/20 text-brand-blue-light px-1.5 py-0.5 rounded font-black uppercase">
+                          Filiado
+                        </span>
+                      )}
                     </div>
                     <h3
                       onClick={() => {
                         sessionStorage.setItem('last_os_id', o.id);
                         navigate(`/ordens/${o.id}`);
                       }}
-                      className="text-sm font-bold text-white hover:text-indigo-300 cursor-pointer transition-colors"
+                      className="text-sm font-bold text-white hover:text-indigo-300 cursor-pointer transition-colors break-words"
                     >
                       {o.nomeCliente}
                     </h3>
                   </div>
 
-                  {/* 2. Lista de Serviços em Espera */}
-                  <div className="flex-[2] min-w-[280px] flex flex-col gap-2">
+                  {/* 2. Credenciais Rápidas */}
+                  <div className="flex flex-row lg:flex-col xl:flex-row gap-2 items-stretch lg:items-start xl:items-center w-full lg:w-[175px] xl:w-[300px] shrink-0">
+                    <div className="flex items-center gap-1.5 bg-brand-dark-4 px-2.5 py-1.5 rounded-lg border border-white/5 flex-1 min-w-0 w-full">
+                      <User size={12} className="text-gray-500 shrink-0" />
+                      <span className="text-[11px] font-mono text-gray-300 truncate flex-1">{o.cpf}</span>
+                      <button
+                        onClick={() => copiarParaTransferencia(o.cpf, 'CPF')}
+                        className="p-1 text-brand-blue hover:text-brand-blue-light transition-all shrink-0"
+                        title="Copiar CPF"
+                      >
+                        <Copy size={12} />
+                      </button>
+                    </div>
+                    <div className="flex items-center gap-1.5 bg-brand-dark-4 px-2.5 py-1.5 rounded-lg border border-white/5 flex-1 min-w-0 w-full">
+                      <Key size={12} className="text-gray-500 shrink-0" />
+                      <span className="text-[11px] font-mono text-gray-300 truncate flex-1">{o.senhaGov || '---'}</span>
+                      <button
+                        onClick={() => copiarParaTransferencia(o.senhaGov, 'Senha GOV.br')}
+                        className="p-1 text-brand-blue hover:text-brand-blue-light transition-all shrink-0"
+                        disabled={!o.senhaGov}
+                        title="Copiar Senha GOV.br"
+                      >
+                        <Copy size={12} />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* 3. Lista de Serviços em Espera */}
+                  <div className="flex-1 min-w-0 w-full flex flex-col gap-2">
                     {o.servicosEmEspera.map(s => (
                       <div
                         key={s.id}
-                        className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-indigo-950/20 p-2.5 rounded-lg border border-indigo-500/20"
+                        className="flex flex-col gap-2 bg-indigo-950/20 p-2.5 rounded-lg border border-indigo-500/20"
                       >
-                        <div className="flex flex-col pr-2 flex-1">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-xs font-bold text-white">{s.nome}</span>
+                        <div className="flex flex-col w-full min-w-0">
+                          <div className="flex items-center justify-between gap-2 flex-wrap">
+                            <span className="text-xs font-bold text-white leading-tight">{s.nome}</span>
                             {s.dataProgramada ? (
-                              <span className="text-[10px] px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-200 border border-indigo-500/30 font-bold">
+                              <span className="text-[10px] px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-200 border border-indigo-500/30 font-bold whitespace-nowrap">
                                 📅 Programado p/ {s.dataProgramada.split('-').reverse().join('/')}
                               </span>
                             ) : (
-                              <span className="text-[10px] px-2 py-0.5 rounded bg-indigo-500/15 text-indigo-300 border border-indigo-500/25 font-bold">
+                              <span className="text-[10px] px-2 py-0.5 rounded bg-indigo-500/15 text-indigo-300 border border-indigo-500/25 font-bold whitespace-nowrap">
                                 🔗 Aguardando liberação da etapa anterior ({s.etapaOrigemNome || 'PF'})
                               </span>
                             )}
                           </div>
                           {s.armaModelo && (
-                            <span className="text-[10px] text-amber-400 font-semibold mt-0.5">
+                            <span className="text-[10px] text-amber-400 font-semibold mt-1 break-words">
                               ⚔️ {s.armaModelo}
+                            </span>
+                          )}
+                          {s.detalhes && s.detalhes.trim() && (
+                            <span className="text-[11px] text-gray-300 leading-snug mt-1 break-words">
+                              <strong className="text-gray-400 font-semibold">Obs:</strong> {s.detalhes}
                             </span>
                           )}
                         </div>
 
-                        <div className="flex items-center gap-1.5 shrink-0">
+                        <div className="flex flex-wrap items-center justify-end gap-1.5 pt-1 border-t border-indigo-500/15">
                           <button
                             type="button"
                             onClick={() => {
@@ -903,14 +968,14 @@ export function RotinaDiaria() {
                               });
                               setDataEsperaInput(s.dataProgramada || '');
                             }}
-                            className="px-2 py-1 rounded text-[10px] font-bold bg-brand-dark-4 hover:bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 transition-all"
+                            className="px-2 py-1 rounded text-[10px] font-bold bg-brand-dark-4 hover:bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 transition-all whitespace-nowrap"
                           >
                             📅 Data
                           </button>
                           <button
                             type="button"
                             onClick={() => handleAlterarStatusRapido(o.id, s.id, 'Não Iniciado')}
-                            className="px-2.5 py-1 rounded text-[10px] font-black uppercase bg-indigo-500 hover:bg-indigo-400 text-white flex items-center gap-1 transition-all"
+                            className="px-2.5 py-1 rounded text-[10px] font-black uppercase bg-indigo-500 hover:bg-indigo-400 text-white flex items-center gap-1 transition-all whitespace-nowrap"
                             title="Tirar da espera e jogar para a Fila de Protocolar agora"
                           >
                             <Zap size={11} />
