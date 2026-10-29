@@ -1,11 +1,18 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FileText, Clock, CheckCircle, Gift, Plus, ChevronRight, Loader, Receipt, XCircle, TrendingDown, AlertCircle } from 'lucide-react';
+import { FileText, Clock, CheckCircle, Plus, ChevronRight, Loader, Receipt, XCircle, AlertCircle } from 'lucide-react';
 import { useOrdens } from '../../context/OrdensContext';
 import { useOrcamentos } from '../../context/OrcamentosContext';
 import { StatusExecucaoServico, STATUS_EXECUCAO_SERVICO } from '../../types';
 import { isSameMonth, parseISO } from 'date-fns';
-import { formatarMoeda, formatarData, formatarNumeroOS, classeStatus, classeStatusOrcamento, classeStatusExecucao, iconeStatusExecucao } from '../../utils/formatters';
+import {
+  formatarMoeda,
+  formatarData,
+  classeStatus,
+  iconeStatusExecucao,
+  isServicoPendenteProtocolar,
+  obterStatusOperacionalOS
+} from '../../utils/formatters';
 import { useAuth } from '../../context/AuthContext';
 import { useStatusConexao } from '../../hooks/useStatusConexao';
 import { useFinanceiro } from '../../context/FinanceiroContext';
@@ -87,12 +94,9 @@ export function Dashboard() {
   const podeVerFaturamento = ehAdmin || usuario?.permissoes?.includes('fat_geral');
 
   const stats = {
-    // Contagens Globais (Mês Atual)
     total:       ordensCriadasMes.length,
     pendente:    ordensCriadasMes.filter(o => o.status === 'Aguardando Pagamento').length,
     pagas:       ordensCriadasMes.filter(o => o.status === 'Pago' || o.status === 'Gratuidade').length,
-
-    // Financeiro Bruto e Líquido Real (Mês Atual - Regime de Caixa)
     receita:     receitaRealMes,
     taxas:       taxasMes,
     receitaPendente,
@@ -101,9 +105,11 @@ export function Dashboard() {
   const margemServicos = stats.receita - stats.taxas;
   const lucroLiquido = margemServicos - valorDespesas;
 
-  // Alertas de Rotina
+  // Alertas de Rotina (Fila para Protocolar + Conferência na PF)
+  const totalPendenteProtocolar = ordens.filter(o => o.servicos?.some(s => isServicoPendenteProtocolar(s))).length;
+  const totalPagosNaoProtocolados = ordens.filter(o => o.status === 'Pago' && o.servicos?.some(s => isServicoPendenteProtocolar(s))).length;
   const totalPF = ordens.filter(o => o.servicos?.some(s => s.statusExecucao === 'Protocolado — Ag. PF')).length;
-  const possuiAlertas = totalPF > 0;
+  const possuiAlertas = totalPendenteProtocolar > 0 || totalPF > 0;
 
   const orcStats = {
     total:       orcamentos.length,
@@ -112,15 +118,12 @@ export function Dashboard() {
     recusado:    orcamentos.filter((o: any) => o.status === 'Recusado').length,
   };
 
-  // Estatísticas de Execução (Operacional)
   // Estatísticas de Execução (Operacional - Total de serviços ativos no banco)
   const todosServicos = ordens.flatMap((o: any) => o.servicos || []);
   const operStats = STATUS_EXECUCAO_SERVICO.reduce((acc, status) => {
     acc[status] = todosServicos.filter((s: any) => (s.statusExecucao || 'Não Iniciado') === status).length;
     return acc;
   }, {} as Record<StatusExecucaoServico, number>);
- 
-  const servicosNaoIniciados = operStats['Não Iniciado'];
  
   const recentes = [...ordensCriadasMes].slice(0, 5);
 
@@ -150,6 +153,7 @@ export function Dashboard() {
           )}
         </div>
       </div>
+
       {/* ── Widget de Atenção (Rotina Diária) ── */}
       {temAcessoRecurso('dash_atencao_diaria') && possuiAlertas && (
         <div 
@@ -157,24 +161,34 @@ export function Dashboard() {
           className="bg-brand-blue/10 border border-brand-blue/30 rounded-2xl p-4 flex items-center justify-between cursor-pointer group hover:bg-brand-blue/20 transition-all shadow-[0_0_15px_rgba(45,141,224,0.1)]"
         >
           <div className="flex items-center gap-4">
-            <div className="w-10 h-10 rounded-xl bg-brand-blue/20 flex items-center justify-center text-brand-blue-light animate-pulse">
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center animate-pulse ${
+              totalPendenteProtocolar > 0 ? 'bg-red-500/20 text-red-400' : 'bg-brand-blue/20 text-brand-blue-light'
+            }`}>
               <AlertCircle size={24} />
             </div>
             <div>
-              <h3 className="font-bold text-white text-sm">Resumo de Atenção Diária</h3>
-              <div className="flex gap-4 mt-0.5">
-                {totalPF > 0 && (
-                  <span className="text-[10px] font-bold text-gray-400 flex items-center gap-1">
-                    <div className="w-1 h-1 bg-brand-blue rounded-full" />
-                    {totalPF} processos aguardando conferência na PF
+              <h3 className="font-bold text-white text-sm">Central de Atenção Diária</h3>
+              <div className="flex flex-wrap gap-3 mt-1">
+                {totalPendenteProtocolar > 0 && (
+                  <span className="text-[11px] font-bold text-red-300 flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 bg-red-400 rounded-full" />
+                    {totalPendenteProtocolar} O.S. com itens pendentes de protocolar
+                    {totalPagosNaoProtocolados > 0 && (
+                      <strong className="text-brand-green-light">({totalPagosNaoProtocolados} já pagas)</strong>
+                    )}
                   </span>
                 )}
-
+                {totalPF > 0 && (
+                  <span className="text-[11px] font-bold text-purple-300 flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 bg-purple-400 rounded-full" />
+                    {totalPF} O.S. aguardando conferência na PF
+                  </span>
+                )}
               </div>
             </div>
           </div>
           <div className="flex items-center gap-2 text-brand-blue-light font-bold text-[10px] uppercase tracking-widest group-hover:translate-x-1 transition-transform">
-            Ver Rotina
+            Abrir Central
             <ChevronRight size={14} />
           </div>
         </div>
@@ -230,7 +244,6 @@ export function Dashboard() {
           <div className="absolute top-0 right-0 w-32 h-32 bg-brand-green/5 rounded-full blur-3xl -mr-16 -mt-16" />
           
           <div className="flex flex-col md:flex-row items-stretch gap-6 relative z-10">
-            {/* Margem Operacional - Principal */}
             <div className="flex-1">
               <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Margem Operacional (Lucro Bruto)</p>
               <div className="flex items-baseline gap-2">
@@ -244,7 +257,6 @@ export function Dashboard() {
 
             <div className="hidden md:block w-px bg-brand-dark-5" />
 
-            {/* Lucro Líquido e Breakdown */}
             <div className="grid grid-cols-2 md:block gap-4 md:space-y-4 min-w-[220px]">
               <div>
                 <p className="text-[10px] font-bold text-brand-blue uppercase tracking-wider">Lucro Líquido Real</p>
@@ -281,7 +293,7 @@ export function Dashboard() {
             <span className="text-xs text-brand-metal font-medium uppercase tracking-wider">Status de Execução</span>
           </div>
           
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
             {STATUS_EXECUCAO_SERVICO.map(status => (
               <div 
                 key={status} 
@@ -295,6 +307,7 @@ export function Dashboard() {
                 <p className="text-[10px] font-bold text-gray-500 uppercase truncate" title={status}>
                   {status === 'Iniciado — Montando Processo' ? 'Iniciado' : 
                    status === 'Protocolado — Ag. PF' ? 'Protocolado' : 
+                   status === 'Aguardando Etapa / Programado' ? 'Em Espera' :
                    status === 'Cancelado / Não Executado' ? 'Cancelados' : status}
                 </p>
                 <div className="w-full h-1 bg-brand-dark-5 rounded-full mt-1 overflow-hidden">
@@ -302,6 +315,7 @@ export function Dashboard() {
                     className={`h-full opacity-50 ${
                       status === 'Concluído' ? 'bg-brand-green' : 
                       status === 'Cancelado / Não Executado' ? 'bg-red-500' :
+                      status === 'Aguardando Etapa / Programado' ? 'bg-indigo-400' :
                       status === 'Não Iniciado' ? 'bg-gray-500' :
                       'bg-brand-blue'
                     }`}
@@ -381,7 +395,9 @@ export function Dashboard() {
             </div>
           ) : (
             <div className="space-y-2">
-              {recentes.map(ordem => (
+              {recentes.map(ordem => {
+                const stOp = obterStatusOperacionalOS(ordem);
+                return (
                 <div
                   key={ordem.id}
                   onClick={() => navigate(`/ordens/${ordem.id}`)}
@@ -396,7 +412,12 @@ export function Dashboard() {
                   </div>
                   <div className="w-px h-8 bg-brand-dark-5 flex-shrink-0" />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-white">{ordem.nomeCliente}</p>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="text-sm font-semibold text-white">{ordem.nomeCliente}</p>
+                      <span className={`px-1.5 py-0.5 rounded text-[9px] font-black border uppercase ${stOp.classe}`}>
+                        {stOp.icone} {stOp.rotuloCurto}
+                      </span>
+                    </div>
                     <p className="text-xs text-gray-400">{formatarData(ordem.criadoEm)}</p>
                   </div>
                   <div className="flex-shrink-0 flex items-center gap-2">
@@ -407,7 +428,8 @@ export function Dashboard() {
                     <ChevronRight size={14} className="text-gray-600" />
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

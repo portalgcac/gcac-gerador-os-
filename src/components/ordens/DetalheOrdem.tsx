@@ -1,6 +1,10 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Edit, Trash2, FileDown, Printer, Cloud, CloudOff, CheckCircle, MessageCircle, Users, Phone, Mail, HelpCircle, ChevronDown, List, ShieldCheck, History, Clock, CreditCard, FileText, RefreshCw } from 'lucide-react';
+import {
+  ArrowLeft, Edit, Trash2, FileDown, Printer, Cloud, CloudOff, CheckCircle,
+  MessageCircle, Users, Phone, Mail, HelpCircle, ChevronDown, List, ShieldCheck,
+  History, Clock, CreditCard, RefreshCw, CalendarClock, Zap
+} from 'lucide-react';
 import { 
   OrdemDeServico, CanalAtendimento, STATUS_EXECUCAO_SERVICO, 
   StatusExecucaoServico, StatusOS, FormaPagamento, STATUS_OS, FORMAS_PAGAMENTO, Arma 
@@ -13,7 +17,20 @@ import { DialogConfirmacao } from '../common/DialogConfirmacao';
 import { Notificacao, useNotificacao } from '../common/Notificacao';
 import { useClientes } from '../../context/ClientesContext';
 import { ModalArma } from '../clientes/AbaDocumentacao';
-import { formatarMoeda, formatarData, formatarDataHora, formatarNumeroOS, classeStatus, classeStatusExecucao, iconeStatusExecucao, calcularProgressoServicos, removerAcentos } from '../../utils/formatters';
+import {
+  formatarMoeda,
+  formatarData,
+  formatarDataHora,
+  formatarNumeroOS,
+  classeStatus,
+  classeStatusExecucao,
+  iconeStatusExecucao,
+  calcularProgressoServicos,
+  removerAcentos,
+  obterStatusOperacionalOS,
+  ehServicoTransferenciaAcervo,
+  isServicoProgramadoLiberado
+} from '../../utils/formatters';
 import { ModalEscolhaWhatsApp } from '../common/ModalEscolhaWhatsApp';
 import { Modal } from '../common/Modal';
 import { visualizarDocumentoBase64, fileToBase64, uploadBase64File } from '../../utils/fileUtils';
@@ -26,7 +43,7 @@ interface DetalheOrdemProps {
 export function DetalheOrdem({ ordem }: DetalheOrdemProps) {
   const navigate = useNavigate();
   const { 
-    deletarOrdem, atualizarStatusServico, atualizarOrdem, 
+    deletarOrdem, atualizarStatusServico, atualizarDadosServico, atualizarOrdem, 
     atualizarGruServico, registrarPagamento, removerPagamento,
     sincronizarComPerfil, sincronizarOrdem
   } = useOrdens();
@@ -51,7 +68,7 @@ export function DetalheOrdem({ ordem }: DetalheOrdemProps) {
   const [novoProtocolo, setNovoProtocolo] = useState('');
 
   const [modalConclusaoAberto, setModalConclusaoAberto] = useState(false);
-  const [servicoConclusao, setServicoConclusao] = useState<{ id: string; nome: string; exigeGt: boolean; exigeCraf: boolean } | null>(null);
+  const [servicoConclusao, setServicoConclusao] = useState<{ id: string; nome: string; exigeGt: boolean; exigeCraf: boolean; isTransfAcervo: boolean } | null>(null);
   const [conclusaoArquivo, setConclusaoArquivo] = useState<string | null>(null);
   const [salvarNoPerfilCac, setSalvarNoPerfilCac] = useState(false);
   const [vencimentoGt, setVencimentoGt] = useState('');
@@ -176,6 +193,7 @@ export function DetalheOrdem({ ordem }: DetalheOrdemProps) {
   const totalServicos = servicos.length;
   const servicosConcluidos = servicos.filter(s => s.statusExecucao === 'Concluído').length;
   const progresso = calcularProgressoServicos(servicos);
+  const statusOperacionalOS = obterStatusOperacionalOS(ordem);
 
   const handleBaixarPdf = async () => {
     setGerandoPdf(true);
@@ -278,7 +296,7 @@ export function DetalheOrdem({ ordem }: DetalheOrdemProps) {
       msg += `Seguem os detalhes da sua O.S.:\n\n`;
       
       servicos.forEach(s => {
-        const icon = s.statusExecucao === 'Concluído' ? '✅' : s.statusExecucao === 'Cancelado / Não Executado' ? '❌' : '🔹';
+        const icon = s.statusExecucao === 'Concluído' ? '✅' : s.statusExecucao === 'Cancelado / Não Executado' ? '❌' : s.statusExecucao === 'Aguardando Etapa / Programado' ? '⏸️' : '🔹';
         msg += `${icon} *${s.nome}*\n`;
         msg += `   Valor: _${formatarMoeda(s.valor || 0)}_\n`;
         
@@ -335,6 +353,7 @@ export function DetalheOrdem({ ordem }: DetalheOrdemProps) {
       const serv = ordem.servicos.find(s => s.id === servicoId);
       const isGuia = serv?.nome.toUpperCase().includes('GUIA') || serv?.nome.toUpperCase().includes('GT');
       const isCraf = serv?.nome.toUpperCase().includes('CRAF') || serv?.nome.toUpperCase().includes('REGISTRO');
+      const isTransfAcervo = ehServicoTransferenciaAcervo(serv?.nome || '');
       
       let defaultTipo: 'Treino' | 'Caça' | 'Manutenção' | 'Transferência' | 'Outro' = 'Treino';
       if (serv?.gtTipo) {
@@ -350,10 +369,11 @@ export function DetalheOrdem({ ordem }: DetalheOrdemProps) {
         id: servicoId,
         nome: serv?.nome || '',
         exigeGt: !!isGuia,
-        exigeCraf: !!isCraf
+        exigeCraf: !!isCraf,
+        isTransfAcervo
       });
       setConclusaoArquivo(null);
-      setSalvarNoPerfilCac(false);
+      setSalvarNoPerfilCac(isTransfAcervo ? true : false);
       setVencimentoGt('');
       setVencimentoCraf('');
       setDestinoGt('');
@@ -369,6 +389,22 @@ export function DetalheOrdem({ ordem }: DetalheOrdemProps) {
     } catch {
       mostrar('erro', 'Erro ao atualizar o status do serviço.');
     }
+  };
+
+  const handleDefinirDataProgramada = async (servicoId: string, dataProgramada?: string) => {
+    try {
+      await atualizarDadosServico(ordem.id, servicoId, { dataProgramada });
+      mostrar('sucesso', dataProgramada ? `Serviço agendado para ${dataProgramada.split('-').reverse().join('/')}!` : 'Configurado para aguardar liberação da etapa anterior.');
+    } catch {
+      mostrar('erro', 'Erro ao atualizar agendamento do serviço.');
+    }
+  };
+
+  const handleProgramarDias = async (servicoId: string, dias: number) => {
+    const dt = new Date();
+    dt.setDate(dt.getDate() + dias);
+    const iso = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+    await handleDefinirDataProgramada(servicoId, iso);
   };
 
   const confirmarProtocolo = async () => {
@@ -446,26 +482,24 @@ export function DetalheOrdem({ ordem }: DetalheOrdemProps) {
 
       const serv = ordem.servicos.find(s => s.id === servicoConclusao.id);
       
-      // Obter armaId e armaModelo a serem associados ao serviço
-      let targetArmaId = serv?.armaId;
+      let targetArmaId = armaSelecionadaId || serv?.armaId;
       let targetArmaModelo = serv?.armaModelo;
       
-      if ((servicoConclusao.exigeGt || servicoConclusao.exigeCraf) && salvarNoPerfilCac && armaSelecionadaId) {
-        targetArmaId = armaSelecionadaId;
-        const arma = armasCliente.find(a => a.id === armaSelecionadaId);
+      if (targetArmaId) {
+        const arma = armasCliente.find(a => a.id === targetArmaId);
         if (arma) {
           targetArmaModelo = `${arma.fabricante} ${arma.modelo} (${arma.calibre})`;
         }
       }
 
-      await atualizarStatusServico(
+      const resultado = await atualizarStatusServico(
         ordem.id, 
         servicoConclusao.id, 
         'Concluído', 
         undefined, 
         finalFileUrl,
-        (servicoConclusao.exigeGt || servicoConclusao.exigeCraf) && salvarNoPerfilCac ? targetArmaId : undefined,
-        (servicoConclusao.exigeGt || servicoConclusao.exigeCraf) && salvarNoPerfilCac ? targetArmaModelo : undefined
+        targetArmaId || undefined,
+        targetArmaModelo || undefined
       );
 
       if (servicoConclusao.exigeGt && salvarNoPerfilCac && targetArmaId) {
@@ -489,9 +523,29 @@ export function DetalheOrdem({ ordem }: DetalheOrdemProps) {
         }
       }
 
+      // Automação de Transferência entre Acervos: atualiza acervo da arma no perfil do cliente automaticamente
+      if (servicoConclusao.isTransfAcervo && targetArmaId && clienteDaOS) {
+        const arma = armasCliente.find(a => a.id === targetArmaId);
+        if (arma) {
+          const novoAcervo = serv?.acervoDestino || 'Caça';
+          await salvarArma({
+            ...arma,
+            acervo: novoAcervo
+          }, clienteDaOS.empresaId);
+        }
+      }
+
       setModalConclusaoAberto(false);
       setServicoConclusao(null);
-      mostrar('sucesso', 'Serviço concluído com sucesso!');
+
+      if (resultado && resultado.etapaDesbloqueada) {
+        mostrar(
+          'sucesso',
+          `✅ Serviço concluído! ⚡ Efeito Dominó: A etapa "${resultado.etapaDesbloqueada}" foi liberada automaticamente para a Fila de Protocolar!`
+        );
+      } else {
+        mostrar('sucesso', 'Serviço concluído com sucesso!');
+      }
     } catch (err: any) {
       console.error(err);
       mostrar('erro', 'Erro ao concluir o serviço: ' + (err.message || ''));
@@ -551,7 +605,7 @@ export function DetalheOrdem({ ordem }: DetalheOrdemProps) {
             </button>
           )}
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <h1 className="text-xl font-bold text-white">{formatarNumeroOS(ordem.numero)}</h1>
               {ordem.migrado && (
                 <span className="text-[10px] font-black text-brand-blue-light border border-brand-blue/30 px-2 py-0.5 rounded-md uppercase tracking-wider bg-brand-blue/5">Histórico</span>
@@ -561,33 +615,44 @@ export function DetalheOrdem({ ordem }: DetalheOrdemProps) {
           </div>
         </div>
         
-        {/* Dropdown Status de Pagamento */}
-        <div className="relative">
-          <button 
-            onClick={() => setDropdownPagoAberto(!dropdownPagoAberto)}
-            className={`${classeStatus(ordem.status)} cursor-pointer flex items-center gap-2 hover:brightness-110 transition-all`}
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Status Geral Operacional da O.S. (Automático) */}
+          <div
+            className={`px-3 py-1.5 rounded-full text-xs font-black border flex items-center gap-1.5 ${statusOperacionalOS.classe}`}
+            title={statusOperacionalOS.resumo}
           >
-            {ordem.status}
-            <ChevronDown size={14} className={`transition-transform ${dropdownPagoAberto ? 'rotate-180' : ''}`} />
-          </button>
+            <span>{statusOperacionalOS.icone}</span>
+            <span>{statusOperacionalOS.rotuloCurto}</span>
+          </div>
 
-          {dropdownPagoAberto && (
-            <div className="absolute right-0 top-full mt-1 z-30 w-48 bg-brand-dark-2 border border-brand-dark-5 rounded-xl shadow-2xl overflow-hidden py-1 animate-scale-up">
-              {STATUS_OS.map(s => (
-                <button
-                  key={s}
-                  onClick={() => handleMudarStatusOS(s)}
-                  className={`w-full text-left px-4 py-2.5 text-sm font-semibold transition-colors ${
-                    ordem.status === s 
-                      ? 'bg-brand-blue/20 text-brand-blue-light' 
-                      : 'text-gray-400 hover:bg-brand-dark-5 hover:text-white'
-                  }`}
-                >
-                  {s}
-                </button>
-              ))}
-            </div>
-          )}
+          {/* Dropdown Status de Pagamento */}
+          <div className="relative">
+            <button 
+              onClick={() => setDropdownPagoAberto(!dropdownPagoAberto)}
+              className={`${classeStatus(ordem.status)} cursor-pointer flex items-center gap-2 hover:brightness-110 transition-all`}
+            >
+              {ordem.status}
+              <ChevronDown size={14} className={`transition-transform ${dropdownPagoAberto ? 'rotate-180' : ''}`} />
+            </button>
+
+            {dropdownPagoAberto && (
+              <div className="absolute right-0 top-full mt-1 z-30 w-48 bg-brand-dark-2 border border-brand-dark-5 rounded-xl shadow-2xl overflow-hidden py-1 animate-scale-up">
+                {STATUS_OS.map(s => (
+                  <button
+                    key={s}
+                    onClick={() => handleMudarStatusOS(s)}
+                    className={`w-full text-left px-4 py-2.5 text-sm font-semibold transition-colors ${
+                      ordem.status === s 
+                        ? 'bg-brand-blue/20 text-brand-blue-light' 
+                        : 'text-gray-400 hover:bg-brand-dark-5 hover:text-white'
+                    }`}
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -688,11 +753,16 @@ export function DetalheOrdem({ ordem }: DetalheOrdemProps) {
 
       {/* ── Serviço ── */}
       <div className="card">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
           <h3 className="text-sm font-bold text-brand-green-light uppercase tracking-wider">Descrição do Serviço</h3>
-          <span className="text-xs font-bold text-gray-400 bg-brand-dark-4 px-2 py-1 rounded">
-            {servicosConcluidos} / {totalServicos} Concluídos
-          </span>
+          <div className="flex items-center gap-2">
+            <span className={`text-[10px] font-black px-2 py-0.5 rounded border ${statusOperacionalOS.classe}`}>
+              {statusOperacionalOS.icone} {statusOperacionalOS.resumo}
+            </span>
+            <span className="text-xs font-bold text-gray-400 bg-brand-dark-4 px-2 py-1 rounded">
+              {servicosConcluidos} / {totalServicos} Concluídos
+            </span>
+          </div>
         </div>
 
         {/* Barra de Progresso */}
@@ -712,11 +782,25 @@ export function DetalheOrdem({ ordem }: DetalheOrdemProps) {
         
         {servicos && servicos.length > 0 ? (
           <div className="space-y-3">
-            {servicos.map((serv) => (
+            {servicos.map((serv) => {
+              const liberadoPelaData = serv.statusExecucao === 'Aguardando Etapa / Programado' && serv.dataProgramada && isServicoProgramadoLiberado(serv.dataProgramada);
+              return (
               <div key={serv.id} className="bg-brand-dark-4 rounded-lg p-4 border border-brand-dark-5 relative">
                 <div className="flex items-start justify-between gap-4 mb-2">
                   <div className="flex flex-col items-start gap-1 flex-1 min-w-0">
-                    <p className="font-bold text-white text-base leading-tight">• {serv.nome}</p>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="font-bold text-white text-base leading-tight">• {serv.nome}</p>
+                      {serv.etapaOrigemNome && (
+                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-bold">
+                          🔗 Etapa de: {serv.etapaOrigemNome}
+                        </span>
+                      )}
+                      {liberadoPelaData && (
+                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-red-500/20 text-red-300 border border-red-500/40 font-black animate-pulse">
+                          🚨 DATA ATINGIDA — PRONTO P/ PROTOCOLAR
+                        </span>
+                      )}
+                    </div>
                     
                     {/* Selo de GRU */}
                     {(serv.exigeGRU === true || (serv.exigeGRU === undefined && (serv.taxaPF || 0) > 0)) && (
@@ -755,7 +839,7 @@ export function DetalheOrdem({ ordem }: DetalheOrdemProps) {
                       </button>
 
                       {statusAberto === serv.id && (
-                        <div className="absolute right-0 top-full mt-1 z-20 w-52 bg-brand-dark-2 border border-brand-dark-5 rounded-xl shadow-2xl overflow-hidden py-1 animate-scale-up">
+                        <div className="absolute right-0 top-full mt-1 z-20 w-56 bg-brand-dark-2 border border-brand-dark-5 rounded-xl shadow-2xl overflow-hidden py-1 animate-scale-up">
                           {STATUS_EXECUCAO_SERVICO.map(s => (
                             <button
                               key={s}
@@ -774,7 +858,7 @@ export function DetalheOrdem({ ordem }: DetalheOrdemProps) {
                       )}
                     </div>
 
-                    {/* Valor Individual do Serviço (Abaixo do botão de status da OS) */}
+                    {/* Valor Individual do Serviço */}
                     <div className="flex flex-col sm:flex-row items-end sm:items-center gap-1">
                       {serv.pagoDireto && (
                         <span className="text-[9px] font-bold text-amber-400 bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded uppercase tracking-wider" title="Valor pago diretamente ao parceiro / terceiro">
@@ -789,6 +873,49 @@ export function DetalheOrdem({ ordem }: DetalheOrdemProps) {
                   </div>
                 </div>
 
+                {/* Painel rápido quando em Aguardando Etapa / Programado */}
+                {serv.statusExecucao === 'Aguardando Etapa / Programado' && (
+                  <div className="mb-3 p-2.5 rounded-lg bg-indigo-500/10 border border-indigo-500/25 flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-indigo-200">
+                      <CalendarClock size={14} className="text-indigo-400 shrink-0" />
+                      <span className="text-[11px] font-bold">
+                        {serv.dataProgramada
+                          ? `Programado p/ ${serv.dataProgramada.split('-').reverse().join('/')}`
+                          : 'Aguardando conclusão da etapa anterior na PF'}
+                      </span>
+                      <input
+                        type="date"
+                        className="bg-brand-dark-3 border border-indigo-500/30 rounded px-2 py-0.5 text-[11px] text-white outline-none"
+                        value={serv.dataProgramada || ''}
+                        onChange={e => handleDefinirDataProgramada(serv.id, e.target.value || undefined)}
+                        title="Alterar data programada"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleProgramarDias(serv.id, 30)}
+                        className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-brand-dark-3 hover:bg-indigo-500/20 text-indigo-300 border border-indigo-500/20"
+                      >
+                        +30d
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleProgramarDias(serv.id, 60)}
+                        className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-brand-dark-3 hover:bg-indigo-500/20 text-indigo-300 border border-indigo-500/20"
+                      >
+                        +60d
+                      </button>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleMudarStatus(serv.id, 'Não Iniciado')}
+                      className="px-2.5 py-1 rounded-lg bg-indigo-500 hover:bg-indigo-400 text-white text-[10px] font-black uppercase tracking-wider flex items-center gap-1 transition-all"
+                    >
+                      <Zap size={11} />
+                      Liberar p/ Fila Agora
+                    </button>
+                  </div>
+                )}
+
                 <div className="flex flex-col gap-1.5 pl-4 border-l-2 border-brand-dark-5">
                   {serv.protocolo && (
                     <div className="flex items-center gap-2">
@@ -799,10 +926,15 @@ export function DetalheOrdem({ ordem }: DetalheOrdemProps) {
                   )}
 
                   {serv.armaModelo && (
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                        <span className="text-[10px] font-black text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20 uppercase tracking-widest flex items-center gap-1.5" title="Armamento Vinculado">
                          ⚔️ ARMA: {serv.armaModelo}
                        </span>
+                       {serv.acervoDestino && (
+                         <span className="text-[10px] font-black text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 uppercase tracking-widest">
+                           🎯 DESTINO: {serv.acervoDestino}
+                         </span>
+                       )}
                     </div>
                   )}
 
@@ -846,12 +978,12 @@ export function DetalheOrdem({ ordem }: DetalheOrdemProps) {
                   )}
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         ) : (
           <div className="bg-brand-dark-4 rounded-lg p-4 border border-brand-dark-5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
             <p className="text-sm text-gray-200 whitespace-pre-wrap leading-relaxed">
-              {/* Fallback caso antiga O.S. tenha texto legado */}
               {(ordem as any).servico || 'Nenhum serviço registrado.'}
             </p>
             <span className="text-xs sm:text-sm font-black text-brand-green-light bg-brand-green/10 border border-brand-green/20 px-2.5 py-0.5 rounded-lg shadow-sm whitespace-nowrap flex items-center gap-1.5 flex-shrink-0">
@@ -1093,7 +1225,6 @@ export function DetalheOrdem({ ordem }: DetalheOrdemProps) {
 
                           await registrarPagamento(ordem.id, valor, metodo);
                           
-                          // Verifica se sobrou troco para gerar crédito
                           if (valor > saldoDevedorAtual && clienteDaOS && metodo !== 'Crédito de Cliente') {
                             const troco = valor - saldoDevedorAtual;
                             if (window.confirm(`Este pagamento gera um troco de ${formatarMoeda(troco)}. Deseja adicionar este troco como crédito (Haver) para o cliente?`)) {
@@ -1279,7 +1410,6 @@ export function DetalheOrdem({ ordem }: DetalheOrdemProps) {
           {ordem.historicoStatus && ordem.historicoStatus.length > 0 ? (
             [...ordem.historicoStatus].reverse().map((evento, idx) => (
               <div key={evento.id} className="relative pl-8 animate-fade-in" style={{ animationDelay: `${idx * 50}ms` }}>
-                {/* Marcador do ponto na linha */}
                 <div className={`absolute left-0 top-1.5 w-4.5 h-4.5 rounded-full border-4 border-brand-dark-2 flex items-center justify-center z-10 ${
                   evento.tipo === 'criacao' ? 'bg-brand-blue shadow-[0_0_8px_rgba(0,123,255,0.4)]' :
                   evento.tipo === 'status_os' ? 'bg-brand-green shadow-[0_0_8px_rgba(109,190,69,0.4)]' :

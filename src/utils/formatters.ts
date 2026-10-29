@@ -1,4 +1,4 @@
-import { StatusOS, FormaPagamento, StatusOrcamento, StatusExecucaoServico } from '../types';
+import { StatusOS, StatusOrcamento, StatusExecucaoServico, StatusOperacionalOS, ServicoConfig } from '../types';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -72,16 +72,16 @@ export function classeStatusOrcamento(status: StatusOrcamento): string {
   switch (status) {
     case 'Pendente': return 'badge-pendente';
     case 'Aprovado': return 'badge-concluido';
-    case 'Recusado': return 'badge-cancelado text-red-400 bg-red-500/10 border-red-500/20'; // Custom if badge-cancelado is not enough
+    case 'Recusado': return 'badge-cancelado text-red-400 bg-red-500/10 border-red-500/20';
     default:         return 'badge';
   }
 }
 
 export function corStatusOrcamento(status: StatusOrcamento): string {
   switch (status) {
-    case 'Pendente': return '#eab308'; // amarelo
-    case 'Aprovado': return '#6DBE45'; // verde
-    case 'Recusado': return '#f87171'; // vermelho
+    case 'Pendente': return '#eab308';
+    case 'Aprovado': return '#6DBE45';
+    case 'Recusado': return '#f87171';
     default:         return '#8A8A8A';
   }
 }
@@ -91,6 +91,7 @@ export function classeStatusExecucao(status?: StatusExecucaoServico): string {
     case 'Não Iniciado':                  return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
     case 'Iniciado — Montando Processo':   return 'bg-blue-500/20 text-blue-300 border-blue-500/30';
     case 'Aguardando Documentos':         return 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30';
+    case 'Aguardando Etapa / Programado': return 'bg-amber-500/20 text-amber-300 border-amber-500/30';
     case 'Protocolado — Ag. PF':          return 'bg-purple-500/20 text-purple-300 border-purple-500/30';
     case 'Concluído':                    return 'bg-green-500/20 text-green-300 border-green-500/30';
     case 'Cancelado / Não Executado':    return 'bg-red-500/20 text-red-300 border-red-500/30';
@@ -103,6 +104,7 @@ export function iconeStatusExecucao(status?: StatusExecucaoServico): string {
     case 'Não Iniciado':                  return '⏳';
     case 'Iniciado — Montando Processo':   return '🔧';
     case 'Aguardando Documentos':         return '📄';
+    case 'Aguardando Etapa / Programado': return '⏸️';
     case 'Protocolado — Ag. PF':          return '📤';
     case 'Concluído':                    return '✅';
     case 'Cancelado / Não Executado':    return '❌';
@@ -116,7 +118,141 @@ export function parsearMoeda(valor: string): number {
 }
 
 export function hoje(): string {
-  return new Date().toISOString().split('T')[0];
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/**
+ * Verifica se um serviço com status 'Aguardando Etapa / Programado' possui uma dataProgramada
+ * que já chegou ou passou (<= hoje), devendo ser tratado como liberado para protocolo.
+ * Aceita tanto o objeto do serviço quanto a string direta de dataProgramada.
+ */
+export function isServicoProgramadoLiberado(
+  s?: { statusExecucao?: StatusExecucaoServico; dataProgramada?: string } | string | null
+): boolean {
+  if (!s) return false;
+  if (typeof s === 'string') {
+    return s <= hoje();
+  }
+  if (s.statusExecucao !== 'Aguardando Etapa / Programado') return false;
+  if (!s.dataProgramada) return false;
+  return s.dataProgramada <= hoje();
+}
+
+/**
+ * Verifica se um item de serviço exige ação imediata do escritório para montar/protocolar.
+ */
+export function isServicoPendenteProtocolar(s: { statusExecucao?: StatusExecucaoServico; dataProgramada?: string }): boolean {
+  const st = s.statusExecucao || 'Não Iniciado';
+  if (st === 'Não Iniciado' || st === 'Iniciado — Montando Processo' || st === 'Aguardando Documentos') {
+    return true;
+  }
+  if (st === 'Aguardando Etapa / Programado' && isServicoProgramadoLiberado(s)) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Verifica se o item está retido aguardando etapa anterior da PF ou agendado para data futura (> hoje).
+ */
+export function isServicoEmEsperaAtiva(s: { statusExecucao?: StatusExecucaoServico; dataProgramada?: string }): boolean {
+  return s.statusExecucao === 'Aguardando Etapa / Programado' && !isServicoProgramadoLiberado(s);
+}
+
+/**
+ * Calcula o Status Operacional Geral da O.S. automaticamente a partir dos itens de serviço.
+ */
+export function obterStatusOperacionalOS(o: { servicos?: { statusExecucao?: StatusExecucaoServico; dataProgramada?: string }[] }) {
+  const servicos = o.servicos || [];
+  const qtdPendentesProtocolar = servicos.filter(isServicoPendenteProtocolar).length;
+  const qtdProtocolados = servicos.filter(s => s.statusExecucao === 'Protocolado — Ag. PF').length;
+  const qtdEmEspera = servicos.filter(isServicoEmEsperaAtiva).length;
+  const qtdConcluidos = servicos.filter(s => s.statusExecucao === 'Concluído').length;
+  const qtdCancelados = servicos.filter(s => s.statusExecucao === 'Cancelado / Não Executado').length;
+  const temProgramadoDesperto = servicos.some(s => isServicoProgramadoLiberado(s));
+
+  if (qtdPendentesProtocolar > 0) {
+    const labelCurto = `Pendente Protocolar (${qtdPendentesProtocolar})`;
+    const labelDetalhado = temProgramadoDesperto
+      ? `🚨 Data Programada Atingida — ${qtdPendentesProtocolar} serviço(s) p/ protocolar`
+      : `🚨 Falta Protocolar ${qtdPendentesProtocolar} serviço(s)`;
+    return {
+      status: 'Pendente Protocolar' as StatusOperacionalOS,
+      icone: '🚨',
+      labelCurto,
+      rotuloCurto: labelCurto,
+      labelDetalhado,
+      resumo: labelDetalhado,
+      classe: 'bg-orange-500/20 text-orange-300 border-orange-500/40',
+      qtdPendentesProtocolar,
+      qtdProtocolados,
+      qtdEmEspera,
+      qtdConcluidos,
+      qtdCancelados,
+      temProgramadoDesperto
+    };
+  }
+
+  if (qtdProtocolados > 0) {
+    const labelCurto = qtdEmEspera > 0 ? `Ag. PF (${qtdProtocolados}) • +${qtdEmEspera} etapa(s)` : `Aguardando PF (${qtdProtocolados})`;
+    const labelDetalhado = qtdEmEspera > 0
+      ? `📤 ${qtdProtocolados} na PF • ⏸️ ${qtdEmEspera} etapa(s) aguardando liberação`
+      : `📤 Todos protocolados (${qtdProtocolados} ag. PF)`;
+    return {
+      status: 'Aguardando PF' as StatusOperacionalOS,
+      icone: '📤',
+      labelCurto,
+      rotuloCurto: labelCurto,
+      labelDetalhado,
+      resumo: labelDetalhado,
+      classe: 'bg-purple-500/20 text-purple-300 border-purple-500/40',
+      qtdPendentesProtocolar,
+      qtdProtocolados,
+      qtdEmEspera,
+      qtdConcluidos,
+      qtdCancelados,
+      temProgramadoDesperto
+    };
+  }
+
+  if (qtdEmEspera > 0) {
+    const labelCurto = `Programada / Espera (${qtdEmEspera})`;
+    const labelDetalhado = `⏸️ Em Espera / Programada (${qtdEmEspera} serviço${qtdEmEspera > 1 ? 's' : ''})`;
+    return {
+      status: 'Em Espera / Programada' as StatusOperacionalOS,
+      icone: '⏸️',
+      labelCurto,
+      rotuloCurto: labelCurto,
+      labelDetalhado,
+      resumo: labelDetalhado,
+      classe: 'bg-amber-500/20 text-amber-300 border-amber-500/40',
+      qtdPendentesProtocolar,
+      qtdProtocolados,
+      qtdEmEspera,
+      qtdConcluidos,
+      qtdCancelados,
+      temProgramadoDesperto
+    };
+  }
+
+  const labelCurto = 'Execução Concluída';
+  const labelDetalhado = '✅ Todos os serviços finalizados';
+  return {
+    status: 'Concluída' as StatusOperacionalOS,
+    icone: '✅',
+    labelCurto,
+    rotuloCurto: labelCurto,
+    labelDetalhado,
+    resumo: labelDetalhado,
+    classe: 'bg-brand-green/20 text-brand-green-light border-brand-green/40',
+    qtdPendentesProtocolar,
+    qtdProtocolados,
+    qtdEmEspera,
+    qtdConcluidos,
+    qtdCancelados,
+    temProgramadoDesperto
+  };
 }
 
 export function calcularProgressoServicos(servicos: { statusExecucao?: StatusExecucaoServico }[]): number {
@@ -127,6 +263,7 @@ export function calcularProgressoServicos(servicos: { statusExecucao?: StatusExe
 
   const pesos: Record<string, number> = {
     'Não Iniciado': 0,
+    'Aguardando Etapa / Programado': 10,
     'Iniciado — Montando Processo': 25,
     'Aguardando Documentos': 50,
     'Protocolado — Ag. PF': 75,
@@ -160,7 +297,6 @@ export function obterResumoExecucao(servicos: { statusExecucao?: StatusExecucaoS
   const pendentes = total - concluidos - cancelados;
   const progresso = calcularProgressoServicos(servicos);
 
-  // Caso todos estejam finalizados (mistura de Concluídos e Cancelados)
   if (pendentes === 0 && concluidos > 0 && cancelados > 0) {
     return {
       texto: `${concluidos} Concluído${concluidos > 1 ? 's' : ''}, ${cancelados} Cancelado${cancelados > 1 ? 's' : ''}`,
@@ -338,4 +474,158 @@ export function normalizarFabricante(fabricante: string | undefined | null): str
   }
   
   return f;
+}
+
+// ─── Inteligência Operacional: Combos e Etapas Sequenciais ──────────────────
+
+export function ehServicoAquisicaoArma(nome: string): boolean {
+  const n = removerAcentos((nome || '').toLowerCase());
+  return (
+    n.includes('aquisicao de arma') ||
+    n.includes('autorizacao de compra') ||
+    n.includes('autorizacao de aquisicao') ||
+    n.includes('pedido de compra')
+  );
+}
+
+export function ehServicoTransferenciaAcervo(nome: string): boolean {
+  const n = removerAcentos((nome || '').toLowerCase());
+  return n.includes('transferencia entre acervo') || n.includes('mudanca de acervo');
+}
+
+export function buscarServicoNoCatalogo(
+  catalogo: ServicoConfig[],
+  termosOuPredicado: string[] | ((nomeNormalizado: string, serv: ServicoConfig) => boolean)
+): ServicoConfig | undefined {
+  if (Array.isArray(termosOuPredicado)) {
+    const termosNorm = termosOuPredicado.map(t => removerAcentos(t.toLowerCase()));
+    return catalogo.find(s => {
+      const n = removerAcentos(s.nome.toLowerCase());
+      return termosNorm.some(t => n === t || n.includes(t));
+    });
+  }
+  return catalogo.find(s => termosOuPredicado(removerAcentos(s.nome.toLowerCase()), s));
+}
+
+export interface ItemComboGerado {
+  nome: string;
+  valorPadrao: number;
+  valorFiliado: number;
+  taxaPF: number;
+  exigeGRU?: boolean;
+  categoria: string;
+  vinculaArma: boolean;
+  statusInicial: StatusExecucaoServico;
+  etapaOrigemNome?: string;
+}
+
+/**
+ * Dado um serviço selecionado no formulário, verifica se ele dispara um combo de etapas
+ * encadeadas (ex: Aquisição de Arma Nova -> 1. Autorização de Compra, 2. Solicitação de CRAF, 3. Guia de Tráfego,
+ * ou etapas personalizadas configuradas no serviço).
+ */
+export function gerarItensComboServico(
+  servicoSelecionado: ServicoConfig,
+  catalogo: ServicoConfig[]
+): ItemComboGerado[] {
+  // 1. Se o serviço possui etapas automáticas customizadas configuradas pelo usuário
+  if (servicoSelecionado.etapasAutomaticas && servicoSelecionado.etapasAutomaticas.length > 0) {
+    const itens: ItemComboGerado[] = [
+      {
+        nome: servicoSelecionado.nome,
+        valorPadrao: servicoSelecionado.valorPadrao,
+        valorFiliado: servicoSelecionado.valorFiliado,
+        taxaPF: servicoSelecionado.taxaPF,
+        exigeGRU: servicoSelecionado.exigeGRU,
+        categoria: servicoSelecionado.categoria || 'Honorário',
+        vinculaArma: !!servicoSelecionado.vinculaArma,
+        statusInicial: 'Não Iniciado',
+      }
+    ];
+    let etapaAnteriorNome = servicoSelecionado.nome;
+    servicoSelecionado.etapasAutomaticas.forEach((nomeEtapa) => {
+      const servEtapa = buscarServicoNoCatalogo(catalogo, [nomeEtapa]);
+      const normAlvo = removerAcentos(nomeEtapa.toLowerCase());
+      const nomeResolvido = servEtapa ? servEtapa.nome : nomeEtapa.toUpperCase();
+      itens.push({
+        nome: nomeResolvido,
+        valorPadrao: servEtapa ? servEtapa.valorPadrao : 150,
+        valorFiliado: servEtapa ? servEtapa.valorFiliado : 100,
+        taxaPF: servEtapa ? servEtapa.taxaPF : 0,
+        exigeGRU: servEtapa ? servEtapa.exigeGRU : true,
+        categoria: servEtapa?.categoria || 'Honorário',
+        vinculaArma: servEtapa ? !!servEtapa.vinculaArma : (normAlvo.includes('craf') || normAlvo.includes('guia') || normAlvo.includes('gt')),
+        statusInicial: 'Aguardando Etapa / Programado',
+        etapaOrigemNome: etapaAnteriorNome,
+      });
+      etapaAnteriorNome = nomeResolvido;
+    });
+    return itens;
+  }
+
+  // 2. Regra Inteligente Nativa: Aquisição de Arma de Fogo / Autorização de Compra
+  if (ehServicoAquisicaoArma(servicoSelecionado.nome)) {
+    const servAutCompra = buscarServicoNoCatalogo(catalogo, ['autorizacao de compra', 'autorizacao de aquisicao', 'pedido de compra']);
+    const servCraf = buscarServicoNoCatalogo(
+      catalogo,
+      n => (n.includes('solicitacao de craf') || n.includes('emissao de craf') || n.includes('apostilamento') || (n.includes('craf') && !n.includes('renovacao')))
+    );
+    const servGt = buscarServicoNoCatalogo(catalogo, ['guia de trafego']);
+
+    const nome1 = ehServicoAquisicaoArma(servicoSelecionado.nome) && !removerAcentos(servicoSelecionado.nome.toLowerCase()).includes('pacote')
+      ? servicoSelecionado.nome
+      : (servAutCompra?.nome || 'SOLICITAÇÃO DE AUTORIZAÇÃO DE COMPRA');
+
+    const nome2 = servCraf?.nome || 'SOLICITAÇÃO DE CRAF';
+    const nome3 = servGt?.nome || 'GUIA DE TRÁFEGO';
+
+    return [
+      {
+        nome: nome1,
+        valorPadrao: servicoSelecionado.valorPadrao || servAutCompra?.valorPadrao || 200,
+        valorFiliado: servicoSelecionado.valorFiliado || servAutCompra?.valorFiliado || 150,
+        taxaPF: servicoSelecionado.taxaPF ?? servAutCompra?.taxaPF ?? 88,
+        exigeGRU: servicoSelecionado.exigeGRU ?? servAutCompra?.exigeGRU ?? true,
+        categoria: servicoSelecionado.categoria || servAutCompra?.categoria || 'Honorário',
+        vinculaArma: false,
+        statusInicial: 'Não Iniciado',
+      },
+      {
+        nome: nome2,
+        valorPadrao: servCraf?.valorPadrao ?? 200,
+        valorFiliado: servCraf?.valorFiliado ?? 150,
+        taxaPF: servCraf?.taxaPF ?? 0,
+        exigeGRU: servCraf?.exigeGRU ?? false,
+        categoria: servCraf?.categoria || 'Honorário',
+        vinculaArma: true,
+        statusInicial: 'Aguardando Etapa / Programado',
+        etapaOrigemNome: nome1,
+      },
+      {
+        nome: nome3,
+        valorPadrao: servGt?.valorPadrao ?? 100,
+        valorFiliado: servGt?.valorFiliado ?? 70,
+        taxaPF: servGt?.taxaPF ?? 0,
+        exigeGRU: servGt?.exigeGRU ?? false,
+        categoria: servGt?.categoria || 'Honorário',
+        vinculaArma: true,
+        statusInicial: 'Aguardando Etapa / Programado',
+        etapaOrigemNome: nome2,
+      }
+    ];
+  }
+
+  // Caso padrão: serviço individual
+  return [
+    {
+      nome: servicoSelecionado.nome,
+      valorPadrao: servicoSelecionado.valorPadrao,
+      valorFiliado: servicoSelecionado.valorFiliado,
+      taxaPF: servicoSelecionado.taxaPF,
+      exigeGRU: servicoSelecionado.exigeGRU,
+      categoria: servicoSelecionado.categoria || 'Honorário',
+      vinculaArma: !!servicoSelecionado.vinculaArma,
+      statusInicial: 'Não Iniciado',
+    }
+  ];
 }

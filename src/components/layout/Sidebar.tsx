@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
-  LayoutDashboard, FileText, Plus, Settings, LogOut, Cloud, CloudOff, Loader, X, Users, Receipt, Calendar, BarChart3, ListTodo, Bell, Shield, Link2, FileSpreadsheet, Building2, UserPlus, Crosshair, MessageSquare, BadgeDollarSign, Sparkles, Target, Scale, ArrowRightLeft, Menu
+  LayoutDashboard, FileText, Plus, Settings, LogOut, Cloud, CloudOff, Loader, X, Users, Receipt, Calendar, BarChart3, ListTodo, Bell, Shield, FileSpreadsheet, Building2, UserPlus, MessageSquare, BadgeDollarSign, Target, Scale, ArrowRightLeft, Menu
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../db/supabase';
@@ -11,6 +11,7 @@ import { useLembretes } from '../../context/LembretesContext';
 import { useNotificacoesSistema } from '../../context/NotificacoesSistemaContext';
 import { NotificacoesDropdown } from './NotificacoesDropdown';
 import { WorkspaceSwitcher } from './WorkspaceSwitcher';
+import { isServicoPendenteProtocolar } from '../../utils/formatters';
 
 const links = [
   { to: '/dashboard', label: 'Painel',          icon: LayoutDashboard, slug: 'painel' },
@@ -118,7 +119,7 @@ interface SidebarProps {
 }
 
 export function Sidebar({ onClose, isMobile }: SidebarProps = {}) {
-  const { usuario, logout, temAcessoRecurso, contextoAtivo, ehSocioPortal, ehGestorPrincipal } = useAuth();
+  const { usuario, logout, temAcessoRecurso, contextoAtivo, ehGestorPrincipal } = useAuth();
   const { ordens, itensFila, sincronizarPendentes } = useOrdens();
   const { lembretes } = useLembretes();
   const { naoLidas } = useNotificacoesSistema();
@@ -152,10 +153,12 @@ export function Sidebar({ onClose, isMobile }: SidebarProps = {}) {
     }
   }, [usuario]);
 
-  // Cálculo de pendências para a Rotina Diária
+  // Cálculo de pendências para a Rotina Diária (Fila para Protocolar + Conferir na PF)
   const totalRotina = ordens.reduce((acc, o) => {
-    const temProtocolado = o.servicos?.some(s => s.statusExecucao === 'Protocolado — Ag. PF');
-    if (temProtocolado) return acc + 1;
+    const temPendenteOuProtocolado = o.servicos?.some(
+      s => isServicoPendenteProtocolar(s) || s.statusExecucao === 'Protocolado — Ag. PF'
+    );
+    if (temPendenteOuProtocolado) return acc + 1;
     return acc;
   }, 0);
 
@@ -498,7 +501,6 @@ export function NavegacaoInferior({ onAbrirMenu }: NavegacaoInferiorProps = {}) 
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-40 bg-brand-dark-2/95 backdrop-blur-md border-t border-brand-dark-5 flex sm:hidden overflow-x-auto no-scrollbar scroll-smooth px-2 items-center">
-      {/* Botão de Menu para abrir Drawer lateral completo no mobile */}
       {onAbrirMenu && (
         <button
           type="button"
@@ -513,7 +515,6 @@ export function NavegacaoInferior({ onAbrirMenu }: NavegacaoInferiorProps = {}) 
         </button>
       )}
 
-      {/* Botão de Alternância Rápida de Layout (Escritório vs Gestor Portal) */}
       {ehSocioPortal && (
         <button
           type="button"

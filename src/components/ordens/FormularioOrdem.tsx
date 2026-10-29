@@ -2,8 +2,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Save, X, Eye, EyeOff, MessageCircle, Users, Phone, Search,
-  Mail, HelpCircle, CheckCircle, ChevronDown, List, Trash2, DollarSign,
-  AlertTriangle, Wallet
+  Mail, HelpCircle, ChevronDown, List, Trash2, DollarSign,
+  AlertTriangle, Wallet, Sparkles, CalendarClock, Layers, Plus
 } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import {
@@ -16,7 +16,16 @@ import { useClientes } from '../../context/ClientesContext';
 import { useServicos } from '../../context/ServicosContext';
 import { Cliente } from '../../types';
 import { Notificacao, useNotificacao } from '../common/Notificacao';
-import { classeStatusExecucao, iconeStatusExecucao, formatarMoeda, formatarNumeroOS, removerAcentos } from '../../utils/formatters';
+import {
+  classeStatusExecucao,
+  iconeStatusExecucao,
+  formatarMoeda,
+  formatarNumeroOS,
+  removerAcentos,
+  gerarItensComboServico,
+  buscarServicoNoCatalogo,
+  ehServicoTransferenciaAcervo
+} from '../../utils/formatters';
 import { supabase } from '../../db/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { isLaudoExame } from '../../utils/categoriaHelper';
@@ -44,7 +53,13 @@ const ESTILO_STATUS: Record<StatusOS, string> = {
 };
 
 // ── Dropdown de serviços ──────────────────────────────────────────────────
-function SeletorServico({ onSelecionar }: { onSelecionar: (s: ServicoConfig) => void }) {
+function SeletorServico({
+  onSelecionar,
+  onSelecionarComboAquisicao
+}: {
+  onSelecionar: (s: ServicoConfig) => void;
+  onSelecionarComboAquisicao: () => void;
+}) {
   const navigate = useNavigate();
   const { servicos } = useServicos();
   const [aberto, setAberto] = useState(false);
@@ -75,6 +90,10 @@ function SeletorServico({ onSelecionar }: { onSelecionar: (s: ServicoConfig) => 
     removerAcentos(s.nome.toLowerCase()).includes(removerAcentos(busca.toLowerCase()))
   );
 
+  const exibirAtalhoAquisicao =
+    !busca.trim() ||
+    removerAcentos('aquisicao de arma de fogo compra craf gt').includes(removerAcentos(busca.toLowerCase()));
+
   return (
     <div ref={ref} className="relative">
       <button
@@ -89,7 +108,7 @@ function SeletorServico({ onSelecionar }: { onSelecionar: (s: ServicoConfig) => 
       </button>
 
       {aberto && (
-        <div className="absolute left-0 top-full mt-1 z-50 w-72 bg-brand-dark-2 border border-brand-dark-5 rounded-xl shadow-2xl overflow-hidden animate-fade-in">
+        <div className="absolute left-0 top-full mt-1 z-50 w-80 bg-brand-dark-2 border border-brand-dark-5 rounded-xl shadow-2xl overflow-hidden animate-fade-in">
           <div className="p-2 border-b border-brand-dark-5 bg-brand-dark-3">
             <div className="relative">
               <Search size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500" />
@@ -97,14 +116,38 @@ function SeletorServico({ onSelecionar }: { onSelecionar: (s: ServicoConfig) => 
                 ref={inputRef}
                 type="text"
                 className="w-full bg-brand-dark-4 border border-brand-dark-5 rounded-lg pl-7 pr-2 py-1.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-brand-blue/50 transition-all font-medium"
-                placeholder="Pesquisar serviço..."
+                placeholder="Pesquisar serviço ou pacote..."
                 value={busca}
                 onChange={e => setBusca(e.target.value)}
               />
             </div>
           </div>
-          <div className="max-h-64 overflow-y-auto">
-            {servicosFiltrados.length === 0 ? (
+          <div className="max-h-72 overflow-y-auto">
+            {exibirAtalhoAquisicao && (
+              <button
+                type="button"
+                onClick={() => {
+                  onSelecionarComboAquisicao();
+                  setAberto(false);
+                }}
+                className="w-full text-left px-3 py-2.5 bg-indigo-500/15 hover:bg-indigo-500/25 border-b border-indigo-500/30 transition-colors"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-black text-indigo-300 flex items-center gap-1.5">
+                    <Sparkles size={13} className="text-indigo-400 shrink-0" />
+                    AQUISIÇÃO DE ARMA DE FOGO (PACOTE)
+                  </span>
+                  <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-indigo-500/30 text-indigo-200 border border-indigo-400/30">
+                    3 Etapas
+                  </span>
+                </div>
+                <p className="text-[10px] text-indigo-200/70 mt-0.5">
+                  Abre Autorização de Compra + CRAF (Em Espera) + Guia de Tráfego (Em Espera)
+                </p>
+              </button>
+            )}
+
+            {servicosFiltrados.length === 0 && !exibirAtalhoAquisicao ? (
               <div className="p-4 text-center">
                 <p className="text-xs text-gray-500 mb-2">
                   {busca ? 'Nenhum serviço encontrado.' : 'Nenhum serviço cadastrado.'}
@@ -336,7 +379,6 @@ export function FormularioOrdem({ ordemExistente }: FormularioOrdemProps) {
         clubeFiliadoText: c.filiadoProTiro ? (clubeParceiroNome || 'CLUBE DE TIRO E CAÇA PRÓ TIRO') : (c.clubeFiliado || ''),
         endereco: c.endereco || ''
       }));
-      // Limpar o estado para não repetir o preenchimento se o usuário recarregar
       window.history.replaceState({}, document.title);
     }
   }, [location, ordemExistente, clubeParceiroNome]);
@@ -439,29 +481,34 @@ export function FormularioOrdem({ ordemExistente }: FormularioOrdemProps) {
     }));
   };
 
-  const adicionarServico = (serv: ServicoConfig) => {
-    // Escolhe o valor baseado no status de filiado
-    const valorAplicado = form.filiadoProTiro ? (serv.valorFiliado || serv.valorPadrao) : serv.valorPadrao;
-    const isLaudo = isLaudoExame(serv.categoria || '', usuario?.dadosEmpresa?.categoriasServico);
+  const adicionarItensAoFormulario = (itensGerados: ReturnType<typeof gerarItensComboServico>, mensagemToast?: string) => {
+    const armaJaSelecionada = (form.servicos as any[]).find(s => s.armaId);
 
-    const novosServicos = [
-      ...form.servicos,
-      { 
-        id: uuidv4(), 
-        nome: serv.nome, 
-        detalhes: '', 
-        taxaPF: serv.taxaPF, 
-        exigeGRU: serv.exigeGRU,
-        valor: valorAplicado, 
-        statusExecucao: 'Não Iniciado' as StatusExecucaoServico, 
-        categoria: serv.categoria || 'Honorário',
+    const novosBlocos = itensGerados.map(item => {
+      const valorAplicado = form.filiadoProTiro ? (item.valorFiliado || item.valorPadrao) : item.valorPadrao;
+      const isLaudo = isLaudoExame(item.categoria || '', usuario?.dadosEmpresa?.categoriasServico);
+      const isTransfAcervo = ehServicoTransferenciaAcervo(item.nome);
+
+      return {
+        id: uuidv4(),
+        nome: item.nome,
+        detalhes: '',
+        taxaPF: item.taxaPF,
+        exigeGRU: item.exigeGRU,
+        valor: valorAplicado,
+        statusExecucao: item.statusInicial,
+        etapaOrigemNome: item.etapaOrigemNome,
+        acervoDestino: isTransfAcervo ? ('Caça' as const) : undefined,
+        armaId: armaJaSelecionada && exigeVinculoArma(item.nome) ? armaJaSelecionada.armaId : undefined,
+        armaModelo: armaJaSelecionada && exigeVinculoArma(item.nome) ? armaJaSelecionada.armaModelo : undefined,
+        categoria: item.categoria || 'Honorário',
         pagoDireto: isLaudo
-      }
-    ];
-    
-    // Auto-preenchimento: recalcula o total somando apenas serviços que NÃO são pagos direto
+      };
+    });
+
+    const novosServicos = [...form.servicos, ...novosBlocos];
     const novoValor = novosServicos.filter((s: any) => !s.pagoDireto).reduce((acc: number, s: any) => acc + (s.valor || 0), 0);
-    
+
     setForm(f => ({
       ...f,
       servicos: novosServicos,
@@ -469,6 +516,71 @@ export function FormularioOrdem({ ordemExistente }: FormularioOrdemProps) {
       valorTexto: novoValor.toFixed(2).replace('.', ',')
     }));
     setErros(e => { const n = { ...e }; delete n['servicos']; delete n['valor']; return n; });
+
+    if (mensagemToast) {
+      mostrar('sucesso', mensagemToast);
+    } else if (novosBlocos.length > 1) {
+      mostrar(
+        'sucesso',
+        `✨ Combo Inteligente: ${novosBlocos.length} etapas adicionadas (${novosBlocos.map(b => b.nome).join(' ➔ ')}).`
+      );
+    }
+  };
+
+  const adicionarServico = (serv: ServicoConfig) => {
+    const itens = gerarItensComboServico(serv, servicos);
+    adicionarItensAoFormulario(itens);
+  };
+
+  const adicionarComboAquisicaoArma = () => {
+    const servAut = buscarServicoNoCatalogo(servicos, ['autorizacao de compra', 'aquisicao de arma']) || {
+      id: 'combo-aquisicao',
+      nome: 'SOLICITAÇÃO DE AUTORIZAÇÃO DE COMPRA',
+      valorPadrao: 200,
+      valorFiliado: 150,
+      taxaPF: 88,
+      exigeGRU: true,
+      categoria: 'Honorário',
+      vinculaArma: false,
+      criadoEm: ''
+    };
+    const itens = gerarItensComboServico(servAut, servicos);
+    adicionarItensAoFormulario(
+      itens,
+      '📦 Pacote Aquisição de Arma adicionado: Autorização de Compra (Fila de Protocolo) + CRAF e Guia de Tráfego (Em Espera da PF)!'
+    );
+  };
+
+  const adicionarEtapaSugerida = (nomeBusca: string[], nomeFallback: string, servicoOrigem: any) => {
+    const encontrado = buscarServicoNoCatalogo(servicos, nomeBusca);
+    const itemGerado = encontrado
+      ? {
+          nome: encontrado.nome,
+          valorPadrao: encontrado.valorPadrao,
+          valorFiliado: encontrado.valorFiliado,
+          taxaPF: encontrado.taxaPF,
+          exigeGRU: encontrado.exigeGRU,
+          categoria: encontrado.categoria || 'Honorário',
+          vinculaArma: !!encontrado.vinculaArma,
+          statusInicial: 'Aguardando Etapa / Programado' as StatusExecucaoServico,
+          etapaOrigemNome: servicoOrigem.nome,
+        }
+      : {
+          nome: nomeFallback,
+          valorPadrao: 100,
+          valorFiliado: 70,
+          taxaPF: 0,
+          exigeGRU: false,
+          categoria: 'Honorário',
+          vinculaArma: true,
+          statusInicial: 'Aguardando Etapa / Programado' as StatusExecucaoServico,
+          etapaOrigemNome: servicoOrigem.nome,
+        };
+
+    adicionarItensAoFormulario(
+      [itemGerado],
+      `✨ Etapa "${itemGerado.nome}" adicionada em espera vinculada a "${servicoOrigem.nome}"!`
+    );
   };
 
   const atualizarPagoDireto = (id: string, pago: boolean) => {
@@ -505,7 +617,40 @@ export function FormularioOrdem({ ordemExistente }: FormularioOrdemProps) {
   const atualizarStatusServicoExec = (id: string, novoStatus: StatusExecucaoServico) => {
     setForm(f => ({
       ...f,
-      servicos: (f.servicos as any[]).map((s: any) => s.id === id ? { ...s, statusExecucao: novoStatus } : s)
+      servicos: (f.servicos as any[]).map((s: any) =>
+        s.id === id
+          ? {
+              ...s,
+              statusExecucao: novoStatus,
+              ...(novoStatus !== 'Aguardando Etapa / Programado' ? { dataProgramada: undefined } : {})
+            }
+          : s
+      )
+    }));
+  };
+
+  const atualizarDataProgramadaServico = (id: string, dataProgramada?: string) => {
+    setForm(f => ({
+      ...f,
+      servicos: (f.servicos as any[]).map((s: any) =>
+        s.id === id ? { ...s, dataProgramada } : s
+      )
+    }));
+  };
+
+  const definirDiasProgramados = (id: string, dias: number) => {
+    const dt = new Date();
+    dt.setDate(dt.getDate() + dias);
+    const iso = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+    atualizarDataProgramadaServico(id, iso);
+  };
+
+  const atualizarAcervoDestinoServico = (id: string, acervoDestino: 'Caça' | 'Tiro Desportivo' | 'Coleção') => {
+    setForm(f => ({
+      ...f,
+      servicos: (f.servicos as any[]).map((s: any) =>
+        s.id === id ? { ...s, acervoDestino } : s
+      )
     }));
   };
 
@@ -519,9 +664,16 @@ export function FormularioOrdem({ ordemExistente }: FormularioOrdemProps) {
   const atualizarArmaServico = (id: string, armaId: string, armaModelo: string) => {
     setForm(f => ({
       ...f,
-      servicos: (f.servicos as any[]).map((s: any) => 
-        s.id === id ? { ...s, armaId, armaModelo, gtTipo: '', gtDestino: '' } : s
-      )
+      servicos: (f.servicos as any[]).map((s: any) => {
+        if (s.id === id) {
+          return { ...s, armaId, armaModelo, gtTipo: '', gtDestino: '' };
+        }
+        // Herança inteligente: se outra etapa da mesma O.S. também vincula arma e ainda está vazia, preenche automaticamente
+        if (armaId && !s.armaId && exigeVinculoArma(s.nome)) {
+          return { ...s, armaId, armaModelo };
+        }
+        return s;
+      })
     }));
   };
 
@@ -771,6 +923,15 @@ export function FormularioOrdem({ ordemExistente }: FormularioOrdemProps) {
     }
   };
 
+  const temGuiaNaOS = (form.servicos as any[]).some(s => {
+    const n = removerAcentos(s.nome.toLowerCase());
+    return n.includes('guia') || n.includes('trafego');
+  });
+
+  const temIbamaNaOS = (form.servicos as any[]).some(s =>
+    removerAcentos(s.nome.toLowerCase()).includes('ibama')
+  );
+
   return (
     <form onSubmit={handleSubmit} className="space-y-6 max-w-2xl mx-auto">
 
@@ -924,12 +1085,26 @@ export function FormularioOrdem({ ordemExistente }: FormularioOrdemProps) {
           Descrição do Serviço
         </h3>
 
-
-
-        {/* Dropdown de serviços */}
+        {/* Dropdown de serviços + Atalho de Pacote */}
         <div className="mb-4">
-          <SeletorServico onSelecionar={adicionarServico} />
-          <p className="text-xs text-gray-500 mt-1.5 flex items-center gap-1.5">💡 Clique para puxar o bloquinho (aceita múltiplos cliques seguidos)</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <SeletorServico
+              onSelecionar={adicionarServico}
+              onSelecionarComboAquisicao={adicionarComboAquisicaoArma}
+            />
+            <button
+              type="button"
+              onClick={adicionarComboAquisicaoArma}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-indigo-500/15 hover:bg-indigo-500/25 border border-indigo-500/30 text-indigo-300 text-xs font-bold transition-all"
+              title="Adiciona automaticamente: 1. Autorização de Compra + 2. Solicitação de CRAF (Em Espera) + 3. Guia de Tráfego (Em Espera)"
+            >
+              <Sparkles size={13} className="text-indigo-400" />
+              + Pacote Aquisição de Arma (Compra + CRAF + GT)
+            </button>
+          </div>
+          <p className="text-xs text-gray-500 mt-1.5 flex items-center gap-1.5">
+            💡 Ao selecionar <strong>Autorização de Compra</strong> ou o <strong>Pacote Aquisição</strong>, o sistema já abre as 3 etapas (Compra + CRAF + GT) automaticamente!
+          </p>
           {erros.servicos && <p className="text-red-400 text-xs mt-1">{erros.servicos}</p>}
         </div>
 
@@ -941,24 +1116,41 @@ export function FormularioOrdem({ ordemExistente }: FormularioOrdemProps) {
                 <p className="text-sm text-gray-400">Nenhum serviço adicionado ainda.</p>
               </div>
             ) : (
-              (form.servicos as any[]).map((serv: any, index: number) => (
+              (form.servicos as any[]).map((serv: any, index: number) => {
+                const nomeNorm = removerAcentos(serv.nome.toLowerCase());
+                const sugereGuiaSecundaria =
+                  !temGuiaNaOS &&
+                  (nomeNorm.includes('transferencia') ||
+                    nomeNorm.includes('endereco') ||
+                    nomeNorm.includes('apostilamento'));
+                const sugereComboIbama =
+                  !temIbamaNaOS &&
+                  (nomeNorm.includes('concessao') || nomeNorm.includes('cacador'));
+                const isTransfAcervo = ehServicoTransferenciaAcervo(serv.nome);
+
+                return (
                 <div key={serv.id} className="relative bg-brand-dark-4 border border-brand-dark-5 p-4 rounded-xl animate-scale-up">
                   <button
                     type="button"
                     onClick={() => removerServico(serv.id)}
-                  className="absolute top-4 right-4 text-gray-500 hover:text-red-400 transition-colors"
-                  title="Remover Serviço"
-                >
-                  <Trash2 size={16} />
-                </button>
+                    className="absolute top-4 right-4 text-gray-500 hover:text-red-400 transition-colors"
+                    title="Remover Serviço"
+                  >
+                    <Trash2 size={16} />
+                  </button>
 
                 {/* Cabeçalho do card: nome + valor + status */}
                 <div className="flex flex-col gap-3 mb-3 pr-8">
                   <div className="flex items-center gap-3">
                     <span className="w-5 h-5 rounded-md bg-brand-dark-5 text-gray-400 text-xs flex items-center justify-center font-bold flex-shrink-0">{index + 1}</span>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <h4 className="text-sm font-bold text-white truncate">{serv.nome}</h4>
+                        {serv.etapaOrigemNome && (
+                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-bold">
+                            🔗 Etapa de: {serv.etapaOrigemNome}
+                          </span>
+                        )}
                         {isLaudoExame(serv.categoria || '', usuario?.dadosEmpresa?.categoriasServico) && (
                           <button
                             type="button"
@@ -989,8 +1181,8 @@ export function FormularioOrdem({ ordemExistente }: FormularioOrdemProps) {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Status Operacional:</label>
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                    <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider shrink-0">Status Operacional:</label>
                     <div className="flex flex-wrap gap-1.5">
                       {STATUS_EXECUCAO_SERVICO.map((status: StatusExecucaoServico) => (
                         <button
@@ -1009,6 +1201,7 @@ export function FormularioOrdem({ ordemExistente }: FormularioOrdemProps) {
                             {status === 'Iniciado — Montando Processo' ? 'Iniciado' : 
                              status === 'Aguardando Documentos' ? 'Ag. Docs' :
                              status === 'Protocolado — Ag. PF' ? 'Protocolado' :
+                             status === 'Aguardando Etapa / Programado' ? 'Em Espera / Programado' :
                              status === 'Não Iniciado' ? 'Não Iniciado' : status}
                           </span>
                         </button>
@@ -1016,6 +1209,93 @@ export function FormularioOrdem({ ordemExistente }: FormularioOrdemProps) {
                     </div>
                   </div>
                 </div>
+
+                {/* ⏸️ Configuração de Espera / Agendamento Futuro */}
+                {serv.statusExecucao === 'Aguardando Etapa / Programado' && (
+                  <div className="mb-3 p-3 rounded-lg bg-indigo-500/10 border border-indigo-500/25 space-y-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="text-[11px] font-bold text-indigo-300 flex items-center gap-1.5">
+                        <CalendarClock size={14} className="text-indigo-400" />
+                        Configuração de Espera / Execução Futura
+                      </span>
+                      <span className="text-[10px] text-indigo-200/80">
+                        {serv.dataProgramada
+                          ? `📅 Liberar na fila em: ${serv.dataProgramada.split('-').reverse().join('/')}`
+                          : '🔗 Aguardando liberação da etapa anterior na PF'}
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <input
+                        type="date"
+                        className="bg-brand-dark-3 border border-indigo-500/30 rounded-lg px-2.5 py-1 text-xs text-white outline-none focus:border-indigo-400"
+                        value={serv.dataProgramada || ''}
+                        onChange={e => atualizarDataProgramadaServico(serv.id, e.target.value || undefined)}
+                        title="Data programada para executar este serviço (opcional)"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => atualizarDataProgramadaServico(serv.id, undefined)}
+                        className={`px-2 py-1 rounded text-[10px] font-bold border transition-all ${
+                          !serv.dataProgramada
+                            ? 'bg-indigo-500/30 text-indigo-200 border-indigo-400/50'
+                            : 'bg-brand-dark-3 text-gray-400 border-brand-dark-5 hover:text-white'
+                        }`}
+                      >
+                        Aguardar Etapa PF
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => definirDiasProgramados(serv.id, 15)}
+                        className="px-2 py-1 rounded text-[10px] font-bold bg-brand-dark-3 hover:bg-indigo-500/20 text-indigo-300 border border-indigo-500/20 transition-all"
+                      >
+                        +15 dias
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => definirDiasProgramados(serv.id, 30)}
+                        className="px-2 py-1 rounded text-[10px] font-bold bg-brand-dark-3 hover:bg-indigo-500/20 text-indigo-300 border border-indigo-500/20 transition-all"
+                      >
+                        +30 dias (1 mês)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => definirDiasProgramados(serv.id, 60)}
+                        className="px-2 py-1 rounded text-[10px] font-bold bg-brand-dark-3 hover:bg-indigo-500/20 text-indigo-300 border border-indigo-500/20 transition-all"
+                      >
+                        +60 dias (2 meses)
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* ✨ Sugestões Contextuais de 2ª Etapa */}
+                {(sugereGuiaSecundaria || sugereComboIbama) && (
+                  <div className="mb-3 flex flex-wrap items-center gap-2">
+                    {sugereGuiaSecundaria && (
+                      <button
+                        type="button"
+                        onClick={() => adicionarEtapaSugerida(['guia de trafego', 'emissao de gt'], 'GUIA DE TRÁFEGO', serv)}
+                        className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-500/15 hover:bg-indigo-500/25 border border-indigo-500/30 text-indigo-300 text-[11px] font-bold transition-all"
+                      >
+                        <Plus size={12} />
+                        Sugestão IA: Adicionar Guia de Tráfego (2ª Etapa em Espera)
+                      </button>
+                    )}
+                    {sugereComboIbama && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          adicionarEtapaSugerida(['cr ibama', 'cadastro tecnico federal'], 'CADASTRO TÉCNICO FEDERAL - CR IBAMA', serv);
+                          adicionarEtapaSugerida(['manejo de fauna', 'manejo'], 'MANEJO DE FAUNA (IBAMA)', serv);
+                        }}
+                        className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-300 text-[11px] font-bold transition-all"
+                      >
+                        <Layers size={12} />
+                        Sugestão IA: Adicionar Combo IBAMA (CR + Manejo em Espera)
+                      </button>
+                    )}
+                  </div>
+                )}
 
                 {/* Controle de GRU */}
                 {(serv.exigeGRU === true || (serv.exigeGRU === undefined && (serv.taxaPF || 0) > 0)) && (
@@ -1080,6 +1360,31 @@ export function FormularioOrdem({ ordemExistente }: FormularioOrdemProps) {
                         </button>
                       </div>
                     </div>
+
+                    {/* Automação de Transferência entre Acervos */}
+                    {isTransfAcervo && (
+                      <div className="pt-2 border-t border-brand-dark-5/50 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <label className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">
+                          🎯 Novo Acervo de Destino (atualiza a arma ao concluir):
+                        </label>
+                        <div className="flex gap-1.5">
+                          {(['Caça', 'Tiro Desportivo', 'Coleção'] as const).map(ac => (
+                            <button
+                              key={ac}
+                              type="button"
+                              onClick={() => atualizarAcervoDestinoServico(serv.id, ac)}
+                              className={`px-2.5 py-1 rounded text-[10px] font-bold border transition-all ${
+                                (serv.acervoDestino || 'Caça') === ac
+                                  ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                                  : 'bg-brand-dark-4 text-gray-400 border-brand-dark-5 hover:text-white'
+                              }`}
+                            >
+                              {ac}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
                     {/* Automação de Guias / GT baseada no Acervo da Arma */}
                     {(() => {
@@ -1303,7 +1608,8 @@ export function FormularioOrdem({ ordemExistente }: FormularioOrdemProps) {
                   onChange={e => atualizarDetalhesServico(serv.id, e.target.value)}
                 />
               </div>
-            ))
+              );
+            })
           )}
         </div>
       </div>
@@ -1463,7 +1769,6 @@ export function FormularioOrdem({ ordemExistente }: FormularioOrdemProps) {
                           atualizar('historicoPagamentos', novoHist);
                           atualizar('valorPago', novoTotal);
                           atualizar('formaPagamento', novoHist.length > 0 ? novoHist[novoHist.length - 1].metodo : 'Pendente');
-                          // Atualiza status se necessário
                           if (novoTotal >= valorLiquidoOS && valorLiquidoOS > 0) atualizar('status', 'Pago');
                           else if (novoTotal > 0) atualizar('status', 'Parcialmente Pago');
                           else atualizar('status', 'Aguardando Pagamento');
@@ -1720,7 +2025,6 @@ export function FormularioOrdem({ ordemExistente }: FormularioOrdemProps) {
               const tempArma = { ...novaArmaObj, tempId: armaId };
 
               if (clienteEncontrado?.id) {
-                // Salva no Supabase passando o empresaId do cliente e depois recarrega a lista
                 await salvarArma({
                   ...novaArmaObj,
                   clienteId: clienteEncontrado.id

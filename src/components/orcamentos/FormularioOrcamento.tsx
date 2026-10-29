@@ -1,18 +1,23 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
-  Save, X, Users, CheckCircle, ChevronDown, List, Trash2, Eye, EyeOff, Search,
-  AlertTriangle
+  Save, X, Users, ChevronDown, List, Trash2, Eye, EyeOff, Search,
+  AlertTriangle, Sparkles
 } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
-import { Orcamento, StatusOrcamento, ServicoConfig } from '../../types';
+import { Orcamento, StatusOrcamento, ServicoConfig, StatusExecucaoServico } from '../../types';
 import { useOrcamentos } from '../../context/OrcamentosContext';
 import { useClientes } from '../../context/ClientesContext';
 import { useServicos } from '../../context/ServicosContext';
 import { useOrdens } from '../../context/OrdensContext';
 import { Cliente } from '../../types';
 import { Notificacao, useNotificacao } from '../common/Notificacao';
-import { formatarMoeda, removerAcentos } from '../../utils/formatters';
+import {
+  formatarMoeda,
+  removerAcentos,
+  gerarItensComboServico,
+  ehServicoAquisicaoArma
+} from '../../utils/formatters';
 import { supabase } from '../../db/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { isLaudoExame } from '../../utils/categoriaHelper';
@@ -66,7 +71,7 @@ function SeletorServico({ onSelecionar }: { onSelecionar: (s: ServicoConfig) => 
       </button>
 
       {aberto && (
-        <div className="absolute left-0 top-full mt-1 z-50 w-72 bg-brand-dark-2 border border-brand-dark-5 rounded-xl shadow-2xl overflow-hidden animate-fade-in">
+        <div className="absolute right-0 top-full mt-1 z-50 w-72 bg-brand-dark-2 border border-brand-dark-5 rounded-xl shadow-2xl overflow-hidden animate-fade-in">
           <div className="p-2 border-b border-brand-dark-5 bg-brand-dark-3">
             <div className="relative">
               <Search size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500" />
@@ -126,6 +131,7 @@ export function FormularioOrcamento({ orcamentoExistente }: FormularioOrcamentoP
   const location = useLocation();
   const { criarOrcamento, atualizarOrcamento } = useOrcamentos();
   const { clientes, criarCliente, clubesRegistrados } = useClientes();
+  const { servicos } = useServicos();
   const { criarOrdem } = useOrdens();
   const { estado: notif, mostrar, fechar } = useNotificacao();
   const { usuario } = useAuth();
@@ -194,7 +200,6 @@ export function FormularioOrcamento({ orcamentoExistente }: FormularioOrcamentoP
         clubeFiliadoText: c.filiadoProTiro ? (clubeParceiroNome || 'CLUBE DE TIRO E CAÇA PRÓ TIRO') : (c.clubeFiliado || ''),
         endereco: c.endereco || ''
       }));
-      // Limpar o estado para não repetir o preenchimento se o usuário recarregar
       window.history.replaceState({}, document.title);
     }
   }, [location, orcamentoExistente, clubeParceiroNome]);
@@ -255,28 +260,35 @@ export function FormularioOrcamento({ orcamentoExistente }: FormularioOrcamentoP
   };
 
   const adicionarServico = (serv: ServicoConfig) => {
-    // Escolhe o valor baseado no status de filiado
-    const valorAplicado = form.filiadoProTiro ? (serv.valorFiliado || serv.valorPadrao) : serv.valorPadrao;
-    const isLaudo = isLaudoExame(serv.categoria || '', usuario?.dadosEmpresa?.categoriasServico);
+    const itens = gerarItensComboServico(serv, servicos);
+    const novosBlocos = itens.map(item => {
+      const valorAplicado = form.filiadoProTiro ? (item.valorFiliado || item.valorPadrao) : item.valorPadrao;
+      const isLaudo = isLaudoExame(item.categoria || '', usuario?.dadosEmpresa?.categoriasServico);
+      return {
+        id: uuidv4(),
+        nome: item.nome,
+        detalhes: '',
+        valor: valorAplicado,
+        taxaPF: item.taxaPF,
+        exigeGRU: item.exigeGRU,
+        categoria: item.categoria || 'Honorário',
+        pagoDireto: isLaudo
+      };
+    });
 
     setForm(f => {
-      const novosServicos = [
-        ...f.servicos,
-        { 
-          id: uuidv4(), 
-          nome: serv.nome, 
-          detalhes: '', 
-          valor: valorAplicado,
-          taxaPF: serv.taxaPF,
-          exigeGRU: serv.exigeGRU,
-          categoria: serv.categoria || 'Honorário',
-          pagoDireto: isLaudo
-        }
-      ];
+      const novosServicos = [...f.servicos, ...novosBlocos];
       const novoTotal = novosServicos.filter(s => !s.pagoDireto).reduce((acc, s) => acc + s.valor, 0);
       return { ...f, servicos: novosServicos, valorTotal: novoTotal };
     });
     setErros(e => { const n = { ...e }; delete n['servicos']; return n; });
+
+    if (novosBlocos.length > 1) {
+      mostrar(
+        'sucesso',
+        `✨ Combo Inteligente: ${novosBlocos.length} etapas adicionadas ao orçamento (${novosBlocos.map(b => b.nome).join(' + ')})!`
+      );
+    }
   };
 
   const atualizarPagoDireto = (id: string, pago: boolean) => {
@@ -362,6 +374,8 @@ export function FormularioOrcamento({ orcamentoExistente }: FormularioOrcamentoP
         });
       }
 
+      const temAutorizacaoCompra = dados.servicos.some((s: any) => ehServicoAquisicaoArma(s.nome));
+
       // 2. Criar a O.S. priorizando dados do cadastro se o cliente já existir
       const osId = await criarOrdem({
         nomeCliente: nomeClienteFormatado,
@@ -371,19 +385,30 @@ export function FormularioOrcamento({ orcamentoExistente }: FormularioOrcamentoP
         clubeFiliado: (clienteExistente?.clubeFiliado) || dados.clubeFiliado || '',
         endereco: (clienteExistente?.endereco) || dados.endereco || '',
         filiadoProTiro: (clienteExistente?.filiadoProTiro) ?? dados.filiadoProTiro ?? false,
-        servicos: dados.servicos.map((s: any) => ({
-          id: s.id,
-          nome: s.nome,
-          detalhes: s.detalhes,
-          valor: s.valor,
-          categoria: s.categoria || 'Honorário',
-          pagoDireto: s.pagoDireto || isLaudoExame(s.categoria || '', usuario?.dadosEmpresa?.categoriasServico),
-          taxaPF: s.taxaPF,
-          exigeGRU: s.exigeGRU,
-          responsavelNome: s.responsavelNome,
-          valorRepasse: s.valorRepasse,
-          statusExecucao: 'Não Iniciado'
-        })),
+        servicos: dados.servicos.map((s: any) => {
+          const n = removerAcentos(s.nome.toLowerCase());
+          const ehEtapaSubsequenteAquisicao =
+            temAutorizacaoCompra &&
+            !ehServicoAquisicaoArma(s.nome) &&
+            (n.includes('craf') || n.includes('guia') || n.includes('trafego'));
+
+          return {
+            id: s.id,
+            nome: s.nome,
+            detalhes: s.detalhes,
+            valor: s.valor,
+            categoria: s.categoria || 'Honorário',
+            pagoDireto: s.pagoDireto || isLaudoExame(s.categoria || '', usuario?.dadosEmpresa?.categoriasServico),
+            taxaPF: s.taxaPF,
+            exigeGRU: s.exigeGRU,
+            responsavelNome: s.responsavelNome,
+            valorRepasse: s.valorRepasse,
+            statusExecucao: (ehEtapaSubsequenteAquisicao
+              ? 'Aguardando Etapa / Programado'
+              : 'Não Iniciado') as StatusExecucaoServico,
+            etapaOrigemNome: ehEtapaSubsequenteAquisicao ? 'SOLICITAÇÃO DE AUTORIZAÇÃO DE COMPRA' : undefined
+          };
+        }),
         valor: dados.servicos.filter((s: any) => !s.pagoDireto && !isLaudoExame(s.categoria || '', usuario?.dadosEmpresa?.categoriasServico)).reduce((acc: number, s: any) => acc + (s.valor || 0), 0),
         valorPago: 0,
         historicoPagamentos: [],
@@ -437,7 +462,6 @@ export function FormularioOrcamento({ orcamentoExistente }: FormularioOrcamentoP
         await atualizarOrcamento(orcamentoExistente.id, dados);
         mostrar('sucesso', 'Orçamento atualizado com sucesso!');
         
-        // Verifica se deve converter em O.S. (apenas se for aprovado agora e não foi antes)
         if (dados.status === 'Aprovado' && !orcamentoExistente.convertidoOsId) {
           if (window.confirm('Este orçamento está APROVADO. Deseja gerar a Ordem de Serviço agora?')) {
              await realizarConversao(orcamentoExistente.id, dados);
@@ -450,11 +474,10 @@ export function FormularioOrcamento({ orcamentoExistente }: FormularioOrcamentoP
         const id = await criarOrcamento(dados);
         mostrar('sucesso', 'Orçamento criado com sucesso!');
         
-        // Verifica se deve converter em O.S.
         if (dados.status === 'Aprovado') {
           if (window.confirm('Este orçamento está APROVADO. Deseja gerar a Ordem de Serviço agora?')) {
              await realizarConversao(id, dados);
-             return; // O realizarConversao já vai navegar
+             return;
           }
         }
 
@@ -613,13 +636,17 @@ export function FormularioOrcamento({ orcamentoExistente }: FormularioOrcamentoP
 
       {/* ── 2. Serviços e Valores ── */}
       <div className="card border-l-4 border-l-brand-green">
-        <div className="flex justify-between items-center mb-4">
+        <div className="flex justify-between items-center mb-4 flex-wrap gap-2">
           <h3 className="text-base font-bold text-white flex items-center gap-2">
             <span className="w-6 h-6 rounded-full bg-brand-green/30 text-brand-green-light text-xs flex items-center justify-center font-bold">2</span>
             Serviços do Orçamento
           </h3>
           <SeletorServico onSelecionar={adicionarServico} />
         </div>
+        <p className="text-xs text-gray-500 mb-3 flex items-center gap-1.5">
+          <Sparkles size={12} className="text-indigo-400" />
+          Ao selecionar <strong>Autorização de Compra</strong>, o pacote completo (Compra + CRAF + GT) já é incluído no orçamento!
+        </p>
         {erros.servicos && <p className="text-red-400 text-xs mt-1 mb-3">{erros.servicos}</p>}
 
         {form.servicos.length === 0 ? (

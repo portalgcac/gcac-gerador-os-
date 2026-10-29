@@ -36,9 +36,16 @@ export type StatusExecucaoServico =
   | 'Não Iniciado'
   | 'Iniciado — Montando Processo'
   | 'Aguardando Documentos'
+  | 'Aguardando Etapa / Programado'
   | 'Protocolado — Ag. PF'
   | 'Concluído'
   | 'Cancelado / Não Executado';
+
+export type StatusOperacionalOS =
+  | 'Pendente Protocolar'
+  | 'Aguardando PF'
+  | 'Em Espera / Programada'
+  | 'Concluída';
 
 export interface ServicoConfig {
   id: string;
@@ -50,6 +57,7 @@ export interface ServicoConfig {
   categoria: string;
   pagoDiretoDefault?: boolean;
   vinculaArma?: boolean;
+  etapasAutomaticas?: string[];
   criadoEm: string;
 }
 
@@ -163,6 +171,9 @@ export interface OrdemDeServico {
     arquivoUrl?: string;
     gtTipo?: string;
     gtDestino?: string;
+    dataProgramada?: string; // YYYY-MM-DD (data para despertar da espera e entrar na fila de protocolo)
+    etapaOrigemNome?: string; // Nome da etapa/combo que gerou este item
+    acervoDestino?: 'Caça' | 'Tiro Desportivo' | 'Coleção'; // Novo acervo em Transferência entre Acervos
   }[];
   valor: number;
   desconto?: number;
@@ -415,6 +426,7 @@ export const STATUS_EXECUCAO_SERVICO: StatusExecucaoServico[] = [
   'Não Iniciado',
   'Iniciado — Montando Processo',
   'Aguardando Documentos',
+  'Aguardando Etapa / Programado',
   'Protocolado — Ag. PF',
   'Concluído',
   'Cancelado / Não Executado',

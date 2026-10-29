@@ -13,6 +13,22 @@ interface ServicosContextType {
 
 const ServicosContext = createContext<ServicosContextType | null>(null);
 
+const lerMapaEtapasAuto = (empresaId?: string): Record<string, string[]> => {
+  if (!empresaId) return {};
+  try {
+    const raw = localStorage.getItem(`gcac_servicos_etapas_${empresaId}`);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+};
+
+const salvarMapaEtapasAuto = (empresaId: string, mapa: Record<string, string[]>) => {
+  try {
+    localStorage.setItem(`gcac_servicos_etapas_${empresaId}`, JSON.stringify(mapa));
+  } catch {}
+};
+
 export function ServicosProvider({ children }: { children: React.ReactNode }) {
   const { usuario } = useAuth();
   const [servicos, setServicos] = useState<ServicoConfig[]>([]);
@@ -32,6 +48,7 @@ export function ServicosProvider({ children }: { children: React.ReactNode }) {
 
       if (error) throw error;
       if (data) {
+        const mapaEtapas = lerMapaEtapasAuto(usuario.empresaId);
         setServicos(data.map(row => ({
           id: row.id,
           nome: row.nome,
@@ -41,6 +58,7 @@ export function ServicosProvider({ children }: { children: React.ReactNode }) {
           exigeGRU: row.exige_gru !== false, // Default para true se for null ou undefined no BD legados
           categoria: row.categoria || 'Honorário',
           vinculaArma: !!row.vincula_arma,
+          etapasAutomaticas: row.etapas_automaticas || mapaEtapas[row.id] || undefined,
           criadoEm: row.criado_em
         })));
       }
@@ -57,7 +75,7 @@ export function ServicosProvider({ children }: { children: React.ReactNode }) {
 
   const criarServico = async (dados: Omit<ServicoConfig, 'id' | 'criadoEm'>) => {
     if (!usuario?.empresaId) throw new Error('Usuário não autenticado');
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('servicos_config')
       .insert([{
         nome: dados.nome,
@@ -68,9 +86,16 @@ export function ServicosProvider({ children }: { children: React.ReactNode }) {
         categoria: dados.categoria,
         vincula_arma: dados.vinculaArma || false,
         empresa_id: usuario.empresaId
-      }]);
+      }])
+      .select()
+      .single();
 
     if (error) throw error;
+    if (data && dados.etapasAutomaticas && dados.etapasAutomaticas.length > 0) {
+      const mapa = lerMapaEtapasAuto(usuario.empresaId);
+      mapa[data.id] = dados.etapasAutomaticas;
+      salvarMapaEtapasAuto(usuario.empresaId, mapa);
+    }
     await carregarServicos();
   };
 
@@ -83,6 +108,16 @@ export function ServicosProvider({ children }: { children: React.ReactNode }) {
     if (dados.exigeGRU !== undefined) payload.exige_gru = dados.exigeGRU;
     if (dados.categoria !== undefined) payload.categoria = dados.categoria;
     if (dados.vinculaArma !== undefined) payload.vincula_arma = dados.vinculaArma;
+
+    if (usuario?.empresaId && dados.etapasAutomaticas !== undefined) {
+      const mapa = lerMapaEtapasAuto(usuario.empresaId);
+      if (dados.etapasAutomaticas.length > 0) {
+        mapa[id] = dados.etapasAutomaticas;
+      } else {
+        delete mapa[id];
+      }
+      salvarMapaEtapasAuto(usuario.empresaId, mapa);
+    }
 
     const { error } = await supabase
       .from('servicos_config')

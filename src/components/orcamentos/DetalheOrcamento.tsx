@@ -3,8 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import {
   FileText, MessageCircle, FileDown, ArrowLeft, Edit2, CheckCircle, Smartphone, User, DollarSign, Calendar, ChevronRight, Printer, ExternalLink, Trash2, Shield
 } from 'lucide-react';
-import { Orcamento } from '../../types';
-import { formatarMoeda, formatarDataHora, classeStatusOrcamento } from '../../utils/formatters';
+import { Orcamento, StatusExecucaoServico } from '../../types';
+import { formatarMoeda, formatarDataHora, classeStatusOrcamento, removerAcentos, ehServicoAquisicaoArma } from '../../utils/formatters';
 import { baixarPdfOrcamento, imprimirPdfOrcamento } from '../../services/geradorPdfOrcamento';
 import { useOrdens } from '../../context/OrdensContext';
 import { useOrcamentos } from '../../context/OrcamentosContext';
@@ -26,7 +26,6 @@ export function DetalheOrcamento({ orcamento }: DetalheOrcamentoProps) {
   const { atualizarOrcamento, deletarOrcamento } = useOrcamentos();
   const { clientes, criarCliente } = useClientes();
   const { estado: notif, mostrar, fechar } = useNotificacao();
-  const [abaAtiva, setAbaAtiva] = useState<'dados' | 'servicos'>('dados');
   const [convertendo, setConvertendo] = useState(false);
   const [confirmandoDelete, setConfirmandoDelete] = useState(false);
   const [modalWhatsAppAberto, setModalWhatsAppAberto] = useState(false);
@@ -93,14 +92,12 @@ export function DetalheOrcamento({ orcamento }: DetalheOrcamentoProps) {
     
     setConvertendo(true);
     try {
-      // Verifica se o cliente já existe na base (pelo CPF ou Nome)
       const nomeClienteFormatado = String(orcamento.nomeCliente).toUpperCase();
       const clienteExistente = clientes.find(c => 
         (orcamento.cpf && c.cpf === orcamento.cpf) || 
         c.nome.toUpperCase() === nomeClienteFormatado
       );
 
-      // Se o cliente não existir, cria-lo de forma transparente
       if (!clienteExistente) {
         await criarCliente({
           nome: nomeClienteFormatado,
@@ -114,6 +111,8 @@ export function DetalheOrcamento({ orcamento }: DetalheOrcamentoProps) {
         });
       }
 
+      const temAutorizacaoCompra = orcamento.servicos.some(s => ehServicoAquisicaoArma(s.nome));
+
       // Cria a O.S. priorizando dados do cadastro se o cliente já existir
       const osId = await criarOrdem({
         nomeCliente: nomeClienteFormatado,
@@ -122,21 +121,32 @@ export function DetalheOrcamento({ orcamento }: DetalheOrcamentoProps) {
         senhaGov: (clienteExistente?.senhaGov) || orcamento.senhaGov || '',
         filiadoProTiro: (clienteExistente?.filiadoProTiro) ?? orcamento.filiadoProTiro ?? false,
         clubeFiliado: (clienteExistente?.clubeFiliado) || orcamento.clubeFiliado || '',
-        servicos: orcamento.servicos.map(s => ({
-          id: s.id,
-          nome: s.nome,
-          detalhes: s.detalhes,
-          valor: s.valor,
-          categoria: s.categoria || 'Honorário',
-          pagoDireto: s.pagoDireto || isLaudoExame(s.categoria || '', usuario?.dadosEmpresa?.categoriasServico),
-          taxaPF: s.taxaPF,
-          exigeGRU: s.exigeGRU,
-          statusExecucao: 'Não Iniciado'
-        })),
+        servicos: orcamento.servicos.map(s => {
+          const n = removerAcentos(s.nome.toLowerCase());
+          const ehEtapaSubsequenteAquisicao =
+            temAutorizacaoCompra &&
+            !ehServicoAquisicaoArma(s.nome) &&
+            (n.includes('craf') || n.includes('guia') || n.includes('trafego'));
+
+          return {
+            id: s.id,
+            nome: s.nome,
+            detalhes: s.detalhes,
+            valor: s.valor,
+            categoria: s.categoria || 'Honorário',
+            pagoDireto: s.pagoDireto || isLaudoExame(s.categoria || '', usuario?.dadosEmpresa?.categoriasServico),
+            taxaPF: s.taxaPF,
+            exigeGRU: s.exigeGRU,
+            statusExecucao: (ehEtapaSubsequenteAquisicao
+              ? 'Aguardando Etapa / Programado'
+              : 'Não Iniciado') as StatusExecucaoServico,
+            etapaOrigemNome: ehEtapaSubsequenteAquisicao ? 'SOLICITAÇÃO DE AUTORIZAÇÃO DE COMPRA' : undefined
+          };
+        }),
         valor: orcamento.servicos.filter(s => !s.pagoDireto && !isLaudoExame(s.categoria || '', usuario?.dadosEmpresa?.categoriasServico)).reduce((acc, s) => acc + (s.valor || 0), 0),
         valorPago: 0,
         historicoPagamentos: [],
-        formaPagamento: 'PIX', // Padrão
+        formaPagamento: 'PIX',
         status: 'Aguardando Pagamento',
         canalAtendimento: 'WhatsApp',
         observacaoContato: 'Convertido do ORC-' + String(orcamento.numero).padStart(4, '0'),
@@ -145,7 +155,6 @@ export function DetalheOrcamento({ orcamento }: DetalheOrcamentoProps) {
         taxaPFTotal: orcamento.servicos.reduce((acc, s) => acc + (s.taxaPF || 0), 0)
       });
 
-      // Atualiza o status do orçamento para "Aprovado" e vincula a O.S.
       await atualizarOrcamento(orcamento.id, { 
         status: 'Aprovado',
         convertidoOsId: osId 
@@ -153,7 +162,6 @@ export function DetalheOrcamento({ orcamento }: DetalheOrcamentoProps) {
 
       mostrar('sucesso', 'Sucesso! Orçamento convertido em O.S.');
       
-      // Manda para a página de edição/detalhe da nova O.S
       setTimeout(() => {
         navigate(`/ordens/${osId}/editar`);
       }, 1500);
@@ -303,8 +311,6 @@ export function DetalheOrcamento({ orcamento }: DetalheOrcamentoProps) {
               </div>
             </div>
             
-
-            
             {orcamento.observacoes && (
               <div className="pt-2">
                 <div className="bg-brand-dark-4/50 border border-brand-dark-5 p-3 rounded-lg flex gap-3">
@@ -328,14 +334,12 @@ export function DetalheOrcamento({ orcamento }: DetalheOrcamentoProps) {
             </h3>
             
             <div className="space-y-2">
-              {/* WhatsApp Button */}
               <button onClick={enviarParaWhatsApp} className="btn w-full bg-[#25D366]/20 text-[#25D366] border-[#25D366]/30 hover:bg-[#25D366] hover:text-white transition-all justify-start relative overflow-hidden group">
                 <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
                 <MessageCircle size={18} className="relative z-10" />
                 <span className="relative z-10 font-bold">Enviar por WhatsApp</span>
               </button>
 
-              {/* Botão PDF */}
               <button 
                 onClick={() => baixarPdfOrcamento(orcamento)}
                 className="btn-ghost w-full justify-start border-gray-700 hover:border-brand-blue hover:text-brand-blue-light"
@@ -435,5 +439,3 @@ export function DetalheOrcamento({ orcamento }: DetalheOrcamentoProps) {
     </div>
   );
 }
-
-

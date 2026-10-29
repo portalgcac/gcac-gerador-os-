@@ -4,13 +4,15 @@ import { supabase } from '../db/supabase';
 import { sincronizarOrdem as apiSincronizarOrdem, sincronizarPendentes as apiSincronizarPendentes } from '../services/driveSync';
 import { useAuth } from './AuthContext';
 import { useStatusConexao } from '../hooks/useStatusConexao';
+import { isServicoProgramadoLiberado } from '../utils/formatters';
 
 interface OrdensContextType {
   ordens: OrdemDeServico[];
   totalPendentes: number;
   criarOrdem: (dados: Omit<OrdemDeServico, 'id' | 'numero' | 'criadoEm' | 'atualizadoEm' | 'driveArquivoJsonId' | 'drivePdfId' | 'ultimaSincronizacao' | 'pendenteSincronizacao'>) => Promise<string>;
   atualizarOrdem: (id: string, dados: Partial<OrdemDeServico>) => Promise<void>;
-  atualizarStatusServico: (ordemId: string, servicoId: string, novoStatus: any, protocolo?: string, arquivoUrl?: string, armaId?: string, armaModelo?: string) => Promise<void>;
+  atualizarStatusServico: (ordemId: string, servicoId: string, novoStatus: any, protocolo?: string, arquivoUrl?: string, armaId?: string, armaModelo?: string) => Promise<{ etapaDesbloqueada?: string } | void>;
+  atualizarDadosServico: (ordemId: string, servicoId: string, dadosParciais: Partial<OrdemDeServico['servicos'][0]>) => Promise<void>;
   atualizarGruServico: (ordemId: string, servicoId: string, pago: boolean) => Promise<void>;
   atualizarProtocoloServico: (ordemId: string, servicoId: string, protocolo: string) => Promise<void>;
   deletarOrdem: (id: string) => Promise<void>;
@@ -20,7 +22,7 @@ interface OrdensContextType {
   sincronizarComPerfil: (ordemId: string) => Promise<boolean>;
   sincronizarOrdem: (ordem: OrdemDeServico) => Promise<boolean>;
   sincronizarPendentes: () => Promise<{ ok: number; erro: number }>;
-  itensFila: number; 
+  itensFila: number;
 }
 
 const OrdensContext = createContext<OrdensContextType | null>(null);
@@ -253,7 +255,7 @@ export function OrdensProvider({ children }: { children: React.ReactNode }) {
     }
 
     return ordemCriada.id;
-  }, [online, estaAutenticado, carregarOrdens, usuario]);
+  }, [online, estaAutenticado, carregarOrdens, usuario, adicionarEvento, sincronizarOrdem]);
 
   const atualizarOrdem = useCallback(async (id: string, dados: Partial<OrdemDeServico>) => {
     // Se estiver marcando como concluída (Pago), registra quem fez a ação
@@ -322,13 +324,17 @@ export function OrdensProvider({ children }: { children: React.ReactNode }) {
     if (online && estaAutenticado && data) {
       sincronizarOrdem(mapFromDB(data)).catch(console.error);
     }
-  }, [online, estaAutenticado, carregarOrdens]);
+  }, [online, estaAutenticado, carregarOrdens, ordens, usuario, adicionarEvento, sincronizarOrdem]);
 
   const atualizarStatusServico = useCallback(async (ordemId: string, servicoId: string, novoStatus: any, protocolo?: string, arquivoUrl?: string, armaId?: string, armaModelo?: string) => {
     const ordem = ordens.find(o => o.id === ordemId);
     if (!ordem) return;
 
-    const novosServicos = ordem.servicos.map(s => 
+    const servicoOriginal = ordem.servicos.find(s => s.id === servicoId);
+    const armaIdEfetiva = armaId || servicoOriginal?.armaId;
+    const armaModeloEfetivo = armaModelo || servicoOriginal?.armaModelo;
+
+    let novosServicos = ordem.servicos.map(s => 
       s.id === servicoId 
         ? { 
             ...s, 
@@ -336,17 +342,38 @@ export function OrdensProvider({ children }: { children: React.ReactNode }) {
             ...(protocolo !== undefined ? { protocolo } : {}),
             ...(arquivoUrl !== undefined ? { arquivoUrl } : {}),
             ...(armaId !== undefined ? { armaId } : {}),
-            ...(armaModelo !== undefined ? { armaModelo } : {})
+            ...(armaModelo !== undefined ? { armaModelo } : {}),
+            ...(novoStatus !== 'Aguardando Etapa / Programado' && s.dataProgramada ? { dataProgramada: undefined } : {})
           } 
         : s
     );
 
-    const servico = ordem.servicos.find(s => s.id === servicoId);
+    // Herança inteligente de arma entre etapas da mesma O.S. (ex: CRAF -> Guia de Tráfego)
+    if (armaIdEfetiva) {
+      novosServicos = novosServicos.map(s => {
+        if (s.id !== servicoId && !s.armaId) {
+          const n = s.nome.toLowerCase();
+          if (
+            n.includes('craf') ||
+            n.includes('guia') ||
+            n.includes('tráfego') ||
+            n.includes('trafego') ||
+            n.includes('transferência') ||
+            n.includes('transferencia') ||
+            n.includes('apostilamento')
+          ) {
+            return { ...s, armaId: armaIdEfetiva, armaModelo: armaModeloEfetivo };
+          }
+        }
+        return s;
+      });
+    }
+
     let novoHistorico = adicionarEvento(
       ordem.historicoStatus,
       'status_execucao',
-      `Status do serviço "${servico?.nome}" alterado para ${novoStatus}`,
-      servico?.statusExecucao,
+      `Status do serviço "${servicoOriginal?.nome}" alterado para ${novoStatus}`,
+      servicoOriginal?.statusExecucao,
       novoStatus
     );
 
@@ -354,8 +381,8 @@ export function OrdensProvider({ children }: { children: React.ReactNode }) {
       novoHistorico = adicionarEvento(
         novoHistorico,
         'protocolo',
-        `Protocolo do serviço "${servico?.nome}" inserido: ${protocolo}`,
-        servico?.protocolo,
+        `Protocolo do serviço "${servicoOriginal?.nome}" inserido: ${protocolo}`,
+        servicoOriginal?.protocolo,
         protocolo
       );
     }
@@ -364,13 +391,87 @@ export function OrdensProvider({ children }: { children: React.ReactNode }) {
       novoHistorico = adicionarEvento(
         novoHistorico,
         'arquivo_conclusao',
-        `Documento de conclusão do serviço "${servico?.nome}" anexado`,
+        `Documento de conclusão do serviço "${servicoOriginal?.nome}" anexado`,
         undefined,
         'Anexado'
       );
     }
 
+    // Efeito Dominó: Ao concluir uma etapa, libera automaticamente a próxima etapa que estava em "Aguardando Etapa / Programado"
+    let etapaDesbloqueada: string | undefined;
+    if (novoStatus === 'Concluído') {
+      const idxConcluido = novosServicos.findIndex(s => s.id === servicoId);
+      const idxProximaEtapa = novosServicos.findIndex((s, idx) => 
+        idx > idxConcluido && 
+        s.statusExecucao === 'Aguardando Etapa / Programado' && 
+        (!s.dataProgramada || isServicoProgramadoLiberado(s.dataProgramada))
+      );
+      const idxAlvo = idxProximaEtapa !== -1 
+        ? idxProximaEtapa 
+        : novosServicos.findIndex(s => 
+            s.id !== servicoId && 
+            s.statusExecucao === 'Aguardando Etapa / Programado' && 
+            (!s.dataProgramada || isServicoProgramadoLiberado(s.dataProgramada))
+          );
+
+      if (idxAlvo !== -1) {
+        const etapaAlvo = novosServicos[idxAlvo];
+        etapaDesbloqueada = etapaAlvo.nome;
+        novosServicos[idxAlvo] = {
+          ...etapaAlvo,
+          statusExecucao: 'Não Iniciado',
+          dataProgramada: undefined,
+        };
+        novoHistorico = adicionarEvento(
+          novoHistorico,
+          'status_execucao',
+          `⚡ Efeito Dominó: Etapa "${etapaAlvo.nome}" liberada automaticamente para a Fila de Protocolar após conclusão de "${servicoOriginal?.nome}"`,
+          'Aguardando Etapa / Programado',
+          'Não Iniciado'
+        );
+      }
+    }
+
     await atualizarOrdem(ordemId, { 
+      servicos: novosServicos,
+      historicoStatus: novoHistorico
+    });
+
+    return { etapaDesbloqueada };
+  }, [ordens, atualizarOrdem, adicionarEvento]);
+
+  const atualizarDadosServico = useCallback(async (ordemId: string, servicoId: string, dadosParciais: Partial<OrdemDeServico['servicos'][0]>) => {
+    const ordem = ordens.find(o => o.id === ordemId);
+    if (!ordem) return;
+
+    const servicoOriginal = ordem.servicos.find(s => s.id === servicoId);
+    if (!servicoOriginal) return;
+
+    const novosServicos = ordem.servicos.map(s =>
+      s.id === servicoId ? { ...s, ...dadosParciais } : s
+    );
+
+    let novoHistorico = ordem.historicoStatus || [];
+    if (dadosParciais.statusExecucao && dadosParciais.statusExecucao !== servicoOriginal.statusExecucao) {
+      novoHistorico = adicionarEvento(
+        novoHistorico,
+        'status_execucao',
+        `Status do serviço "${servicoOriginal.nome}" alterado para ${dadosParciais.statusExecucao}`,
+        servicoOriginal.statusExecucao,
+        dadosParciais.statusExecucao
+      );
+    }
+    if (dadosParciais.dataProgramada !== undefined && dadosParciais.dataProgramada !== servicoOriginal.dataProgramada) {
+      novoHistorico = adicionarEvento(
+        novoHistorico,
+        'sistema',
+        dadosParciais.dataProgramada
+          ? `Serviço "${servicoOriginal.nome}" programado para ${dadosParciais.dataProgramada}`
+          : `Agendamento futuro removido do serviço "${servicoOriginal.nome}"`
+      );
+    }
+
+    await atualizarOrdem(ordemId, {
       servicos: novosServicos,
       historicoStatus: novoHistorico
     });
@@ -422,7 +523,7 @@ export function OrdensProvider({ children }: { children: React.ReactNode }) {
       servicos: novosServicos,
       historicoStatus: novoHistorico
     });
-  }, [ordens, atualizarOrdem]);
+  }, [ordens, atualizarOrdem, adicionarEvento]);
 
   const deletarOrdem = useCallback(async (id: string) => {
     const { error } = await supabase
@@ -433,6 +534,7 @@ export function OrdensProvider({ children }: { children: React.ReactNode }) {
     if (error) throw error;
     await carregarOrdens();
   }, [carregarOrdens]);
+
   const buscarOrdem = useCallback(async (id: string) => {
     if (!usuario?.empresaId) return undefined;
     const { data, error } = await supabase
@@ -449,8 +551,6 @@ export function OrdensProvider({ children }: { children: React.ReactNode }) {
   const registrarPagamento = useCallback(async (ordemId: string, valor: number, metodo: FormaPagamento) => {
     const ordem = ordens.find(o => o.id === ordemId);
     if (!ordem) return;
-    
-    // ... (rest of registrarPagamento is fine, but I'll add removerPagamento below)
 
     const novoPagamento = {
       id: crypto.randomUUID(),
@@ -461,7 +561,6 @@ export function OrdensProvider({ children }: { children: React.ReactNode }) {
 
     const novoHistorico = [...(ordem.historicoPagamentos || []), novoPagamento];
     const novoValorPago = novoHistorico.reduce((acc, p) => acc + p.valor, 0);
-    
     
     let novoStatus: StatusOS = ordem.status;
     let concluidoPorNome = ordem.concluidoPorNome;
@@ -488,7 +587,7 @@ export function OrdensProvider({ children }: { children: React.ReactNode }) {
         `Pagamento de R$ ${valor.toFixed(2)} registrado via ${metodo}`
       )
     });
-  }, [ordens, atualizarOrdem]);
+  }, [ordens, atualizarOrdem, usuario, adicionarEvento]);
 
   const removerPagamento = useCallback(async (ordemId: string, pagamentoId: string) => {
     const ordem = ordens.find(o => o.id === ordemId);
@@ -548,7 +647,7 @@ export function OrdensProvider({ children }: { children: React.ReactNode }) {
       console.error('Erro ao sincronizar com perfil:', err);
       return false;
     }
-  }, [ordens, atualizarOrdem, adicionarEvento]);
+  }, [ordens, atualizarOrdem, adicionarEvento, usuario]);
 
   return (
     <OrdensContext.Provider value={{
@@ -557,6 +656,7 @@ export function OrdensProvider({ children }: { children: React.ReactNode }) {
       criarOrdem,
       atualizarOrdem,
       atualizarStatusServico,
+      atualizarDadosServico,
       atualizarGruServico,
       atualizarProtocoloServico,
       deletarOrdem,

@@ -1,10 +1,17 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
-import { Search, Plus, Filter, ChevronRight, FileText, X, Trash2, CheckCircle, Clock } from 'lucide-react';
+import { Search, Plus, Filter, ChevronRight, FileText, Trash2, CheckCircle, Clock } from 'lucide-react';
 import { useOrdens } from '../../context/OrdensContext';
 import { useServicos } from '../../context/ServicosContext';
-import { StatusOS, StatusExecucaoServico } from '../../types';
-import { formatarMoeda, formatarData, formatarNumeroOS, classeStatus, classeStatusExecucao, iconeStatusExecucao, obterResumoExecucao, isOrdemConcluida, removerAcentos } from '../../utils/formatters';
+import { StatusOS, StatusExecucaoServico, StatusOperacionalOS } from '../../types';
+import {
+  formatarMoeda,
+  classeStatus,
+  obterResumoExecucao,
+  obterStatusOperacionalOS,
+  isOrdemConcluida,
+  removerAcentos
+} from '../../utils/formatters';
 import { DialogConfirmacao } from '../common/DialogConfirmacao';
 import { Notificacao, useNotificacao } from '../common/Notificacao';
 import { useAuth } from '../../context/AuthContext';
@@ -17,12 +24,13 @@ const STATUS_FILTROS: { label: string; valor: StatusOS }[] = [
 ];
 
 const STATUS_EXEC_FILTROS: { label: string; valor: StatusExecucaoServico }[] = [
-  { label: 'Não Iniciado',        valor: 'Não Iniciado' },
-  { label: 'Iniciado',            valor: 'Iniciado — Montando Processo' },
-  { label: 'Agd Documentos',      valor: 'Aguardando Documentos' },
-  { label: 'Protocolado',         valor: 'Protocolado — Ag. PF' },
-  { label: 'Concluídos',          valor: 'Concluído' },
-  { label: 'Cancelados',          valor: 'Cancelado / Não Executado' },
+  { label: 'Não Iniciado',            valor: 'Não Iniciado' },
+  { label: 'Iniciado',                valor: 'Iniciado — Montando Processo' },
+  { label: 'Agd Documentos',          valor: 'Aguardando Documentos' },
+  { label: 'Protocolado',             valor: 'Protocolado — Ag. PF' },
+  { label: 'Em Espera / Programado',  valor: 'Aguardando Etapa / Programado' },
+  { label: 'Concluídos',              valor: 'Concluído' },
+  { label: 'Cancelados',              valor: 'Cancelado / Não Executado' },
 ];
 
 export function ListaOrdens() {
@@ -38,6 +46,7 @@ export function ListaOrdens() {
   // Estados derivados da URL
   const busca = searchParams.get('busca') || '';
   const abaAtiva = (searchParams.get('aba') as 'ativas' | 'concluidas') || 'ativas';
+  const filtroOpGeral = (searchParams.get('op') as StatusOperacionalOS | '') || '';
   const filtrosStatus = useMemo(() => searchParams.getAll('status') as StatusOS[], [searchParams]);
   const filtrosStatusExec = useMemo(() => searchParams.getAll('exec') as StatusExecucaoServico[], [searchParams]);
   const filtrosServico = useMemo(() => searchParams.getAll('servico'), [searchParams]);
@@ -60,7 +69,6 @@ export function ListaOrdens() {
     }, { replace: true });
   };
 
-
   const handleDeletar = async () => {
     if (!confirmandoDelete) return;
     try {
@@ -77,16 +85,35 @@ export function ListaOrdens() {
     const state = location.state as { filtroStatusExecucao?: StatusExecucaoServico };
     if (state?.filtroStatusExecucao) {
       updateParams('exec', [state.filtroStatusExecucao]);
-      // Limpar o estado para evitar comportamentos inesperados ao recarregar
       window.history.replaceState({}, document.title);
     }
   }, [location]);
+
+  // Contadores de Status Operacional Geral das O.S. em aberto
+  const contadoresOperacionais = useMemo(() => {
+    const abertas = ordens.filter(o => !isOrdemConcluida(o));
+    let pendenteProtocolar = 0;
+    let aguardandoPF = 0;
+    let emEspera = 0;
+    abertas.forEach(o => {
+      const st = obterStatusOperacionalOS(o).status;
+      if (st === 'Pendente Protocolar') pendenteProtocolar++;
+      else if (st === 'Aguardando PF') aguardandoPF++;
+      else if (st === 'Em Espera / Programada') emEspera++;
+    });
+    return { pendenteProtocolar, aguardandoPF, emEspera };
+  }, [ordens]);
 
   const ordensFiltradas = ordens.filter(o => {
     // Primeiro filtro: Aba Ativa vs Concluída
     const statusConclusao = isOrdemConcluida(o);
     if (abaAtiva === 'ativas' && statusConclusao) return false;
     if (abaAtiva === 'concluidas' && !statusConclusao) return false;
+
+    if (filtroOpGeral && abaAtiva === 'ativas') {
+      const stOp = obterStatusOperacionalOS(o).status;
+      if (stOp !== filtroOpGeral) return false;
+    }
 
     const matchBusca = !busca || [
       o.nomeCliente, 
@@ -161,32 +188,97 @@ export function ListaOrdens() {
         </button>
       </div>
 
-      {/* ── Seletor de Abas ── */}
-      <div className="flex gap-1 p-1 bg-brand-dark-3 border border-brand-dark-5 rounded-xl w-fit">
-        <button 
-          onClick={() => updateParams('aba', 'ativas')}
-          className={`px-4 py-2 rounded-lg text-xs font-bold uppercase transition-all flex items-center gap-2 ${
-            abaAtiva === 'ativas' ? 'bg-brand-blue text-white shadow-lg' : 'text-gray-500 hover:text-gray-300'
-          }`}
-        >
-          <Clock size={14} />
-          Em Aberto
-          <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${abaAtiva === 'ativas' ? 'bg-white/20' : 'bg-brand-dark-5'}`}>
-            {ordens.filter(o => !isOrdemConcluida(o)).length}
-          </span>
-        </button>
-        <button 
-          onClick={() => updateParams('aba', 'concluidas')}
-          className={`px-4 py-2 rounded-lg text-xs font-bold uppercase transition-all flex items-center gap-2 ${
-            abaAtiva === 'concluidas' ? 'bg-brand-blue text-white shadow-lg' : 'text-gray-500 hover:text-gray-300'
-          }`}
-        >
-          <CheckCircle size={14} />
-          Histórico / Concluídas
-          <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${abaAtiva === 'concluidas' ? 'bg-white/20' : 'bg-brand-dark-5'}`}>
-            {ordens.filter(o => isOrdemConcluida(o)).length}
-          </span>
-        </button>
+      {/* ── Seletor de Abas + Filtros Rápidos de Status Geral da O.S. ── */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex gap-1 p-1 bg-brand-dark-3 border border-brand-dark-5 rounded-xl w-fit">
+          <button 
+            onClick={() => {
+              setSearchParams(prev => {
+                const next = new URLSearchParams(prev);
+                next.set('aba', 'ativas');
+                return next;
+              }, { replace: true });
+            }}
+            className={`px-4 py-2 rounded-lg text-xs font-bold uppercase transition-all flex items-center gap-2 ${
+              abaAtiva === 'ativas' ? 'bg-brand-blue text-white shadow-lg' : 'text-gray-500 hover:text-gray-300'
+            }`}
+          >
+            <Clock size={14} />
+            Em Aberto
+            <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${abaAtiva === 'ativas' ? 'bg-white/20' : 'bg-brand-dark-5'}`}>
+              {ordens.filter(o => !isOrdemConcluida(o)).length}
+            </span>
+          </button>
+          <button 
+            onClick={() => {
+              setSearchParams(prev => {
+                const next = new URLSearchParams(prev);
+                next.set('aba', 'concluidas');
+                next.delete('op');
+                return next;
+              }, { replace: true });
+            }}
+            className={`px-4 py-2 rounded-lg text-xs font-bold uppercase transition-all flex items-center gap-2 ${
+              abaAtiva === 'concluidas' ? 'bg-brand-blue text-white shadow-lg' : 'text-gray-500 hover:text-gray-300'
+            }`}
+          >
+            <CheckCircle size={14} />
+            Histórico / Concluídas
+            <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${abaAtiva === 'concluidas' ? 'bg-white/20' : 'bg-brand-dark-5'}`}>
+              {ordens.filter(o => isOrdemConcluida(o)).length}
+            </span>
+          </button>
+        </div>
+
+        {/* Pílulas de Status Operacional Geral da O.S. */}
+        {abaAtiva === 'ativas' && (
+          <div className="flex flex-wrap items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => updateParams('op', filtroOpGeral === 'Pendente Protocolar' ? null : 'Pendente Protocolar')}
+              className={`px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider border transition-all flex items-center gap-1.5 ${
+                filtroOpGeral === 'Pendente Protocolar'
+                  ? 'bg-red-500/25 text-red-300 border-red-500/60 shadow-[0_0_12px_rgba(239,68,68,0.2)]'
+                  : 'bg-brand-dark-3 text-gray-400 border-brand-dark-5 hover:border-red-500/40 hover:text-red-300'
+              }`}
+            >
+              <span>🚨 Pendente Protocolar</span>
+              <span className="px-1.5 py-0.2 rounded-full bg-red-500/20 text-red-300 text-[10px]">
+                {contadoresOperacionais.pendenteProtocolar}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => updateParams('op', filtroOpGeral === 'Aguardando PF' ? null : 'Aguardando PF')}
+              className={`px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider border transition-all flex items-center gap-1.5 ${
+                filtroOpGeral === 'Aguardando PF'
+                  ? 'bg-purple-500/25 text-purple-300 border-purple-500/60 shadow-[0_0_12px_rgba(168,85,247,0.2)]'
+                  : 'bg-brand-dark-3 text-gray-400 border-brand-dark-5 hover:border-purple-500/40 hover:text-purple-300'
+              }`}
+            >
+              <span>📤 Aguardando PF</span>
+              <span className="px-1.5 py-0.2 rounded-full bg-purple-500/20 text-purple-300 text-[10px]">
+                {contadoresOperacionais.aguardandoPF}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => updateParams('op', filtroOpGeral === 'Em Espera / Programada' ? null : 'Em Espera / Programada')}
+              className={`px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider border transition-all flex items-center gap-1.5 ${
+                filtroOpGeral === 'Em Espera / Programada'
+                  ? 'bg-indigo-500/25 text-indigo-300 border-indigo-500/60 shadow-[0_0_12px_rgba(99,102,241,0.2)]'
+                  : 'bg-brand-dark-3 text-gray-400 border-brand-dark-5 hover:border-indigo-500/40 hover:text-indigo-300'
+              }`}
+            >
+              <span>⏸️ Em Espera / Programada</span>
+              <span className="px-1.5 py-0.2 rounded-full bg-indigo-500/20 text-indigo-300 text-[10px]">
+                {contadoresOperacionais.emEspera}
+              </span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* ── Busca e Filtros ── */}
@@ -350,11 +442,11 @@ export function ListaOrdens() {
           </div>
           <p className="text-gray-400 font-medium">Nenhuma OS encontrada</p>
           <p className="text-sm text-gray-500 mt-1">
-            {busca || filtrosStatus.length > 0 || filtrosStatusExec.length > 0 || filtrosServico.length > 0 || filtrosGru.length > 0
+            {busca || filtroOpGeral || filtrosStatus.length > 0 || filtrosStatusExec.length > 0 || filtrosServico.length > 0 || filtrosGru.length > 0
               ? 'Tente ajustar os filtros de busca'
               : 'Clique em "Nova OS" para criar a primeira ordem'}
           </p>
-          {!busca && filtrosStatus.length === 0 && filtrosStatusExec.length === 0 && filtrosServico.length === 0 && filtrosGru.length === 0 && (
+          {!busca && !filtroOpGeral && filtrosStatus.length === 0 && filtrosStatusExec.length === 0 && filtrosServico.length === 0 && filtrosGru.length === 0 && (
             <button onClick={() => navigate('/ordens/nova')} className="btn-primary mt-4 mx-auto">
               <Plus size={16} />
               Criar primeira OS
@@ -363,7 +455,9 @@ export function ListaOrdens() {
         </div>
       ) : (
         <div className="space-y-2">
-          {ordensFiltradas.map(ordem => (
+          {ordensFiltradas.map(ordem => {
+            const stOp = obterStatusOperacionalOS(ordem);
+            return (
             <div
               key={ordem.id}
               onClick={() => navigate(`/ordens/${ordem.id}`)}
@@ -382,7 +476,16 @@ export function ListaOrdens() {
               <div className="w-px h-8 bg-brand-dark-5 flex-shrink-0" />
 
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-white leading-tight">{ordem.nomeCliente}</p>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="text-sm font-semibold text-white leading-tight">{ordem.nomeCliente}</p>
+                  <span
+                    className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-black border uppercase tracking-wider ${stOp.classe}`}
+                    title={stOp.resumo}
+                  >
+                    <span>{stOp.icone}</span>
+                    <span>{stOp.rotuloCurto}</span>
+                  </span>
+                </div>
                 <p className="text-[10px] text-gray-500 mt-0.5 truncate">{ordem.servicos ? ordem.servicos.map((s: any) => s.nome).join(', ') : (ordem as any).servico}</p>
                 {ordem.criadoPorNome && (
                   <p className="text-[8px] text-brand-blue-light/70 font-bold uppercase mt-0.5 tracking-tighter">Emitido por: {ordem.criadoPorNome}</p>
@@ -476,7 +579,8 @@ export function ListaOrdens() {
                 <ChevronRight size={14} className="text-gray-600 flex-shrink-0" />
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
       <Notificacao {...notif} onFechar={fechar} />
