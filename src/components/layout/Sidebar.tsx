@@ -13,21 +13,75 @@ import { NotificacoesDropdown } from './NotificacoesDropdown';
 import { WorkspaceSwitcher } from './WorkspaceSwitcher';
 import { isServicoPendenteProtocolar } from '../../utils/formatters';
 
-const links = [
-  { to: '/dashboard', label: 'Painel',          icon: LayoutDashboard, slug: 'painel' },
-  { to: '/rotina',    label: 'Rotina Diária',   icon: ListTodo,        slug: 'rotina' },
-  { to: '/agenda',    label: 'Agenda / Lembretes', icon: ListTodo,     slug: 'agenda' },
-  { to: '/financeiro', label: 'Financeiro',     icon: BarChart3,       slug: 'financeiro' },
-  { to: '/orcamentos', label: 'Orçamentos',     icon: Receipt,         slug: 'orcamentos' },
-  { to: '/ordens',     label: 'Ordens de Serviço', icon: FileText,      slug: 'ordens' },
-  { to: '/recibos',    label: 'Recibos',           icon: Receipt,      slug: 'recibos' },
-  { to: '/agendamentos', label: 'Agendamentos',   icon: Calendar,      slug: 'agendamentos' },
-  { to: '/clientes',   label: 'Meus Clientes',     icon: Users,         slug: 'clientes' },
-  { to: '/relatorios', label: 'Relatórios',       icon: FileSpreadsheet, slug: 'relatorios' },
-  { to: '/equipe',     label: 'Equipe do Escritório', icon: Shield,     slug: 'equipe' },
-  { to: '/configuracoes', label: 'Configurações', icon: Settings,      slug: 'config' },
-  { to: '/declaracoes', label: 'Declarações',     icon: FileText,      slug: 'declaracoes' },
-].sort((a, b) => a.label.localeCompare(b.label));
+export const LINKS_MENU_BASE = [
+  { to: '/dashboard',     label: 'Painel',                icon: LayoutDashboard, slug: 'painel' },
+  { to: '/rotina',        label: 'Rotina Diária',         icon: ListTodo,        slug: 'rotina' },
+  { to: '/ordens',        label: 'Ordens de Serviço',     icon: FileText,        slug: 'ordens' },
+  { to: '/orcamentos',    label: 'Orçamentos',            icon: Receipt,         slug: 'orcamentos' },
+  { to: '/clientes',      label: 'Meus Clientes',         icon: Users,           slug: 'clientes' },
+  { to: '/agenda',        label: 'Agenda / Lembretes',    icon: ListTodo,        slug: 'agenda' },
+  { to: '/agendamentos',  label: 'Agendamentos',          icon: Calendar,        slug: 'agendamentos' },
+  { to: '/declaracoes',   label: 'Declarações',           icon: FileText,        slug: 'declaracoes' },
+  { to: '/recibos',       label: 'Recibos',               icon: Receipt,         slug: 'recibos' },
+  { to: '/financeiro',    label: 'Financeiro',            icon: BarChart3,       slug: 'financeiro' },
+  { to: '/relatorios',    label: 'Relatórios',            icon: FileSpreadsheet, slug: 'relatorios' },
+  { to: '/equipe',        label: 'Equipe do Escritório',  icon: Shield,          slug: 'equipe' },
+  { to: '/configuracoes', label: 'Configurações',         icon: Settings,        slug: 'config' },
+];
+
+export const ORDEM_MENU_OPERACIONAL_PADRAO = LINKS_MENU_BASE.map(l => l.slug);
+
+export const ORDEM_MENU_ALFABETICA = [...LINKS_MENU_BASE]
+  .sort((a, b) => a.label.localeCompare(b.label))
+  .map(l => l.slug);
+
+const getChaveOrdemMenu = (empresaId?: string) =>
+  `gcac_ordem_menu_${empresaId || 'default'}`;
+
+export function obterOrdemMenuSalva(empresaId?: string): string[] {
+  try {
+    const raw =
+      (empresaId ? localStorage.getItem(getChaveOrdemMenu(empresaId)) : null) ||
+      localStorage.getItem(getChaveOrdemMenu('default'));
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        const existentes = parsed.filter(slug => LINKS_MENU_BASE.some(l => l.slug === slug));
+        const faltantes = ORDEM_MENU_OPERACIONAL_PADRAO.filter(slug => !existentes.includes(slug));
+        return [...existentes, ...faltantes];
+      }
+    }
+  } catch {
+    // fallback silencioso
+  }
+  return ORDEM_MENU_OPERACIONAL_PADRAO;
+}
+
+export function salvarOrdemMenu(slugs: string[], empresaId?: string) {
+  try {
+    const validos = slugs.filter(slug => LINKS_MENU_BASE.some(l => l.slug === slug));
+    const faltantes = ORDEM_MENU_OPERACIONAL_PADRAO.filter(slug => !validos.includes(slug));
+    const listaFinal = [...validos, ...faltantes];
+    if (empresaId) {
+      localStorage.setItem(getChaveOrdemMenu(empresaId), JSON.stringify(listaFinal));
+    }
+    localStorage.setItem(getChaveOrdemMenu('default'), JSON.stringify(listaFinal));
+    window.dispatchEvent(new CustomEvent('gcac-menu-order-changed'));
+  } catch (e) {
+    console.error('Erro ao salvar ordem do menu:', e);
+  }
+}
+
+export function ordenarLinksMenu<T extends { slug: string }>(listaLinks: T[], empresaId?: string): T[] {
+  const ordem = obterOrdemMenuSalva(empresaId);
+  return [...listaLinks].sort((a, b) => {
+    const idxA = ordem.indexOf(a.slug);
+    const idxB = ordem.indexOf(b.slug);
+    const posA = idxA === -1 ? 999 : idxA;
+    const posB = idxB === -1 ? 999 : idxB;
+    return posA - posB;
+  });
+}
 
 const linksPortalSaaS = [
   { to: '/portal-admin?tab=empresas', label: 'Despachantes & Clubes (B2B)', icon: Building2, tab: 'empresas' },
@@ -42,7 +96,7 @@ const linksPortalSaaS = [
   { to: '/portal-admin?tab=socios', label: 'Sócios do Portal', icon: Shield, tab: 'socios' },
 ];
 
-const temAcessoLink = (link: typeof links[0], usuario: any, temAcessoRecurso: (r: string) => boolean) => {
+export const temAcessoLink = (link: typeof LINKS_MENU_BASE[0], usuario: any, temAcessoRecurso: (r: string) => boolean) => {
   if (usuario?.tipoConta === 'cac_individual') {
     return (link.slug === 'clientes' && link.to === '/clientes') || link.slug === 'agenda' || link.slug === 'config';
   }
@@ -102,10 +156,11 @@ const temAcessoLink = (link: typeof links[0], usuario: any, temAcessoRecurso: (r
 };
 
 const filtrarLinks = (usuario: any, temAcessoRecurso: (r: string) => boolean) => {
-  return links.filter(link => temAcessoLink(link, usuario, temAcessoRecurso));
+  const acessiveis = LINKS_MENU_BASE.filter(link => temAcessoLink(link, usuario, temAcessoRecurso));
+  return ordenarLinksMenu(acessiveis, usuario?.empresaId);
 };
 
-const getLinkLabel = (link: typeof links[0], usuario: any) => {
+const getLinkLabel = (link: typeof LINKS_MENU_BASE[0], usuario: any) => {
   if (usuario?.tipoConta === 'cac_individual') {
     if (link.slug === 'clientes') return 'Meu Acervo & CR';
     if (link.slug === 'agenda') return 'Meus Lembretes';
@@ -129,7 +184,18 @@ export function Sidebar({ onClose, isMobile }: SidebarProps = {}) {
   const searchParams = new URLSearchParams(location.search);
   const currentTab = searchParams.get('tab') || 'empresas';
 
+  const [, setVersaoOrdemMenu] = useState(0);
   const [despachanteVinculado, setDespachanteVinculado] = useState<string | null>(null);
+
+  useEffect(() => {
+    const handleMenuChanged = () => setVersaoOrdemMenu(v => v + 1);
+    window.addEventListener('gcac-menu-order-changed', handleMenuChanged);
+    window.addEventListener('storage', handleMenuChanged);
+    return () => {
+      window.removeEventListener('gcac-menu-order-changed', handleMenuChanged);
+      window.removeEventListener('storage', handleMenuChanged);
+    };
+  }, []);
 
   useEffect(() => {
     if (usuario?.tipoConta === 'cac_individual' && usuario?.empresaId) {
@@ -475,6 +541,17 @@ export function NavegacaoInferior({ onAbrirMenu }: NavegacaoInferiorProps = {}) 
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
   const currentTab = searchParams.get('tab') || 'empresas';
+  const [, setVersaoOrdemMenu] = useState(0);
+
+  useEffect(() => {
+    const handleMenuChanged = () => setVersaoOrdemMenu(v => v + 1);
+    window.addEventListener('gcac-menu-order-changed', handleMenuChanged);
+    window.addEventListener('storage', handleMenuChanged);
+    return () => {
+      window.removeEventListener('gcac-menu-order-changed', handleMenuChanged);
+      window.removeEventListener('storage', handleMenuChanged);
+    };
+  }, []);
 
   const linksFiltrados = filtrarLinks(usuario, temAcessoRecurso);
 
@@ -490,7 +567,7 @@ export function NavegacaoInferior({ onAbrirMenu }: NavegacaoInferiorProps = {}) 
   };
 
   const handleTrocarAmbiente = () => {
-    const novoCtx = contextoAtivo === 'escritorio' ? 'portal_saas' : 'escritorio';
+    const novoCtx = contextoAtivo === 'escritorio' ? 'portal_saas' : 'portal_saas' === contextoAtivo ? 'escritorio' : 'portal_saas';
     setContextoAtivo(novoCtx);
     if (novoCtx === 'portal_saas') {
       navigate('/portal-admin');

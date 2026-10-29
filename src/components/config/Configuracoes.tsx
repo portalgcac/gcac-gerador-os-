@@ -20,6 +20,7 @@ import { Notificacao, useNotificacao } from '../common/Notificacao';
 import { ModalServico } from './ModalServico';
 import { ModalCategoria } from './ModalCategoria';
 import { GestaoUsuarios } from './GestaoUsuarios';
+import { GerenciadorOrdemMenu } from './GerenciadorOrdemMenu';
 import { formatarMoeda, formatarData } from '../../utils/formatters';
 import { compressImage, uploadBase64File } from '../../utils/fileUtils';
 import { ServicoConfig, CategoriaServico } from '../../types';
@@ -1423,6 +1424,9 @@ export function Configuracoes() {
           )}
         </div>
       )}
+
+      {/* ── Ordem das Opções do Menu Lateral ── */}
+      <GerenciadorOrdemMenu usuario={usuario} temAcessoRecurso={temAcessoRecurso} onNotificar={mostrar} />
 
       {/* ── Alertas de Vencimento (empresa/colaborador) ── */}
       {temAcessoRecurso('config_alertas_vencimento') && (
