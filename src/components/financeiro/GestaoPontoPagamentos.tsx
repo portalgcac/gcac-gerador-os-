@@ -16,7 +16,16 @@ import {
   Wand2,
   ShieldCheck,
   AlertCircle,
-  Camera
+  Camera,
+  Calculator,
+  Copy,
+  Check,
+  Sun,
+  Moon,
+  Coffee,
+  HelpCircle,
+  Send,
+  ArrowRight
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useAuth } from '../../context/AuthContext';
@@ -45,6 +54,9 @@ import {
   calcularApuracaoPeriodo,
   calcularMinutosTrabalhadosDia,
   formatarMinutosHoras,
+  minutosParaHoraInput,
+  calcularHoraSaidaParaCarga,
+  calcularSimulacaoProporcional,
   ConfigSedeGps
 } from '../../services/pontoColaboradoresService';
 import { baixarPdfApuracaoColaborador } from '../../services/geradorPdfApuracaoColaborador';
@@ -64,7 +76,7 @@ export function GestaoPontoPagamentos({ dataInicio, dataFim }: GestaoPontoPagame
 
   const empresaId = usuario?.empresaId || '00000000-0000-0000-0000-000000000001';
 
-  const [subModo, setSubModo] = useState<'apuracao' | 'relogio' | 'historico_nf'>('apuracao');
+  const [subModo, setSubModo] = useState<'apuracao' | 'relogio' | 'historico_nf' | 'simulador'>('apuracao');
   const [contratos, setContratos] = useState<ColaboradorContrato[]>([]);
   const [colaboradorAtivoId, setColaboradorAtivoId] = useState<string>('');
   const [registros, setRegistros] = useState<RegistroPontoColaborador[]>([]);
@@ -100,7 +112,7 @@ export function GestaoPontoPagamentos({ dataInicio, dataFim }: GestaoPontoPagame
     modeloCalculo: 'mensal_proporcional' as ModeloCalculoColaborador,
     divisorMensal: 'dias_uteis' as DivisorMensalColaborador,
     valorBase: '1800',
-    cargaHorariaHoras: '8',
+    cargaHorariaFormatada: '08:00', // Suporta minutos (ex: 08:30)
     horarioEntradaPadrao: '08:00',
     horarioIntervaloInicioPadrao: '12:00',
     horarioIntervaloFimPadrao: '13:30',
@@ -120,6 +132,22 @@ export function GestaoPontoPagamentos({ dataInicio, dataFim }: GestaoPontoPagame
     horaSaida: string;
     observacao: string;
   } | null>(null);
+
+  // Estado da Calculadora de Simulação de Fechamento
+  const [simColaboradorId, setSimColaboradorId] = useState<string>('hector');
+  const [simNome, setSimNome] = useState('Hector Henrique Meira');
+  const [simValorBase, setSimValorBase] = useState('3000');
+  const [simModelo, setSimModelo] = useState<ModeloCalculoColaborador>('mensal_proporcional');
+  const [simDivisor, setSimDivisor] = useState<DivisorMensalColaborador>('dias_uteis');
+  const [simDataInicio, setSimDataInicio] = useState('2026-10-19');
+  const [simMesAno, setSimMesAno] = useState('2026-10');
+  const [simCargaFormatada, setSimCargaFormatada] = useState('08:30');
+  const [simDiasTrabalhados, setSimDiasTrabalhados] = useState<number | ''>(7);
+  const [simDiasFaltas, setSimDiasFaltas] = useState<number | ''>(3);
+  const [simAdiantamentos, setSimAdiantamentos] = useState('0');
+  const [simAjudaCusto, setSimAjudaCusto] = useState('0');
+  const [simHorasExtrasMins, setSimHorasExtrasMins] = useState(0);
+  const [simCopiado, setSimCopiado] = useState(false);
 
   const dataInicioStr = useMemo(() => format(dataInicio, 'yyyy-MM-dd'), [dataInicio]);
   const dataFimStr = useMemo(() => format(dataFim, 'yyyy-MM-dd'), [dataFim]);
@@ -236,6 +264,92 @@ export function GestaoPontoPagamentos({ dataInicio, dataFim }: GestaoPontoPagame
     };
   }, [apuracao, incluirComissoesOs, comissoesColaboradorPeriodo, valorAjudaCustoInput, valorAdiantamentosInput]);
 
+  /** Converte qualquer string ("08:30", "8.5", "8h30", "8") em minutos inteiros */
+  const parseCargaParaMinutos = (valor: string | number): number => {
+    if (typeof valor === 'number') return Math.max(0, Math.round(valor * 60));
+    if (!valor || !String(valor).trim()) return 480;
+    const limpo = String(valor).trim().toLowerCase();
+    if (limpo.includes(':')) {
+      const [h, m] = limpo.split(':').map(Number);
+      return Math.max(0, (h || 0) * 60 + (m || 0));
+    }
+    if (limpo.includes('h')) {
+      const parts = limpo.split('h');
+      const h = parseInt(parts[0], 10) || 0;
+      const m = parseInt(parts[1], 10) || 0;
+      return Math.max(0, h * 60 + m);
+    }
+    const num = parseFloat(limpo);
+    if (isNaN(num)) return 480;
+    return Math.max(0, Math.round(num * 60));
+  };
+
+  /** Resumo dinâmico da jornada do modal de contrato em tempo real */
+  const resumoJornada = useMemo(() => {
+    const ent = formContrato.horarioEntradaPadrao;
+    const intIda = formContrato.horarioIntervaloInicioPadrao;
+    const intVolta = formContrato.horarioIntervaloFimPadrao;
+    const saida = formContrato.horarioSaidaPadrao;
+
+    const minManha = calcularMinutosTrabalhadosDia(ent, '', '', intIda);
+    const minIntervalo = calcularMinutosTrabalhadosDia(intIda, '', '', intVolta);
+    const minTarde = calcularMinutosTrabalhadosDia(intVolta, '', '', saida);
+    const minTotal = calcularMinutosTrabalhadosDia(ent, intIda, intVolta, saida);
+    const minDesejado = parseCargaParaMinutos(formContrato.cargaHorariaFormatada);
+
+    return {
+      manha: formatarMinutosHoras(minManha),
+      intervalo: formatarMinutosHoras(minIntervalo),
+      tarde: formatarMinutosHoras(minTarde),
+      total: formatarMinutosHoras(minTotal),
+      minTotal,
+      minDesejado,
+      bateCarga: minTotal > 0 && Math.abs(minTotal - minDesejado) <= 1
+    };
+  }, [
+    formContrato.horarioEntradaPadrao,
+    formContrato.horarioIntervaloInicioPadrao,
+    formContrato.horarioIntervaloFimPadrao,
+    formContrato.horarioSaidaPadrao,
+    formContrato.cargaHorariaFormatada
+  ]);
+
+  /** Modal Inteligente: Ao mudar a carga horária desejada, recalcula a saída padrão */
+  const handleChangeCargaHoraria = (novaCarga: string) => {
+    const minsDesejados = parseCargaParaMinutos(novaCarga);
+    const novaSaida = calcularHoraSaidaParaCarga(
+      formContrato.horarioEntradaPadrao,
+      formContrato.horarioIntervaloInicioPadrao,
+      formContrato.horarioIntervaloFimPadrao,
+      minsDesejados
+    );
+
+    setFormContrato(prev => ({
+      ...prev,
+      cargaHorariaFormatada: novaCarga,
+      horarioSaidaPadrao: novaSaida
+    }));
+  };
+
+  /** Modal Inteligente: Ao mexer em qualquer horário, recalcula a carga líquida apurada */
+  const handleChangeHorario = (
+    campo: 'horarioEntradaPadrao' | 'horarioIntervaloInicioPadrao' | 'horarioIntervaloFimPadrao' | 'horarioSaidaPadrao',
+    valor: string
+  ) => {
+    const atualizado = { ...formContrato, [campo]: valor };
+    const minLiquido = calcularMinutosTrabalhadosDia(
+      atualizado.horarioEntradaPadrao,
+      atualizado.horarioIntervaloInicioPadrao,
+      atualizado.horarioIntervaloFimPadrao,
+      atualizado.horarioSaidaPadrao
+    );
+
+    if (minLiquido > 0) {
+      atualizado.cargaHorariaFormatada = minutosParaHoraInput(minLiquido);
+    }
+    setFormContrato(atualizado);
+  };
+
   const abrirModalNovoContrato = () => {
     setEditandoContratoId(undefined);
     setFormContrato({
@@ -249,7 +363,7 @@ export function GestaoPontoPagamentos({ dataInicio, dataFim }: GestaoPontoPagame
       modeloCalculo: 'mensal_proporcional',
       divisorMensal: 'dias_uteis',
       valorBase: '1800',
-      cargaHorariaHoras: '8',
+      cargaHorariaFormatada: '08:00',
       horarioEntradaPadrao: '08:00',
       horarioIntervaloInicioPadrao: '12:00',
       horarioIntervaloFimPadrao: '13:30',
@@ -274,7 +388,7 @@ export function GestaoPontoPagamentos({ dataInicio, dataFim }: GestaoPontoPagame
       modeloCalculo: c.modeloCalculo,
       divisorMensal: c.divisorMensal,
       valorBase: String(c.valorBase),
-      cargaHorariaHoras: String((c.cargaHorariaDiariaMin || 480) / 60),
+      cargaHorariaFormatada: minutosParaHoraInput(c.cargaHorariaDiariaMin || 480),
       horarioEntradaPadrao: c.horarioEntradaPadrao || '08:00',
       horarioIntervaloInicioPadrao: c.horarioIntervaloInicioPadrao || '12:00',
       horarioIntervaloFimPadrao: c.horarioIntervaloFimPadrao || '13:30',
@@ -291,6 +405,7 @@ export function GestaoPontoPagamentos({ dataInicio, dataFim }: GestaoPontoPagame
     if (!formContrato.nome.trim()) return;
     setSalvando(true);
     try {
+      const cargaEmMinutos = parseCargaParaMinutos(formContrato.cargaHorariaFormatada);
       const salvo = await salvarContratoColaborador({
         id: editandoContratoId,
         empresaId,
@@ -304,7 +419,7 @@ export function GestaoPontoPagamentos({ dataInicio, dataFim }: GestaoPontoPagame
         modeloCalculo: formContrato.modeloCalculo,
         divisorMensal: formContrato.divisorMensal,
         valorBase: parseFloat(formContrato.valorBase) || 0,
-        cargaHorariaDiariaMin: Math.round((parseFloat(formContrato.cargaHorariaHoras) || 8) * 60),
+        cargaHorariaDiariaMin: cargaEmMinutos || 480,
         horarioEntradaPadrao: formContrato.horarioEntradaPadrao,
         horarioIntervaloInicioPadrao: formContrato.horarioIntervaloInicioPadrao,
         horarioIntervaloFimPadrao: formContrato.horarioIntervaloFimPadrao,
@@ -324,6 +439,90 @@ export function GestaoPontoPagamentos({ dataInicio, dataFim }: GestaoPontoPagame
       setFeedback({ tipo: 'erro', texto: err?.message || 'Erro ao salvar colaborador.' });
     } finally {
       setSalvando(false);
+    }
+  };
+
+  // Cálculo da Calculadora de Simulação de Fechamento Proporcional
+  const resultadoSimulacao = useMemo(() => {
+    const cargaMin = parseCargaParaMinutos(simCargaFormatada);
+    return calcularSimulacaoProporcional({
+      nomeColaborador: simNome,
+      valorBase: parseFloat(simValorBase) || 0,
+      modeloCalculo: simModelo,
+      divisorMensal: simDivisor,
+      dataInicioContrato: simDataInicio,
+      mesAnoReferencia: simMesAno,
+      cargaDiariaMinutos: cargaMin,
+      diasTrabalhadosManuais: typeof simDiasTrabalhados === 'number' ? simDiasTrabalhados : undefined,
+      diasFaltasManuais: typeof simDiasFaltas === 'number' ? simDiasFaltas : undefined,
+      minutosExtrasManuais: simHorasExtrasMins,
+      adiantamentos: parseFloat(simAdiantamentos) || 0,
+      ajudaCusto: parseFloat(simAjudaCusto) || 0
+    });
+  }, [
+    simNome,
+    simValorBase,
+    simModelo,
+    simDivisor,
+    simDataInicio,
+    simMesAno,
+    simCargaFormatada,
+    simDiasTrabalhados,
+    simDiasFaltas,
+    simHorasExtrasMins,
+    simAdiantamentos,
+    simAjudaCusto
+  ]);
+
+  const carregarColaboradorNaSimulacao = (colabId: string) => {
+    setSimColaboradorId(colabId);
+    if (colabId === 'hector') {
+      setSimNome('Hector Henrique Meira');
+      setSimValorBase('3000');
+      setSimDataInicio('2026-10-19');
+      setSimMesAno('2026-10');
+      setSimCargaFormatada('08:30');
+      setSimDiasTrabalhados(7);
+      setSimDiasFaltas(3);
+      setSimModelo('mensal_proporcional');
+      setSimDivisor('dias_uteis');
+      return;
+    }
+    const c = contratos.find(x => x.id === colabId);
+    if (c) {
+      setSimNome(c.nome);
+      setSimValorBase(String(c.valorBase));
+      setSimDataInicio(c.dataInicio);
+      setSimModelo(c.modeloCalculo);
+      setSimDivisor(c.divisorMensal);
+      setSimCargaFormatada(minutosParaHoraInput(c.cargaHorariaDiariaMin || 480));
+    }
+  };
+
+  const aplicarSimulacaoNoFechamento = () => {
+    const c = contratos.find(x => x.id === simColaboradorId || x.nome.toLowerCase().includes(simNome.toLowerCase()));
+    if (c) {
+      setColaboradorAtivoId(c.id);
+    }
+    setValorAjudaCustoInput(simAjudaCusto || '0');
+    setValorAdiantamentosInput(simAdiantamentos || '0');
+    setObservacoesFechamento(
+      `Simulação Proporcional aplicada: Início ${simDataInicio}, ${simDiasTrabalhados} dias trabalhados, ${simDiasFaltas} faltas.`
+    );
+    setSubModo('apuracao');
+    setFeedback({
+      tipo: 'sucesso',
+      texto: `Valores da simulação de ${simNome} aplicados na tela de apuração!`
+    });
+  };
+
+  const handleCopiarWhatsAppSimulacao = async () => {
+    try {
+      await navigator.clipboard.writeText(resultadoSimulacao.textoWhatsApp);
+      setSimCopiado(true);
+      setTimeout(() => setSimCopiado(false), 3000);
+    } catch {
+      // fallback
     }
   };
 
@@ -712,6 +911,17 @@ export function GestaoPontoPagamentos({ dataInicio, dataFim }: GestaoPontoPagame
             <FileText size={15} />
             Notas Fiscais & Fechamentos ({fechamentos.length})
           </button>
+
+          <button
+            type="button"
+            onClick={() => setSubModo('simulador')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold uppercase flex items-center gap-2 transition-all ${
+              subModo === 'simulador' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-900/30' : 'text-emerald-400 hover:text-white hover:bg-emerald-500/10'
+            }`}
+          >
+            <Calculator size={15} />
+            Calculadora de Simulação
+          </button>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -874,6 +1084,413 @@ export function GestaoPontoPagamentos({ dataInicio, dataFim }: GestaoPontoPagame
         </div>
       )}
 
+      {/* MODO 4: Calculadora & Simulador de Fechamento Proporcional (Caso Hector e Novos Ingressos) */}
+      {subModo === 'simulador' && (
+        <div className="space-y-6">
+          {/* Banner de Apresentação & Presets */}
+          <div className="card bg-gradient-to-r from-emerald-950/40 via-brand-dark-3 to-brand-dark-3 border-emerald-500/30 p-5 space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                    <Calculator size={20} />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-black text-white uppercase tracking-wider flex items-center gap-2">
+                      Calculadora & Simulador de Fechamento Proporcional (PJ)
+                    </h2>
+                    <p className="text-xs text-gray-400">
+                      Simule valores proporcionais para colaboradores que iniciaram no meio do mês, faltaram ou tiveram horários parciais.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Ações de carregamento rápido */}
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => carregarColaboradorNaSimulacao('hector')}
+                  className="px-3.5 py-2 rounded-xl bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/40 text-purple-300 text-xs font-bold flex items-center gap-2 transition-all shadow"
+                >
+                  <Sparkles size={14} />
+                  Simular Hector (Início 19/10/26 • R$ 3.000)
+                </button>
+
+                {contratos.length > 0 && (
+                  <select
+                    value={simColaboradorId}
+                    onChange={e => carregarColaboradorNaSimulacao(e.target.value)}
+                    className="select text-xs min-w-[200px]"
+                  >
+                    <option value="hector">⚡ Preset Hector (Início 19/10)</option>
+                    <option value="livre">✏️ Simulação Livre / Avulsa</option>
+                    <optgroup label="Colaboradores Cadastrados">
+                      {contratos.map(c => (
+                        <option key={c.id} value={c.id}>
+                          {c.nome} (Base: {formatarMoeda(c.valorBase)})
+                        </option>
+                      ))}
+                    </optgroup>
+                  </select>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Grid Principal: Parâmetros (Esquerda) e Resultados (Direita) */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            {/* Coluna de Configurações e Parâmetros (7 colunas) */}
+            <div className="lg:col-span-7 space-y-4">
+              <div className="card border-brand-dark-5 p-5 space-y-4">
+                <h3 className="text-xs font-black text-white uppercase flex items-center gap-2 border-b border-brand-dark-5 pb-3">
+                  <Clock className="w-4 h-4 text-emerald-400" />
+                  1. Dados do Contrato & Período
+                </h3>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="label text-xs">Nome do Colaborador</label>
+                    <input
+                      type="text"
+                      value={simNome}
+                      onChange={e => setSimNome(e.target.value)}
+                      placeholder="Ex: Hector Henrique Meira"
+                      className="input text-xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="label text-xs">Mês de Competência</label>
+                    <input
+                      type="month"
+                      value={simMesAno}
+                      onChange={e => setSimMesAno(e.target.value)}
+                      className="input font-mono text-xs"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="label text-xs">Data de Início das Atividades *</label>
+                    <input
+                      type="date"
+                      value={simDataInicio}
+                      onChange={e => setSimDataInicio(e.target.value)}
+                      className="input font-mono text-xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="label text-xs">Valor Base Mensal (R$)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={simValorBase}
+                      onChange={e => setSimValorBase(e.target.value)}
+                      className="input font-mono font-bold text-emerald-400 text-xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="label text-xs">Carga Diária (HH:mm)</label>
+                    <input
+                      type="text"
+                      value={simCargaFormatada}
+                      onChange={e => setSimCargaFormatada(e.target.value)}
+                      placeholder="08:30"
+                      className="input font-mono text-xs font-bold text-center"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-brand-dark-4 p-3 rounded-xl border border-brand-dark-5">
+                  <div>
+                    <label className="label text-xs">Critério de Divisão</label>
+                    <select
+                      value={simDivisor}
+                      onChange={e => setSimDivisor(e.target.value as DivisorMensalColaborador)}
+                      className="select text-xs"
+                    >
+                      <option value="dias_uteis">Pelos Dias Úteis do Mês (Recomendado)</option>
+                      <option value="30_dias">Comercial (30 Dias)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="label text-xs">Modelo Contratual</label>
+                    <select
+                      value={simModelo}
+                      onChange={e => setSimModelo(e.target.value as ModeloCalculoColaborador)}
+                      className="select text-xs"
+                    >
+                      <option value="mensal_proporcional">Mensal Proporcional</option>
+                      <option value="diaria">Valor por Diária</option>
+                      <option value="horista">Valor por Hora</option>
+                    </select>
+                  </div>
+                </div>
+
+                <h3 className="text-xs font-black text-white uppercase flex items-center gap-2 border-b border-brand-dark-5 pt-2 pb-3">
+                  <Calendar className="w-4 h-4 text-emerald-400" />
+                  2. Apuração Efetiva do Mês (Faltas e Ajustes)
+                </h3>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Dias Trabalhados */}
+                  <div className="bg-brand-dark-4 p-3.5 rounded-xl border border-brand-dark-5 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-white uppercase">
+                        Dias Trabalhados Efetivamente
+                      </label>
+                      <span className="text-[10px] text-gray-400 font-mono">
+                        de {resultadoSimulacao.diasUteisPeriodoContrato} previstos
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setSimDiasTrabalhados(prev =>
+                            Math.max(0, (typeof prev === 'number' ? prev : resultadoSimulacao.diasUteisPeriodoContrato) - 1)
+                          )
+                        }
+                        className="btn-ghost px-2.5 py-1 text-xs border border-brand-dark-5"
+                      >
+                        -1
+                      </button>
+                      <input
+                        type="number"
+                        min="0"
+                        max={resultadoSimulacao.diasUteisPeriodoContrato}
+                        value={simDiasTrabalhados}
+                        onChange={e => {
+                          const v = e.target.value === '' ? '' : parseInt(e.target.value, 10);
+                          setSimDiasTrabalhados(v);
+                          if (typeof v === 'number') {
+                            setSimDiasFaltas(Math.max(0, resultadoSimulacao.diasUteisPeriodoContrato - v));
+                          }
+                        }}
+                        className="input font-mono font-black text-center text-sm text-emerald-400"
+                      />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setSimDiasTrabalhados(prev =>
+                            Math.min(
+                              resultadoSimulacao.diasUteisPeriodoContrato,
+                              (typeof prev === 'number' ? prev : 0) + 1
+                            )
+                          )
+                        }
+                        className="btn-ghost px-2.5 py-1 text-xs border border-brand-dark-5"
+                      >
+                        +1
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSimDiasTrabalhados(resultadoSimulacao.diasUteisPeriodoContrato);
+                          setSimDiasFaltas(0);
+                        }}
+                        className="text-[10px] text-gray-400 hover:text-white underline font-semibold ml-1"
+                      >
+                        Todos
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Faltas / Ausências */}
+                  <div className="bg-brand-dark-4 p-3.5 rounded-xl border border-brand-dark-5 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-white uppercase text-red-300">
+                        Faltas a Descontar (Dias)
+                      </label>
+                      <span className="text-[10px] text-gray-400">ausências</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setSimDiasFaltas(prev => Math.max(0, (typeof prev === 'number' ? prev : 0) - 1))
+                        }
+                        className="btn-ghost px-2.5 py-1 text-xs border border-brand-dark-5"
+                      >
+                        -1
+                      </button>
+                      <input
+                        type="number"
+                        min="0"
+                        value={simDiasFaltas}
+                        onChange={e => {
+                          const v = e.target.value === '' ? '' : parseInt(e.target.value, 10);
+                          setSimDiasFaltas(v);
+                          if (typeof v === 'number') {
+                            setSimDiasTrabalhados(Math.max(0, resultadoSimulacao.diasUteisPeriodoContrato - v));
+                          }
+                        }}
+                        className="input font-mono font-black text-center text-sm text-red-400"
+                      />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setSimDiasFaltas(prev => (typeof prev === 'number' ? prev : 0) + 1)
+                        }
+                        className="btn-ghost px-2.5 py-1 text-xs border border-brand-dark-5"
+                      >
+                        +1
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSimDiasFaltas(0);
+                          setSimDiasTrabalhados(resultadoSimulacao.diasUteisPeriodoContrato);
+                        }}
+                        className="text-[10px] text-gray-400 hover:text-white underline font-semibold ml-1"
+                      >
+                        Zerar
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Ajustes Financeiros: Adiantamentos e Ajuda de Custo */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                  <div>
+                    <label className="label text-xs text-red-400">(-) Adiantamentos Já Repassados (R$)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={simAdiantamentos}
+                      onChange={e => setSimAdiantamentos(e.target.value)}
+                      placeholder="0.00"
+                      className="input font-mono text-xs text-red-400 font-bold"
+                    />
+                  </div>
+                  <div>
+                    <label className="label text-xs text-emerald-400">(+) Ajuda de Custo / Bônus (R$)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={simAjudaCusto}
+                      onChange={e => setSimAjudaCusto(e.target.value)}
+                      placeholder="0.00"
+                      className="input font-mono text-xs text-emerald-400 font-bold"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Coluna de Resultados & Memória de Cálculo (5 colunas) */}
+            <div className="lg:col-span-5 space-y-4">
+              {/* Card Destaque: Valor Final Líquido a Pagar */}
+              <div className="card bg-gradient-to-b from-brand-dark-3 to-brand-dark-4 border-emerald-500/40 p-5 space-y-4 shadow-xl shadow-black/40">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <CheckCircle2 size={14} />
+                    Valor Líquido da Nota Fiscal (NFS-e)
+                  </span>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">
+                    Simulação Pronta
+                  </span>
+                </div>
+
+                <div className="space-y-1">
+                  <div className="text-3xl font-black text-white font-mono tracking-tight text-emerald-400">
+                    {formatarMoeda(resultadoSimulacao.valorLiquidoFinal)}
+                  </div>
+                  <div className="text-xs text-gray-400 flex items-center gap-2">
+                    <span>Taxa diária: <strong className="text-white font-mono">{formatarMoeda(resultadoSimulacao.valorDiaRef)}</strong></span>
+                    <span>•</span>
+                    <span>Taxa/hora: <strong className="text-white font-mono">{formatarMoeda(resultadoSimulacao.valorHoraRef)}</strong></span>
+                  </div>
+                </div>
+
+                {/* Métricas Rápidas */}
+                <div className="grid grid-cols-3 gap-2 pt-2 border-t border-brand-dark-5">
+                  <div className="bg-brand-dark-2/60 p-2 rounded-lg text-center border border-brand-dark-5">
+                    <span className="text-[10px] text-gray-400 block">Total Mês</span>
+                    <span className="text-xs font-bold text-white font-mono">
+                      {resultadoSimulacao.totalDiasUteisMesInteiro} dias
+                    </span>
+                  </div>
+                  <div className="bg-brand-dark-2/60 p-2 rounded-lg text-center border border-brand-dark-5">
+                    <span className="text-[10px] text-gray-400 block">Período Ativo</span>
+                    <span className="text-xs font-bold text-white font-mono">
+                      {resultadoSimulacao.diasUteisPeriodoContrato} dias
+                    </span>
+                  </div>
+                  <div className="bg-brand-dark-2/60 p-2 rounded-lg text-center border border-brand-dark-5">
+                    <span className="text-[10px] text-gray-400 block">Trabalhados</span>
+                    <span className="text-xs font-bold text-emerald-400 font-mono">
+                      {resultadoSimulacao.diasTrabalhados} dias
+                    </span>
+                  </div>
+                </div>
+
+                {/* Ações */}
+                <div className="space-y-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={aplicarSimulacaoNoFechamento}
+                    className="w-full btn-primary py-2.5 text-xs font-bold uppercase flex items-center justify-center gap-2 shadow-lg"
+                  >
+                    <ArrowRight size={15} />
+                    Aplicar no Fechamento Oficial do Mês
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleCopiarWhatsAppSimulacao}
+                    className="w-full btn-ghost py-2 text-xs font-bold uppercase flex items-center justify-center gap-2 border border-brand-dark-5 hover:border-emerald-500/40 text-gray-300 hover:text-white"
+                  >
+                    {simCopiado ? (
+                      <>
+                        <Check size={14} className="text-emerald-400" />
+                        <span className="text-emerald-400">Copiado para a Área de Transferência!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy size={14} />
+                        Copiar Demonstrativo p/ WhatsApp
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Memória de Cálculo Detalhada */}
+              <div className="card border-brand-dark-5 p-4 space-y-3">
+                <div className="flex items-center justify-between border-b border-brand-dark-5 pb-2">
+                  <h4 className="text-xs font-black text-white uppercase flex items-center gap-1.5">
+                    <FileText size={13} className="text-brand-blue-light" />
+                    Memória de Cálculo Didática
+                  </h4>
+                  <span className="text-[10px] text-gray-400 font-mono">Transparência Total</span>
+                </div>
+
+                <div className="bg-brand-dark-2 p-3 rounded-xl border border-brand-dark-5 space-y-1.5 font-mono text-[11px]">
+                  {resultadoSimulacao.memoriaCalculoLinhas.map((linha, idx) => (
+                    <div
+                      key={idx}
+                      className={
+                        linha.includes('VALOR LÍQUIDO')
+                          ? 'font-bold text-emerald-400 pt-1 border-t border-brand-dark-5 text-xs'
+                          : linha.includes('(-)')
+                          ? 'text-red-400'
+                          : linha.includes('Subtotal')
+                          ? 'text-blue-300 font-semibold'
+                          : 'text-gray-300'
+                      }
+                    >
+                      {linha}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* MODO 1: Painel Principal de Apuração & Cálculo de Pagamento */}
       {subModo === 'apuracao' && (
         <>
@@ -954,11 +1571,23 @@ export function GestaoPontoPagamentos({ dataInicio, dataFim }: GestaoPontoPagame
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
+                      onClick={() => {
+                        carregarColaboradorNaSimulacao(contratoAtivo.id);
+                        setSubModo('simulador');
+                      }}
+                      className="btn-secondary text-xs py-1.5 px-3 flex items-center gap-1.5 border border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10"
+                      title="Abrir calculadora de simulação proporcional para este colaborador"
+                    >
+                      <Calculator size={13} />
+                      Simular Proporcional
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => abrirModalEditarContrato(contratoAtivo)}
                       className="btn-ghost text-xs py-1.5 px-3 flex items-center gap-1.5 border border-brand-dark-5"
                     >
                       <Edit2 size={13} />
-                      Editar Contrato / Valor
+                      Editar Contrato / Horários
                     </button>
                     <button
                       type="button"
@@ -1482,9 +2111,10 @@ export function GestaoPontoPagamentos({ dataInicio, dataFim }: GestaoPontoPagame
       {/* Modal: Configurar / Editar Colaborador */}
       {modalContratoAberto && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="card w-full max-w-xl border-brand-dark-5 max-h-[90vh] overflow-y-auto space-y-4">
+          <div className="card w-full max-w-2xl border-brand-dark-5 max-h-[90vh] overflow-y-auto space-y-4">
             <div className="flex items-center justify-between border-b border-brand-dark-5 pb-3">
-              <h3 className="text-base font-black text-white uppercase">
+              <h3 className="text-base font-black text-white uppercase flex items-center gap-2">
+                <Clock className="w-5 h-5 text-brand-green" />
                 {editandoContratoId ? 'Editar Contrato / Carga Horária' : 'Configurar Colaborador / Prestador PJ'}
               </h3>
               <button
@@ -1633,53 +2263,143 @@ export function GestaoPontoPagamentos({ dataInicio, dataFim }: GestaoPontoPagame
                 </div>
               </div>
 
-              {/* Carga Horária Padrão */}
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-                <div>
-                  <label className="label">Horas/Dia</label>
-                  <input
-                    type="number"
-                    step="0.5"
-                    value={formContrato.cargaHorariaHoras}
-                    onChange={e => setFormContrato({ ...formContrato, cargaHorariaHoras: e.target.value })}
-                    className="input font-mono"
-                  />
+              {/* Bloco Inteligente de Carga Horária e Horários do Dia */}
+              <div className="bg-brand-dark-4 p-4 rounded-xl border border-brand-dark-5 space-y-3.5">
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-brand-dark-5/80 pb-3">
+                  <div>
+                    <label className="text-xs font-bold text-white uppercase flex items-center gap-1.5">
+                      <Clock size={14} className="text-brand-green" />
+                      Carga Horária Diária Contratada (Horas & Minutos)
+                    </label>
+                    <p className="text-[11px] text-gray-400">
+                      Ex: <span className="font-mono text-brand-green">08:30</span> ou <span className="font-mono text-brand-green">08:00</span>. O horário de saída sincroniza automaticamente!
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={formContrato.cargaHorariaFormatada}
+                      onChange={e => handleChangeCargaHoraria(e.target.value)}
+                      placeholder="08:30"
+                      className="input font-mono font-bold text-center w-24 text-sm bg-brand-dark-2 text-brand-green border-brand-green/40 shadow-inner"
+                      title="Digite a carga diária em horas e minutos (ex: 08:30)"
+                    />
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => handleChangeCargaHoraria('08:00')}
+                        className="px-2 py-1 rounded bg-brand-dark-3 hover:bg-brand-dark-2 text-[10px] font-bold text-gray-300 border border-brand-dark-5"
+                      >
+                        8h00
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleChangeCargaHoraria('08:30')}
+                        className="px-2 py-1 rounded bg-brand-green/20 hover:bg-brand-green/30 text-[10px] font-bold text-brand-green border border-brand-green/40"
+                      >
+                        8h30
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleChangeCargaHoraria('08:48')}
+                        className="px-2 py-1 rounded bg-brand-dark-3 hover:bg-brand-dark-2 text-[10px] font-bold text-gray-300 border border-brand-dark-5"
+                      >
+                        8h48
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleChangeCargaHoraria('06:00')}
+                        className="px-2 py-1 rounded bg-brand-dark-3 hover:bg-brand-dark-2 text-[10px] font-bold text-gray-300 border border-brand-dark-5"
+                      >
+                        6h00
+                      </button>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <label className="label">Entrada</label>
-                  <input
-                    type="time"
-                    value={formContrato.horarioEntradaPadrao}
-                    onChange={e => setFormContrato({ ...formContrato, horarioEntradaPadrao: e.target.value })}
-                    className="input font-mono"
-                  />
+
+                {/* 4 Horários com grid amplo para não cortar dígitos no Windows/Chrome */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div>
+                    <label className="label text-[11px] flex items-center gap-1 text-gray-300">
+                      <Sun size={12} className="text-amber-400" />
+                      1. Entrada
+                    </label>
+                    <input
+                      type="time"
+                      value={formContrato.horarioEntradaPadrao}
+                      onChange={e => handleChangeHorario('horarioEntradaPadrao', e.target.value)}
+                      className="input font-mono text-sm w-full px-2.5 py-1.5"
+                    />
+                  </div>
+                  <div>
+                    <label className="label text-[11px] flex items-center gap-1 text-gray-300">
+                      <Coffee size={12} className="text-orange-400" />
+                      2. Ida Almoço
+                    </label>
+                    <input
+                      type="time"
+                      value={formContrato.horarioIntervaloInicioPadrao}
+                      onChange={e => handleChangeHorario('horarioIntervaloInicioPadrao', e.target.value)}
+                      className="input font-mono text-sm w-full px-2.5 py-1.5"
+                    />
+                  </div>
+                  <div>
+                    <label className="label text-[11px] flex items-center gap-1 text-gray-300">
+                      <Clock size={12} className="text-blue-400" />
+                      3. Volta Almoço
+                    </label>
+                    <input
+                      type="time"
+                      value={formContrato.horarioIntervaloFimPadrao}
+                      onChange={e => handleChangeHorario('horarioIntervaloFimPadrao', e.target.value)}
+                      className="input font-mono text-sm w-full px-2.5 py-1.5"
+                    />
+                  </div>
+                  <div>
+                    <label className="label text-[11px] flex items-center gap-1 text-brand-green font-bold">
+                      <Moon size={12} className="text-brand-green" />
+                      4. Saída do Dia
+                    </label>
+                    <input
+                      type="time"
+                      value={formContrato.horarioSaidaPadrao}
+                      onChange={e => handleChangeHorario('horarioSaidaPadrao', e.target.value)}
+                      className="input font-mono text-sm w-full px-2.5 py-1.5 border-brand-green/50 text-brand-green font-bold bg-brand-green/5"
+                    />
+                  </div>
                 </div>
-                <div>
-                  <label className="label">Ida Almoço</label>
-                  <input
-                    type="time"
-                    value={formContrato.horarioIntervaloInicioPadrao}
-                    onChange={e => setFormContrato({ ...formContrato, horarioIntervaloInicioPadrao: e.target.value })}
-                    className="input font-mono"
-                  />
-                </div>
-                <div>
-                  <label className="label">Volta Almoço</label>
-                  <input
-                    type="time"
-                    value={formContrato.horarioIntervaloFimPadrao}
-                    onChange={e => setFormContrato({ ...formContrato, horarioIntervaloFimPadrao: e.target.value })}
-                    className="input font-mono"
-                  />
-                </div>
-                <div>
-                  <label className="label">Saída</label>
-                  <input
-                    type="time"
-                    value={formContrato.horarioSaidaPadrao}
-                    onChange={e => setFormContrato({ ...formContrato, horarioSaidaPadrao: e.target.value })}
-                    className="input font-mono"
-                  />
+
+                {/* Resumo Dinâmico da Jornada Apurada */}
+                <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] bg-brand-dark-3/80 px-3.5 py-2.5 rounded-xl border border-brand-dark-5 text-gray-300">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <span>Manhã: <strong className="text-white font-mono">{resumoJornada.manha}</strong></span>
+                    <span className="text-gray-500">•</span>
+                    <span>Almoço: <strong className="text-white font-mono">{resumoJornada.intervalo}</strong></span>
+                    <span className="text-gray-500">•</span>
+                    <span>Tarde: <strong className="text-white font-mono">{resumoJornada.tarde}</strong></span>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-400 font-semibold">Total Calculado:</span>
+                    <span className="font-mono text-xs font-black text-white bg-brand-dark-2 px-2 py-0.5 rounded border border-brand-dark-5">
+                      {resumoJornada.total}
+                    </span>
+                    {resumoJornada.bateCarga ? (
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-brand-green/20 text-brand-green font-bold border border-brand-green/30 flex items-center gap-1">
+                        <Check size={11} /> Bate 100% com a Carga
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => handleChangeCargaHoraria(formContrato.cargaHorariaFormatada)}
+                        className="text-[10px] text-amber-400 hover:text-amber-300 underline font-semibold flex items-center gap-1"
+                        title="Ajustar automaticamente a saída para bater com a carga contratada"
+                      >
+                        <Wand2 size={11} /> Ajustar Saída para {formContrato.cargaHorariaFormatada}
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
 

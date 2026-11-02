@@ -4,7 +4,9 @@ import {
   ColaboradorContrato,
   RegistroPontoColaborador,
   FechamentoColaborador,
-  StatusDiaPonto
+  StatusDiaPonto,
+  ModeloCalculoColaborador,
+  DivisorMensalColaborador
 } from '../types';
 
 const STORAGE_KEY_CONTRATOS = (empresaId: string) => `gcac_colab_contratos_${empresaId}`;
@@ -69,6 +71,38 @@ export function formatarMinutosHoras(minutos: number, comSinal = false): string 
   const m = abs % 60;
   const sinal = negativo ? '-' : comSinal && minutos > 0 ? '+' : '';
   return `${sinal}${String(h).padStart(2, '0')}h${String(m).padStart(2, '0')}`;
+}
+
+/**
+ * Converte minutos totais para string "HH:mm" (ex: 510 -> "08:30")
+ */
+export function minutosParaHoraInput(minutos: number): string {
+  const abs = Math.max(0, Math.round(minutos));
+  const h = Math.floor(abs / 60);
+  const m = abs % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
+/**
+ * Calcula qual deve ser o horário de Saída ("HH:mm") para atingir exatamente a carga horária desejada
+ */
+export function calcularHoraSaidaParaCarga(
+  horaEntrada: string,
+  horaIntervaloIda: string,
+  horaIntervaloVolta: string,
+  cargaMinutosDesejada: number
+): string {
+  const ent = horaParaMinutos(horaEntrada) ?? 480; // 08:00
+  const intIda = horaParaMinutos(horaIntervaloIda);
+  const intVolta = horaParaMinutos(horaIntervaloVolta);
+
+  let duracaoIntervalo = 0;
+  if (intIda !== null && intVolta !== null && intVolta > intIda) {
+    duracaoIntervalo = intVolta - intIda;
+  }
+
+  const saidaMin = (ent + duracaoIntervalo + Math.max(0, cargaMinutosDesejada)) % (24 * 60);
+  return minutosParaHoraInput(saidaMin);
 }
 
 /**
@@ -937,5 +971,188 @@ export function calcularApuracaoPeriodo(
     valorDescontosTotal,
     valorHorasExtras,
     valorLiquidoHorasEDias
+  };
+}
+
+/**
+ * Parâmetros para simulação rápida de fechamento e proporcionalidade
+ */
+export interface ParametrosSimulacaoProporcional {
+  nomeColaborador?: string;
+  valorBase: number;
+  modeloCalculo: ModeloCalculoColaborador;
+  divisorMensal: DivisorMensalColaborador;
+  dataInicioContrato: string; // YYYY-MM-DD (ex: 2026-10-19)
+  mesAnoReferencia: string; // YYYY-MM (ex: 2026-10)
+  cargaDiariaMinutos: number; // ex: 480 ou 510 (8h30)
+  diasSemanaTrabalho?: number[];
+  diasTrabalhadosManuais?: number;
+  diasFaltasManuais?: number;
+  minutosExtrasManuais?: number;
+  adiantamentos?: number;
+  ajudaCusto?: number;
+}
+
+export interface ResultadoSimulacaoProporcional {
+  totalDiasUteisMesInteiro: number;
+  diasUteisPeriodoContrato: number;
+  diasCorridosPeriodoContrato: number;
+  valorDiaRef: number;
+  valorHoraRef: number;
+  diasTrabalhados: number;
+  diasFaltas: number;
+  valorBrutoProporcional: number;
+  valorDescontoFaltas: number;
+  valorHorasExtras: number;
+  valorAdiantamentos: number;
+  valorAjudaCusto: number;
+  valorLiquidoFinal: number;
+  memoriaCalculoLinhas: string[];
+  textoWhatsApp: string;
+}
+
+/**
+ * Simula proporcionalidade e valores para qualquer colaborador ou cenário hipotético
+ */
+export function calcularSimulacaoProporcional(params: ParametrosSimulacaoProporcional): ResultadoSimulacaoProporcional {
+  const diasSemana = params.diasSemanaTrabalho || [1, 2, 3, 4, 5];
+  const [ano, mes] = params.mesAnoReferencia.split('-').map(Number);
+  const ultimoDia = new Date(ano, mes, 0).getDate();
+
+  // 1. Total de dias úteis no mês completo
+  let totalDiasUteisMesInteiro = 0;
+  for (let d = 1; d <= ultimoDia; d++) {
+    const dt = new Date(ano, mes - 1, d, 12, 0, 0);
+    if (diasSemana.includes(dt.getDay())) {
+      totalDiasUteisMesInteiro++;
+    }
+  }
+  if (totalDiasUteisMesInteiro === 0) totalDiasUteisMesInteiro = 22;
+
+  // 2. Dias a partir da data de início
+  const dtInicio = new Date(params.dataInicioContrato + 'T12:00:00');
+  let diasUteisPeriodoContrato = 0;
+  let diasCorridosPeriodoContrato = 0;
+
+  for (let d = 1; d <= ultimoDia; d++) {
+    const dt = new Date(ano, mes - 1, d, 12, 0, 0);
+    if (dt >= dtInicio) {
+      diasCorridosPeriodoContrato++;
+      if (diasSemana.includes(dt.getDay())) {
+        diasUteisPeriodoContrato++;
+      }
+    }
+  }
+
+  // 3. Taxa por dia e por hora
+  const horasDiarias = (params.cargaDiariaMinutos || 480) / 60;
+  let valorDiaRef = 0;
+  let valorHoraRef = 0;
+
+  if (params.modeloCalculo === 'mensal_proporcional') {
+    const divisor = params.divisorMensal === '30_dias' ? 30 : totalDiasUteisMesInteiro;
+    valorDiaRef = params.valorBase / divisor;
+    valorHoraRef = valorDiaRef / (horasDiarias || 8);
+  } else if (params.modeloCalculo === 'diaria') {
+    valorDiaRef = params.valorBase;
+    valorHoraRef = valorDiaRef / (horasDiarias || 8);
+  } else {
+    valorHoraRef = params.valorBase;
+    valorDiaRef = valorHoraRef * (horasDiarias || 8);
+  }
+
+  // 4. Dias trabalhados e faltas simuladas
+  const diasTrabalhados = params.diasTrabalhadosManuais !== undefined
+    ? Math.max(0, params.diasTrabalhadosManuais)
+    : diasUteisPeriodoContrato;
+
+  const diasFaltas = params.diasFaltasManuais !== undefined
+    ? Math.max(0, params.diasFaltasManuais)
+    : Math.max(0, diasUteisPeriodoContrato - diasTrabalhados);
+
+  let valorBrutoProporcional = 0;
+  let valorDescontoFaltas = 0;
+
+  if (params.modeloCalculo === 'mensal_proporcional') {
+    if (params.divisorMensal === '30_dias') {
+      valorBrutoProporcional = valorDiaRef * diasCorridosPeriodoContrato;
+    } else {
+      valorBrutoProporcional = valorDiaRef * diasUteisPeriodoContrato;
+    }
+    valorDescontoFaltas = diasFaltas * valorDiaRef;
+  } else if (params.modeloCalculo === 'diaria') {
+    valorBrutoProporcional = diasTrabalhados * valorDiaRef;
+    valorDescontoFaltas = 0;
+  } else {
+    // Horista
+    const totalMinutos = diasTrabalhados * (params.cargaDiariaMinutos || 480);
+    valorBrutoProporcional = (totalMinutos / 60) * valorHoraRef;
+    valorDescontoFaltas = 0;
+  }
+
+  const minutosExtras = params.minutosExtrasManuais || 0;
+  const valorHorasExtras = (minutosExtras / 60) * valorHoraRef;
+  const adiantamentos = params.adiantamentos || 0;
+  const ajudaCusto = params.ajudaCusto || 0;
+
+  const valorLiquidoFinal = Math.max(
+    0,
+    valorBrutoProporcional - valorDescontoFaltas + valorHorasExtras + ajudaCusto - adiantamentos
+  );
+
+  // Formatação da memória de cálculo
+  const nomeColab = params.nomeColaborador || 'Colaborador';
+  const fmtMoeda = (n: number) => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+  const memoriaCalculoLinhas = [
+    `Colaborador: ${nomeColab}`,
+    `Mês de Competência: ${params.mesAnoReferencia} | Início das Atividades: ${params.dataInicioContrato.split('-').reverse().join('/')}`,
+    `Carga Horária Contratada: ${formatarMinutosHoras(params.cargaDiariaMinutos)} por dia`,
+    `Valor Contratual Base: ${fmtMoeda(params.valorBase)} (${params.modeloCalculo === 'mensal_proporcional' ? 'Mensal' : params.modeloCalculo === 'diaria' ? 'Diária' : 'Horista'})`,
+    `Critério: ${params.divisorMensal === '30_dias' ? 'Comercial (30 dias)' : `Dias Úteis (${totalDiasUteisMesInteiro} dias úteis no mês)`}`,
+    `Valor da Diária de Referência: ${fmtMoeda(valorDiaRef)} (ou ${fmtMoeda(valorHoraRef)}/hora)`,
+    `Dias úteis elegíveis no período contratado: ${diasUteisPeriodoContrato} dias (${diasCorridosPeriodoContrato} dias corridos)`,
+    `Subtotal Proporcional do Período: ${fmtMoeda(valorBrutoProporcional)}`,
+    diasFaltas > 0 ? `(-) Desconto de Faltas/Ausências (${diasFaltas} dias): -${fmtMoeda(valorDescontoFaltas)}` : `(✓) Sem descontos de faltas`,
+    minutosExtras > 0 ? `(+) Horas Extras / Adicionais (${formatarMinutosHoras(minutosExtras)}): +${fmtMoeda(valorHorasExtras)}` : null,
+    ajudaCusto > 0 ? `(+) Ajuda de Custo / Bônus: +${fmtMoeda(ajudaCusto)}` : null,
+    adiantamentos > 0 ? `(-) Adiantamentos Já Repassados: -${fmtMoeda(adiantamentos)}` : null,
+    `-------------------------------------------------------`,
+    `VALOR LÍQUIDO A PAGAR (NFS-E): ${fmtMoeda(valorLiquidoFinal)}`
+  ].filter(Boolean) as string[];
+
+  const textoWhatsApp = [
+    `*DEMONSTRATIVO DE APURAÇÃO DE HORAS & PAGAMENTO*`,
+    `*Colaborador:* ${nomeColab}`,
+    `*Mês:* ${params.mesAnoReferencia} (Início em ${params.dataInicioContrato.split('-').reverse().join('/')})`,
+    `*Carga Diária:* ${formatarMinutosHoras(params.cargaDiariaMinutos)}`,
+    ``,
+    `*Memória de Cálculo:*`,
+    `• Dias úteis no período: ${diasUteisPeriodoContrato} dias`,
+    `• Dias trabalhados: ${diasTrabalhados} dias`,
+    diasFaltas > 0 ? `• Ausências / faltas: ${diasFaltas} dias (-${fmtMoeda(valorDescontoFaltas)})` : `• Faltas: 0`,
+    `• Diária proporcional: ${fmtMoeda(valorDiaRef)}`,
+    adiantamentos > 0 ? `• Adiantamentos: -${fmtMoeda(adiantamentos)}` : null,
+    ajudaCusto > 0 ? `• Ajuda de custo: +${fmtMoeda(ajudaCusto)}` : null,
+    ``,
+    `💰 *Valor Líquido da NFS-e a Emitir: ${fmtMoeda(valorLiquidoFinal)}*`
+  ].filter(Boolean).join('\n');
+
+  return {
+    totalDiasUteisMesInteiro,
+    diasUteisPeriodoContrato,
+    diasCorridosPeriodoContrato,
+    valorDiaRef,
+    valorHoraRef,
+    diasTrabalhados,
+    diasFaltas,
+    valorBrutoProporcional,
+    valorDescontoFaltas,
+    valorHorasExtras,
+    valorAdiantamentos: adiantamentos,
+    valorAjudaCusto: ajudaCusto,
+    valorLiquidoFinal,
+    memoriaCalculoLinhas,
+    textoWhatsApp
   };
 }
