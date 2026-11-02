@@ -1165,25 +1165,103 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
   // --- Gestão de Manejo ---
   const buscarManejos = useCallback(async (clienteId: string, overrideEmpresaId?: string) => {
     if (!usuario?.empresaId || !clienteId) return [];
+
+    const clienteIds = new Set<string>([clienteId]);
+    const cacEmpresaIds = new Set<string>();
+
+    if (overrideEmpresaId && overrideEmpresaId !== usuario.empresaId) {
+      cacEmpresaIds.add(overrideEmpresaId);
+    }
+
+    let clienteAlvo = clientes.find(c => c.id === clienteId);
+    if (!clienteAlvo) {
+      try {
+        const { data: cliRow } = await supabase
+          .from('clientes')
+          .select('id, nome, cpf, empresa_id')
+          .eq('id', clienteId)
+          .maybeSingle();
+        if (cliRow) {
+          clienteAlvo = {
+            id: cliRow.id,
+            nome: cliRow.nome || '',
+            cpf: cliRow.cpf || '',
+            empresaId: cliRow.empresa_id || undefined
+          } as Cliente;
+        }
+      } catch {
+        // Ignorar erro silencioso na busca auxiliar
+      }
+    }
+
+    if (clienteAlvo) {
+      const cpfLimpo = (clienteAlvo.cpf || '').replace(/\D/g, '');
+      const nomeNorm = removerAcentos((clienteAlvo.nome || '').trim().toUpperCase().replace(/\s+/g, ' '));
+
+      clientes.forEach(c => {
+        const cCpf = (c.cpf || '').replace(/\D/g, '');
+        const cNome = removerAcentos((c.nome || '').trim().toUpperCase().replace(/\s+/g, ' '));
+        if ((cpfLimpo.length >= 11 && cCpf === cpfLimpo) || (nomeNorm.length > 0 && cNome === nomeNorm)) {
+          clienteIds.add(c.id);
+        }
+      });
+
+      if (cpfLimpo.length >= 11) {
+        const cpfFormatado = cpfLimpo.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+        try {
+          const [clientesMesmoCpfRes, vinculoRes] = await Promise.all([
+            supabase
+              .from('clientes')
+              .select('id, empresa_id')
+              .or(`cpf.eq.${cpfLimpo},cpf.eq.${cpfFormatado}`),
+            supabase
+              .from('vinculos_despachante_cac')
+              .select('cac_empresa_id')
+              .eq('despachante_empresa_id', usuario.empresaId)
+              .eq('status', 'ativo')
+              .or(`cac_cpf.eq.${cpfLimpo},cac_cpf.eq.${cpfFormatado}`)
+              .maybeSingle()
+          ]);
+
+          if (clientesMesmoCpfRes.data) {
+            clientesMesmoCpfRes.data.forEach(row => {
+              if (row.id) clienteIds.add(row.id);
+            });
+          }
+          if (vinculoRes.data?.cac_empresa_id) {
+            cacEmpresaIds.add(vinculoRes.data.cac_empresa_id);
+          }
+        } catch {
+          // Ignorar falha de rede/RLS nas consultas complementares
+        }
+      }
+    }
+
     const { data, error } = await supabase
       .from('autorizacoes_manejo')
       .select('*')
-      .eq('cliente_id', clienteId)
+      .in('cliente_id', Array.from(clienteIds))
       .order('vencimento', { ascending: true });
     
     if (error) throw error;
 
     let todasRows: any[] = [...(data || [])];
-    if (overrideEmpresaId && overrideEmpresaId !== usuario.empresaId) {
+    if (cacEmpresaIds.size > 0) {
       const { data: portalManejos } = await supabase
         .from('autorizacoes_manejo')
         .select('*')
-        .eq('empresa_id', overrideEmpresaId)
+        .in('empresa_id', Array.from(cacEmpresaIds))
         .order('vencimento', { ascending: true });
       if (portalManejos && portalManejos.length > 0) {
         todasRows = [...todasRows, ...portalManejos];
       }
     }
+
+    todasRows.sort((a, b) => {
+      const scoreA = (a.cliente_id === clienteId ? 2 : 0) + (a.empresa_id === usuario.empresaId ? 1 : 0);
+      const scoreB = (b.cliente_id === clienteId ? 2 : 0) + (b.empresa_id === usuario.empresaId ? 1 : 0);
+      return scoreB - scoreA;
+    });
 
     const vistosId = new Set<string>();
     const vistosChave = new Set<string>();
@@ -1196,6 +1274,8 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
       if (chave !== '_') vistosChave.add(chave);
       filtrados.push(row);
     }
+
+    filtrados.sort((a, b) => (a.vencimento || '').localeCompare(b.vencimento || ''));
 
     return filtrados.map(row => ({
       id: row.id,
@@ -1210,17 +1290,18 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
       manejoEmRenovacao: !!row.manejo_em_renovacao,
       criadoEm: row.criado_em
     }));
-  }, [usuario]);
+  }, [usuario, clientes]);
 
   const salvarManejo = useCallback(async (dados: Partial<AutorizacaoManejo> & { clienteId: string }, overrideEmpresaId?: string) => {
     if (!usuario?.empresaId) throw new Error('Usuário não autenticado');
-    const empresaId = overrideEmpresaId || usuario.empresaId;
+    const isClienteLocal = clientes.some(c => c.id === dados.clienteId);
+    const empresaIdPrincipal = isClienteLocal ? usuario.empresaId : (overrideEmpresaId || usuario.empresaId);
     const manejoId = dados.id || uuidv4();
 
     let arquivoUrl = (dados as any).arquivoUrl;
     if (arquivoUrl && arquivoUrl.startsWith('data:')) {
       const ext = arquivoUrl.split(';base64,')[0].split(':')[1].split('/')[1] || 'pdf';
-      const path = `${empresaId}/clientes/${dados.clienteId}/manejos/${manejoId}/manejo_${uuidv4()}.${ext}`;
+      const path = `${empresaIdPrincipal}/clientes/${dados.clienteId}/manejos/${manejoId}/manejo_${uuidv4()}.${ext}`;
       arquivoUrl = await uploadBase64File(arquivoUrl, 'documentos-clientes', path) || '';
     }
 
@@ -1234,7 +1315,7 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
       status: dados.status || 'Ativo',
       arquivo_url: arquivoUrl || null,
       manejo_em_renovacao: dados.manejoEmRenovacao !== undefined ? dados.manejoEmRenovacao : false,
-      empresa_id: empresaId
+      empresa_id: empresaIdPrincipal
     };
 
     if (dados.id) {
@@ -1249,7 +1330,45 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
         .insert([{ id: manejoId, ...payload }]);
       if (error) throw error;
     }
-  }, [usuario]);
+
+    if (isClienteLocal && overrideEmpresaId && overrideEmpresaId !== usuario.empresaId) {
+      try {
+        const { data: clienteCac } = await supabase
+          .from('clientes')
+          .select('id')
+          .eq('empresa_id', overrideEmpresaId)
+          .limit(1)
+          .maybeSingle();
+
+        if (clienteCac?.id && clienteCac.id !== dados.clienteId) {
+          const fazNorm = (dados.nomeFazenda || '').trim().toUpperCase();
+          let portalManejoId: string | undefined;
+          if (fazNorm) {
+            const { data: existentePortal } = await supabase
+              .from('autorizacoes_manejo')
+              .select('id')
+              .eq('empresa_id', overrideEmpresaId)
+              .ilike('nome_fazenda', fazNorm)
+              .limit(1)
+              .maybeSingle();
+            if (existentePortal?.id && existentePortal.id !== manejoId) {
+              portalManejoId = existentePortal.id;
+            }
+          }
+          await supabase
+            .from('autorizacoes_manejo')
+            .upsert({
+              id: portalManejoId || uuidv4(),
+              ...payload,
+              cliente_id: clienteCac.id,
+              empresa_id: overrideEmpresaId
+            });
+        }
+      } catch (syncErr) {
+        console.warn('Aviso ao sincronizar manejo com portal CAC:', syncErr);
+      }
+    }
+  }, [usuario, clientes]);
 
   const deletarManejo = useCallback(async (id: string, overrideEmpresaId?: string) => {
     const { error } = await supabase.from('autorizacoes_manejo').delete().eq('id', id);

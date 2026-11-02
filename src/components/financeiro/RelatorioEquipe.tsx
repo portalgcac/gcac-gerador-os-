@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../../db/supabase';
+import { useAuth } from '../../context/AuthContext';
 import { useOrdens } from '../../context/OrdensContext';
 import { useOrcamentos } from '../../context/OrcamentosContext';
 import { useRecibos } from '../../context/RecibosContext';
@@ -40,6 +41,7 @@ interface AtividadeDetalhe {
 
 export function RelatorioEquipe({ dataInicio, dataFim }: RelatorioEquipeProps) {
   const navigate = useNavigate();
+  const { usuario } = useAuth();
   const { ordens } = useOrdens();
   const { orcamentos } = useOrcamentos();
   const { recibos } = useRecibos();
@@ -48,17 +50,23 @@ export function RelatorioEquipe({ dataInicio, dataFim }: RelatorioEquipeProps) {
   const [colaboradorSelecionado, setColaboradorSelecionado] = useState<string>('Todos');
 
   useEffect(() => {
+    setColaboradorSelecionado('Todos');
     const carregarUsuarios = async () => {
+      if (!usuario?.empresaId) {
+        setUsuarios([]);
+        return;
+      }
       const { data } = await supabase
         .from('usuarios_autorizados')
         .select('id, nome')
         .eq('ativo', true)
+        .eq('empresa_id', usuario.empresaId)
         .order('nome');
       
       if (data) setUsuarios(data);
     };
     carregarUsuarios();
-  }, []);
+  }, [usuario?.empresaId]);
 
   const stats = useMemo(() => {
     // Filtro por Período
