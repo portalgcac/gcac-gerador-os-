@@ -496,16 +496,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Contas de empresa dependem das permissões do tenant (recursosLiberados)
     const recursosTenant = usuario.dadosEmpresa?.recursosLiberados || [];
-    if (!recursosTenant.includes(recurso)) return false;
-
     const userPerms = usuario.permissoes || [];
+
+    // Regra exclusiva para Gestão de Ponto e Pagamento de Colaboradores (NF):
+    // Somente o Gestor (admin) tem acesso por padrão, ou colaboradores com a chave 'fin_gestao_colaboradores' liberada.
+    if (recurso === 'fin_gestao_colaboradores') {
+      return usuario.role === 'admin' || userPerms.includes('fin_gestao_colaboradores');
+    }
+
+    if (!recursosTenant.includes(recurso)) return false;
 
     // Se o usuário tem alguma das chaves de recursos do sistema em seu array de permissões,
     // significa que ele foi personalizado de forma granular. Portanto, validamos estritamente.
     const chavesRecursosSistema = [
       'dash_atencao_diaria', 'dash_alertas_vencimento', 'dash_lembretes', 'dash_resumo_os',
       'dash_margem_operacional', 'dash_resumo_operacional', 'dash_resumo_orcamentos', 'dash_ordens_recentes',
-      'fin_fluxo_caixa', 'fin_relatorio_equipe', 'fin_exportacao',
+      'fin_fluxo_caixa', 'fin_relatorio_equipe', 'fin_gestao_colaboradores', 'fin_exportacao',
       'modulo_ordens', 'modulo_orcamentos', 'modulo_recibos', 'modulo_agendamentos', 'modulo_clientes',
       'modulo_clientes_cac', 'acervo_anexos', 'acervo_gerenciador',
       'config_alertas_vencimento', 'config_notificacoes_push', 'config_servicos', 'config_manual'

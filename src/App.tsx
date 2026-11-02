@@ -39,6 +39,7 @@ import { ListaAgendamentos } from './components/agendamentos/ListaAgendamentos';
 import { NotificacoesSistemaProvider } from './context/NotificacoesSistemaContext';
 import { FinanceiroProvider } from './context/FinanceiroContext';
 import { Financeiro } from './components/financeiro/Financeiro';
+import { PaginaPontoColaboradores } from './components/financeiro/PaginaPontoColaboradores';
 import { Relatorios } from './components/relatorios/Relatorios';
 import { RotinaDiaria } from './components/operacional/RotinaDiaria';
 import { LembretesProvider } from './context/LembretesContext';
@@ -213,8 +214,10 @@ function RotaProtegida({ children, modulo }: { children: React.ReactNode, modulo
       temAcessoTenant = temAcessoRecurso('modulo_recibos');
     } else if (modulo === 'agendamentos') {
       temAcessoTenant = temAcessoRecurso('modulo_agendamentos');
+    } else if (modulo === 'ponto') {
+      temAcessoTenant = true;
     } else if (modulo === 'financeiro') {
-      temAcessoTenant = temAcessoRecurso('fin_fluxo_caixa') || temAcessoRecurso('fin_relatorio_equipe') || temAcessoRecurso('fin_exportacao');
+      temAcessoTenant = temAcessoRecurso('fin_fluxo_caixa') || temAcessoRecurso('fin_relatorio_equipe') || temAcessoRecurso('fin_exportacao') || temAcessoRecurso('fin_gestao_colaboradores');
     } else if (modulo === 'painel') {
       temAcessoTenant = temAcessoRecurso('dash_atencao_diaria') || temAcessoRecurso('dash_alertas_vencimento') || 
                         temAcessoRecurso('dash_lembretes') || temAcessoRecurso('dash_resumo_os') || 
@@ -235,6 +238,14 @@ function RotaProtegida({ children, modulo }: { children: React.ReactNode, modulo
 
   // Se for admin da empresa, tem acesso a tudo liberado para o tenant
   if (usuario.role === 'admin') return <>{children}</>;
+
+  // O módulo de ponto é acessível a todos os colaboradores do escritório para baterem o próprio ponto e enviarem NF
+  if (modulo === 'ponto') return <>{children}</>;
+
+  // Colaborador com permissão específica de gestão de colaboradores pode acessar financeiro
+  if (modulo === 'financeiro' && usuario.permissoes?.includes('fin_gestao_colaboradores')) {
+    return <>{children}</>;
+  }
 
   // Se houver um módulo específico, verifica permissão do colaborador
   const permKey = modulo === 'declaracoes' ? 'clientes' : (modulo || '');
@@ -325,6 +336,7 @@ export default function App() {
                               <Route path="clientes-cac" element={<Navigate to="/portal-admin?tab=vinculos" replace />} />
                               <Route path="clientes/:id" element={<RotaProtegida modulo="clientes"><PaginaDetalheCliente /></RotaProtegida>} />
                               <Route path="agendamentos" element={<RotaProtegida modulo="agendamentos"><ListaAgendamentos /></RotaProtegida>} />
+                              <Route path="ponto" element={<RotaProtegida modulo="ponto"><PaginaPontoColaboradores /></RotaProtegida>} />
                               <Route path="financeiro" element={<RotaProtegida modulo="financeiro"><Financeiro /></RotaProtegida>} />
                               <Route path="relatorios" element={<RotaProtegida modulo="relatorios"><Relatorios /></RotaProtegida>} />
                               <Route path="rotina" element={<RotaProtegida modulo="rotina"><RotinaDiaria /></RotaProtegida>} />

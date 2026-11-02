@@ -24,6 +24,7 @@ const MODULOS = [
   { slug: 'painel', label: 'Painel / Dashboard' },
   { slug: 'rotina', label: 'Rotina Diária' },
   { slug: 'agenda', label: 'Agenda / Lembretes' },
+  { slug: 'ponto', label: 'Ponto & NF (PJ)' },
   { slug: 'financeiro', label: 'Financeiro' },
   { slug: 'orcamentos', label: 'Orçamentos' },
   { slug: 'ordens', label: 'Ordens de Serviço' },
@@ -45,6 +46,7 @@ const RECURSOS_SISTEMA = [
   { key: 'dash_ordens_recentes', label: 'Dashboard — Listagem de Ordens de Serviço Recentes' },
   { key: 'fin_fluxo_caixa', label: 'Financeiro — Fluxo de Caixa e Lançamentos' },
   { key: 'fin_relatorio_equipe', label: 'Financeiro — Relatório de Produtividade da Equipe' },
+  { key: 'fin_gestao_colaboradores', label: 'Financeiro / RH — Gestão de Ponto, Cargas Horárias e Pagamento de Colaboradores (NF)' },
   { key: 'fin_exportacao', label: 'Financeiro — Exportação de Relatórios Financeiros' },
   { key: 'modulo_ordens', label: 'Módulo Ordens de Serviço — Emissão e Controle de Ordens de Serviço' },
   { key: 'modulo_orcamentos', label: 'Módulo Orçamentos — Emissão e Controle de Orçamentos' },
@@ -4250,6 +4252,18 @@ Você pode adicionar comentários, observações ou explicações adicionais ant
                     >
                       Excluir Registros (OS/Fin/etc.)
                       {formData.permissoes.includes('excluir_registros') ? <CheckCircle size={14} className="text-brand-green" /> : <div className="w-3.5 h-3.5 rounded-full border border-gray-700" />}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => togglePermissao('fin_gestao_colaboradores')}
+                      className={`sm:col-span-2 flex items-center justify-between p-2.5 rounded-lg border text-sm transition-all ${
+                        formData.permissoes.includes('fin_gestao_colaboradores')
+                          ? 'bg-brand-green/15 border-brand-green/40 text-brand-green font-bold'
+                          : 'bg-brand-dark-4 border-brand-dark-5 text-gray-500 hover:border-gray-700'
+                      }`}
+                    >
+                      Gerir Ponto, Cargas Horárias e Pagamentos de Colaboradores (NF)
+                      {formData.permissoes.includes('fin_gestao_colaboradores') ? <CheckCircle size={14} className="text-brand-green" /> : <div className="w-3.5 h-3.5 rounded-full border border-gray-700" />}
                     </button>
                   </div>
                 </div>

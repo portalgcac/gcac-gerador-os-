@@ -12,15 +12,21 @@ import {
   Filter,
   ArrowRightLeft,
   Clock,
-  TrendingUp
+  TrendingUp,
+  BadgeDollarSign,
+  Eye,
+  Upload,
+  FileText
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { RelatorioEquipe } from './RelatorioEquipe';
 import { FechamentoComissoes } from './FechamentoComissoes';
+import { GestaoPontoPagamentos } from './GestaoPontoPagamentos';
 import { useOrdens } from '../../context/OrdensContext';
 import { useFinanceiro, CATEGORIAS_DESPESA } from '../../context/FinanceiroContext';
 import { useClientes } from '../../context/ClientesContext';
 import { formatarMoeda, formatarData } from '../../utils/formatters';
+import { fileToBase64, uploadBase64File, visualizarDocumentoBase64 } from '../../utils/fileUtils';
 import { isSameMonth, parseISO, startOfMonth, endOfMonth, format, isWithinInterval, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfYear, endOfYear, setDate } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import * as XLSX from 'xlsx';
@@ -33,8 +39,12 @@ export function Financeiro() {
   const { despesas, criarDespesa, deletarDespesa } = useFinanceiro();
   const { usuario } = useAuth();
   const podeExcluir = usuario?.role === 'admin' || usuario?.permissoes?.includes('excluir_registros');
+  const podeGerirColaboradores =
+    usuario?.role === 'admin' ||
+    usuario?.email === 'gui.gomesassis@gmail.com' ||
+    Boolean(usuario?.permissoes?.includes('fin_gestao_colaboradores'));
 
-  const [abaAtiva, setAbaAtiva] = useState<'relatorio' | 'despesas' | 'equipe' | 'comissoes'>('relatorio');
+  const [abaAtiva, setAbaAtiva] = useState<'relatorio' | 'despesas' | 'equipe' | 'comissoes' | 'ponto_pagamentos'>('relatorio');
   
   // Estados de Filtro de Períodos
   const [tipoFiltro, setTipoFiltro] = useState<'semanal' | 'quinzenal' | 'mensal' | 'anual' | 'personalizado'>('mensal');
@@ -51,7 +61,9 @@ export function Financeiro() {
     descricao: '',
     valor: '',
     categoria: CATEGORIAS_DESPESA[0],
-    data: format(new Date(), 'yyyy-MM-dd')
+    data: format(new Date(), 'yyyy-MM-dd'),
+    numeroNf: '',
+    notaFiscalUrl: ''
   });
 
   // Corrige inicialização de categoria no state formDespesa
@@ -209,6 +221,25 @@ export function Financeiro() {
     setIsExportModalOpen(true);
   };
 
+  const handleAnexarNfDespesaModal = async (file: File) => {
+    try {
+      const base64 = await fileToBase64(file);
+      let urlFinal = base64;
+      try {
+        const empresaId = usuario?.empresaId || 'default';
+        const ext = file.name.split('.').pop() || 'pdf';
+        const path = `${empresaId}/notas-fiscais/despesas/NF_${Date.now()}.${ext}`;
+        const uploaded = await uploadBase64File(base64, 'documentos-clientes', path);
+        if (uploaded) urlFinal = uploaded;
+      } catch {
+        // usa base64
+      }
+      setFormDespesa(prev => ({ ...prev, notaFiscalUrl: urlFinal }));
+    } catch {
+      alert('Não foi possível ler o arquivo da Nota Fiscal.');
+    }
+  };
+
   const handleSalvarDespesa = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formDespesa.descricao || !formDespesa.valor) return;
@@ -218,14 +249,18 @@ export function Financeiro() {
         descricao: formDespesa.descricao,
         valor: parseFloat(formDespesa.valor),
         categoria: formDespesa.categoria as any,
-        data: formDespesa.data
+        data: formDespesa.data,
+        numeroNf: formDespesa.numeroNf || undefined,
+        notaFiscalUrl: formDespesa.notaFiscalUrl || undefined
       });
       setNovaDespesaModal(false);
       setFormDespesa({
         descricao: '',
         valor: '',
         categoria: CATEGORIAS_DESPESA[0],
-        data: format(new Date(), 'yyyy-MM-dd')
+        data: format(new Date(), 'yyyy-MM-dd'),
+        numeroNf: '',
+        notaFiscalUrl: ''
       });
     } catch (error) {
       alert('Erro ao salvar despesa');
@@ -242,7 +277,7 @@ export function Financeiro() {
             Gestão Financeira
           </h1>
           <div className="flex items-center gap-2 flex-wrap mt-1">
-            <p className="text-gray-400 text-sm">Controle de faturamento, taxas e despesas PJ</p>
+            <p className="text-gray-400 text-sm">Controle de faturamento, taxas, colaboradores (NF) e despesas PJ</p>
             <span className="px-2 py-0.5 rounded bg-brand-dark-3 border border-brand-dark-5 text-[10px] text-brand-blue-light font-mono font-bold">
               Período: {format(dataInicio, 'dd/MM/yyyy')} a {format(dataFim, 'dd/MM/yyyy')}
             </span>
@@ -442,7 +477,7 @@ export function Financeiro() {
       </div>
 
       {/* Abas */}
-      <div className="flex gap-1 p-1 bg-brand-dark-3 border border-brand-dark-5 rounded-xl w-fit">
+      <div className="flex flex-wrap gap-1 p-1 bg-brand-dark-3 border border-brand-dark-5 rounded-xl w-fit">
         <button 
           onClick={() => setAbaAtiva('relatorio')}
           className={`px-4 py-2 rounded-lg text-xs font-bold uppercase transition-all ${
@@ -480,6 +515,19 @@ export function Financeiro() {
               Comissões
             </button>
           </>
+        )}
+        {podeGerirColaboradores && (
+          <button
+            onClick={() => setAbaAtiva('ponto_pagamentos')}
+            className={`px-4 py-2 rounded-lg text-xs font-bold uppercase transition-all flex items-center gap-2 ${
+              abaAtiva === 'ponto_pagamentos'
+                ? 'bg-brand-green text-black shadow-lg'
+                : 'text-brand-green hover:bg-brand-green/10'
+            }`}
+          >
+            <BadgeDollarSign size={14} />
+            Ponto & Pagamentos (NF)
+          </button>
         )}
       </div>
 
@@ -603,6 +651,7 @@ export function Financeiro() {
                   <th className="table-header">Data</th>
                   <th className="table-header">Descrição</th>
                   <th className="table-header">Categoria</th>
+                  <th className="table-header">Nota Fiscal / Anexo</th>
                   <th className="table-header text-right">Valor</th>
                   <th className="table-header text-center">Ações</th>
                 </tr>
@@ -610,7 +659,7 @@ export function Financeiro() {
               <tbody className="divide-y divide-brand-dark-5/30">
                 {despesasMes.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="py-20 text-center text-gray-500 text-sm">
+                    <td colSpan={6} className="py-20 text-center text-gray-500 text-sm">
                       Nenhuma despesa para o período selecionado.
                     </td>
                   </tr>
@@ -622,10 +671,27 @@ export function Financeiro() {
                       <td className="table-cell whitespace-nowrap">
                         <span className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${
                           d.categoria === 'Retirada (Pró-labore)' ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30' :
+                          d.categoria === 'Pagamento Colaboradores (NF)' ? 'bg-brand-green/20 text-brand-green border border-brand-green/30' :
                           'bg-brand-dark-4 text-gray-400 border border-brand-dark-5'
                         }`}>
                           {d.categoria}
                         </span>
+                      </td>
+                      <td className="table-cell">
+                        {d.notaFiscalUrl ? (
+                          <button
+                            type="button"
+                            onClick={() => visualizarDocumentoBase64(d.notaFiscalUrl!, `NF_${d.numeroNf || d.id}.pdf`)}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-brand-blue/15 text-brand-blue-light border border-brand-blue/30 text-[10px] font-bold hover:underline"
+                          >
+                            <Eye size={12} />
+                            Ver NF {d.numeroNf ? `#${d.numeroNf}` : ''}
+                          </button>
+                        ) : d.numeroNf ? (
+                          <span className="text-xs font-mono text-gray-300">NF #{d.numeroNf}</span>
+                        ) : (
+                          <span className="text-xs text-gray-600">—</span>
+                        )}
                       </td>
                       <td className="table-cell text-right font-bold text-red-400 whitespace-nowrap">
                         -{formatarMoeda(d.valor)}
@@ -657,6 +723,11 @@ export function Financeiro() {
       {/* Conteúdo Aba Comissões */}
       {abaAtiva === 'comissoes' && <FechamentoComissoes dataInicio={dataInicio} dataFim={dataFim} />}
 
+      {/* Conteúdo Aba Ponto & Pagamentos (NF) */}
+      {abaAtiva === 'ponto_pagamentos' && podeGerirColaboradores && (
+        <GestaoPontoPagamentos dataInicio={dataInicio} dataFim={dataFim} />
+      )}
+
       {/* Modal Nova Despesa */}
       {novaDespesaModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
@@ -670,7 +741,7 @@ export function Financeiro() {
                 <input 
                   type="text" 
                   className="input" 
-                  placeholder="Ex: Assinatura Sistema, Internet" 
+                  placeholder="Ex: Pgto Colaborador PJ, Assinatura Sistema, Internet" 
                   autoFocus
                   value={formDespesa.descricao}
                   onChange={e => setFormDespesa({...formDespesa, descricao: e.target.value})}
@@ -711,6 +782,36 @@ export function Financeiro() {
                     <option key={cat} value={cat}>{cat}</option>
                   ))}
                 </select>
+              </div>
+
+              {/* Anexo opcional de Nota Fiscal */}
+              <div className="bg-brand-dark-4 border border-brand-dark-5 rounded-xl p-3 space-y-2">
+                <label className="text-[10px] font-bold text-gray-400 uppercase flex items-center gap-1.5">
+                  <FileText size={13} className="text-brand-blue-light" />
+                  Nota Fiscal / Comprovante (Opcional)
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    type="text"
+                    placeholder="Nº da NF (opcional)"
+                    value={formDespesa.numeroNf}
+                    onChange={e => setFormDespesa({ ...formDespesa, numeroNf: e.target.value })}
+                    className="input text-xs py-1.5"
+                  />
+                  <label className="btn-ghost border border-dashed border-brand-blue/40 text-brand-blue-light text-xs py-1.5 px-2 rounded-xl cursor-pointer flex items-center justify-center gap-1">
+                    <Upload size={13} />
+                    <span className="truncate">{formDespesa.notaFiscalUrl ? 'NF Anexada ✅' : 'Anexar PDF/Foto'}</span>
+                    <input
+                      type="file"
+                      accept=".pdf,image/*,.xml"
+                      className="hidden"
+                      onChange={e => {
+                        const f = e.target.files?.[0];
+                        if (f) handleAnexarNfDespesaModal(f);
+                      }}
+                    />
+                  </label>
+                </div>
               </div>
 
               <div className="flex gap-3 pt-4 font-black">

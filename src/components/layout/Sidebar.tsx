@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
-  LayoutDashboard, FileText, Plus, Settings, LogOut, Cloud, CloudOff, Loader, X, Users, Receipt, Calendar, BarChart3, ListTodo, Bell, Shield, FileSpreadsheet, Building2, UserPlus, MessageSquare, BadgeDollarSign, Target, Scale, ArrowRightLeft, Menu
+  LayoutDashboard, FileText, Plus, Settings, LogOut, Cloud, CloudOff, Loader, X, Users, Receipt, Calendar, BarChart3, ListTodo, Bell, Shield, FileSpreadsheet, Building2, UserPlus, MessageSquare, BadgeDollarSign, Target, Scale, ArrowRightLeft, Menu, Clock
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../db/supabase';
@@ -23,6 +23,7 @@ export const LINKS_MENU_BASE = [
   { to: '/agendamentos',  label: 'Agendamentos',          icon: Calendar,        slug: 'agendamentos' },
   { to: '/declaracoes',   label: 'Declarações',           icon: FileText,        slug: 'declaracoes' },
   { to: '/recibos',       label: 'Recibos',               icon: Receipt,         slug: 'recibos' },
+  { to: '/ponto',         label: 'Ponto & NF (PJ)',       icon: Clock,           slug: 'ponto' },
   { to: '/financeiro',    label: 'Financeiro',            icon: BarChart3,       slug: 'financeiro' },
   { to: '/relatorios',    label: 'Relatórios',            icon: FileSpreadsheet, slug: 'relatorios' },
   { to: '/equipe',        label: 'Equipe do Escritório',  icon: Shield,          slug: 'equipe' },
@@ -105,9 +106,14 @@ export const temAcessoLink = (link: typeof LINKS_MENU_BASE[0], usuario: any, tem
     return usuario?.role === 'admin' && usuario?.tipoConta !== 'cac_individual';
   }
 
+  if (link.slug === 'ponto') {
+    return usuario?.tipoConta !== 'cac_individual';
+  }
+
   // Verificar permissão no nível de usuário
   const temPermissaoUser = usuario?.permissoes?.includes(link.slug) || 
                            (link.slug === 'declaracoes' && usuario?.permissoes?.includes('clientes')) ||
+                           (link.slug === 'financeiro' && usuario?.permissoes?.includes('fin_gestao_colaboradores')) ||
                            usuario?.role === 'admin';
   if (!temPermissaoUser) return false;
 
@@ -116,7 +122,7 @@ export const temAcessoLink = (link: typeof LINKS_MENU_BASE[0], usuario: any, tem
     return temAcessoRecurso('modulo_ordens') || temAcessoRecurso('modulo_clientes') || temAcessoRecurso('fin_fluxo_caixa');
   }
   if (link.slug === 'financeiro') {
-    return temAcessoRecurso('fin_fluxo_caixa') || temAcessoRecurso('fin_relatorio_equipe') || temAcessoRecurso('fin_exportacao');
+    return temAcessoRecurso('fin_fluxo_caixa') || temAcessoRecurso('fin_relatorio_equipe') || temAcessoRecurso('fin_exportacao') || temAcessoRecurso('fin_gestao_colaboradores');
   }
   if (link.slug === 'painel') {
     return temAcessoRecurso('dash_atencao_diaria') || temAcessoRecurso('dash_alertas_vencimento') || 

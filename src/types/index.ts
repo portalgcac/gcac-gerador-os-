@@ -552,3 +552,96 @@ export interface ProfissionalLaudo {
 }
 
 
+
+export type ModeloCalculoColaborador = 'mensal_proporcional' | 'diaria' | 'horista';
+export type DivisorMensalColaborador = 'dias_uteis' | '30_dias';
+export type StatusDiaPonto = 'trabalhado' | 'parcial' | 'falta_descontada' | 'falta_abonada' | 'folga_feriado';
+export type StatusFechamentoColaborador = 'rascunho' | 'aguardando_nf' | 'nf_enviada' | 'pago';
+
+export interface ColaboradorContrato {
+  id: string;
+  empresaId: string;
+  usuarioEmail?: string;
+  nome: string;
+  cpfCnpj?: string;
+  contato?: string;
+  chavePix?: string;
+  cargoFuncao: string;
+  dataInicio: string; // YYYY-MM-DD
+  modeloCalculo: ModeloCalculoColaborador;
+  divisorMensal: DivisorMensalColaborador;
+  valorBase: number;
+  cargaHorariaDiariaMin: number; // ex: 480 (8h)
+  horarioEntradaPadrao: string; // HH:mm
+  horarioIntervaloInicioPadrao: string; // HH:mm
+  horarioIntervaloFimPadrao: string; // HH:mm
+  horarioSaidaPadrao: string; // HH:mm
+  diasSemanaTrabalho: number[]; // [1,2,3,4,5]
+  exigeFotoPonto: boolean;
+  exigeGpsPonto: boolean;
+  ativo: boolean;
+  observacoes?: string;
+  criadoEm: string;
+  atualizadoEm?: string;
+}
+
+export interface RegistroPontoColaborador {
+  id: string;
+  empresaId: string;
+  colaboradorId: string;
+  colaboradorEmail?: string;
+  colaboradorNome: string;
+  data: string; // YYYY-MM-DD
+  statusDia: StatusDiaPonto;
+  horaEntrada?: string;
+  horaIntervaloIda?: string;
+  horaIntervaloVolta?: string;
+  horaSaida?: string;
+  minutosTrabalhados: number;
+  minutosEsperados: number;
+  minutosSaldo: number;
+  fotoEntradaUrl?: string;
+  fotoSaidaUrl?: string;
+  latEntrada?: number;
+  lngEntrada?: number;
+  distanciaEntradaMetros?: number;
+  latSaida?: number;
+  lngSaida?: number;
+  distanciaSaidaMetros?: number;
+  origemRegistro: 'eletronico' | 'ajuste_gestor';
+  observacao?: string;
+  criadoEm: string;
+  atualizadoEm?: string;
+}
+
+export interface FechamentoColaborador {
+  id: string;
+  empresaId: string;
+  colaboradorId: string;
+  colaboradorNome: string;
+  dataInicioPeriodo: string; // YYYY-MM-DD
+  dataFimPeriodo: string; // YYYY-MM-DD
+  diasUteisPeriodo: number;
+  diasTrabalhados: number;
+  diasFaltasDescontadas: number;
+  diasFaltasAbonadas: number;
+  minutosTrabalhadosTotal: number;
+  minutosEsperadosTotal: number;
+  valorBaseProporcional: number;
+  valorDescontosAusenciasHoras: number;
+  valorHorasExtras: number;
+  valorComissoesOs: number;
+  valorAjudaCusto: number;
+  valorAdiantamentos: number;
+  valorLiquidoFinal: number;
+  numeroNf?: string;
+  dataEmissaoNf?: string;
+  notaFiscalUrl?: string;
+  comprovantePagamentoUrl?: string;
+  despesaId?: string;
+  status: StatusFechamentoColaborador;
+  observacoes?: string;
+  snapshotPonto?: RegistroPontoColaborador[];
+  criadoEm: string;
+  atualizadoEm?: string;
+}
