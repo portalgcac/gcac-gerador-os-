@@ -23,7 +23,7 @@ export const LINKS_MENU_BASE = [
   { to: '/agendamentos',  label: 'Agendamentos',          icon: Calendar,        slug: 'agendamentos' },
   { to: '/declaracoes',   label: 'Declarações',           icon: FileText,        slug: 'declaracoes' },
   { to: '/recibos',       label: 'Recibos',               icon: Receipt,         slug: 'recibos' },
-  { to: '/ponto',         label: 'Ponto & NF (PJ)',       icon: Clock,           slug: 'ponto' },
+  { to: '/ponto',         label: 'Registro de Ponto',     icon: Clock,           slug: 'ponto' },
   { to: '/financeiro',    label: 'Financeiro',            icon: BarChart3,       slug: 'financeiro' },
   { to: '/relatorios',    label: 'Relatórios',            icon: FileSpreadsheet, slug: 'relatorios' },
   { to: '/equipe',        label: 'Equipe do Escritório',  icon: Shield,          slug: 'equipe' },

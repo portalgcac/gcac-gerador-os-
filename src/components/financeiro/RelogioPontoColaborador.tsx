@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Clock,
   MapPin,
@@ -14,12 +15,14 @@ import {
   AlertTriangle,
   ShieldCheck,
   User,
-  Calendar
+  Calendar,
+  ArrowRight
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { ColaboradorContrato, RegistroPontoColaborador, FechamentoColaborador } from '../../types';
 import {
   listarContratosColaboradores,
+  salvarContratoColaborador,
   listarRegistrosPonto,
   salvarRegistroPonto,
   listarFechamentosColaboradores,
@@ -39,6 +42,8 @@ interface RelogioPontoColaboradorProps {
 }
 
 export function RelogioPontoColaborador({ onPontoRegistrado }: RelogioPontoColaboradorProps) {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { usuario } = useAuth();
   const empresaId = usuario?.empresaId || '00000000-0000-0000-0000-000000000001';
   const ehGestor =
@@ -54,6 +59,7 @@ export function RelogioPontoColaborador({ onPontoRegistrado }: RelogioPontoColab
   const [sedeGps, setSedeGps] = useState<ConfigSedeGps>({ latitude: null, longitude: null, raioMetros: 150 });
   const [carregando, setCarregando] = useState(true);
   const [registrando, setRegistrando] = useState(false);
+  const [redirecionandoPainel, setRedirecionandoPainel] = useState(false);
   const [mensagemFeedback, setMensagemFeedback] = useState<{ tipo: 'sucesso' | 'erro' | 'aviso'; texto: string } | null>(null);
 
   // Estado GPS atual
@@ -83,23 +89,53 @@ export function RelogioPontoColaborador({ onPontoRegistrado }: RelogioPontoColab
   const carregarDados = async () => {
     setCarregando(true);
     try {
-      const [listaContratos, cfgSede, listaFechamentos] = await Promise.all([
+      let [listaContratos, cfgSede, listaFechamentos] = await Promise.all([
         listarContratosColaboradores(empresaId),
         obterConfigSedeGps(empresaId),
         listarFechamentosColaboradores(empresaId)
       ]);
       setSedeGps(cfgSede);
-      setContratos(listaContratos);
       setFechamentos(listaFechamentos);
 
       // Tenta vincular automaticamente pelo e-mail ou nome do usuário logado
       const emailUser = usuario?.email?.trim().toLowerCase();
       const nomeUser = usuario?.nome?.trim().toLowerCase();
-      const meuContrato = listaContratos.find(
+      let meuContrato = listaContratos.find(
         c =>
           (c.usuarioEmail && c.usuarioEmail.toLowerCase() === emailUser) ||
           c.nome.trim().toLowerCase() === nomeUser
       );
+
+      // Se o usuário logado (seja admin ou colaborador) ainda não tiver contrato, auto-cadastramos
+      if (!meuContrato && usuario) {
+        try {
+          const novoContrato = await salvarContratoColaborador({
+            empresaId,
+            usuarioEmail: usuario.email,
+            nome: usuario.nome || usuario.email.split('@')[0],
+            cargoFuncao: usuario.role === 'admin' ? 'Administrador / Gestor' : 'Colaborador',
+            dataInicio: new Date().toISOString().slice(0, 10),
+            modeloCalculo: 'mensal_proporcional',
+            divisorMensal: 'dias_uteis',
+            valorBase: 0,
+            cargaHorariaDiariaMin: 480,
+            horarioEntradaPadrao: '08:00',
+            horarioIntervaloInicioPadrao: '12:00',
+            horarioIntervaloFimPadrao: '13:00',
+            horarioSaidaPadrao: '17:00',
+            diasSemanaTrabalho: [1, 2, 3, 4, 5],
+            exigeFotoPonto: false,
+            exigeGpsPonto: false,
+            ativo: true
+          });
+          meuContrato = novoContrato;
+          listaContratos = [novoContrato, ...listaContratos];
+        } catch (e) {
+          console.warn('Não foi possível auto-cadastrar contrato padrão para o usuário:', e);
+        }
+      }
+
+      setContratos(listaContratos);
 
       const idAlvo = meuContrato?.id || (ehGestor && listaContratos[0]?.id) || '';
       setColaboradorSelecionadoId(idAlvo);
@@ -287,15 +323,27 @@ export function RelogioPontoColaborador({ onPontoRegistrado }: RelogioPontoColab
 
       const labels: Record<typeof tipoBatida, string> = {
         entrada: 'Entrada registrada',
-        intervalo_ida: 'Saída para intervalo registrada',
-        intervalo_volta: 'Retorno do intervalo registrado',
-        saida: 'Saída de expediente registrada'
+        intervalo_ida: 'Saída para almoço registrada',
+        intervalo_volta: 'Retorno do almoço registrado',
+        saida: 'Saída final registrada'
+      };
+
+      const mensagensRedirecionamento: Record<typeof tipoBatida, string> = {
+        entrada: `Entrada registrada com sucesso às ${horaAtualStr}! Redirecionando para o Painel...`,
+        intervalo_ida: `Saída para intervalo registrada às ${horaAtualStr}! Bom almoço! Redirecionando para o Painel...`,
+        intervalo_volta: `Retorno do almoço registrado às ${horaAtualStr}! Bom trabalho! Redirecionando para o Painel...`,
+        saida: `Saída final registrada às ${horaAtualStr}! Expediente encerrado, bom descanso! Redirecionando para o Painel...`
       };
 
       setMensagemFeedback({
         tipo: 'sucesso',
-        texto: `${labels[tipoBatida]} com sucesso às ${horaAtualStr}! (${salvo.colaboradorNome})`
+        texto: mensagensRedirecionamento[tipoBatida]
       });
+
+      setRedirecionandoPainel(true);
+      setTimeout(() => {
+        navigate('/dashboard');
+      }, 1600);
     } catch (err: any) {
       setMensagemFeedback({
         tipo: 'erro',
@@ -361,6 +409,34 @@ export function RelogioPontoColaborador({ onPontoRegistrado }: RelogioPontoColab
 
   return (
     <div className="space-y-6">
+      {/* Banner de Boas-vindas e Flexibilização (Primeiro Acesso do Dia) */}
+      {(!registroHoje || !registroHoje.horaEntrada) && (
+        <div className="bg-brand-blue/10 border border-brand-blue/30 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-white animate-fade-in shadow-lg">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-brand-blue/20 rounded-xl text-brand-blue-light shrink-0">
+              <Clock size={22} />
+            </div>
+            <div>
+              <h3 className="font-bold text-sm text-white">
+                Bom dia, {usuario?.nome || 'Colaborador'}! Registre o seu ponto de entrada
+              </h3>
+              <p className="text-xs text-gray-300">
+                Inicie suas atividades registrando seu ponto de entrada. Após a confirmação você será direcionado automaticamente ao Painel.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => navigate('/dashboard')}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white border border-white/10 text-xs font-semibold transition-all whitespace-nowrap self-start sm:self-center"
+            title="Ir para o painel e registrar o ponto mais tarde"
+          >
+            Ir ao Painel agora (registrar depois)
+            <ArrowRight size={14} />
+          </button>
+        </div>
+      )}
+
       {/* Cabeçalho do Relógio Digital + Seletor de Colaborador (se Gestor ou Terminal Compartilhado) */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Card Principal: Relógio & Botões de Registro */}
@@ -416,7 +492,7 @@ export function RelogioPontoColaborador({ onPontoRegistrado }: RelogioPontoColab
           {/* Feedback de batida */}
           {mensagemFeedback && (
             <div
-              className={`p-3.5 rounded-xl border text-xs font-bold flex items-center gap-2.5 ${
+              className={`p-3.5 rounded-xl border text-xs font-bold flex items-center justify-between gap-2.5 ${
                 mensagemFeedback.tipo === 'sucesso'
                   ? 'bg-brand-green/15 border-brand-green/30 text-brand-green'
                   : mensagemFeedback.tipo === 'aviso'
@@ -424,8 +500,19 @@ export function RelogioPontoColaborador({ onPontoRegistrado }: RelogioPontoColab
                   : 'bg-red-500/15 border-red-500/30 text-red-400'
               }`}
             >
-              <CheckCircle2 size={16} className="shrink-0" />
-              <span>{mensagemFeedback.texto}</span>
+              <div className="flex items-center gap-2.5">
+                <CheckCircle2 size={16} className="shrink-0" />
+                <span>{mensagemFeedback.texto}</span>
+              </div>
+              {redirecionandoPainel && (
+                <button
+                  type="button"
+                  onClick={() => navigate('/dashboard')}
+                  className="px-2.5 py-1 rounded bg-brand-green/20 hover:bg-brand-green/30 text-white text-[11px] font-black uppercase tracking-wider shrink-0 transition-colors"
+                >
+                  Ir agora →
+                </button>
+              )}
             </div>
           )}
 
@@ -593,7 +680,7 @@ export function RelogioPontoColaborador({ onPontoRegistrado }: RelogioPontoColab
               <div className="flex items-center justify-between">
                 <span className="text-[10px] font-bold uppercase text-gray-400 flex items-center gap-1.5">
                   <Camera size={13} className="text-brand-blue-light" />
-                  Foto na Batida (Selfie Leve)
+                  Foto na Batida (Selfie - Opcional)
                 </span>
                 {cameraAtiva ? (
                   <button
@@ -609,7 +696,7 @@ export function RelogioPontoColaborador({ onPontoRegistrado }: RelogioPontoColab
                     onClick={iniciarCamera}
                     className="text-[10px] font-bold text-brand-green hover:underline"
                   >
-                    Ativar Câmera
+                    Ativar Câmera (Opcional)
                   </button>
                 )}
               </div>
@@ -624,21 +711,21 @@ export function RelogioPontoColaborador({ onPontoRegistrado }: RelogioPontoColab
                     className="w-full h-full object-cover mirror"
                   />
                   <span className="absolute bottom-1.5 right-2 bg-black/70 text-[9px] text-brand-green px-2 py-0.5 rounded font-bold">
-                    ● Câmera Pronta (~20KB)
+                    ● Câmera Pronta (Foto Opcional)
                   </span>
                 </div>
               ) : (
                 <div className="text-center py-4 px-2 border border-dashed border-brand-dark-5 rounded-xl space-y-2">
                   <Camera size={22} className="mx-auto text-gray-600" />
                   <p className="text-[11px] text-gray-400">
-                    Ative a câmera antes de clicar em Entrada/Saída para anexar sua foto ao registro.
+                    A foto é <strong>opcional</strong>. O ponto é registrado com horário e GPS. Caso queira anexar foto, ative a câmera abaixo.
                   </p>
                   <button
                     type="button"
                     onClick={iniciarCamera}
                     className="btn-ghost text-[10px] py-1 px-3 font-bold uppercase"
                   >
-                    Ligar Câmera Agora
+                    Ligar Câmera (Opcional)
                   </button>
                 </div>
               )}

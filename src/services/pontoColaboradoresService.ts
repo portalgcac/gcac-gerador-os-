@@ -1192,3 +1192,46 @@ export function calcularSimulacaoProporcional(params: ParametrosSimulacaoProporc
     textoWhatsApp
   };
 }
+
+/**
+ * Verifica se o usuário atual (administrador ou colaborador) possui pendência de registro de entrada hoje
+ */
+export async function verificarPontoEntradaPendenteHoje(
+  empresaId: string,
+  usuarioEmail?: string,
+  usuarioNome?: string
+): Promise<boolean> {
+  try {
+    const hoje = new Date();
+    const hojeStr = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}-${String(hoje.getDate()).padStart(2, '0')}`;
+
+    const contratos = await listarContratosColaboradores(empresaId);
+    const emailUser = usuarioEmail?.trim().toLowerCase();
+    const nomeUser = usuarioNome?.trim().toLowerCase();
+
+    const contrato = contratos.find(
+      c =>
+        (c.usuarioEmail && c.usuarioEmail.trim().toLowerCase() === emailUser) ||
+        (nomeUser && c.nome.trim().toLowerCase() === nomeUser)
+    );
+
+    // Se ainda não existir contrato registrado no banco ou local, o colaborador/admin ainda precisa registrar sua primeira entrada
+    if (!contrato) {
+      return true;
+    }
+
+    const registros = await listarRegistrosPonto(empresaId, contrato.id);
+    const registroHoje = registros.find(r => r.data === hojeStr);
+
+    // Se já bateu a entrada hoje, não está mais pendente
+    if (registroHoje && registroHoje.horaEntrada) {
+      return false;
+    }
+
+    return true;
+  } catch (err) {
+    console.warn('Erro ao verificar pendência de ponto do dia:', err);
+    return false;
+  }
+}
+

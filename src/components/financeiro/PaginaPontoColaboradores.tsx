@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Clock, BadgeDollarSign, ShieldCheck } from 'lucide-react';
 import { startOfMonth, endOfMonth } from 'date-fns';
 import { useAuth } from '../../context/AuthContext';
@@ -7,12 +8,21 @@ import { GestaoPontoPagamentos } from './GestaoPontoPagamentos';
 
 export function PaginaPontoColaboradores() {
   const { usuario } = useAuth();
+  const [searchParams] = useSearchParams();
+  const abaUrl = searchParams.get('aba');
+
   const temAcessoGestao =
     usuario?.role === 'admin' ||
     usuario?.email === 'gui.gomesassis@gmail.com' ||
     Boolean(usuario?.permissoes?.includes('fin_gestao_colaboradores'));
 
-  const [aba, setAba] = useState<'meu_ponto' | 'gestao'>(temAcessoGestao ? 'gestao' : 'meu_ponto');
+  // Por padrão abre sempre no relógio de ponto ("meu_ponto") para permitir o registro imediato do ponto,
+  // abrindo em "gestao" apenas se for explicitamente solicitado via URL
+  const [aba, setAba] = useState<'meu_ponto' | 'gestao'>(() => {
+    if (abaUrl === 'gestao' && temAcessoGestao) return 'gestao';
+    return 'meu_ponto';
+  });
+
   const [mesFiltro, setMesFiltro] = useState(() => {
     const hoje = new Date();
     return `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}`;
@@ -28,11 +38,11 @@ export function PaginaPontoColaboradores() {
         <div>
           <h1 className="text-2xl font-bold text-white flex items-center gap-2">
             <Clock className="text-brand-blue-light" />
-            Ponto Eletrônico & Prestação PJ (Nota Fiscal)
+            Registro de Ponto & Prestação PJ
           </h1>
           <p className="text-gray-400 text-sm mt-0.5">
             {temAcessoGestao
-              ? 'Controle de entradas, saídas, geolocalização, cálculo de apuração proporcional e notas fiscais da equipe.'
+              ? 'Registre seu horário de trabalho com GPS e foto, ou alterne para gerenciar a apuração da equipe.'
               : 'Registre seu horário de entrada/saída com localização e envie sua Nota Fiscal do período.'}
           </p>
         </div>

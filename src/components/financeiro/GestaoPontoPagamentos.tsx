@@ -121,7 +121,7 @@ export function GestaoPontoPagamentos({ dataInicio, dataFim }: GestaoPontoPagame
     horarioIntervaloFimPadrao: '13:30',
     horarioSaidaPadrao: '17:30',
     diasSemanaTrabalho: [1, 2, 3, 4, 5] as number[],
-    exigeFotoPonto: true,
+    exigeFotoPonto: false,
     exigeGpsPonto: true
   });
 
@@ -421,7 +421,7 @@ export function GestaoPontoPagamentos({ dataInicio, dataFim }: GestaoPontoPagame
       horarioIntervaloFimPadrao: '13:30',
       horarioSaidaPadrao: '17:30',
       diasSemanaTrabalho: [1, 2, 3, 4, 5],
-      exigeFotoPonto: true,
+      exigeFotoPonto: false,
       exigeGpsPonto: true
     });
     setModalContratoAberto(true);
@@ -623,7 +623,7 @@ export function GestaoPontoPagamentos({ dataInicio, dataFim }: GestaoPontoPagame
         horarioIntervaloFimPadrao: '13:30',
         horarioSaidaPadrao: '17:30',
         diasSemanaTrabalho: [1, 2, 3, 4, 5],
-        exigeFotoPonto: true,
+        exigeFotoPonto: false,
         exigeGpsPonto: true,
         ativo: true
       });
@@ -880,6 +880,32 @@ export function GestaoPontoPagamentos({ dataInicio, dataFim }: GestaoPontoPagame
         observacoes: observacoesFechamento || undefined
       }
     });
+  };
+
+  const handleExportarCsvApuracao = () => {
+    if (!contratoAtivo || !apuracao) return;
+    const cabecalho = ['Data', 'Dia da Semana', 'Status', 'Entrada', 'Saida Almoco', 'Retorno Almoco', 'Saida Final', 'Horas Trabalhadas', 'Horas Esperadas', 'Saldo', 'Observacao'];
+    const linhas = apuracao.diasCalendario.map(d => [
+      d.data,
+      d.diaSemanaLabel,
+      d.statusEfetivo,
+      d.registro?.horaEntrada || '',
+      d.registro?.horaIntervaloIda || '',
+      d.registro?.horaIntervaloVolta || '',
+      d.registro?.horaSaida || '',
+      formatarMinutosHoras(d.minutosTrabalhados),
+      formatarMinutosHoras(d.minutosEsperados),
+      formatarMinutosHoras(d.minutosDiferenca, true),
+      (d.registro?.observacao || '').replace(/;/g, ' - ')
+    ]);
+    const csvContent = '\uFEFF' + [cabecalho.join(';'), ...linhas.map(l => l.map(val => `"${val}"`).join(';'))].join('\r\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Extrato_Ponto_${contratoAtivo.nome.replace(/\s+/g, '_')}_${format(dataInicio, 'yyyy-MM')}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const handleConfirmarFechamentoEPagamento = async (comoPago: boolean) => {
@@ -1879,6 +1905,16 @@ export function GestaoPontoPagamentos({ dataInicio, dataFim }: GestaoPontoPagame
                       <Download size={14} className="text-brand-blue-light" />
                       Baixar PDF
                     </button>
+
+                    <button
+                      type="button"
+                      onClick={handleExportarCsvApuracao}
+                      className="btn-ghost border border-brand-dark-5 text-xs py-2 px-3 flex items-center gap-1.5 text-emerald-400 hover:text-white"
+                      title="Exportar Extrato dos Pontos em Excel / CSV"
+                    >
+                      <FileText size={14} />
+                      Exportar Excel (CSV)
+                    </button>
                   </div>
                 </div>
               )}
@@ -2331,6 +2367,15 @@ export function GestaoPontoPagamentos({ dataInicio, dataFim }: GestaoPontoPagame
                       >
                         <Download size={15} className="text-brand-blue-light" />
                         Baixar PDF (Extrato + Entradas e Saídas)
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleExportarCsvApuracao}
+                        className="w-full btn-ghost border border-brand-dark-5 py-2.5 text-xs font-bold uppercase flex items-center justify-center gap-2 text-emerald-400 hover:text-white"
+                      >
+                        <FileText size={15} />
+                        Exportar Extrato para Excel (CSV)
                       </button>
 
                       <button

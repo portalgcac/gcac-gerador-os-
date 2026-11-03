@@ -1,5 +1,6 @@
 import React from 'react';
-import { Outlet, useLocation } from 'react-router-dom';
+import { Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { verificarPontoEntradaPendenteHoje } from '../../services/pontoColaboradoresService';
 import { Sidebar, NavegacaoInferior } from './Sidebar';
 import { WorkspaceSwitcher } from './WorkspaceSwitcher';
 import { NotificacoesDropdown } from './NotificacoesDropdown';
@@ -22,6 +23,7 @@ export function AppShell() {
   const { naoLidas } = useNotificacoesSistema();
   const online = useStatusConexao();
   const location = useLocation();
+  const navigate = useNavigate();
   const [jaSincronizou, setJaSincronizou] = React.useState(false);
   const [vinculoPendente, setVinculoPendente] = React.useState<VinculoDespachanteCac | null>(null);
   const [modalVinculoAberto, setModalVinculoAberto] = React.useState(false);
@@ -29,6 +31,36 @@ export function AppShell() {
   const [painelDebugAberto, setPainelDebugAberto] = React.useState(false);
   const [drawerAberto, setDrawerAberto] = React.useState(false);
   const [dropdownNotifAberto, setDropdownNotifAberto] = React.useState(false);
+
+  
+  // Redirecionamento automático no primeiro acesso do dia para Registro de Ponto
+  React.useEffect(() => {
+    if (!estaAutenticado || !usuario || usuario.tipoConta === 'cac_individual') return;
+    if (location.pathname === '/ponto') return;
+
+    const hoje = new Date();
+    const hojeStr = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}-${String(hoje.getDate()).padStart(2, '0')}`;
+    const storageKey = `gcac_ponto_auto_direcionado_${usuario.email || 'user'}_${hojeStr}`;
+
+    // Se já verificamos/redirecionamos nesta sessão hoje, respeita a navegação do usuário (flexibilização)
+    if (sessionStorage.getItem(storageKey)) {
+      return;
+    }
+
+    // Só atua se o usuário estiver acessando as rotas de entrada inicial padrão (/ ou /dashboard)
+    if (location.pathname === '/' || location.pathname === '/dashboard') {
+      const checarPontoPrimeiroAcesso = async () => {
+        sessionStorage.setItem(storageKey, 'true');
+        const empresaId = usuario.empresaId || '00000000-0000-0000-0000-000000000001';
+        const pendente = await verificarPontoEntradaPendenteHoje(empresaId, usuario.email, usuario.nome);
+        if (pendente) {
+          navigate('/ponto?origem=primeiro_acesso', { replace: true });
+        }
+      };
+
+      checarPontoPrimeiroAcesso();
+    }
+  }, [estaAutenticado, usuario, location.pathname, navigate]);
 
   const isAdmin = usuario?.role === 'admin';
 
