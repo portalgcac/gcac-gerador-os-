@@ -423,15 +423,31 @@ export async function excluirContratoColaborador(empresaId: string, id: string):
 
 // ── CRUD Registros de Ponto ──────────────────────────────────────────────
 
+export function limparRegistrosFuturosLocal(empresaId: string): void {
+  const localRaw = localStorage.getItem(STORAGE_KEY_PONTOS(empresaId));
+  if (!localRaw) return;
+  try {
+    const hojeStr = new Date().toISOString().slice(0, 10);
+    const locais = JSON.parse(localRaw) as RegistroPontoColaborador[];
+    const validos = locais.filter(l => l.data <= hojeStr);
+    if (validos.length !== locais.length) {
+      localStorage.setItem(STORAGE_KEY_PONTOS(empresaId), JSON.stringify(validos));
+    }
+  } catch { /* ignore */ }
+}
+
 export async function listarRegistrosPonto(
   empresaId: string,
   colaboradorId?: string
 ): Promise<RegistroPontoColaborador[]> {
+  limparRegistrosFuturosLocal(empresaId);
+  const hojeStr = new Date().toISOString().slice(0, 10);
+
   const localRaw = localStorage.getItem(STORAGE_KEY_PONTOS(empresaId));
   let locais: RegistroPontoColaborador[] = [];
   if (localRaw) {
     try {
-      locais = JSON.parse(localRaw);
+      locais = (JSON.parse(localRaw) as RegistroPontoColaborador[]).filter(l => l.data <= hojeStr);
     } catch { /* ignore */ }
   }
 
@@ -440,6 +456,7 @@ export async function listarRegistrosPonto(
       .from('registros_ponto_colaboradores')
       .select('*')
       .eq('empresa_id', empresaId)
+      .lte('data', hojeStr)
       .order('data', { ascending: true });
 
     if (colaboradorId) {
@@ -448,7 +465,7 @@ export async function listarRegistrosPonto(
 
     const { data, error } = await query;
     if (!error && data) {
-      const remotos = data.map(mapPontoFromDb);
+      const remotos = data.map(mapPontoFromDb).filter(r => r.data <= hojeStr);
       if (!colaboradorId) {
         const chavesRemotas = new Set(remotos.map(r => `${r.colaboradorId}_${r.data}`));
         const pendentesLocais = locais.filter(l => !chavesRemotas.has(`${l.colaboradorId}_${l.data}`));

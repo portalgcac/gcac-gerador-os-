@@ -52,6 +52,10 @@ export function RelogioPontoColaborador({ onPontoRegistrado }: RelogioPontoColab
     Boolean(usuario?.permissoes?.includes('fin_gestao_colaboradores'));
 
   const [agora, setAgora] = useState(new Date());
+  const [mesFiltro, setMesFiltro] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  });
   const [contratos, setContratos] = useState<ColaboradorContrato[]>([]);
   const [colaboradorSelecionadoId, setColaboradorSelecionadoId] = useState<string>('');
   const [registros, setRegistros] = useState<RegistroPontoColaborador[]>([]);
@@ -397,6 +401,13 @@ export function RelogioPontoColaborador({ onPontoRegistrado }: RelogioPontoColab
     () => fechamentos.filter(f => f.colaboradorId === colaboradorSelecionadoId),
     [fechamentos, colaboradorSelecionadoId]
   );
+
+  const registrosDoMes = useMemo(() => {
+    const hojeDataStr = `${agora.getFullYear()}-${String(agora.getMonth() + 1).padStart(2, '0')}-${String(agora.getDate()).padStart(2, '0')}`;
+    return registros
+      .filter(r => r.data.startsWith(mesFiltro) && r.data <= hojeDataStr)
+      .sort((a, b) => b.data.localeCompare(a.data));
+  }, [registros, mesFiltro, agora]);
 
   if (carregando) {
     return (
@@ -830,14 +841,30 @@ export function RelogioPontoColaborador({ onPontoRegistrado }: RelogioPontoColab
         </div>
       )}
 
-      {/* Histórico Recente de Batidas do Colaborador */}
+      {/* Histórico do Mês de Batidas do Colaborador (Apenas Registros Já Realizados) */}
       <div className="card p-0 overflow-hidden border-brand-dark-5">
-        <div className="p-4 border-b border-brand-dark-5 flex items-center justify-between bg-brand-dark-3/40">
-          <h3 className="text-xs font-black text-white uppercase tracking-wider flex items-center gap-2">
+        <div className="p-4 border-b border-brand-dark-5 flex flex-wrap items-center justify-between gap-3 bg-brand-dark-3/40">
+          <div className="flex items-center gap-2">
             <Calendar size={15} className="text-brand-blue-light" />
-            Meus Registros Recentes de Entrada e Saída ({contratoAtual?.nome || 'Colaborador'})
-          </h3>
-          <span className="text-[11px] text-gray-400">{registros.length} dia(s) registrado(s)</span>
+            <h3 className="text-xs font-black text-white uppercase tracking-wider">
+              Meus Registros de Ponto ({contratoAtual?.nome || 'Colaborador'})
+            </h3>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <span className="text-[11px] text-gray-400 font-bold">
+              {registrosDoMes.length} dia(s) realizado(s)
+            </span>
+            <div className="flex items-center bg-brand-dark-4 border border-brand-dark-5 rounded-lg px-2.5 py-1 gap-1.5">
+              <span className="text-[10px] font-bold text-gray-400 uppercase">Mês:</span>
+              <input
+                type="month"
+                value={mesFiltro}
+                onChange={e => e.target.value && setMesFiltro(e.target.value)}
+                className="bg-transparent text-white border-none focus:ring-0 text-xs outline-none p-0 cursor-pointer"
+              />
+            </div>
+          </div>
         </div>
 
         <div className="overflow-x-auto">
@@ -854,64 +881,61 @@ export function RelogioPontoColaborador({ onPontoRegistrado }: RelogioPontoColab
               </tr>
             </thead>
             <tbody className="divide-y divide-brand-dark-5/40">
-              {registros.length === 0 ? (
+              {registrosDoMes.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="py-10 text-center text-gray-500">
-                    Nenhum registro de ponto lançado ainda para este colaborador.
+                    Nenhum registro de ponto realizado ainda para este colaborador no mês selecionado.
                   </td>
                 </tr>
               ) : (
-                [...registros]
-                  .sort((a, b) => b.data.localeCompare(a.data))
-                  .slice(0, 31)
-                  .map(r => (
-                    <tr key={r.id} className="hover:bg-brand-dark-4/50">
-                      <td className="table-cell font-mono font-bold text-white">{formatarData(r.data)}</td>
-                      <td className="table-cell font-mono text-brand-green">{r.horaEntrada || '—'}</td>
-                      <td className="table-cell font-mono text-gray-400">
-                        {r.horaIntervaloIda || r.horaIntervaloVolta
-                          ? `${r.horaIntervaloIda || '--:--'} às ${r.horaIntervaloVolta || '--:--'}`
-                          : '—'}
-                      </td>
-                      <td className="table-cell font-mono text-purple-300">{r.horaSaida || '—'}</td>
-                      <td className="table-cell font-mono font-bold text-white">
-                        {formatarMinutosHoras(r.minutosTrabalhados)}
-                      </td>
-                      <td className="table-cell">
-                        <div className="flex items-center gap-2">
-                          {r.latEntrada && r.lngEntrada ? (
-                            <a
-                              href={`https://www.google.com/maps?q=${r.latEntrada},${r.lngEntrada}`}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="px-2 py-0.5 rounded bg-brand-blue/15 text-brand-blue-light text-[10px] font-bold hover:underline"
-                            >
-                              📍 {r.distanciaEntradaMetros !== undefined ? `${r.distanciaEntradaMetros}m` : 'Mapa'}
-                            </a>
-                          ) : (
-                            <span className="text-[10px] text-gray-500">Manual</span>
-                          )}
-                          {(r.fotoEntradaUrl || r.fotoSaidaUrl) && (
-                            <button
-                              type="button"
-                              onClick={() =>
-                                visualizarDocumentoBase64(
-                                  (r.fotoEntradaUrl || r.fotoSaidaUrl)!,
-                                  `Foto_Ponto_${r.data}.webp`
-                                )
-                              }
-                              className="px-2 py-0.5 rounded bg-brand-green/15 text-brand-green text-[10px] font-bold hover:underline"
-                            >
-                              📷 Foto
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                      <td className="table-cell text-gray-400 max-w-[200px] truncate" title={r.observacao}>
-                        {r.observacao || '—'}
-                      </td>
-                    </tr>
-                  ))
+                registrosDoMes.map(r => (
+                  <tr key={r.id} className="hover:bg-brand-dark-4/50">
+                    <td className="table-cell font-mono font-bold text-white">{formatarData(r.data)}</td>
+                    <td className="table-cell font-mono text-brand-green">{r.horaEntrada || '—'}</td>
+                    <td className="table-cell font-mono text-gray-400">
+                      {r.horaIntervaloIda || r.horaIntervaloVolta
+                        ? `${r.horaIntervaloIda || '--:--'} às ${r.horaIntervaloVolta || '--:--'}`
+                        : '—'}
+                    </td>
+                    <td className="table-cell font-mono text-purple-300">{r.horaSaida || '—'}</td>
+                    <td className="table-cell font-mono font-bold text-white">
+                      {formatarMinutosHoras(r.minutosTrabalhados)}
+                    </td>
+                    <td className="table-cell">
+                      <div className="flex items-center gap-2">
+                        {r.latEntrada && r.lngEntrada ? (
+                          <a
+                            href={`https://www.google.com/maps?q=${r.latEntrada},${r.lngEntrada}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="px-2 py-0.5 rounded bg-brand-blue/15 text-brand-blue-light text-[10px] font-bold hover:underline"
+                          >
+                            📍 {r.distanciaEntradaMetros !== undefined ? `${r.distanciaEntradaMetros}m` : 'Mapa'}
+                          </a>
+                        ) : (
+                          <span className="text-[10px] text-gray-500">Manual</span>
+                        )}
+                        {(r.fotoEntradaUrl || r.fotoSaidaUrl) && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              visualizarDocumentoBase64(
+                                (r.fotoEntradaUrl || r.fotoSaidaUrl)!,
+                                `Foto_Ponto_${r.data}.webp`
+                              )
+                            }
+                            className="px-2 py-0.5 rounded bg-brand-green/15 text-brand-green text-[10px] font-bold hover:underline"
+                          >
+                            📷 Foto
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                    <td className="table-cell text-gray-400 max-w-[200px] truncate" title={r.observacao}>
+                      {r.observacao || '—'}
+                    </td>
+                  </tr>
+                ))
               )}
             </tbody>
           </table>

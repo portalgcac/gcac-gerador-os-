@@ -650,7 +650,7 @@ export function GestaoPontoPagamentos({ dataInicio, dataFim }: GestaoPontoPagame
           !dia.antesDaAdmissao &&
           dia.ehDiaTrabalhoContrato &&
           !dia.registro &&
-          dia.data <= (dataFimStr > hojeStr ? dataFimStr : hojeStr)
+          dia.data <= hojeStr
         ) {
           const minTrab = calcularMinutosTrabalhadosDia(
             contratoAtivo.horarioEntradaPadrao,
