@@ -31,6 +31,7 @@ import {
   calcularDistanciaMetros,
   calcularMinutosTrabalhadosDia,
   formatarMinutosHoras,
+  calcularHoraSaidaParaCarga,
   capturarFrameVideoComprimido,
   ConfigSedeGps
 } from '../../services/pontoColaboradoresService';
@@ -409,6 +410,15 @@ export function RelogioPontoColaborador({ onPontoRegistrado }: RelogioPontoColab
       .sort((a, b) => b.data.localeCompare(a.data));
   }, [registros, mesFiltro, agora]);
 
+  const horaSaidaPrevista = useMemo(() => {
+    if (!contratoAtual) return null;
+    const cargaMin = contratoAtual.cargaHorariaDiariaMin || 510;
+    const ent = registroHoje?.horaEntrada || contratoAtual.horarioEntradaPadrao || '08:00';
+    const intIda = registroHoje?.horaIntervaloIda || contratoAtual.horarioIntervaloInicioPadrao || '12:00';
+    const intVolta = registroHoje?.horaIntervaloVolta || contratoAtual.horarioIntervaloFimPadrao || '13:00';
+    return calcularHoraSaidaParaCarga(ent, intIda, intVolta, cargaMin);
+  }, [contratoAtual, registroHoje]);
+
   if (carregando) {
     return (
       <div className="card p-10 text-center text-gray-400">
@@ -554,6 +564,30 @@ export function RelogioPontoColaborador({ onPontoRegistrado }: RelogioPontoColab
               </span>
             </div>
           </div>
+
+          {/* Card Resumo da Carga Horária Contratada & Previsão de Saída */}
+          {contratoAtual && (
+            <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-xl bg-brand-dark-4/70 border border-brand-dark-5 text-xs">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[10px] font-bold uppercase text-gray-400">Carga Diária Contratada:</span>
+                <span className="px-2 py-0.5 rounded bg-brand-dark-3 text-white font-mono font-bold border border-brand-dark-5">
+                  {formatarMinutosHoras(contratoAtual.cargaHorariaDiariaMin || 510)}/dia
+                </span>
+                <span className="text-gray-400 text-[11px]">
+                  ({contratoAtual.horarioEntradaPadrao || '08:00'} às {contratoAtual.horarioSaidaPadrao || '17:30'} • Almoço: {contratoAtual.horarioIntervaloInicioPadrao || '12:00'} às {contratoAtual.horarioIntervaloFimPadrao || '13:00'})
+                </span>
+              </div>
+
+              {horaSaidaPrevista && (
+                <div className="flex items-center gap-1.5 text-xs">
+                  <span className="text-gray-400 text-[11px]">Saída recomendada hoje:</span>
+                  <span className="px-2 py-0.5 rounded bg-brand-blue/15 text-brand-blue-light font-mono font-bold border border-brand-blue/30">
+                    {horaSaidaPrevista}
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Botões de Ação de Bater Ponto */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
