@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { 
   Target, MapPin, Calendar, Plus, Trash2, ShieldAlert, AlertTriangle,
-  ChevronDown, ChevronUp, FileText, Globe, Landmark, Upload, Loader2, Pencil, RefreshCw, Camera
+  ChevronDown, ChevronUp, FileText, Globe, Landmark, Upload, Loader2, Pencil, RefreshCw, Camera, Crosshair
 } from 'lucide-react';
 import { parseIbamaPdf } from '../../services/ibamaParserService';
 import { parseGtPdf } from '../../services/gtParserService';
@@ -15,6 +15,17 @@ import { useAuth } from '../../context/AuthContext';
 import { buscarAcervoVinculado } from '../../services/vinculosService';
 import { ModalUploadCelular } from '../common/ModalUploadCelular';
 import { normalizarTipoArma } from '../../data/catalogoArmas';
+
+export type TipoFiltroAcervo = 'todos' | 'tiro' | 'caca' | 'colecao';
+
+export function categorizarTipoAcervo(acervo?: string): 'tiro' | 'caca' | 'colecao' | 'outros' {
+  if (!acervo) return 'outros';
+  const a = acervo.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+  if (a.includes('caca')) return 'caca';
+  if (a.includes('tiro')) return 'tiro';
+  if (a.includes('colec')) return 'colecao';
+  return 'outros';
+}
 
 const TIPOS_ARMA = ['Pistola', 'Revólver', 'Carabina / Fuzil', 'Espingarda'];
 
@@ -179,6 +190,8 @@ export function AbaDocumentacao({ cliente, armaIdInicial, cacEmpresaId, podeEdit
   const [modalManejo, setModalManejo] = useState(false);
   const [manejoParaEditar, setManejoParaEditar] = useState<AutorizacaoManejo | null>(null);
   const [modalEditarCr, setModalEditarCr] = useState<{ tipo: 'CR' | 'IBAMA_CR'; label: string } | null>(null);
+  const [filtroAcervo, setFiltroAcervo] = useState<TipoFiltroAcervo>('todos');
+  const [acervoPadraoNovo, setAcervoPadraoNovo] = useState<'Caça' | 'Tiro Desportivo' | 'Coleção'>('Tiro Desportivo');
 
   const carregadoUmaVez = useRef(false);
 
@@ -270,6 +283,204 @@ export function AbaDocumentacao({ cliente, armaIdInicial, cacEmpresaId, podeEdit
       </div>
     );
   }
+
+  const armasTiro = useMemo(() => armas.filter(a => categorizarTipoAcervo(a.acervo) === 'tiro'), [armas]);
+  const armasCaca = useMemo(() => armas.filter(a => categorizarTipoAcervo(a.acervo) === 'caca'), [armas]);
+  const armasColecao = useMemo(() => armas.filter(a => categorizarTipoAcervo(a.acervo) === 'colecao'), [armas]);
+  const armasOutras = useMemo(() => armas.filter(a => categorizarTipoAcervo(a.acervo) === 'outros'), [armas]);
+
+  const renderArmaCard = (arma: Arma) => {
+    const categoria = categorizarTipoAcervo(arma.acervo);
+    const isCaca = categoria === 'caca';
+    const isColecao = categoria === 'colecao';
+
+    const temaEstilo = isCaca ? {
+      cardBorder: 'border-amber-500/25 hover:border-amber-500/50 bg-gradient-to-r from-amber-500/5 to-transparent',
+      iconeBg: 'bg-amber-500/15 text-amber-400 border border-amber-500/30',
+      badge: 'bg-amber-500/20 text-amber-300 border border-amber-500/40',
+      badgeTexto: '🐗 CAÇA'
+    } : isColecao ? {
+      cardBorder: 'border-purple-500/25 hover:border-purple-500/50 bg-gradient-to-r from-purple-500/5 to-transparent',
+      iconeBg: 'bg-purple-500/15 text-purple-300 border border-purple-500/30',
+      badge: 'bg-purple-500/20 text-purple-300 border border-purple-500/40',
+      badgeTexto: '🏛️ COLEÇÃO'
+    } : {
+      cardBorder: 'border-brand-dark-5 hover:border-brand-blue/50 bg-gradient-to-r from-brand-blue/5 to-transparent',
+      iconeBg: 'bg-brand-blue/15 text-brand-blue-light border border-brand-blue/30',
+      badge: 'bg-brand-blue/20 text-brand-blue-light border border-brand-blue/40',
+      badgeTexto: '🎯 TIRO DESPORTIVO'
+    };
+
+    return (
+      <div key={arma.id} className={`card bg-brand-dark-3/50 p-0 overflow-hidden transition-all duration-200 ${temaEstilo.cardBorder}`}>
+        <div 
+          onClick={() => setExpandirArma(expandirArma === arma.id ? null : arma.id)}
+          className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer hover:bg-brand-dark-3/80 transition-colors"
+        >
+          <div className="flex items-start sm:items-center gap-3 min-w-0">
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${temaEstilo.iconeBg}`}>
+              <Target size={20} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-bold text-white truncate">
+                {arma.tipo ? `${arma.tipo} - ` : ''}{arma.modelo} • {arma.calibre}
+              </p>
+              <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                <p className="text-[10px] text-gray-500 uppercase font-bold tracking-widest truncate">
+                  Série: {arma.numeroSerie} • SIGMA: {arma.numeroSigma}
+                </p>
+                <span className={`text-[9px] px-2 py-0.5 rounded font-black uppercase tracking-tight shrink-0 flex items-center gap-1 ${temaEstilo.badge}`}>
+                  {temaEstilo.badgeTexto}
+                </span>
+                {(() => {
+                  const gts = gtsPorArma[arma.id] || [];
+                  const gtsAlerta = gts.filter(g => isAlerta(g.vencimento, 'GT')).length;
+                  if (gtsAlerta > 0) {
+                    return (
+                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-red-500/20 text-red-400 font-bold uppercase tracking-tighter shrink-0 flex items-center gap-1">
+                        <AlertTriangle size={10} /> {gtsAlerta} GT com alerta
+                      </span>
+                    );
+                  }
+                  return null;
+                })()}
+              </div>
+            </div>
+          </div>
+          
+          <div className="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t border-brand-dark-5/30 sm:border-0">
+            <div className="text-left sm:text-right flex flex-row sm:flex-col items-center sm:items-end gap-1.5 sm:gap-0 shrink-0">
+              <p className="text-[9px] text-gray-500 font-bold uppercase sm:mb-1">CRAF:</p>
+              <BadgeVencimento data={arma.vencimentoCraf} tipo="CRAF" emRenovacao={arma.crafEmRenovacao} />
+            </div>
+            <div className="flex items-center gap-1.5 shrink-0">
+              {arma.crafUrl && (
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    visualizarDocumentoBase64(arma.crafUrl!, `CRAF-${arma.numeroSerie || 'arma'}`);
+                  }}
+                  className="p-2 rounded-lg bg-brand-dark-2 text-brand-blue hover:text-brand-blue-light transition-colors"
+                  title="Visualizar CRAF"
+                >
+                  <FileText size={16} />
+                </button>
+              )}
+              {podeEditar && (
+                <>
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setArmaParaEditar(arma);
+                      setModalArma(true);
+                    }}
+                    className="p-2 rounded-lg bg-brand-dark-2 text-gray-400 hover:text-brand-blue transition-colors"
+                    title="Editar Arma"
+                  >
+                    <Pencil size={16} />
+                  </button>
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (confirm('Deseja realmente excluir esta arma e todas as suas guias?')) {
+                        deletarArma(arma.id).then(carregarDados);
+                      }
+                    }}
+                    className="p-2 rounded-lg bg-brand-dark-2 text-gray-400 hover:text-red-400 transition-colors"
+                    title="Excluir Arma"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </>
+              )}
+              <div className="p-1 text-gray-400">
+                {expandirArma === arma.id ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {expandirArma === arma.id && (
+          <div className="border-t border-brand-dark-5 p-4 bg-brand-dark-4 animate-slide-down">
+            <div className="flex items-center justify-between mb-4">
+               <h4 className="text-[10px] font-black text-gray-500 uppercase tracking-widest flex items-center gap-2">
+                 Guias de Tráfego (GTs)
+                 <span className="bg-brand-dark-3 text-gray-400 px-1.5 py-0.5 rounded-full text-[9px]">
+                   {gtsPorArma[arma.id]?.length || 0}
+                 </span>
+               </h4>
+               {podeEditar && (
+                 <button 
+                   onClick={() => setModalGt({armaId: arma.id})} 
+                   className="text-[10px] font-bold text-brand-blue-light hover:underline flex items-center gap-1"
+                 >
+                   <Plus size={12} /> Nova Guia
+                 </button>
+               )}
+            </div>
+
+            <div className="space-y-2">
+              {gtsPorArma[arma.id]?.length === 0 ? (
+                <p className="text-[10px] text-gray-600 italic">Nenhuma guia cadastrada para esta arma.</p>
+              ) : (
+                gtsPorArma[arma.id]?.map(gt => (
+                  <div key={gt.id} className="flex items-center justify-between p-2.5 rounded-lg bg-brand-dark-3 border border-brand-dark-5">
+                    <div className="flex items-center gap-3">
+                      <div className="p-1.5 rounded-lg bg-brand-dark-2 text-brand-blue">
+                        <MapPin size={12} />
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-white">GT {gt.tipo} - {gt.destino}</p>
+                        <p className="text-[9px] text-gray-500 uppercase">Vencimento: {formatarData(gt.vencimento)}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <BadgeVencimento data={gt.vencimento} tipo="GT" emRenovacao={gt.gtEmRenovacao} />
+                      {gt.arquivoUrl && (
+                        <button 
+                          onClick={() => visualizarDocumentoBase64(gt.arquivoUrl!, `GT-${gt.tipo}-${gt.destino}`)}
+                          className="text-brand-blue hover:text-brand-blue-light p-1"
+                          title="Visualizar Guia"
+                        >
+                          <FileText size={14} />
+                        </button>
+                      )}
+                      {podeEditar && (
+                        <>
+                          <button onClick={() => setModalGt({armaId: arma.id, gt})} className="text-gray-600 hover:text-brand-blue p-1" title="Editar Guia">
+                            <Pencil size={14} />
+                          </button>
+                          <button onClick={() => {
+                            if(confirm('Excluir esta guia?')) {
+                              deletarGt(gt.id).then(carregarDados);
+                            }
+                          }} className="text-gray-600 hover:text-red-400 p-1" title="Excluir Guia">
+                            <Trash2 size={14} />
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {podeEditar && (
+              <div className="mt-4 pt-3 border-t border-brand-dark-5 flex justify-end">
+                <button onClick={() => {
+                  if(confirm('Excluir esta arma e todas as suas guias?')) {
+                    deletarArma(arma.id).then(carregarDados);
+                  }
+                }} className="flex items-center gap-1.5 text-[10px] font-bold text-red-500/60 hover:text-red-500 transition-colors uppercase">
+                  <Trash2 size={12} /> Remover Arma
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="space-y-8 animate-fade-in">
@@ -364,198 +575,251 @@ export function AbaDocumentacao({ cliente, armaIdInicial, cacEmpresaId, podeEdit
         />
       </div>
 
-      {/* ── Seção Armas & CRAFs ── */}
-      <section>
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <Target size={20} className="text-brand-blue" />
-            <h3 className="text-sm font-black text-white uppercase tracking-wider flex items-center gap-2">
-              Armas & CRAFs
-              <span className="bg-brand-blue/20 text-brand-blue px-2 py-0.5 rounded-full text-[10px]">
-                {armas.length}
-              </span>
-            </h3>
+      {/* ── Seção Armas & CRAFs Divididas por Acervo ── */}
+      <section className="space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 rounded-xl bg-brand-blue/10 border border-brand-blue/20 text-brand-blue">
+              <Target size={20} />
+            </div>
+            <div>
+              <h3 className="text-sm font-black text-white uppercase tracking-wider flex items-center gap-2">
+                Armas & CRAFs
+                <span className="bg-brand-blue/20 text-brand-blue px-2 py-0.5 rounded-full text-[10px]">
+                  {armas.length}
+                </span>
+              </h3>
+              <p className="text-[11px] text-gray-400">Divisão organizada entre armas de Acervo de Caça e Tiro Desportivo</p>
+            </div>
           </div>
           {podeEditar && (
-            <button onClick={() => setModalArma(true)} className="btn-primary py-1.5 px-3 text-xs">
+            <button 
+              onClick={() => {
+                setArmaParaEditar(null);
+                setModalArma(true);
+              }} 
+              className="btn-primary py-1.5 px-3.5 text-xs flex items-center gap-1.5 self-start sm:self-auto"
+            >
               <Plus size={14} /> Adicionar Arma
             </button>
           )}
         </div>
 
+        {/* Abas de Navegação / Filtro por Acervo */}
+        <div className="flex items-center gap-2 p-1.5 bg-brand-dark-3/70 rounded-xl border border-brand-dark-5 overflow-x-auto">
+          <button
+            type="button"
+            onClick={() => setFiltroAcervo('todos')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2 shrink-0 ${
+              filtroAcervo === 'todos'
+                ? 'bg-brand-blue text-white shadow-md shadow-brand-blue/30'
+                : 'text-gray-400 hover:text-white hover:bg-brand-dark-2'
+            }`}
+          >
+            <span>Todas as Armas</span>
+            <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${filtroAcervo === 'todos' ? 'bg-black/30 text-white' : 'bg-brand-dark-5 text-gray-400'}`}>
+              {armas.length}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setFiltroAcervo('tiro');
+              setAcervoPadraoNovo('Tiro Desportivo');
+            }}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2 shrink-0 ${
+              filtroAcervo === 'tiro'
+                ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
+                : 'text-gray-400 hover:text-white hover:bg-brand-dark-2'
+            }`}
+          >
+            <span>🎯 Tiro Desportivo</span>
+            <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${filtroAcervo === 'tiro' ? 'bg-black/30 text-white' : 'bg-blue-500/20 text-blue-400'}`}>
+              {armasTiro.length}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setFiltroAcervo('caca');
+              setAcervoPadraoNovo('Caça');
+            }}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2 shrink-0 ${
+              filtroAcervo === 'caca'
+                ? 'bg-amber-600 text-white shadow-md shadow-amber-600/30'
+                : 'text-gray-400 hover:text-white hover:bg-brand-dark-2'
+            }`}
+          >
+            <span>🐗 Acervo de Caça</span>
+            <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${filtroAcervo === 'caca' ? 'bg-black/30 text-white' : 'bg-amber-500/20 text-amber-400'}`}>
+              {armasCaca.length}
+            </span>
+          </button>
+
+          {(armasColecao.length > 0 || filtroAcervo === 'colecao') && (
+            <button
+              type="button"
+              onClick={() => {
+                setFiltroAcervo('colecao');
+                setAcervoPadraoNovo('Coleção');
+              }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2 shrink-0 ${
+                filtroAcervo === 'colecao'
+                  ? 'bg-purple-600 text-white shadow-md shadow-purple-600/30'
+                  : 'text-gray-400 hover:text-white hover:bg-brand-dark-2'
+              }`}
+            >
+              <span>🏛️ Coleção</span>
+              <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${filtroAcervo === 'colecao' ? 'bg-black/30 text-white' : 'bg-purple-500/20 text-purple-400'}`}>
+                {armasColecao.length}
+              </span>
+            </button>
+          )}
+        </div>
+
         {armas.length === 0 ? (
-          <EmptyState msg="Nenhuma arma cadastrada." />
+          <EmptyState msg="Nenhuma arma cadastrada neste cliente." />
         ) : (
-          <div className="space-y-3">
-            {armas.map(arma => (
-              <div key={arma.id} className="card bg-brand-dark-3/50 border-brand-dark-5 p-0 overflow-hidden">
-                <div 
-                  onClick={() => setExpandirArma(expandirArma === arma.id ? null : arma.id)}
-                  className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer hover:bg-brand-dark-3 transition-colors"
-                >
-                  <div className="flex items-start sm:items-center gap-3 min-w-0">
-                    <div className="w-10 h-10 rounded-xl bg-brand-blue/10 flex items-center justify-center text-brand-blue shrink-0">
-                      <Target size={20} />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-bold text-white truncate">
-                        {arma.tipo ? `${arma.tipo} - ` : ''}{arma.modelo} • {arma.calibre}
-                      </p>
-                      <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
-                        <p className="text-[10px] text-gray-500 uppercase font-bold tracking-widest truncate">
-                          Série: {arma.numeroSerie} • SIGMA: {arma.numeroSigma}
-                        </p>
-                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-brand-blue/20 text-brand-blue-light font-black uppercase tracking-tighter shrink-0">
-                          {arma.acervo}
-                        </span>
-                        {(() => {
-                          const gts = gtsPorArma[arma.id] || [];
-                          const gtsAlerta = gts.filter(g => isAlerta(g.vencimento, 'GT')).length;
-                          if (gtsAlerta > 0) {
-                            return (
-                              <span className="text-[9px] px-1.5 py-0.5 rounded bg-red-500/20 text-red-400 font-bold uppercase tracking-tighter shrink-0 flex items-center gap-1">
-                                <AlertTriangle size={10} /> {gtsAlerta} GT com alerta
-                              </span>
-                            );
-                          }
-                          return null;
-                        })()}
-                      </div>
-                    </div>
+          <div className="space-y-6">
+            {/* Bloco 1: Acervo de Tiro Desportivo */}
+            {(filtroAcervo === 'todos' || filtroAcervo === 'tiro') && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between pb-2 border-b border-blue-500/20">
+                  <div className="flex items-center gap-2">
+                    <span className="text-base">🎯</span>
+                    <h4 className="text-xs font-black text-blue-400 uppercase tracking-wider">
+                      Acervo de Tiro Desportivo
+                    </h4>
+                    <span className="bg-blue-500/20 text-blue-300 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                      {armasTiro.length} {armasTiro.length === 1 ? 'arma' : 'armas'}
+                    </span>
                   </div>
-                  
-                  <div className="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t border-brand-dark-5/30 sm:border-0">
-                    <div className="text-left sm:text-right flex flex-row sm:flex-col items-center sm:items-end gap-1.5 sm:gap-0 shrink-0">
-                      <p className="text-[9px] text-gray-500 font-bold uppercase sm:mb-1">CRAF:</p>
-                      <BadgeVencimento data={arma.vencimentoCraf} tipo="CRAF" emRenovacao={arma.crafEmRenovacao} />
-                    </div>
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      {arma.crafUrl && (
-                        <button 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            visualizarDocumentoBase64(arma.crafUrl!, `CRAF-${arma.numeroSerie || 'arma'}`);
-                          }}
-                          className="p-2 rounded-lg bg-brand-dark-2 text-brand-blue hover:text-brand-blue-light transition-colors"
-                          title="Visualizar CRAF"
-                        >
-                          <FileText size={16} />
-                        </button>
-                      )}
-                      {podeEditar && (
-                        <>
-                          <button 
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setArmaParaEditar(arma);
-                              setModalArma(true);
-                            }}
-                            className="p-2 rounded-lg bg-brand-dark-2 text-gray-400 hover:text-brand-blue transition-colors"
-                            title="Editar Arma"
-                          >
-                            <Pencil size={16} />
-                          </button>
-                          <button 
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (confirm('Deseja realmente excluir esta arma e todas as suas guias?')) {
-                                deletarArma(arma.id).then(carregarDados);
-                              }
-                            }}
-                            className="p-2 rounded-lg bg-brand-dark-2 text-gray-400 hover:text-red-400 transition-colors"
-                            title="Excluir Arma"
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        </>
-                      )}
-                      <div className="p-1 text-gray-400">
-                        {expandirArma === arma.id ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-                      </div>
-                    </div>
-                  </div>
+                  {podeEditar && (
+                    <button 
+                      onClick={() => {
+                        setAcervoPadraoNovo('Tiro Desportivo');
+                        setArmaParaEditar(null);
+                        setModalArma(true);
+                      }}
+                      className="text-[11px] font-bold text-blue-400 hover:text-blue-300 flex items-center gap-1"
+                    >
+                      <Plus size={12} /> Adicionar no Tiro
+                    </button>
+                  )}
                 </div>
 
-                {expandirArma === arma.id && (
-                  <div className="border-t border-brand-dark-5 p-4 bg-brand-dark-4 animate-slide-down">
-                    <div className="flex items-center justify-between mb-4">
-                       <h4 className="text-[10px] font-black text-gray-500 uppercase tracking-widest flex items-center gap-2">
-                         Guias de Tráfego (GTs)
-                         <span className="bg-brand-dark-3 text-gray-400 px-1.5 py-0.5 rounded-full text-[9px]">
-                           {gtsPorArma[arma.id]?.length || 0}
-                         </span>
-                       </h4>
-                       {podeEditar && (
-                         <button 
-                           onClick={() => setModalGt({armaId: arma.id})} 
-                           className="text-[10px] font-bold text-brand-blue-light hover:underline flex items-center gap-1"
-                         >
-                           <Plus size={12} /> Nova Guia
-                         </button>
-                       )}
-                    </div>
-
-                    <div className="space-y-2">
-                      {gtsPorArma[arma.id]?.length === 0 ? (
-                        <p className="text-[10px] text-gray-600 italic">Nenhuma guia cadastrada para esta arma.</p>
-                      ) : (
-                        gtsPorArma[arma.id]?.map(gt => (
-                          <div key={gt.id} className="flex items-center justify-between p-2.5 rounded-lg bg-brand-dark-3 border border-brand-dark-5">
-                            <div className="flex items-center gap-3">
-                              <div className="p-1.5 rounded-lg bg-brand-dark-2 text-brand-blue">
-                                <MapPin size={12} />
-                              </div>
-                              <div>
-                                <p className="text-xs font-bold text-white">GT {gt.tipo} - {gt.destino}</p>
-                                <p className="text-[9px] text-gray-500 uppercase">Vencimento: {formatarData(gt.vencimento)}</p>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-3">
-                              <BadgeVencimento data={gt.vencimento} tipo="GT" emRenovacao={gt.gtEmRenovacao} />
-                              {gt.arquivoUrl && (
-                                <button 
-                                  onClick={() => visualizarDocumentoBase64(gt.arquivoUrl!, `GT-${gt.tipo}-${gt.destino}`)}
-                                  className="text-brand-blue hover:text-brand-blue-light p-1"
-                                  title="Visualizar Guia"
-                                >
-                                  <FileText size={14} />
-                                </button>
-                              )}
-                              {podeEditar && (
-                                <>
-                                  <button onClick={() => setModalGt({armaId: arma.id, gt})} className="text-gray-600 hover:text-brand-blue p-1" title="Editar Guia">
-                                    <Pencil size={14} />
-                                  </button>
-                                  <button onClick={() => {
-                                    if(confirm('Excluir esta guia?')) {
-                                      deletarGt(gt.id).then(carregarDados);
-                                    }
-                                  }} className="text-gray-600 hover:text-red-400 p-1" title="Excluir Guia">
-                                    <Trash2 size={14} />
-                                  </button>
-                                </>
-                              )}
-                            </div>
-                          </div>
-                        ))
-                      )}
-                    </div>
-
-                    {podeEditar && (
-                      <div className="mt-4 pt-3 border-t border-brand-dark-5 flex justify-end">
-                        <button onClick={() => {
-                          if(confirm('Excluir esta arma e todas as suas guias?')) {
-                            deletarArma(arma.id).then(carregarDados);
-                          }
-                        }} className="flex items-center gap-1.5 text-[10px] font-bold text-red-500/60 hover:text-red-500 transition-colors uppercase">
-                          <Trash2 size={12} /> Remover Arma
-                        </button>
-                      </div>
-                    )}
+                {armasTiro.length === 0 ? (
+                  <div className="py-4 text-center bg-brand-dark-3/20 border border-dashed border-brand-dark-5 rounded-xl">
+                    <p className="text-xs text-gray-500 italic">Nenhuma arma cadastrada no Acervo de Tiro Desportivo.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {armasTiro.map(renderArmaCard)}
                   </div>
                 )}
               </div>
-            ))}
+            )}
+
+            {/* Bloco 2: Acervo de Caça */}
+            {(filtroAcervo === 'todos' || filtroAcervo === 'caca') && (
+              <div className="space-y-3 pt-2">
+                <div className="flex items-center justify-between pb-2 border-b border-amber-500/20">
+                  <div className="flex items-center gap-2">
+                    <span className="text-base">🐗</span>
+                    <h4 className="text-xs font-black text-amber-400 uppercase tracking-wider">
+                      Acervo de Caça
+                    </h4>
+                    <span className="bg-amber-500/20 text-amber-300 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                      {armasCaca.length} {armasCaca.length === 1 ? 'arma' : 'armas'}
+                    </span>
+                  </div>
+                  {podeEditar && (
+                    <button 
+                      onClick={() => {
+                        setAcervoPadraoNovo('Caça');
+                        setArmaParaEditar(null);
+                        setModalArma(true);
+                      }}
+                      className="text-[11px] font-bold text-amber-400 hover:text-amber-300 flex items-center gap-1"
+                    >
+                      <Plus size={12} /> Adicionar na Caça
+                    </button>
+                  )}
+                </div>
+
+                {armasCaca.length === 0 ? (
+                  <div className="py-4 text-center bg-amber-500/5 border border-dashed border-amber-500/20 rounded-xl">
+                    <p className="text-xs text-amber-400/70 italic">Nenhuma arma cadastrada no Acervo de Caça.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {armasCaca.map(renderArmaCard)}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Bloco 3: Acervo de Coleção (se houver ou se filtrado) */}
+            {(filtroAcervo === 'colecao' || (filtroAcervo === 'todos' && armasColecao.length > 0)) && (
+              <div className="space-y-3 pt-2">
+                <div className="flex items-center justify-between pb-2 border-b border-purple-500/20">
+                  <div className="flex items-center gap-2">
+                    <span className="text-base">🏛️</span>
+                    <h4 className="text-xs font-black text-purple-400 uppercase tracking-wider">
+                      Acervo de Coleção
+                    </h4>
+                    <span className="bg-purple-500/20 text-purple-300 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                      {armasColecao.length} {armasColecao.length === 1 ? 'arma' : 'armas'}
+                    </span>
+                  </div>
+                  {podeEditar && (
+                    <button 
+                      onClick={() => {
+                        setAcervoPadraoNovo('Coleção');
+                        setArmaParaEditar(null);
+                        setModalArma(true);
+                      }}
+                      className="text-[11px] font-bold text-purple-400 hover:text-purple-300 flex items-center gap-1"
+                    >
+                      <Plus size={12} /> Adicionar na Coleção
+                    </button>
+                  )}
+                </div>
+
+                {armasColecao.length === 0 ? (
+                  <div className="py-4 text-center bg-purple-500/5 border border-dashed border-purple-500/20 rounded-xl">
+                    <p className="text-xs text-purple-400/70 italic">Nenhuma arma cadastrada no Acervo de Coleção.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {armasColecao.map(renderArmaCard)}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Bloco 4: Demais Armas (caso haja com acervo não preenchido) */}
+            {filtroAcervo === 'todos' && armasOutras.length > 0 && (
+              <div className="space-y-3 pt-2">
+                <div className="flex items-center justify-between pb-2 border-b border-gray-600/30">
+                  <div className="flex items-center gap-2">
+                    <span className="text-base">📋</span>
+                    <h4 className="text-xs font-black text-gray-400 uppercase tracking-wider">
+                      Outras Armas / Sem Acervo Definido
+                    </h4>
+                    <span className="bg-gray-700/50 text-gray-300 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                      {armasOutras.length} {armasOutras.length === 1 ? 'arma' : 'armas'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  {armasOutras.map(renderArmaCard)}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </section>
@@ -660,6 +924,7 @@ export function AbaDocumentacao({ cliente, armaIdInicial, cacEmpresaId, podeEdit
       {modalArma && (
         <ModalArma 
           armaParaEditar={armaParaEditar || undefined}
+          acervoPadrao={acervoPadraoNovo}
           onFechar={() => {
             setModalArma(false);
             setArmaParaEditar(null);
@@ -1033,7 +1298,7 @@ function EmptyState({ msg }: { msg: string }) {
 
 // --- Formulários Internos (Modais) ---
 
-export function ModalArma({ armaParaEditar, onFechar, onSalvar }: { armaParaEditar?: Arma, onFechar: () => void, onSalvar: (d: any) => void }) {
+export function ModalArma({ armaParaEditar, acervoPadrao, onFechar, onSalvar }: { armaParaEditar?: Arma, acervoPadrao?: 'Caça' | 'Tiro Desportivo' | 'Coleção', onFechar: () => void, onSalvar: (d: any) => void }) {
   const { 
     opcoesArmas,
     calibresRegistrados,
@@ -1053,7 +1318,7 @@ export function ModalArma({ armaParaEditar, onFechar, onSalvar }: { armaParaEdit
     calibre: armaParaEditar?.calibre ? normalizarCalibre(armaParaEditar.calibre) : '', 
     numeroSerie: armaParaEditar?.numeroSerie || '', 
     numeroSigma: armaParaEditar?.numeroSigma || '', 
-    acervo: (armaParaEditar?.acervo || 'Tiro Desportivo') as any, 
+    acervo: (armaParaEditar?.acervo || acervoPadrao || 'Tiro Desportivo') as any, 
     vencimentoCraf: armaParaEditar?.vencimentoCraf || '',
     crafUrl: armaParaEditar?.crafUrl || '',
     crafEmRenovacao: armaParaEditar?.crafEmRenovacao ?? false

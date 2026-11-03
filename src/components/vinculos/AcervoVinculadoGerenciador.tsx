@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   X, Target, FileText, Award, Shield, AlertTriangle,
   CheckCircle, ChevronDown, ChevronUp, Calendar, User,
@@ -87,7 +87,28 @@ export function AcervoVinculadoGerenciador({ vinculo, acervo, onClose }: Props) 
 
   const [dadosAcervo, setDadosAcervo] = useState<AcervoVinculado>(acervo);
   const [carregandoInterno, setCarregandoInterno] = useState(false);
+  const { cliente, armas, manejos } = dadosAcervo;
+
+
   const [armaExpandida, setArmaExpandida] = useState<string | null>(null);
+  const [filtroAcervo, setFiltroAcervo] = useState<'todos' | 'tiro' | 'caca'>('todos');
+
+  const categorizarAcervo = (acervo?: string) => {
+    if (!acervo) return 'outros';
+    const a = acervo.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+    if (a.includes('caca')) return 'caca';
+    if (a.includes('tiro')) return 'tiro';
+    return 'outros';
+  };
+
+  const armasTiro = useMemo(() => armas.filter(a => categorizarAcervo(a.acervo) === 'tiro'), [armas]);
+  const armasCaca = useMemo(() => armas.filter(a => categorizarAcervo(a.acervo) === 'caca'), [armas]);
+  const armasExibidas = useMemo(() => {
+    if (filtroAcervo === 'tiro') return armasTiro;
+    if (filtroAcervo === 'caca') return armasCaca;
+    return armas;
+  }, [filtroAcervo, armas, armasTiro, armasCaca]);
+
 
   // States de Edição
   const [editandoCr, setEditandoCr] = useState(false);
@@ -110,7 +131,7 @@ export function AcervoVinculadoGerenciador({ vinculo, acervo, onClose }: Props) 
   const [cameraModalConfig, setCameraModalConfig] = useState<{ isOpen: boolean; campo: 'crUrl' | 'crIbamaUrl'; label: string } | null>(null);
 
   const { usuario } = useAuth();
-  const { cliente, armas, manejos } = dadosAcervo;
+  
   const podeEditar = !!dadosAcervo.vinculo?.permite_edicao || usuario?.tipoConta === 'empresa';
   const cacEmpresaId = vinculo.cac_empresa_id;
 
@@ -555,11 +576,11 @@ export function AcervoVinculadoGerenciador({ vinculo, acervo, onClose }: Props) 
               </button>
             )}
           >
-            {armas.length === 0 ? (
-              <p className="text-xs text-gray-600 text-center py-2">Nenhuma arma cadastrada</p>
+            {armasExibidas.length === 0 ? (
+              <p className="text-xs text-gray-600 text-center py-2">Nenhuma arma cadastrada neste filtro</p>
             ) : (
               <div className="space-y-3">
-                {armas.map(arma => (
+                {armasExibidas.map(arma => (
                   <div key={arma.id} className="bg-brand-dark-2 rounded-xl border border-brand-dark-5 overflow-hidden transition-all duration-300">
                     <div
                       className="w-full flex items-center justify-between px-4 py-3 hover:bg-brand-dark-3/50 transition-colors text-left"
@@ -575,7 +596,14 @@ export function AcervoVinculadoGerenciador({ vinculo, acervo, onClose }: Props) 
                               <AlertTriangle size={12} className="text-yellow-400 shrink-0" />
                             )}
                           </div>
-                          <p className="text-[11px] text-gray-500">{arma.fabricante} · {arma.calibre} · {arma.acervo}</p>
+                          <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                            <span className="text-[11px] text-gray-400 font-medium">{arma.fabricante} · {arma.calibre}</span>
+                            {categorizarAcervo(arma.acervo) === 'caca' ? (
+                              <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold uppercase">🐗 Caça</span>
+                            ) : (
+                              <span className="text-[9px] px-1.5 py-0.2 rounded bg-brand-blue/20 text-brand-blue-light border border-brand-blue/30 font-bold uppercase">🎯 Tiro</span>
+                            )}
+                          </div>
                         </div>
                       </button>
                       <div className="flex items-center gap-2 shrink-0 ml-2">

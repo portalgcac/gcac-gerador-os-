@@ -130,8 +130,28 @@ export async function exportarAcervoPdf(perfil: any, armas: any[], manejos: any[
 
   y += 6;
 
-  // ── Seção Armas & CRAFs ──
-  y = secaoTitulo(doc, 'ARMAS & CRAFs CADASTRADAS', y, AZUL);
+    // ── Seção Armas & CRAFs Divididas por Acervo ──
+  const categorizarAcervoPdf = (acervo?: string) => {
+    if (!acervo) return 'outros';
+    const a = acervo.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+    if (a.includes('caca')) return 'caca';
+    if (a.includes('tiro')) return 'tiro';
+    if (a.includes('colec')) return 'colecao';
+    return 'outros';
+  };
+
+  const gruposArmas: { titulo: string; armas: any[]; cor: string }[] = [];
+  const armasTiro = armas.filter(a => categorizarAcervoPdf(a.acervo) === 'tiro');
+  const armasCaca = armas.filter(a => categorizarAcervoPdf(a.acervo) === 'caca');
+  const armasColecao = armas.filter(a => categorizarAcervoPdf(a.acervo) === 'colecao');
+  const armasOutras = armas.filter(a => categorizarAcervoPdf(a.acervo) === 'outros');
+
+  if (armasTiro.length > 0) gruposArmas.push({ titulo: `ACERVO DE TIRO DESPORTIVO (${armasTiro.length} ARMA${armasTiro.length > 1 ? 'S' : ''})`, armas: armasTiro, cor: AZUL });
+  if (armasCaca.length > 0) gruposArmas.push({ titulo: `ACERVO DE CAÇA (${armasCaca.length} ARMA${armasCaca.length > 1 ? 'S' : ''})`, armas: armasCaca, cor: '#B45309' });
+  if (armasColecao.length > 0) gruposArmas.push({ titulo: `ACERVO DE COLEÇÃO (${armasColecao.length} ARMA${armasColecao.length > 1 ? 'S' : ''})`, armas: armasColecao, cor: '#6B21A8' });
+  if (armasOutras.length > 0) gruposArmas.push({ titulo: `DEMAIS ARMAS (${armasOutras.length})`, armas: armasOutras, cor: CINZA });
+
+  y = secaoTitulo(doc, `ARMAS & CRAFs CADASTRADAS (${armas.length} TOTAL)`, y, AZUL);
   y += 2;
 
   if (armas.length === 0) {
@@ -141,65 +161,82 @@ export async function exportarAcervoPdf(perfil: any, armas: any[], manejos: any[
     doc.text('Nenhuma arma cadastrada no acervo.', 14, y);
     y += 8;
   } else {
-    armas.forEach((arma, index) => {
-      // Calcular altura necessária
-      const gtsCount = arma.gts?.length || 0;
-      const alturaBloco = 26 + (gtsCount * 10) + (gtsCount > 0 ? 6 : 0);
-
-      if (y + alturaBloco > 270) {
+    let indiceGlobal = 1;
+    gruposArmas.forEach(grupo => {
+      if (y + 16 > 270) {
         doc.addPage();
         y = 20;
       }
 
-      doc.setFillColor('#F8F9FA');
-      doc.setDrawColor(LINHA);
-      doc.roundedRect(12, y, largura - 24, alturaBloco, 2, 2, 'F');
-      doc.roundedRect(12, y, largura - 24, alturaBloco, 2, 2, 'S');
-
-      // Nome da Arma
-      doc.setTextColor(ESCURO);
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'bold');
-      doc.text(`${index + 1}. ${arma.tipo || 'ARMA'} ${arma.modelo} • ${arma.calibre}`, 16, y + 6);
-
-      // Detalhes da arma
+      // Subcabeçalho do Grupo
+      doc.setFillColor('#F0F4F8');
+      doc.setDrawColor(grupo.cor);
+      doc.roundedRect(12, y, largura - 24, 7, 1.5, 1.5, 'FD');
       doc.setFontSize(8.5);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor('#555555');
-      doc.text(`Fabricante: ${arma.fabricante || 'N/I'}  |  Série: ${arma.numeroSerie || 'N/I'}  |  SIGMA: ${arma.numeroSigma || 'N/I'}  |  Acervo: ${arma.acervo}`, 16, y + 12);
-      
       doc.setFont('helvetica', 'bold');
-      doc.setTextColor(AZUL);
-      doc.text(`Validade do CRAF: ${formatarData(arma.vencimentoCraf)}`, 16, y + 18);
+      doc.setTextColor(grupo.cor);
+      doc.text(grupo.titulo, 16, y + 5);
+      y += 10;
 
-      let subY = y + 22;
+      grupo.armas.forEach((arma: any) => {
+        const gtsCount = arma.gts?.length || 0;
+        const alturaBloco = 26 + (gtsCount * 10) + (gtsCount > 0 ? 6 : 0);
 
-      // Guias de Tráfego
-      if (gtsCount > 0) {
-        doc.setDrawColor('#E5E7EB');
-        doc.line(16, subY, largura - 16, subY);
-        subY += 4;
+        if (y + alturaBloco > 270) {
+          doc.addPage();
+          y = 20;
+        }
 
-        doc.setFontSize(8);
+        doc.setFillColor('#F8F9FA');
+        doc.setDrawColor(LINHA);
+        doc.roundedRect(12, y, largura - 24, alturaBloco, 2, 2, 'F');
+        doc.roundedRect(12, y, largura - 24, alturaBloco, 2, 2, 'S');
+
+        // Nome da Arma com tag do Acervo
+        doc.setTextColor(ESCURO);
+        doc.setFontSize(9.5);
         doc.setFont('helvetica', 'bold');
-        doc.setTextColor(CINZA);
-        doc.text('GUIAS DE TRÁFEGO (GTs) ATIVAS:', 16, subY);
-        subY += 4;
+        doc.text(`${indiceGlobal++}. ${arma.tipo || 'ARMA'} ${arma.modelo} • ${arma.calibre}`, 16, y + 6);
 
-        arma.gts.forEach((gt: any) => {
+        // Detalhes da arma
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor('#555555');
+        doc.text(`Fabricante: ${arma.fabricante || 'N/I'}  |  Série: ${arma.numeroSerie || 'N/I'}  |  SIGMA: ${arma.numeroSigma || 'N/I'}  |  Acervo: ${arma.acervo}`, 16, y + 12);
+        
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(grupo.cor);
+        doc.text(`Validade do CRAF: ${formatarData(arma.vencimentoCraf)}`, 16, y + 18);
+
+        let subY = y + 22;
+
+        // Guias de Tráfego
+        if (gtsCount > 0) {
+          doc.setDrawColor('#E5E7EB');
+          doc.line(16, subY, largura - 16, subY);
+          subY += 4;
+
           doc.setFontSize(8);
-          doc.setFont('helvetica', 'normal');
-          doc.setTextColor(ESCURO);
-          doc.text(`• GT ${gt.tipo} - Vencimento: ${formatarData(gt.vencimento)} - Destino: ${gt.destino}`, 18, subY);
-          subY += 5;
-        });
-      }
+          doc.setFont('helvetica', 'bold');
+          doc.setTextColor(CINZA);
+          doc.text('GUIAS DE TRÁFEGO (GTs) ATIVAS:', 16, subY);
+          subY += 4;
 
-      y += alturaBloco + 4;
+          arma.gts.forEach((gt: any) => {
+            doc.setFontSize(8);
+            doc.setFont('helvetica', 'normal');
+            doc.setTextColor(ESCURO);
+            doc.text(`• GT ${gt.tipo} - Vencimento: ${formatarData(gt.vencimento)} - Destino: ${gt.destino}`, 18, subY);
+            subY += 5;
+          });
+        }
+
+        y += alturaBloco + 4;
+      });
+
+      y += 2;
     });
   }
-
-  y += 4;
 
   // ── Seção Manejo IBAMA ──
   if (manejos.length > 0) {
