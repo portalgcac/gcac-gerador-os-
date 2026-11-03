@@ -92,6 +92,9 @@ export function GestaoPontoPagamentos({ dataInicio, dataFim }: GestaoPontoPagame
   const [incluirComissoesOs, setIncluirComissoesOs] = useState(true);
   const [valorAjudaCustoInput, setValorAjudaCustoInput] = useState('0');
   const [valorAdiantamentosInput, setValorAdiantamentosInput] = useState('0');
+  const [valorAjusteManualInput, setValorAjusteManualInput] = useState('0');
+  const [motivoAjusteManualInput, setMotivoAjusteManualInput] = useState('');
+  const [modoEdicaoValorFinal, setModoEdicaoValorFinal] = useState(false);
   const [numeroNfInput, setNumeroNfInput] = useState('');
   const [dataEmissaoNfInput, setDataEmissaoNfInput] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [notaFiscalUrlInput, setNotaFiscalUrlInput] = useState<string>('');
@@ -146,6 +149,8 @@ export function GestaoPontoPagamentos({ dataInicio, dataFim }: GestaoPontoPagame
   const [simDiasFaltas, setSimDiasFaltas] = useState<number | ''>(3);
   const [simAdiantamentos, setSimAdiantamentos] = useState('0');
   const [simAjudaCusto, setSimAjudaCusto] = useState('0');
+  const [simAjusteManual, setSimAjusteManual] = useState('0');
+  const [simMotivoAjuste, setSimMotivoAjuste] = useState('');
   const [simHorasExtrasMins, setSimHorasExtrasMins] = useState(0);
   const [simCopiado, setSimCopiado] = useState(false);
 
@@ -252,17 +257,43 @@ export function GestaoPontoPagamentos({ dataInicio, dataFim }: GestaoPontoPagame
     const comissoes = incluirComissoesOs ? comissoesColaboradorPeriodo : 0;
     const ajudaCusto = parseFloat(valorAjudaCustoInput) || 0;
     const adiantamentos = parseFloat(valorAdiantamentosInput) || 0;
-    const liquidoFinal = Math.max(
+    const ajusteManual = parseFloat(valorAjusteManualInput) || 0;
+    const motivoAjuste = motivoAjusteManualInput.trim();
+    const justificativaPendente = ajusteManual !== 0 && !motivoAjuste;
+
+    const subtotalCalculado = Math.max(
       0,
       apuracao.valorLiquidoHorasEDias + comissoes + ajudaCusto - adiantamentos
     );
+    const liquidoFinal = Math.max(0, subtotalCalculado + ajusteManual);
+
     return {
       comissoes,
       ajudaCusto,
       adiantamentos,
+      ajusteManual,
+      motivoAjuste,
+      justificativaPendente,
+      subtotalCalculado,
       liquidoFinal
     };
-  }, [apuracao, incluirComissoesOs, comissoesColaboradorPeriodo, valorAjudaCustoInput, valorAdiantamentosInput]);
+  }, [
+    apuracao,
+    incluirComissoesOs,
+    comissoesColaboradorPeriodo,
+    valorAjudaCustoInput,
+    valorAdiantamentosInput,
+    valorAjusteManualInput,
+    motivoAjusteManualInput
+  ]);
+
+  /** Define o valor final diretamente calculando a diferença do ajuste */
+  const handleDefinirValorFinalDireto = (valorFinalDesejado: number) => {
+    if (!resumoFinal) return;
+    const diferenca = valorFinalDesejado - resumoFinal.subtotalCalculado;
+    setValorAjusteManualInput(diferenca.toFixed(2));
+    setModoEdicaoValorFinal(false);
+  };
 
   /** Converte qualquer string ("08:30", "8.5", "8h30", "8") em minutos inteiros */
   const parseCargaParaMinutos = (valor: string | number): number => {
@@ -457,7 +488,9 @@ export function GestaoPontoPagamentos({ dataInicio, dataFim }: GestaoPontoPagame
       diasFaltasManuais: typeof simDiasFaltas === 'number' ? simDiasFaltas : undefined,
       minutosExtrasManuais: simHorasExtrasMins,
       adiantamentos: parseFloat(simAdiantamentos) || 0,
-      ajudaCusto: parseFloat(simAjudaCusto) || 0
+      ajudaCusto: parseFloat(simAjudaCusto) || 0,
+      valorAjusteManual: parseFloat(simAjusteManual) || 0,
+      motivoAjusteManual: simMotivoAjuste
     });
   }, [
     simNome,
@@ -471,7 +504,9 @@ export function GestaoPontoPagamentos({ dataInicio, dataFim }: GestaoPontoPagame
     simDiasFaltas,
     simHorasExtrasMins,
     simAdiantamentos,
-    simAjudaCusto
+    simAjudaCusto,
+    simAjusteManual,
+    simMotivoAjuste
   ]);
 
   const carregarColaboradorNaSimulacao = (colabId: string) => {
@@ -484,6 +519,8 @@ export function GestaoPontoPagamentos({ dataInicio, dataFim }: GestaoPontoPagame
       setSimCargaFormatada('08:30');
       setSimDiasTrabalhados(7);
       setSimDiasFaltas(3);
+      setSimAjusteManual('0');
+      setSimMotivoAjuste('');
       setSimModelo('mensal_proporcional');
       setSimDivisor('dias_uteis');
       return;
@@ -495,19 +532,32 @@ export function GestaoPontoPagamentos({ dataInicio, dataFim }: GestaoPontoPagame
       setSimDataInicio(c.dataInicio);
       setSimModelo(c.modeloCalculo);
       setSimDivisor(c.divisorMensal);
+      setSimAjusteManual('0');
+      setSimMotivoAjuste('');
       setSimCargaFormatada(minutosParaHoraInput(c.cargaHorariaDiariaMin || 480));
     }
   };
 
   const aplicarSimulacaoNoFechamento = () => {
+    if (parseFloat(simAjusteManual) !== 0 && !simMotivoAjuste.trim()) {
+      setFeedback({
+        tipo: 'erro',
+        texto: 'Atenção: É obrigatório informar a justificativa do ajuste manual para aplicar no fechamento!'
+      });
+      return;
+    }
     const c = contratos.find(x => x.id === simColaboradorId || x.nome.toLowerCase().includes(simNome.toLowerCase()));
     if (c) {
       setColaboradorAtivoId(c.id);
     }
     setValorAjudaCustoInput(simAjudaCusto || '0');
     setValorAdiantamentosInput(simAdiantamentos || '0');
+    setValorAjusteManualInput(simAjusteManual || '0');
+    setMotivoAjusteManualInput(simMotivoAjuste || '');
     setObservacoesFechamento(
-      `Simulação Proporcional aplicada: Início ${simDataInicio}, ${simDiasTrabalhados} dias trabalhados, ${simDiasFaltas} faltas.`
+      `Simulação Proporcional aplicada: Início ${simDataInicio}, ${simDiasTrabalhados} dias trabalhados, ${simDiasFaltas} faltas.${
+        parseFloat(simAjusteManual) !== 0 ? ` Ajuste Gestor: ${parseFloat(simAjusteManual) > 0 ? '+' : ''}${formatarMoeda(parseFloat(simAjusteManual))} (${simMotivoAjuste}).` : ''
+      }`
     );
     setSubModo('apuracao');
     setFeedback({
@@ -799,6 +849,8 @@ export function GestaoPontoPagamentos({ dataInicio, dataFim }: GestaoPontoPagame
         valorComissoesOs: resumoFinal.comissoes,
         valorAjudaCusto: resumoFinal.ajudaCusto,
         valorAdiantamentos: resumoFinal.adiantamentos,
+        valorAjusteManual: resumoFinal.ajusteManual,
+        motivoAjusteManual: resumoFinal.motivoAjuste,
         valorLiquidoFinal: resumoFinal.liquidoFinal,
         numeroNf: numeroNfInput || undefined,
         dataEmissaoNf: dataEmissaoNfInput || undefined,
@@ -811,6 +863,16 @@ export function GestaoPontoPagamentos({ dataInicio, dataFim }: GestaoPontoPagame
 
   const handleConfirmarFechamentoEPagamento = async (comoPago: boolean) => {
     if (!contratoAtivo || !apuracao || !resumoFinal) return;
+
+    // Validação estrita da justificativa para ajuste manual
+    if (resumoFinal.justificativaPendente) {
+      setFeedback({
+        tipo: 'erro',
+        texto: 'Atenção: É obrigatório informar a justificativa para qualquer ajuste manual no valor final antes de salvar.'
+      });
+      return;
+    }
+
     setSalvando(true);
     try {
       let despesaCriadaId: string | undefined;
@@ -830,6 +892,13 @@ export function GestaoPontoPagamentos({ dataInicio, dataFim }: GestaoPontoPagame
         });
       }
 
+      const obsFinal = [
+        observacoesFechamento,
+        resumoFinal.ajusteManual !== 0
+          ? `[Ajuste Gestor: ${resumoFinal.ajusteManual > 0 ? '+' : ''}${formatarMoeda(resumoFinal.ajusteManual)} - Motivo: ${resumoFinal.motivoAjuste}]`
+          : null
+      ].filter(Boolean).join(' | ');
+
       await salvarFechamentoColaborador({
         empresaId,
         colaboradorId: contratoAtivo.id,
@@ -848,13 +917,15 @@ export function GestaoPontoPagamentos({ dataInicio, dataFim }: GestaoPontoPagame
         valorComissoesOs: Number(resumoFinal.comissoes.toFixed(2)),
         valorAjudaCusto: Number(resumoFinal.ajudaCusto.toFixed(2)),
         valorAdiantamentos: Number(resumoFinal.adiantamentos.toFixed(2)),
+        valorAjusteManual: Number(resumoFinal.ajusteManual.toFixed(2)),
+        motivoAjusteManual: resumoFinal.motivoAjuste || undefined,
         valorLiquidoFinal: Number(resumoFinal.liquidoFinal.toFixed(2)),
         numeroNf: numeroNfInput || undefined,
         dataEmissaoNf: dataEmissaoNfInput || undefined,
         notaFiscalUrl: notaFiscalUrlInput || undefined,
         despesaId: despesaCriadaId,
         status: comoPago ? 'pago' : notaFiscalUrlInput ? 'nf_enviada' : 'aguardando_nf',
-        observacoes: observacoesFechamento || undefined,
+        observacoes: obsFinal || undefined,
         snapshotPonto: registros.filter(r => r.data >= apuracao.dataInicioEfetiva && r.data <= apuracao.dataFimEfetiva)
       });
 
@@ -1376,6 +1447,97 @@ export function GestaoPontoPagamentos({ dataInicio, dataFim }: GestaoPontoPagame
                     />
                   </div>
                 </div>
+
+                {/* Bloco de Ajuste Manual do Gestor na Simulação */}
+                <div className={`p-3.5 rounded-xl border transition-all ${
+                  resultadoSimulacao.valorAjusteManual !== 0
+                    ? 'bg-amber-500/10 border-amber-500/40'
+                    : 'bg-brand-dark-3/50 border-brand-dark-5'
+                }`}>
+                  <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                    <label className="text-xs font-bold text-white uppercase flex items-center gap-1.5">
+                      <Edit2 size={13} className="text-amber-400" />
+                      (±) Ajuste Manual do Gestor no Valor Final (R$)
+                    </label>
+                    {resultadoSimulacao.valorAjusteManual !== 0 && (
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                        resultadoSimulacao.valorAjusteManual > 0 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'
+                      }`}>
+                        {resultadoSimulacao.valorAjusteManual > 0 ? `+ Acréscimo: ${formatarMoeda(resultadoSimulacao.valorAjusteManual)}` : `- Desconto: ${formatarMoeda(resultadoSimulacao.valorAjusteManual)}`}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
+                    <div className="sm:col-span-4">
+                      <label className="text-[10px] font-bold text-gray-400 uppercase block mb-1">
+                        Valor do Ajuste (+ / - R$)
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={simAjusteManual}
+                        onChange={e => setSimAjusteManual(e.target.value)}
+                        placeholder="0.00"
+                        className={`input font-mono text-xs font-bold w-full ${
+                          parseFloat(simAjusteManual) > 0
+                            ? 'text-emerald-400 border-emerald-500/40'
+                            : parseFloat(simAjusteManual) < 0
+                            ? 'text-red-400 border-red-500/40'
+                            : ''
+                        }`}
+                      />
+                      {parseFloat(simAjusteManual) !== 0 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSimAjusteManual('0');
+                            setSimMotivoAjuste('');
+                          }}
+                          className="text-[10px] text-gray-400 hover:text-white underline mt-1 block"
+                        >
+                          Zerar ajuste
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="sm:col-span-8">
+                      <label className={`text-[10px] font-bold uppercase block mb-1 flex items-center gap-1 ${
+                        resultadoSimulacao.justificativaPendente
+                          ? 'text-amber-400 animate-pulse font-black'
+                          : 'text-gray-300'
+                      }`}>
+                        <AlertCircle size={11} />
+                        Justificativa Obrigatória do Ajuste *
+                      </label>
+                      <input
+                        type="text"
+                        required={resultadoSimulacao.valorAjusteManual !== 0}
+                        value={simMotivoAjuste}
+                        onChange={e => setSimMotivoAjuste(e.target.value)}
+                        placeholder={
+                          resultadoSimulacao.valorAjusteManual !== 0
+                            ? 'Ex: Acordo prévio de fechamento, bonificação extra, arredondamento...'
+                            : 'Obrigatório se houver ajuste manual'
+                        }
+                        className={`input text-xs py-1.5 w-full ${
+                          resultadoSimulacao.justificativaPendente
+                            ? 'border-amber-500 bg-amber-500/10 text-white placeholder-amber-300/60 font-semibold'
+                            : ''
+                        }`}
+                      />
+                    </div>
+                  </div>
+
+                  {resultadoSimulacao.justificativaPendente && (
+                    <div className="flex items-center gap-1.5 mt-2 text-[11px] text-amber-400 bg-amber-500/10 border border-amber-500/30 px-3 py-1.5 rounded-lg">
+                      <AlertCircle size={14} className="shrink-0" />
+                      <span>
+                        <strong>Atenção:</strong> É obrigatório informar a justificativa do ajuste manual para fechar ou aplicar o demonstrativo.
+                      </span>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -1430,8 +1592,13 @@ export function GestaoPontoPagamentos({ dataInicio, dataFim }: GestaoPontoPagame
                 <div className="space-y-2 pt-2">
                   <button
                     type="button"
+                    disabled={resultadoSimulacao.justificativaPendente}
                     onClick={aplicarSimulacaoNoFechamento}
-                    className="w-full btn-primary py-2.5 text-xs font-bold uppercase flex items-center justify-center gap-2 shadow-lg"
+                    className={`w-full py-2.5 text-xs font-bold uppercase flex items-center justify-center gap-2 shadow-lg rounded-xl transition-all ${
+                      resultadoSimulacao.justificativaPendente
+                        ? 'bg-gray-800 text-gray-500 border border-gray-700 cursor-not-allowed'
+                        : 'btn-primary'
+                    }`}
                   >
                     <ArrowRight size={15} />
                     Aplicar no Fechamento Oficial do Mês
@@ -1762,6 +1929,145 @@ export function GestaoPontoPagamentos({ dataInicio, dataFim }: GestaoPontoPagame
                           />
                         </div>
                       </div>
+
+                      {/* Bloco de Ajuste Manual do Gestor no Valor Final */}
+                      <div className={`p-3.5 rounded-xl border transition-all ${
+                        resumoFinal.ajusteManual !== 0
+                          ? 'bg-amber-500/10 border-amber-500/40'
+                          : 'bg-brand-dark-3/50 border-brand-dark-5'
+                      }`}>
+                        <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                          <label className="text-xs font-bold text-white uppercase flex items-center gap-1.5">
+                            <Edit2 size={13} className="text-amber-400" />
+                            (±) Ajuste Manual do Gestor no Valor Final (R$)
+                          </label>
+                          <div className="flex items-center gap-2">
+                            {resumoFinal.ajusteManual !== 0 && (
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                resumoFinal.ajusteManual > 0 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'
+                              }`}>
+                                {resumoFinal.ajusteManual > 0 ? `+ Acréscimo: ${formatarMoeda(resumoFinal.ajusteManual)}` : `- Desconto: ${formatarMoeda(resumoFinal.ajusteManual)}`}
+                              </span>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => setModoEdicaoValorFinal(!modoEdicaoValorFinal)}
+                              className="text-[10px] text-brand-blue-light hover:underline font-bold"
+                            >
+                              {modoEdicaoValorFinal ? 'Digitar Diferença (±)' : 'Digitar Valor Final Direto'}
+                            </button>
+                          </div>
+                        </div>
+
+                        {modoEdicaoValorFinal ? (
+                          <div className="p-3 bg-brand-dark-2 rounded-lg border border-brand-blue/30 space-y-2 mb-2">
+                            <label className="text-[11px] text-brand-blue-light font-bold block">
+                              Qual o valor líquido final que você deseja pagar a {contratoAtivo.nome}?
+                            </label>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-bold text-gray-400">R$</span>
+                              <input
+                                type="number"
+                                step="0.01"
+                                autoFocus
+                                placeholder={String(resumoFinal.liquidoFinal.toFixed(2))}
+                                onKeyDown={e => {
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    const val = parseFloat((e.target as HTMLInputElement).value);
+                                    if (!isNaN(val)) handleDefinirValorFinalDireto(val);
+                                  }
+                                }}
+                                onBlur={e => {
+                                  const val = parseFloat(e.target.value);
+                                  if (!isNaN(val)) handleDefinirValorFinalDireto(val);
+                                }}
+                                className="input text-xs py-1.5 font-mono font-bold text-white w-32"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setModoEdicaoValorFinal(false)}
+                                className="btn-ghost text-xs py-1.5 px-3 border border-brand-dark-5"
+                              >
+                                OK
+                              </button>
+                            </div>
+                            <p className="text-[10px] text-gray-400">
+                              O sistema calculará automaticamente o ajuste em relação ao ponto ({formatarMoeda(resumoFinal.subtotalCalculado)}).
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
+                            <div className="sm:col-span-4">
+                              <label className="text-[10px] font-bold text-gray-400 uppercase block mb-1">
+                                Valor do Ajuste (+ / - R$)
+                              </label>
+                              <input
+                                type="number"
+                                step="0.01"
+                                value={valorAjusteManualInput}
+                                onChange={e => setValorAjusteManualInput(e.target.value)}
+                                placeholder="0.00"
+                                className={`input text-xs py-1.5 font-mono font-bold w-full ${
+                                  resumoFinal.ajusteManual > 0
+                                    ? 'text-emerald-400 border-emerald-500/40'
+                                    : resumoFinal.ajusteManual < 0
+                                    ? 'text-red-400 border-red-500/40'
+                                    : ''
+                                }`}
+                              />
+                              {resumoFinal.ajusteManual !== 0 && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setValorAjusteManualInput('0');
+                                    setMotivoAjusteManualInput('');
+                                  }}
+                                  className="text-[10px] text-gray-400 hover:text-white underline mt-1 block"
+                                >
+                                  Zerar ajuste manual
+                                </button>
+                              )}
+                            </div>
+
+                            <div className="sm:col-span-8">
+                              <label className={`text-[10px] font-bold uppercase block mb-1 flex items-center gap-1 ${
+                                resumoFinal.justificativaPendente
+                                  ? 'text-amber-400 animate-pulse font-black'
+                                  : 'text-gray-300'
+                              }`}>
+                                <AlertCircle size={11} />
+                                Justificativa do Ajuste {resumoFinal.ajusteManual !== 0 ? '(OBRIGATÓRIA *)' : '(Opcional)'}
+                              </label>
+                              <input
+                                type="text"
+                                required={resumoFinal.ajusteManual !== 0}
+                                value={motivoAjusteManualInput}
+                                onChange={e => setMotivoAjusteManualInput(e.target.value)}
+                                placeholder={
+                                  resumoFinal.ajusteManual !== 0
+                                    ? 'Ex: Acordo prévio de fechamento, bonificação extra, arredondamento...'
+                                    : 'Informe o motivo sempre que ajustar o valor final'
+                                }
+                                className={`input text-xs py-1.5 w-full ${
+                                  resumoFinal.justificativaPendente
+                                    ? 'border-amber-500 bg-amber-500/10 text-white placeholder-amber-300/60 font-semibold'
+                                    : ''
+                                }`}
+                              />
+                            </div>
+                          </div>
+                        )}
+
+                        {resumoFinal.justificativaPendente && (
+                          <div className="flex items-center gap-1.5 mt-2 text-[11px] text-amber-400 bg-amber-500/10 border border-amber-500/30 px-3 py-1.5 rounded-lg">
+                            <AlertCircle size={14} className="shrink-0" />
+                            <span>
+                              <strong>Atenção:</strong> Você fez um ajuste de <strong>{formatarMoeda(resumoFinal.ajusteManual)}</strong>. É obrigatório digitar a justificativa acima para poder fechar o pagamento!
+                            </span>
+                          </div>
+                        )}
+                      </div>
                     </div>
 
                     {/* Opção rápida: considerar dias sem batida como presença ou exigir lançamento */}
@@ -1791,13 +2097,42 @@ export function GestaoPontoPagamentos({ dataInicio, dataFim }: GestaoPontoPagame
                   </div>
 
                   {/* Coluna Direita: Valor Final para Nota Fiscal + Anexo da NF + Lançar na Despesa Mensal */}
-                  <div className="card border-brand-green/30 bg-brand-green/5 flex flex-col justify-between space-y-4">
+                  <div className={`card flex flex-col justify-between space-y-4 transition-all ${
+                    resumoFinal.ajusteManual !== 0
+                      ? 'border-amber-500/40 bg-gradient-to-b from-brand-dark-3 to-amber-950/20'
+                      : 'border-brand-green/30 bg-brand-green/5'
+                  }`}>
                     <div className="space-y-4">
-                      <div className="bg-brand-dark-3 border border-brand-green/30 rounded-2xl p-4 text-center">
+                      <div className="bg-brand-dark-3 border border-brand-dark-5 rounded-2xl p-4 text-center">
                         <span className="text-[10px] font-black uppercase tracking-widest text-gray-400 block">
                           Valor Líquido Apurado (Valor para Emissão da NF)
                         </span>
-                        <p className="text-3xl font-black text-brand-green mt-1">
+
+                        {resumoFinal.ajusteManual !== 0 && (
+                          <div className="text-[11px] text-gray-300 bg-brand-dark-2 px-3 py-2 rounded-xl border border-brand-dark-5 my-2 text-left space-y-1 font-mono">
+                            <div className="flex justify-between text-gray-400">
+                              <span>Cálculo do Ponto:</span>
+                              <span className="font-bold">{formatarMoeda(resumoFinal.subtotalCalculado)}</span>
+                            </div>
+                            <div className="flex justify-between font-bold text-amber-400">
+                              <span>Ajuste do Gestor:</span>
+                              <span>{resumoFinal.ajusteManual > 0 ? '+' : ''}{formatarMoeda(resumoFinal.ajusteManual)}</span>
+                            </div>
+                            {resumoFinal.motivoAjuste ? (
+                              <div className="text-[10px] text-amber-300/80 italic pt-1 border-t border-brand-dark-5/80 truncate">
+                                <strong>Motivo:</strong> {resumoFinal.motivoAjuste}
+                              </div>
+                            ) : (
+                              <div className="text-[10px] text-red-400 font-bold pt-1 border-t border-brand-dark-5/80 animate-pulse">
+                                ⚠️ Justificativa do ajuste obrigatória!
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        <p className={`text-3xl font-black mt-1 font-mono ${
+                          resumoFinal.ajusteManual !== 0 ? 'text-amber-400' : 'text-brand-green'
+                        }`}>
                           {formatarMoeda(resumoFinal.liquidoFinal)}
                         </p>
                         <p className="text-[11px] text-gray-400 mt-1">
@@ -1892,18 +2227,26 @@ export function GestaoPontoPagamentos({ dataInicio, dataFim }: GestaoPontoPagame
 
                       <button
                         type="button"
-                        disabled={salvando}
+                        disabled={salvando || resumoFinal.justificativaPendente}
                         onClick={() => handleConfirmarFechamentoEPagamento(false)}
-                        className="w-full py-2.5 rounded-xl bg-brand-blue/20 hover:bg-brand-blue/30 border border-brand-blue/30 text-brand-blue-light text-xs font-bold uppercase transition-all"
+                        className={`w-full py-2.5 rounded-xl border text-xs font-bold uppercase transition-all ${
+                          resumoFinal.justificativaPendente
+                            ? 'bg-gray-800 text-gray-500 border-gray-700 cursor-not-allowed'
+                            : 'bg-brand-blue/20 hover:bg-brand-blue/30 border-brand-blue/30 text-brand-blue-light'
+                        }`}
                       >
                         Salvar Apuração (Aguardar NF do Colaborador)
                       </button>
 
                       <button
                         type="button"
-                        disabled={salvando}
+                        disabled={salvando || resumoFinal.justificativaPendente}
                         onClick={() => handleConfirmarFechamentoEPagamento(true)}
-                        className="w-full py-3 rounded-xl bg-brand-green hover:bg-brand-green/90 text-black text-xs font-black uppercase tracking-wider transition-all shadow-lg flex items-center justify-center gap-2"
+                        className={`w-full py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-lg flex items-center justify-center gap-2 ${
+                          resumoFinal.justificativaPendente
+                            ? 'bg-gray-800 text-gray-500 cursor-not-allowed border border-gray-700'
+                            : 'bg-brand-green hover:bg-brand-green/90 text-black'
+                        }`}
                       >
                         <CheckCircle2 size={16} />
                         Confirmar Pagamento & Lançar Despesa PJ

@@ -633,6 +633,8 @@ export interface FechamentoColaborador {
   valorComissoesOs: number;
   valorAjudaCusto: number;
   valorAdiantamentos: number;
+  valorAjusteManual?: number; // Ajuste manual discricionário do gestor (+ ou - R$)
+  motivoAjusteManual?: string; // Justificativa obrigatória do ajuste
   valorLiquidoFinal: number;
   numeroNf?: string;
   dataEmissaoNf?: string;

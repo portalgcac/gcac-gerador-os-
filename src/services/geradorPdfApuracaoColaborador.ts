@@ -153,6 +153,19 @@ export async function baixarPdfApuracaoColaborador(dados: DadosGeracaoPdfApuraca
   doc.setTextColor(VERMELHO_BRAND);
   doc.text(`- ${formatarMoeda(dados.fechamento.valorAdiantamentos)}`, col2X + 43, y + 25);
 
+  // Ajuste Manual do Gestor (se houver)
+  if (dados.fechamento.valorAjusteManual) {
+    const aj = dados.fechamento.valorAjusteManual;
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(aj > 0 ? VERDE_BRAND : VERMELHO_BRAND);
+    doc.setFontSize(6.5);
+    doc.text(
+      `Ajuste Gestor: ${aj > 0 ? '+' : ''}${formatarMoeda(aj)} (${dados.fechamento.motivoAjusteManual || 'Acordo'})`,
+      col2X,
+      y + 30
+    );
+  }
+
   // Coluna 3 (Destaque Valor Final)
   doc.setFillColor(ESCURO_BRAND);
   doc.roundedRect(col3X, y + 7, largura - 15 - col3X, 23, 2, 2, 'F');

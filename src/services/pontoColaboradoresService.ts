@@ -253,6 +253,8 @@ function mapFechamentoFromDb(row: any): FechamentoColaborador {
     valorComissoesOs: Number(row.valor_comissoes_os) || 0,
     valorAjudaCusto: Number(row.valor_ajuda_custo) || 0,
     valorAdiantamentos: Number(row.valor_adiantamentos) || 0,
+    valorAjusteManual: Number(row.valor_ajuste_manual) || 0,
+    motivoAjusteManual: row.motivo_ajuste_manual || undefined,
     valorLiquidoFinal: Number(row.valor_liquido_final) || 0,
     numeroNf: row.numero_nf || undefined,
     dataEmissaoNf: row.data_emissao_nf || undefined,
@@ -627,6 +629,8 @@ export async function salvarFechamentoColaborador(
       valor_comissoes_os: completo.valorComissoesOs,
       valor_ajuda_custo: completo.valorAjudaCusto,
       valor_adiantamentos: completo.valorAdiantamentos,
+      valor_ajuste_manual: completo.valorAjusteManual || 0,
+      motivo_ajuste_manual: completo.motivoAjusteManual || null,
       valor_liquido_final: completo.valorLiquidoFinal,
       numero_nf: completo.numeroNf || null,
       data_emissao_nf: completo.dataEmissaoNf || null,
@@ -639,11 +643,28 @@ export async function salvarFechamentoColaborador(
       atualizado_em: agora
     };
 
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from('fechamentos_colaboradores')
       .upsert([payload], { onConflict: 'id' })
       .select()
       .single();
+
+    if (error && (error.message?.includes('ajuste_manual') || error.code === '42703')) {
+      // Fallback caso a coluna ainda não tenha sido criada no Supabase
+      const payloadFallback: Record<string, any> = { ...payload };
+      delete payloadFallback.valor_ajuste_manual;
+      delete payloadFallback.motivo_ajuste_manual;
+      if (completo.valorAjusteManual) {
+        payloadFallback.observacoes = `${payloadFallback.observacoes ? payloadFallback.observacoes + ' | ' : ''}[Ajuste Manual: R$ ${completo.valorAjusteManual.toFixed(2)} - Motivo: ${completo.motivoAjusteManual || 'N/A'}]`;
+      }
+      const resFallback = await supabase
+        .from('fechamentos_colaboradores')
+        .upsert([payloadFallback], { onConflict: 'id' })
+        .select()
+        .single();
+      data = resFallback.data;
+      error = resFallback.error;
+    }
 
     if (!error && data) {
       return mapFechamentoFromDb(data);
@@ -991,6 +1012,8 @@ export interface ParametrosSimulacaoProporcional {
   minutosExtrasManuais?: number;
   adiantamentos?: number;
   ajudaCusto?: number;
+  valorAjusteManual?: number; // Ajuste manual discricionário (+ ou - R$)
+  motivoAjusteManual?: string; // Justificativa obrigatória do ajuste
 }
 
 export interface ResultadoSimulacaoProporcional {
@@ -1006,6 +1029,9 @@ export interface ResultadoSimulacaoProporcional {
   valorHorasExtras: number;
   valorAdiantamentos: number;
   valorAjudaCusto: number;
+  valorAjusteManual: number;
+  motivoAjusteManual?: string;
+  justificativaPendente: boolean;
   valorLiquidoFinal: number;
   memoriaCalculoLinhas: string[];
   textoWhatsApp: string;
@@ -1094,10 +1120,13 @@ export function calcularSimulacaoProporcional(params: ParametrosSimulacaoProporc
   const valorHorasExtras = (minutosExtras / 60) * valorHoraRef;
   const adiantamentos = params.adiantamentos || 0;
   const ajudaCusto = params.ajudaCusto || 0;
+  const ajusteManual = params.valorAjusteManual || 0;
+  const motivoAjuste = params.motivoAjusteManual?.trim() || '';
+  const justificativaPendente = ajusteManual !== 0 && !motivoAjuste;
 
   const valorLiquidoFinal = Math.max(
     0,
-    valorBrutoProporcional - valorDescontoFaltas + valorHorasExtras + ajudaCusto - adiantamentos
+    valorBrutoProporcional - valorDescontoFaltas + valorHorasExtras + ajudaCusto - adiantamentos + ajusteManual
   );
 
   // Formatação da memória de cálculo
@@ -1117,6 +1146,9 @@ export function calcularSimulacaoProporcional(params: ParametrosSimulacaoProporc
     minutosExtras > 0 ? `(+) Horas Extras / Adicionais (${formatarMinutosHoras(minutosExtras)}): +${fmtMoeda(valorHorasExtras)}` : null,
     ajudaCusto > 0 ? `(+) Ajuda de Custo / Bônus: +${fmtMoeda(ajudaCusto)}` : null,
     adiantamentos > 0 ? `(-) Adiantamentos Já Repassados: -${fmtMoeda(adiantamentos)}` : null,
+    ajusteManual !== 0
+      ? `(${ajusteManual > 0 ? '+' : '-'}) Ajuste Manual do Gestor: ${ajusteManual > 0 ? '+' : ''}${fmtMoeda(ajusteManual)} (Justificativa: ${motivoAjuste || '⚠️ PENDENTE'})`
+      : null,
     `-------------------------------------------------------`,
     `VALOR LÍQUIDO A PAGAR (NFS-E): ${fmtMoeda(valorLiquidoFinal)}`
   ].filter(Boolean) as string[];
@@ -1134,6 +1166,7 @@ export function calcularSimulacaoProporcional(params: ParametrosSimulacaoProporc
     `• Diária proporcional: ${fmtMoeda(valorDiaRef)}`,
     adiantamentos > 0 ? `• Adiantamentos: -${fmtMoeda(adiantamentos)}` : null,
     ajudaCusto > 0 ? `• Ajuda de custo: +${fmtMoeda(ajudaCusto)}` : null,
+    ajusteManual !== 0 ? `• Ajuste acordado: ${ajusteManual > 0 ? '+' : ''}${fmtMoeda(ajusteManual)} (Motivo: ${motivoAjuste || 'Acordo de gestão'})` : null,
     ``,
     `💰 *Valor Líquido da NFS-e a Emitir: ${fmtMoeda(valorLiquidoFinal)}*`
   ].filter(Boolean).join('\n');
@@ -1151,6 +1184,9 @@ export function calcularSimulacaoProporcional(params: ParametrosSimulacaoProporc
     valorHorasExtras,
     valorAdiantamentos: adiantamentos,
     valorAjudaCusto: ajudaCusto,
+    valorAjusteManual: ajusteManual,
+    motivoAjusteManual: motivoAjuste,
+    justificativaPendente,
     valorLiquidoFinal,
     memoriaCalculoLinhas,
     textoWhatsApp

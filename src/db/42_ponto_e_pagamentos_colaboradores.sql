@@ -121,6 +121,8 @@ CREATE TABLE IF NOT EXISTS public.fechamentos_colaboradores (
     valor_comissoes_os NUMERIC(12,2) DEFAULT 0,
     valor_ajuda_custo NUMERIC(12,2) DEFAULT 0,
     valor_adiantamentos NUMERIC(12,2) DEFAULT 0,
+    valor_ajuste_manual NUMERIC(12,2) DEFAULT 0,
+    motivo_ajuste_manual TEXT,
     valor_liquido_final NUMERIC(12,2) NOT NULL DEFAULT 0,
     numero_nf TEXT,
     data_emissao_nf DATE,
