@@ -276,6 +276,11 @@ export function AbaDocumentacao({ cliente, armaIdInicial, cacEmpresaId, podeEdit
     carregarDados();
   }, [carregarDados]);
 
+  const armasTiro = useMemo(() => (armas || []).filter(a => categorizarTipoAcervo(a.acervo) === 'tiro'), [armas]);
+  const armasCaca = useMemo(() => (armas || []).filter(a => categorizarTipoAcervo(a.acervo) === 'caca'), [armas]);
+  const armasColecao = useMemo(() => (armas || []).filter(a => categorizarTipoAcervo(a.acervo) === 'colecao'), [armas]);
+  const armasOutras = useMemo(() => (armas || []).filter(a => categorizarTipoAcervo(a.acervo) === 'outros'), [armas]);
+
   if (carregando) {
     return (
       <div className="flex justify-center py-10">
@@ -283,11 +288,6 @@ export function AbaDocumentacao({ cliente, armaIdInicial, cacEmpresaId, podeEdit
       </div>
     );
   }
-
-  const armasTiro = useMemo(() => armas.filter(a => categorizarTipoAcervo(a.acervo) === 'tiro'), [armas]);
-  const armasCaca = useMemo(() => armas.filter(a => categorizarTipoAcervo(a.acervo) === 'caca'), [armas]);
-  const armasColecao = useMemo(() => armas.filter(a => categorizarTipoAcervo(a.acervo) === 'colecao'), [armas]);
-  const armasOutras = useMemo(() => armas.filter(a => categorizarTipoAcervo(a.acervo) === 'outros'), [armas]);
 
   const renderArmaCard = (arma: Arma) => {
     const categoria = categorizarTipoAcervo(arma.acervo);
