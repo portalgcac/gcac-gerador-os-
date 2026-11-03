@@ -154,8 +154,29 @@ export function GestaoPontoPagamentos({ dataInicio, dataFim }: GestaoPontoPagame
   const [simHorasExtrasMins, setSimHorasExtrasMins] = useState(0);
   const [simCopiado, setSimCopiado] = useState(false);
 
+  // Modal de Confirmação & Sucesso do Pagamento
+  const [modalSucessoFechamento, setModalSucessoFechamento] = useState<{
+    colaboradorNome: string;
+    periodoStr: string;
+    valorLiquido: number;
+    comoPago: boolean;
+    ajusteManual: number;
+    motivoAjuste?: string;
+  } | null>(null);
+
   const dataInicioStr = useMemo(() => format(dataInicio, 'yyyy-MM-dd'), [dataInicio]);
   const dataFimStr = useMemo(() => format(dataFim, 'yyyy-MM-dd'), [dataFim]);
+
+  // Verifica se já existe fechamento salvo para o colaborador neste mês/período selecionado
+  const fechamentoExistentePeriodo = useMemo(() => {
+    if (!colaboradorAtivoId) return null;
+    return fechamentos.find(
+      f =>
+        f.colaboradorId === colaboradorAtivoId &&
+        ((f.dataInicioPeriodo >= dataInicioStr && f.dataInicioPeriodo <= dataFimStr) ||
+          (f.dataFimPeriodo >= dataInicioStr && f.dataFimPeriodo <= dataFimStr))
+    );
+  }, [colaboradorAtivoId, fechamentos, dataInicioStr, dataFimStr]);
 
   const carregarTudo = async () => {
     setCarregando(true);
@@ -932,11 +953,42 @@ export function GestaoPontoPagamentos({ dataInicio, dataFim }: GestaoPontoPagame
       const listaF = await listarFechamentosColaboradores(empresaId);
       setFechamentos(listaF);
 
+      const pagoValor = resumoFinal.liquidoFinal;
+      const ajManual = resumoFinal.ajusteManual;
+      const motAjuste = resumoFinal.motivoAjuste;
+      const colabNome = contratoAtivo.nome;
+      const periodoTexto = `${formatarData(apuracao.dataInicioEfetiva)} a ${formatarData(apuracao.dataFimEfetiva)}`;
+
+      // 1. Limpar todos os inputs temporários da tela após salvar
+      setValorAjusteManualInput('0');
+      setMotivoAjusteManualInput('');
+      setValorAjudaCustoInput('0');
+      setValorAdiantamentosInput('0');
+      setNumeroNfInput('');
+      setNotaFiscalUrlInput('');
+      setObservacoesFechamento('');
+      setModoEdicaoValorFinal(false);
+
+      // 2. Abrir Modal de Confirmação & Comprovante em Destaque
+      setModalSucessoFechamento({
+        colaboradorNome: colabNome,
+        periodoStr: periodoTexto,
+        valorLiquido: pagoValor,
+        comoPago,
+        ajusteManual: ajManual,
+        motivoAjuste: motAjuste
+      });
+
+      // 3. Rolar suavemente a tela para o topo
+      if (typeof window !== 'undefined') {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+
       setFeedback({
         tipo: 'sucesso',
         texto: comoPago
-          ? `Pagamento de ${formatarMoeda(resumoFinal.liquidoFinal)} para ${contratoAtivo.nome} registrado e lançado automaticamente na aba Despesas PJ do mês!`
-          : `Apuração de ${contratoAtivo.nome} (${formatarMoeda(resumoFinal.liquidoFinal)}) salva! O colaborador já pode emitir e anexar a Nota Fiscal.`
+          ? `Pagamento de ${formatarMoeda(pagoValor)} para ${colabNome} registrado e lançado automaticamente na aba Despesas PJ do mês!`
+          : `Apuração de ${colabNome} (${formatarMoeda(pagoValor)}) salva! O colaborador já pode emitir e anexar a Nota Fiscal.`
       });
     } catch (err: any) {
       setFeedback({ tipo: 'erro', texto: err?.message || 'Erro ao fechar pagamento.' });
@@ -980,7 +1032,7 @@ export function GestaoPontoPagamentos({ dataInicio, dataFim }: GestaoPontoPagame
             }`}
           >
             <FileText size={15} />
-            Notas Fiscais & Fechamentos ({fechamentos.length})
+            Extrato de Pagamentos & NFs ({fechamentos.length})
           </button>
 
           <button
@@ -1774,6 +1826,62 @@ export function GestaoPontoPagamentos({ dataInicio, dataFim }: GestaoPontoPagame
                   </div>
                 )}
               </div>
+
+              {/* Banner Informativo: Fechamento Já Realizado para o Colaborador neste Mês/Período */}
+              {fechamentoExistentePeriodo && contratoAtivo && (
+                <div className="card bg-emerald-950/40 border-emerald-500/50 p-4.5 flex flex-wrap items-center justify-between gap-4 shadow-xl shadow-emerald-950/30 animate-in fade-in">
+                  <div className="flex items-center gap-3.5">
+                    <div className="p-3 rounded-2xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 shrink-0">
+                      <CheckCircle2 size={24} />
+                    </div>
+                    <div className="space-y-0.5">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h4 className="text-sm font-black text-white uppercase tracking-wider">
+                          Fechamento Oficial Já Realizado para este Período!
+                        </h4>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                          fechamentoExistentePeriodo.status === 'pago'
+                            ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                            : 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                        }`}>
+                          {fechamentoExistentePeriodo.status === 'pago' ? 'PAGO & LANÇADO NAS DESPESAS PJ' : 'AGUARDANDO NF'}
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-300">
+                        Valor Fechado: <strong className="text-emerald-400 font-mono text-sm">{formatarMoeda(fechamentoExistentePeriodo.valorLiquidoFinal)}</strong>
+                        {fechamentoExistentePeriodo.valorAjusteManual ? (
+                          <span className="text-amber-300 ml-2 font-mono text-[11px]">
+                            (Ajuste: {fechamentoExistentePeriodo.valorAjusteManual > 0 ? '+' : ''}{formatarMoeda(fechamentoExistentePeriodo.valorAjusteManual)})
+                          </span>
+                        ) : null}
+                        {fechamentoExistentePeriodo.numeroNf ? ` • NF #${fechamentoExistentePeriodo.numeroNf}` : ''}
+                        {' • '}Gravado no Extrato da empresa.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setSubModo('historico_nf')}
+                      className="btn-primary text-xs py-2 px-3.5 flex items-center gap-1.5 shadow"
+                    >
+                      <FileText size={14} />
+                      Ver no Extrato / Histórico ({fechamentos.length})
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleExportarPdfApuracao}
+                      className="btn-ghost border border-brand-dark-5 text-xs py-2 px-3 flex items-center gap-1.5 text-gray-300 hover:text-white"
+                      title="Baixar espelho e comprovante em PDF"
+                    >
+                      <Download size={14} className="text-brand-blue-light" />
+                      Baixar PDF
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Grid Principal: Calculadora de Pagamento & Anexo NF + Resumo de Carga Horária */}
               {contratoAtivo && apuracao && resumoFinal && (
@@ -2865,6 +2973,94 @@ export function GestaoPontoPagamentos({ dataInicio, dataFim }: GestaoPontoPagame
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* Modal de Sucesso & Comprovante do Pagamento Confirmado */}
+      {modalSucessoFechamento && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
+          <div className="card w-full max-w-lg border-emerald-500/50 bg-gradient-to-b from-brand-dark-3 to-brand-dark-4 p-6 space-y-5 text-center shadow-2xl shadow-emerald-950/60 animate-in fade-in zoom-in-95">
+            <div className="w-16 h-16 rounded-full bg-emerald-500/20 border-2 border-emerald-500/40 text-emerald-400 flex items-center justify-center mx-auto shadow-lg shadow-emerald-500/20">
+              <CheckCircle2 size={36} />
+            </div>
+
+            <div className="space-y-1">
+              <h3 className="text-lg font-black text-white uppercase tracking-wider">
+                {modalSucessoFechamento.comoPago ? 'Pagamento Registrado com Sucesso!' : 'Apuração Salva com Sucesso!'}
+              </h3>
+              <p className="text-xs text-gray-300">
+                O fechamento foi gravado no sistema e as informações da tela foram arquivadas.
+              </p>
+            </div>
+
+            {/* Card Resumo do Pagamento */}
+            <div className="bg-brand-dark-2/90 border border-brand-dark-5 rounded-2xl p-4 text-left space-y-2 text-xs font-mono">
+              <div className="flex justify-between border-b border-brand-dark-5 pb-1.5">
+                <span className="text-gray-400">Colaborador:</span>
+                <strong className="text-white font-sans uppercase">{modalSucessoFechamento.colaboradorNome}</strong>
+              </div>
+              <div className="flex justify-between border-b border-brand-dark-5 pb-1.5">
+                <span className="text-gray-400">Período:</span>
+                <span className="text-gray-200">{modalSucessoFechamento.periodoStr}</span>
+              </div>
+              {modalSucessoFechamento.ajusteManual !== 0 && (
+                <div className="flex justify-between border-b border-brand-dark-5 pb-1.5 text-amber-400 font-bold">
+                  <span>Ajuste Gestor:</span>
+                  <span>
+                    {modalSucessoFechamento.ajusteManual > 0 ? '+' : ''}{formatarMoeda(modalSucessoFechamento.ajusteManual)}
+                  </span>
+                </div>
+              )}
+              {modalSucessoFechamento.motivoAjuste && (
+                <div className="text-[11px] text-gray-400 italic border-b border-brand-dark-5 pb-1.5">
+                  Motivo: {modalSucessoFechamento.motivoAjuste}
+                </div>
+              )}
+              <div className="flex justify-between pt-1 text-sm font-black">
+                <span className="text-emerald-400">Total Líquido / NF:</span>
+                <span className="text-emerald-400 font-sans text-base">{formatarMoeda(modalSucessoFechamento.valorLiquido)}</span>
+              </div>
+              <div className="flex justify-between text-[11px] text-gray-400 pt-1">
+                <span>Destino:</span>
+                <span className="text-gray-300">
+                  {modalSucessoFechamento.comoPago ? '✓ Lançado nas Despesas Mensais PJ' : '✓ Aguardando Envio de NF'}
+                </span>
+              </div>
+            </div>
+
+            {/* Botões de Ação */}
+            <div className="space-y-2 pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setModalSucessoFechamento(null);
+                  setSubModo('historico_nf');
+                }}
+                className="w-full btn-primary py-3 text-xs font-black uppercase flex items-center justify-center gap-2 shadow-lg"
+              >
+                <FileText size={16} />
+                Ver Extrato de Pagamentos & Fechamentos ({fechamentos.length})
+              </button>
+
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={handleExportarPdfApuracao}
+                  className="btn-ghost border border-brand-dark-5 py-2.5 text-xs font-bold uppercase flex items-center justify-center gap-1.5 text-gray-300 hover:text-white"
+                >
+                  <Download size={14} className="text-brand-blue-light" />
+                  Baixar Recibo (PDF)
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setModalSucessoFechamento(null)}
+                  className="btn-ghost border border-brand-dark-5 py-2.5 text-xs font-bold uppercase text-gray-400 hover:text-white"
+                >
+                  Concluir
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
