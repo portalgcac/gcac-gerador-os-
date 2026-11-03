@@ -10,11 +10,61 @@ async function blobParaBase64(blob: Blob): Promise<string> {
   });
 }
 
-export async function gerarPdfDeclaracaoBlob(titulo: string, textoHtml: string, nomeCliente: string): Promise<Blob> {
-  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+async function obterLogoEscritorioBase64(): Promise<string> {
+  // 1. Tentar pegar a logo configurada no perfil da empresa
+  try {
+    const dadosUsuario = localStorage.getItem('gcac_usuario');
+    if (dadosUsuario) {
+      const u = JSON.parse(dadosUsuario);
+      const customLogo = u.dadosEmpresa?.logoUrl;
+      if (customLogo) {
+        if (customLogo.startsWith('data:image/')) {
+          return customLogo;
+        }
+        try {
+          const res = await fetch(customLogo);
+          if (res.ok) {
+            const blob = await res.blob();
+            const b64 = await blobParaBase64(blob);
+            if (b64) return b64;
+          }
+        } catch (e) {
+          console.warn('Erro ao carregar logo personalizada do escritório:', e);
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('Erro ao ler dados da empresa:', e);
+  }
 
-  let nomeEmpresa = '';
-  let logoBase64 = '';
+  // 2. Fallbacks de imagem oficial do Portal GCAC
+  const fallbacks = [
+    '/LOGO PORTAL G CAC 2 SEM FRASE.png',
+    '/logo.png',
+    '/LOGO CORRETA.png',
+    '/Logo oficial.png'
+  ];
+
+  for (const path of fallbacks) {
+    try {
+      const res = await fetch(encodeURI(path));
+      if (res.ok) {
+        const blob = await res.blob();
+        const base64 = await blobParaBase64(blob);
+        if (base64) return base64;
+      }
+    } catch {
+      // continua para o próximo fallback
+    }
+  }
+
+  return '';
+}
+
+export async function gerarPdfDeclaracaoBlob(titulo: string, textoHtml: string, nomeCliente: string): Promise<Blob> {
+  let nomeEmpresa = 'GCAC DESPACHANTE BÉLICO';
+  let enderecoEmpresa = '';
+  let contatoTelefone = '';
   let cidadeEmpresa = 'Jataí';
   let estadoEmpresa = 'GO';
 
@@ -22,10 +72,17 @@ export async function gerarPdfDeclaracaoBlob(titulo: string, textoHtml: string, 
     const dadosUsuario = localStorage.getItem('gcac_usuario');
     if (dadosUsuario) {
       const u = JSON.parse(dadosUsuario);
-      if (u.dadosEmpresa?.logoUrl) {
-        logoBase64 = u.dadosEmpresa.logoUrl;
+      const ehGuilherme = u.email === 'gui.gomesassis@gmail.com';
+      nomeEmpresa = u.dadosEmpresa?.razaoSocialFantasia?.toUpperCase() || 
+                    u.dadosEmpresa?.nome?.toUpperCase() || 
+                    (ehGuilherme ? 'GCAC DESPACHANTE BÉLICO' : 'GCAC DESPACHANTE BÉLICO');
+      
+      if (u.dadosEmpresa?.endereco) {
+        enderecoEmpresa = u.dadosEmpresa.endereco;
       }
-      nomeEmpresa = u.dadosEmpresa?.razaoSocialFantasia?.toUpperCase() || u.dadosEmpresa?.nome?.toUpperCase() || '';
+      if (u.dadosEmpresa?.contatoTelefone) {
+        contatoTelefone = u.dadosEmpresa.contatoTelefone;
+      }
       if (u.dadosEmpresa?.cidade) {
         cidadeEmpresa = u.dadosEmpresa.cidade;
       }
@@ -33,33 +90,34 @@ export async function gerarPdfDeclaracaoBlob(titulo: string, textoHtml: string, 
         estadoEmpresa = u.dadosEmpresa.estado;
       }
     }
-
-    if (!logoBase64 && !nomeEmpresa) {
-      const logoRes = await fetch('/LOGO PORTAL G CAC 2 SEM FRASE.png');
-      if (logoRes.ok) {
-        const logoBlob = await logoRes.blob();
-        logoBase64 = await blobParaBase64(logoBlob);
-      }
-      nomeEmpresa = 'GCAC DESPACHANTE BÉLICO';
-    }
   } catch (err) {
-    console.error('Erro ao carregar cabeçalho:', err);
+    console.error('Erro ao ler dados da empresa:', err);
   }
 
-  // Create hidden DOM container for high fidelity PDF layout
+  // Carregar logo garantido (do escritório ou fallback oficial)
+  const logoBase64 = await obterLogoEscritorioBase64();
+
+  // Criar container DOM com layout A4 oficial para captura de alta resolução
   const container = document.createElement('div');
-  container.className = 'pdf-render-container';
-  container.style.width = '794px'; // 210mm at 96 DPI
-  container.style.padding = '60px 80px';
+  container.className = 'pdf-render-declaracao-container';
+  container.style.position = 'fixed';
+  container.style.left = '0';
+  container.style.top = '0';
+  container.style.width = '794px'; // 210mm a 96 DPI
+  container.style.minHeight = '1120px'; // Proporção da página A4 (297mm)
+  container.style.padding = '55px 70px';
   container.style.boxSizing = 'border-box';
   container.style.backgroundColor = '#FFFFFF';
   container.style.color = '#000000';
-  container.style.fontFamily = 'Helvetica, Arial, sans-serif';
+  container.style.fontFamily = 'Arial, Helvetica, sans-serif';
   container.style.fontSize = '14px';
   container.style.lineHeight = '1.6';
-  container.style.position = 'absolute';
-  container.style.left = '-9999px';
-  container.style.top = '-9999px';
+  container.style.zIndex = '-99999';
+  container.style.pointerEvents = 'none';
+  container.style.opacity = '1';
+  container.style.display = 'flex';
+  container.style.flexDirection = 'column';
+  container.style.justifyContent = 'space-between';
 
   const meses = [
     'janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
@@ -69,62 +127,110 @@ export async function gerarPdfDeclaracaoBlob(titulo: string, textoHtml: string, 
   const dataExtenso = `${cidadeEmpresa} - ${estadoEmpresa}, ${hoje.getDate()} de ${meses[hoje.getMonth()]} de ${hoje.getFullYear()}.`;
 
   container.innerHTML = `
-    <!-- Header -->
-    <div style="display: flex; align-items: center; border-bottom: 2px solid #E2E8F0; padding-bottom: 12px; margin-bottom: 24px;">
-      ${logoBase64 ? `<img src="${logoBase64}" style="width: 60px; height: 60px; margin-right: 16px; object-fit: contain;" />` : ''}
-      <div style="display: flex; flex-direction: column;">
-        <span style="font-size: 15px; font-weight: bold; color: #0D0D0D; font-family: Helvetica, Arial, sans-serif;">${nomeEmpresa}</span>
-        <span style="font-size: 9px; font-weight: bold; color: #1B6FBF; letter-spacing: 1px; margin-top: 2px; font-family: Helvetica, Arial, sans-serif;">DOCUMENTO OFICIAL DE DECLARAÇÃO</span>
+    <!-- Top Content -->
+    <div style="flex: 1; display: flex; flex-direction: column;">
+      <!-- Header com Logo do Escritório -->
+      <div style="display: flex; align-items: center; border-bottom: 2px solid #1B6FBF; padding-bottom: 14px; margin-bottom: 28px;">
+        ${logoBase64 ? `<img src="${logoBase64}" alt="Logo" style="width: 65px; height: 65px; margin-right: 18px; object-fit: contain; flex-shrink: 0;" />` : ''}
+        <div style="display: flex; flex-direction: column; justify-content: center;">
+          <span style="font-size: 16px; font-weight: 800; color: #0D0D0D; letter-spacing: 0.5px; font-family: Arial, Helvetica, sans-serif;">${nomeEmpresa}</span>
+          <span style="font-size: 10px; font-weight: 700; color: #1B6FBF; letter-spacing: 1.5px; margin-top: 3px; font-family: Arial, Helvetica, sans-serif;">DOCUMENTO OFICIAL DE DECLARAÇÃO</span>
+          ${(enderecoEmpresa || contatoTelefone) ? `
+            <span style="font-size: 9px; color: #64748B; margin-top: 3px; font-family: Arial, Helvetica, sans-serif;">
+              ${[enderecoEmpresa, contatoTelefone].filter(Boolean).join(' • ')}
+            </span>
+          ` : ''}
+        </div>
+      </div>
+
+      <!-- Título da Declaração -->
+      <div style="text-align: center; font-size: 15px; font-weight: 800; margin-bottom: 26px; text-transform: uppercase; color: #0D0D0D; font-family: Arial, Helvetica, sans-serif; letter-spacing: 0.5px;">
+        ${titulo}
+      </div>
+
+      <!-- Corpo da Declaração -->
+      <div style="text-align: justify; font-size: 13.5px; color: #1F2937; margin-bottom: 28px; font-family: Arial, Helvetica, sans-serif; line-height: 1.7; word-wrap: break-word;">
+        ${textoHtml}
+      </div>
+
+      <!-- Data e Localidade -->
+      <div style="font-size: 13.5px; color: #0D0D0D; margin-top: 15px; margin-bottom: 25px; font-family: Arial, Helvetica, sans-serif;">
+        ${dataExtenso}
       </div>
     </div>
 
-    <!-- Title -->
-    <div style="text-align: center; font-size: 15px; font-weight: bold; margin-bottom: 24px; text-transform: uppercase; font-family: Helvetica, Arial, sans-serif; color: #0D0D0D;">
-      ${titulo}
-    </div>
-
-    <!-- Body text (render HTML) -->
-    <div style="text-align: justify; font-size: 13px; color: #1F2937; margin-bottom: 30px; font-family: Helvetica, Arial, sans-serif; line-height: 1.6; word-wrap: break-word;">
-      ${textoHtml}
-    </div>
-
-    <!-- Date -->
-    <div style="font-size: 13px; color: #0D0D0D; margin-bottom: 40px; font-family: Helvetica, Arial, sans-serif;">
-      ${dataExtenso}
-    </div>
-
-    <!-- Signature -->
-    <div style="display: flex; flex-direction: column; align-items: center; margin-top: 40px; page-break-inside: avoid; break-inside: avoid;">
-      <div style="width: 250px; border-top: 1.5px solid #94A3B8; margin-bottom: 6px;"></div>
-      <span style="font-size: 13px; font-weight: bold; text-transform: uppercase; font-family: Helvetica, Arial, sans-serif; color: #0D0D0D;">${nomeCliente}</span>
-      <span style="font-size: 10px; color: #64748B; font-family: Helvetica, Arial, sans-serif;">Declarante</span>
+    <!-- Assinatura do Declarante -->
+    <div style="display: flex; flex-direction: column; align-items: center; margin-top: 35px; padding-bottom: 10px;">
+      <div style="width: 280px; border-top: 1.5px solid #0D0D0D; margin-bottom: 8px;"></div>
+      <span style="font-size: 13px; font-weight: 800; text-transform: uppercase; color: #0D0D0D; font-family: Arial, Helvetica, sans-serif;">${nomeCliente}</span>
+      <span style="font-size: 10.5px; color: #64748B; font-weight: 600; font-family: Arial, Helvetica, sans-serif; margin-top: 2px;">Declarante</span>
     </div>
   `;
 
   document.body.appendChild(container);
-  (window as any).html2canvas = html2canvas;
 
   try {
-    await new Promise<void>((resolve, reject) => {
-      doc.html(container, {
-        callback: () => resolve(),
-        x: 0,
-        y: 0,
-        width: 210, // A4 width in mm
-        windowWidth: 794,
-        html2canvas: {
-          scale: 2,
-          useCORS: true,
-          logging: false
-        }
-      });
+    // Aguardar o carregamento e renderização de todas as imagens internas (incluindo a logo)
+    const imgs = Array.from(container.querySelectorAll('img'));
+    await Promise.all(
+      imgs.map(img => {
+        if (img.complete && img.naturalWidth > 0) return Promise.resolve();
+        return new Promise<void>(res => {
+          img.onload = () => res();
+          img.onerror = () => res();
+        });
+      })
+    );
+
+    // Pequeno intervalo para renderização estável no DOM
+    await new Promise(r => setTimeout(r, 60));
+
+    // Captura com html2canvas em alta resolução (scale: 2)
+    const canvas = await html2canvas(container, {
+      scale: 2,
+      useCORS: true,
+      allowTaint: true,
+      logging: false,
+      backgroundColor: '#FFFFFF',
+      windowWidth: 794
     });
+
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const pageWidthMm = 210;
+    const pageHeightMm = 297;
+
+    const canvasWidth = canvas.width;
+    const canvasHeight = canvas.height;
+    const totalHeightMm = (canvasHeight * pageWidthMm) / canvasWidth;
+
+    const imgData = canvas.toDataURL('image/jpeg', 0.98);
+
+    // Se o conteúdo cabe em 1 página (com tolerância de 3mm)
+    if (totalHeightMm <= pageHeightMm + 3) {
+      doc.addImage(imgData, 'JPEG', 0, 0, pageWidthMm, Math.min(totalHeightMm, pageHeightMm), undefined, 'FAST');
+    } else {
+      // Caso exceda 1 página, aplica paginação fluida
+      let heightLeft = totalHeightMm;
+      let position = 0;
+
+      doc.addImage(imgData, 'JPEG', 0, position, pageWidthMm, totalHeightMm, undefined, 'FAST');
+      heightLeft -= pageHeightMm;
+
+      while (heightLeft > 5) {
+        position -= pageHeightMm;
+        doc.addPage();
+        doc.addImage(imgData, 'JPEG', 0, position, pageWidthMm, totalHeightMm, undefined, 'FAST');
+        heightLeft -= pageHeightMm;
+      }
+    }
+
+    return doc.output('blob');
   } catch (err) {
-    console.error('Erro na renderização do PDF:', err);
+    console.error('Erro na renderização do PDF da declaração:', err);
     throw err;
   } finally {
-    document.body.removeChild(container);
+    if (document.body.contains(container)) {
+      document.body.removeChild(container);
+    }
   }
-
-  return doc.output('blob');
 }
