@@ -1,5 +1,6 @@
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
+import { formatarCPF } from '../utils/formatters';
 
 async function blobParaBase64(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -10,7 +11,7 @@ async function blobParaBase64(blob: Blob): Promise<string> {
   });
 }
 
-async function obterLogoEscritorioBase64(): Promise<string> {
+async function obterLogoOficialBase64(): Promise<string> {
   // 1. Tentar pegar a logo configurada no perfil da empresa
   try {
     const dadosUsuario = localStorage.getItem('gcac_usuario');
@@ -29,7 +30,7 @@ async function obterLogoEscritorioBase64(): Promise<string> {
             if (b64) return b64;
           }
         } catch (e) {
-          console.warn('Erro ao carregar logo personalizada do escritório:', e);
+          console.warn('Erro ao carregar logo personalizada:', e);
         }
       }
     }
@@ -37,12 +38,13 @@ async function obterLogoEscritorioBase64(): Promise<string> {
     console.warn('Erro ao ler dados da empresa:', e);
   }
 
-  // 2. Fallbacks de imagem oficial do Portal GCAC
+  // 2. Fallbacks de imagem oficial do Portal GCAC (logo oficial com brasão GCAC Despachante Bélico)
   const fallbacks = [
+    '/logo_oficial_documentos.png',
+    '/Logo oficial.png',
     '/LOGO PORTAL G CAC 2 SEM FRASE.png',
     '/logo.png',
-    '/LOGO CORRETA.png',
-    '/Logo oficial.png'
+    '/LOGO CORRETA.png'
   ];
 
   for (const path of fallbacks) {
@@ -61,10 +63,12 @@ async function obterLogoEscritorioBase64(): Promise<string> {
   return '';
 }
 
-export async function gerarPdfDeclaracaoBlob(titulo: string, textoHtml: string, nomeCliente: string): Promise<Blob> {
-  let nomeEmpresa = 'GCAC DESPACHANTE BÉLICO';
-  let enderecoEmpresa = '';
-  let contatoTelefone = '';
+export async function gerarPdfDeclaracaoBlob(
+  titulo: string, 
+  textoHtml: string, 
+  nomeCliente: string,
+  cpfCliente?: string
+): Promise<Blob> {
   let cidadeEmpresa = 'Jataí';
   let estadoEmpresa = 'GO';
 
@@ -72,17 +76,6 @@ export async function gerarPdfDeclaracaoBlob(titulo: string, textoHtml: string, 
     const dadosUsuario = localStorage.getItem('gcac_usuario');
     if (dadosUsuario) {
       const u = JSON.parse(dadosUsuario);
-      const ehGuilherme = u.email === 'gui.gomesassis@gmail.com';
-      nomeEmpresa = u.dadosEmpresa?.razaoSocialFantasia?.toUpperCase() || 
-                    u.dadosEmpresa?.nome?.toUpperCase() || 
-                    (ehGuilherme ? 'GCAC DESPACHANTE BÉLICO' : 'GCAC DESPACHANTE BÉLICO');
-      
-      if (u.dadosEmpresa?.endereco) {
-        enderecoEmpresa = u.dadosEmpresa.endereco;
-      }
-      if (u.dadosEmpresa?.contatoTelefone) {
-        contatoTelefone = u.dadosEmpresa.contatoTelefone;
-      }
       if (u.dadosEmpresa?.cidade) {
         cidadeEmpresa = u.dadosEmpresa.cidade;
       }
@@ -94,8 +87,11 @@ export async function gerarPdfDeclaracaoBlob(titulo: string, textoHtml: string, 
     console.error('Erro ao ler dados da empresa:', err);
   }
 
-  // Carregar logo garantido (do escritório ou fallback oficial)
-  const logoBase64 = await obterLogoEscritorioBase64();
+  // Carregar logo oficial (com brasão e texto GCAC Despachante Bélico)
+  const logoBase64 = await obterLogoOficialBase64();
+
+  // Formatar CPF para a assinatura
+  const cpfFormatado = cpfCliente ? formatarCPF(cpfCliente) : '';
 
   // Criar container DOM com layout A4 oficial para captura de alta resolução
   const container = document.createElement('div');
@@ -104,8 +100,8 @@ export async function gerarPdfDeclaracaoBlob(titulo: string, textoHtml: string, 
   container.style.left = '0';
   container.style.top = '0';
   container.style.width = '794px'; // 210mm a 96 DPI
-  container.style.minHeight = '1120px'; // Proporção da página A4 (297mm)
-  container.style.padding = '55px 70px';
+  container.style.minHeight = '1120px'; // Proporção exata da página A4 (297mm)
+  container.style.padding = '50px 75px 60px 75px';
   container.style.boxSizing = 'border-box';
   container.style.backgroundColor = '#FFFFFF';
   container.style.color = '#000000';
@@ -126,51 +122,45 @@ export async function gerarPdfDeclaracaoBlob(titulo: string, textoHtml: string, 
   const hoje = new Date();
   const dataExtenso = `${cidadeEmpresa} - ${estadoEmpresa}, ${hoje.getDate()} de ${meses[hoje.getMonth()]} de ${hoje.getFullYear()}.`;
 
+  const jaTemFechamento = textoHtml.toLowerCase().includes('por ser verdade');
+
   container.innerHTML = `
     <!-- Top Content -->
     <div style="flex: 1; display: flex; flex-direction: column;">
-      <!-- Header com Logo do Escritório -->
-      <div style="display: flex; align-items: center; border-bottom: 2px solid #1B6FBF; padding-bottom: 14px; margin-bottom: 28px;">
-        ${logoBase64 ? `<img src="${logoBase64}" alt="Logo" style="width: 65px; height: 65px; margin-right: 18px; object-fit: contain; flex-shrink: 0;" />` : ''}
-        <div style="display: flex; flex-direction: column; justify-content: center;">
-          <span style="font-size: 16px; font-weight: 800; color: #0D0D0D; letter-spacing: 0.5px; font-family: Arial, Helvetica, sans-serif;">${nomeEmpresa}</span>
-          <span style="font-size: 10px; font-weight: 700; color: #1B6FBF; letter-spacing: 1.5px; margin-top: 3px; font-family: Arial, Helvetica, sans-serif;">DOCUMENTO OFICIAL DE DECLARAÇÃO</span>
-          ${(enderecoEmpresa || contatoTelefone) ? `
-            <span style="font-size: 9px; color: #64748B; margin-top: 3px; font-family: Arial, Helvetica, sans-serif;">
-              ${[enderecoEmpresa, contatoTelefone].filter(Boolean).join(' • ')}
-            </span>
-          ` : ''}
-        </div>
+      <!-- Logo Oficial Centralizada no Topo (conforme layout oficial de declarações GCAC) -->
+      <div style="display: flex; justify-content: center; align-items: center; margin-top: 5px; margin-bottom: 25px;">
+        ${logoBase64 ? `<img src="${logoBase64}" alt="Logo GCAC Despachante Bélico" style="width: 175px; height: 175px; object-fit: contain;" />` : ''}
       </div>
 
-      <!-- Título da Declaração -->
-      <div style="text-align: center; font-size: 15px; font-weight: 800; margin-bottom: 26px; text-transform: uppercase; color: #0D0D0D; font-family: Arial, Helvetica, sans-serif; letter-spacing: 0.5px;">
+      <!-- Título da Declaração Centralizado em Negrito -->
+      <div style="text-align: center; font-size: 16px; font-weight: bold; margin-bottom: 28px; text-transform: uppercase; color: #000000; font-family: Arial, Helvetica, sans-serif; letter-spacing: 0.5px;">
         ${titulo}
       </div>
 
-      <!-- Corpo da Declaração -->
-      <div style="text-align: justify; font-size: 13.5px; color: #1F2937; margin-bottom: 28px; font-family: Arial, Helvetica, sans-serif; line-height: 1.7; word-wrap: break-word;">
+      <!-- Corpo da Declaração Justificado -->
+      <div style="text-align: justify; font-size: 13.5px; color: #000000; font-family: Arial, Helvetica, sans-serif; line-height: 1.65; word-wrap: break-word;">
         ${textoHtml}
       </div>
 
-      <!-- Data e Localidade -->
-      <div style="font-size: 13.5px; color: #0D0D0D; margin-top: 15px; margin-bottom: 25px; font-family: Arial, Helvetica, sans-serif;">
+      <!-- Fechamento e Data Alinhados à Direita -->
+      <div style="text-align: right; font-size: 13px; color: #000000; margin-top: 30px; margin-bottom: 25px; font-family: Arial, Helvetica, sans-serif; line-height: 1.5;">
+        ${!jaTemFechamento ? 'Por ser verdade, firmo o presente documento.<br>' : ''}
         ${dataExtenso}
       </div>
     </div>
 
-    <!-- Assinatura do Declarante -->
+    <!-- Linha de Assinatura Centralizada com Nome e CPF -->
     <div style="display: flex; flex-direction: column; align-items: center; margin-top: 35px; padding-bottom: 10px;">
-      <div style="width: 280px; border-top: 1.5px solid #0D0D0D; margin-bottom: 8px;"></div>
-      <span style="font-size: 13px; font-weight: 800; text-transform: uppercase; color: #0D0D0D; font-family: Arial, Helvetica, sans-serif;">${nomeCliente}</span>
-      <span style="font-size: 10.5px; color: #64748B; font-weight: 600; font-family: Arial, Helvetica, sans-serif; margin-top: 2px;">Declarante</span>
+      <div style="width: 340px; border-top: 1px solid #000000; margin-bottom: 6px;"></div>
+      <span style="font-size: 13px; font-weight: bold; text-transform: uppercase; color: #000000; font-family: Arial, Helvetica, sans-serif;">${nomeCliente}</span>
+      ${cpfFormatado ? `<span style="font-size: 12px; color: #222222; font-family: Arial, Helvetica, sans-serif; margin-top: 2px;">${cpfFormatado}</span>` : ''}
     </div>
   `;
 
   document.body.appendChild(container);
 
   try {
-    // Aguardar o carregamento e renderização de todas as imagens internas (incluindo a logo)
+    // Aguardar o carregamento de todas as imagens internas (incluindo a logo)
     const imgs = Array.from(container.querySelectorAll('img'));
     await Promise.all(
       imgs.map(img => {
@@ -182,7 +172,7 @@ export async function gerarPdfDeclaracaoBlob(titulo: string, textoHtml: string, 
       })
     );
 
-    // Pequeno intervalo para renderização estável no DOM
+    // Intervalo para renderização estável no DOM
     await new Promise(r => setTimeout(r, 60));
 
     // Captura com html2canvas em alta resolução (scale: 2)

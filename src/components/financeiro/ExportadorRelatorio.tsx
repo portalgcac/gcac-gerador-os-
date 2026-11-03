@@ -128,7 +128,10 @@ export function ExportadorRelatorio({ isOpen, onClose, dataInicioProp, dataFimPr
     let logoBase64 = usuario?.dadosEmpresa?.logoUrl || '';
     if (!logoBase64) {
       try {
-        const logoRes = await fetch('/LOGO PORTAL G CAC 2 SEM FRASE.png');
+        let logoRes = await fetch('/logo_oficial_documentos.png');
+        if (!logoRes.ok) {
+          logoRes = await fetch('/LOGO PORTAL G CAC 2 SEM FRASE.png');
+        }
         if (logoRes.ok) {
           const logoBlob = await logoRes.blob();
           logoBase64 = await new Promise<string>((resolve) => {

@@ -921,7 +921,12 @@ Por ser expressão da verdade, firmo o presente compromisso.`;
     if (!textoEditado || !tituloManual || !clienteSelecionado) return;
     setGerandoPdf(true);
     try {
-      const blob = await gerarPdfDeclaracaoBlob(tituloManual, textoEditado, clienteSelecionado.nome);
+      const blob = await gerarPdfDeclaracaoBlob(
+        tituloManual, 
+        textoEditado, 
+        clienteSelecionado.nome,
+        clienteSelecionado.cpf
+      );
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
