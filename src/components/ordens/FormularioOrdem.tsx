@@ -84,6 +84,7 @@ function SeletorServico({
 
   const handleSelecionar = (servico: ServicoConfig) => {
     onSelecionar(servico);
+    setAberto(false);
   };
 
   const servicosFiltrados = servicos.filter(s => 
@@ -100,7 +101,7 @@ function SeletorServico({
         type="button"
         id="btn-selecionar-servico"
         onClick={() => setAberto(a => !a)}
-        className="flex items-center gap-2 px-3 py-2 rounded-lg bg-brand-dark-5 border border-brand-dark-5 hover:border-brand-blue/40 hover:bg-brand-blue/10 text-gray-300 hover:text-brand-blue-light text-sm font-medium transition-all"
+        className="flex items-center gap-2 px-3 py-2 rounded-lg bg-brand-dark-5 border border-brand-dark-5 hover:border-brand-blue/40 hover:bg-brand-blue/10 text-gray-300 hover:text-brand-blue-light text-xs sm:text-sm font-medium transition-all"
       >
         <List size={14} />
         Selecionar serviço
@@ -108,79 +109,102 @@ function SeletorServico({
       </button>
 
       {aberto && (
-        <div className="absolute left-0 top-full mt-1 z-50 w-80 bg-brand-dark-2 border border-brand-dark-5 rounded-xl shadow-2xl overflow-hidden animate-fade-in">
-          <div className="p-2 border-b border-brand-dark-5 bg-brand-dark-3">
-            <div className="relative">
-              <Search size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500" />
-              <input 
-                ref={inputRef}
-                type="text"
-                className="w-full bg-brand-dark-4 border border-brand-dark-5 rounded-lg pl-7 pr-2 py-1.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-brand-blue/50 transition-all font-medium"
-                placeholder="Pesquisar serviço ou pacote..."
-                value={busca}
-                onChange={e => setBusca(e.target.value)}
-              />
-            </div>
-          </div>
-          <div className="max-h-72 overflow-y-auto">
-            {exibirAtalhoAquisicao && (
+        <>
+          {/* Backdrop mobile */}
+          <div
+            className="fixed inset-0 bg-black/70 backdrop-blur-xs z-50 sm:hidden"
+            onClick={() => setAberto(false)}
+          />
+
+          {/* Menu Dropdown com auto-ajuste inteligente */}
+          <div className="
+            fixed inset-x-3 top-20 z-50 max-h-[75vh] flex flex-col bg-brand-dark-2 border border-brand-dark-5 rounded-2xl shadow-2xl overflow-hidden animate-scale-up
+            sm:absolute sm:inset-auto sm:left-0 sm:top-full sm:mt-1 sm:w-80 sm:rounded-xl sm:max-h-72
+          ">
+            <div className="p-2.5 sm:p-2 border-b border-brand-dark-5 bg-brand-dark-3 flex items-center gap-2">
+              <div className="relative flex-1">
+                <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-500" />
+                <input 
+                  ref={inputRef}
+                  type="text"
+                  className="w-full bg-brand-dark-4 border border-brand-dark-5 rounded-lg pl-8 pr-2 py-2 sm:py-1.5 text-sm sm:text-xs text-white placeholder-gray-500 focus:outline-none focus:border-brand-blue/50 transition-all font-medium"
+                  placeholder="Pesquisar serviço ou pacote..."
+                  value={busca}
+                  onChange={e => setBusca(e.target.value)}
+                />
+              </div>
               <button
                 type="button"
-                onClick={() => {
-                  onSelecionarComboAquisicao();
-                  setAberto(false);
-                }}
-                className="w-full text-left px-3 py-2.5 bg-indigo-500/15 hover:bg-indigo-500/25 border-b border-indigo-500/30 transition-colors"
+                onClick={() => setAberto(false)}
+                className="p-1.5 text-gray-400 hover:text-white rounded-lg hover:bg-brand-dark-4 sm:hidden shrink-0"
+                title="Fechar"
               >
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs font-black text-indigo-300 flex items-center gap-1.5">
-                    <Sparkles size={13} className="text-indigo-400 shrink-0" />
-                    AQUISIÇÃO DE ARMA DE FOGO (PACOTE)
-                  </span>
-                  <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-indigo-500/30 text-indigo-200 border border-indigo-400/30">
-                    3 Etapas
-                  </span>
-                </div>
-                <p className="text-[10px] text-indigo-200/70 mt-0.5">
-                  Abre Autorização de Compra + CRAF (Em Espera) + Guia de Tráfego (Em Espera)
-                </p>
+                <X size={18} />
               </button>
-            )}
-
-            {servicosFiltrados.length === 0 && !exibirAtalhoAquisicao ? (
-              <div className="p-4 text-center">
-                <p className="text-xs text-gray-500 mb-2">
-                  {busca ? 'Nenhum serviço encontrado.' : 'Nenhum serviço cadastrado.'}
-                </p>
-                {!busca && (
-                  <button
-                    type="button"
-                    onClick={() => navigate('/configuracoes')}
-                    className="text-xs text-brand-blue-light hover:underline"
-                  >
-                    Cadastrar em Configurações
-                  </button>
-                )}
-              </div>
-            ) : (
-              servicosFiltrados.map((servico) => (
+            </div>
+            <div className="max-h-[60vh] sm:max-h-72 overflow-y-auto">
+              {exibirAtalhoAquisicao && (
                 <button
-                  key={servico.id}
                   type="button"
-                  onClick={() => handleSelecionar(servico)}
-                  className="w-full text-left px-3 py-2.5 text-sm text-gray-200 hover:bg-brand-blue/20 hover:text-white transition-colors border-b border-brand-dark-5/50 last:border-0"
+                  onClick={() => {
+                    onSelecionarComboAquisicao();
+                    setAberto(false);
+                  }}
+                  className="w-full text-left px-3.5 py-3 sm:py-2.5 bg-indigo-500/15 hover:bg-indigo-500/25 border-b border-indigo-500/30 transition-colors"
                 >
-                  <div className="flex justify-between items-start gap-2">
-                    <span className="pr-2 leading-relaxed">{servico.nome}</span>
-                    <span className="text-[10px] bg-brand-dark-4 px-1.5 py-0.5 rounded text-brand-green flex-shrink-0 mt-0.5">
-                      R$ {servico.valorPadrao.toFixed(2).replace('.', ',')}
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-black text-indigo-300 flex items-center gap-1.5">
+                      <Sparkles size={13} className="text-indigo-400 shrink-0" />
+                      AQUISIÇÃO DE ARMA DE FOGO (PACOTE)
+                    </span>
+                    <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-indigo-500/30 text-indigo-200 border border-indigo-400/30">
+                      3 Etapas
                     </span>
                   </div>
+                  <p className="text-[10px] text-indigo-200/70 mt-0.5">
+                    Abre Autorização de Compra + CRAF (Em Espera) + Guia de Tráfego (Em Espera)
+                  </p>
                 </button>
-              ))
-            )}
+              )}
+
+              {servicosFiltrados.length === 0 && !exibirAtalhoAquisicao ? (
+                <div className="p-4 text-center">
+                  <p className="text-xs text-gray-500 mb-2">
+                    {busca ? 'Nenhum serviço encontrado.' : 'Nenhum serviço cadastrado.'}
+                  </p>
+                  {!busca && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAberto(false);
+                        navigate('/configuracoes');
+                      }}
+                      className="text-xs text-brand-blue-light hover:underline"
+                    >
+                      Cadastrar em Configurações
+                    </button>
+                  )}
+                </div>
+              ) : (
+                servicosFiltrados.map((servico) => (
+                  <button
+                    key={servico.id}
+                    type="button"
+                    onClick={() => handleSelecionar(servico)}
+                    className="w-full text-left px-3.5 py-3 sm:py-2.5 text-xs sm:text-sm text-gray-200 hover:bg-brand-blue/20 hover:text-white transition-colors border-b border-brand-dark-5/50 last:border-0"
+                  >
+                    <div className="flex justify-between items-center gap-3">
+                      <span className="leading-snug break-words flex-1 font-medium">{servico.nome}</span>
+                      <span className="text-[11px] sm:text-[10px] bg-brand-dark-4 px-2 py-0.5 rounded text-brand-green font-bold shrink-0">
+                        R$ {servico.valorPadrao.toFixed(2).replace('.', ',')}
+                      </span>
+                    </div>
+                  </button>
+                ))
+              )}
+            </div>
           </div>
-        </div>
+        </>
       )}
     </div>
   );

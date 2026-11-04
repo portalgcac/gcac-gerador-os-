@@ -583,7 +583,7 @@ export function NavegacaoInferior({ onAbrirMenu }: NavegacaoInferiorProps = {}) 
   };
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-40 bg-brand-dark-2/95 backdrop-blur-md border-t border-brand-dark-5 flex sm:hidden overflow-x-auto no-scrollbar scroll-smooth px-2 items-center">
+    <nav className="fixed bottom-0 left-0 right-0 z-40 bg-brand-dark-2/95 backdrop-blur-md border-t border-brand-dark-5 flex sm:hidden overflow-x-auto no-scrollbar scroll-smooth px-2 items-center pb-[env(safe-area-inset-bottom,0px)]">
       {onAbrirMenu && (
         <button
           type="button"

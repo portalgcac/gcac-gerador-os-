@@ -457,42 +457,69 @@ function SeletorServicoRapido({ onSelecionar, servicos }: { onSelecionar: (s: Se
       </button>
 
       {aberto && (
-        <div className="absolute left-0 top-full mt-1 z-50 w-72 bg-brand-dark-2 border border-brand-dark-5 rounded-xl shadow-2xl overflow-hidden animate-fade-in">
-          <div className="p-2 border-b border-brand-dark-5 bg-brand-dark-3">
-            <div className="relative">
-              <Search size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500" />
-              <input 
-                ref={inputRef}
-                type="text"
-                className="w-full bg-brand-dark-4 border border-brand-dark-5 rounded-lg pl-7 pr-2 py-1.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-brand-blue/50 transition-all font-medium"
-                placeholder="Pesquisar serviço..."
-                value={busca}
-                onChange={e => setBusca(e.target.value)}
-              />
+        <>
+          {/* Backdrop mobile */}
+          <div
+            className="fixed inset-0 bg-black/70 backdrop-blur-xs z-50 sm:hidden"
+            onClick={() => setAberto(false)}
+          />
+
+          {/* Menu Dropdown com auto-ajuste inteligente */}
+          <div className="
+            fixed inset-x-3 top-20 z-50 max-h-[75vh] flex flex-col bg-brand-dark-2 border border-brand-dark-5 rounded-2xl shadow-2xl overflow-hidden animate-scale-up
+            sm:absolute sm:inset-auto sm:left-0 sm:top-full sm:mt-1 sm:w-80 sm:rounded-xl sm:max-h-72
+          ">
+            <div className="p-2.5 sm:p-2 border-b border-brand-dark-5 bg-brand-dark-3 flex items-center gap-2">
+              <div className="relative flex-1">
+                <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-500" />
+                <input 
+                  ref={inputRef}
+                  type="text"
+                  className="w-full bg-brand-dark-4 border border-brand-dark-5 rounded-lg pl-8 pr-2 py-2 sm:py-1.5 text-sm sm:text-xs text-white placeholder-gray-500 focus:outline-none focus:border-brand-blue/50 transition-all font-medium"
+                  placeholder="Pesquisar serviço..."
+                  value={busca}
+                  onChange={e => setBusca(e.target.value)}
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => setAberto(false)}
+                className="p-1.5 text-gray-400 hover:text-white rounded-lg hover:bg-brand-dark-4 sm:hidden shrink-0"
+                title="Fechar"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="max-h-[60vh] sm:max-h-64 overflow-y-auto">
+              {servicosFiltrados.length === 0 ? (
+                <div className="p-4 text-center">
+                  <p className="text-xs text-gray-500">
+                    {busca ? 'Nenhum serviço encontrado.' : 'Nenhum serviço cadastrado.'}
+                  </p>
+                </div>
+              ) : (
+                servicosFiltrados.map(s => (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => {
+                      onSelecionar(s);
+                      setAberto(false);
+                    }}
+                    className="w-full text-left px-3.5 py-3 sm:py-2.5 text-xs sm:text-sm text-gray-200 hover:bg-brand-blue/20 hover:text-white transition-colors border-b border-brand-dark-5/50 last:border-0"
+                  >
+                    <div className="flex justify-between items-center gap-3">
+                      <span className="leading-snug break-words flex-1 font-medium">{s.nome}</span>
+                      <span className="text-[11px] sm:text-[10px] bg-brand-dark-4 px-2 py-0.5 rounded text-brand-green font-bold shrink-0">
+                        {formatarMoeda(s.valorPadrao)}
+                      </span>
+                    </div>
+                  </button>
+                ))
+              )}
             </div>
           </div>
-          <div className="max-h-64 overflow-y-auto">
-            {servicosFiltrados.length === 0 ? (
-              <div className="p-4 text-center">
-                <p className="text-xs text-gray-500">
-                  {busca ? 'Nenhum serviço encontrado.' : 'Nenhum serviço cadastrado.'}
-                </p>
-              </div>
-            ) : (
-              servicosFiltrados.map(s => (
-                <button
-                  key={s.id}
-                  type="button"
-                  onClick={() => { onSelecionar(s); }}
-                  className="w-full text-left px-3 py-2.5 text-xs text-gray-200 hover:bg-brand-blue/20 transition-colors border-b border-brand-dark-5/50 last:border-0 flex justify-between items-center"
-                >
-                  <span className="truncate pr-2">{s.nome}</span>
-                  <span className="text-brand-green font-bold flex-shrink-0">{formatarMoeda(s.valorPadrao)}</span>
-                </button>
-              ))
-            )}
-          </div>
-        </div>
+        </>
       )}
     </div>
   );

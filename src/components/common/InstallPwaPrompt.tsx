@@ -82,7 +82,7 @@ export function InstallPwaPrompt() {
   if (!visivel) return null;
 
   return (
-    <div className="fixed bottom-4 left-4 right-4 z-[200] animate-slide-up">
+    <div className="fixed bottom-20 sm:bottom-4 left-4 right-4 z-[200] animate-slide-up">
       <div className="bg-brand-dark-2 border border-brand-blue/30 rounded-2xl shadow-2xl p-4 max-w-sm mx-auto">
         {/* Header */}
         <div className="flex items-start justify-between mb-3">

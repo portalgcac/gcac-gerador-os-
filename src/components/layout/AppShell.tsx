@@ -403,7 +403,7 @@ export function AppShell() {
           </div>
         )}
 
-        <div className="p-4 sm:p-6 pb-24 sm:pb-6 min-h-[calc(100vh-4rem)] flex flex-col justify-between">
+        <div className="p-3 sm:p-6 pb-32 sm:pb-8 min-h-[calc(100vh-4rem)] flex flex-col justify-between">
           <div className="flex-grow">
             <Outlet />
           </div>

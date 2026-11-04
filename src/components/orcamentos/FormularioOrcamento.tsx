@@ -52,6 +52,7 @@ function SeletorServico({ onSelecionar }: { onSelecionar: (s: ServicoConfig) => 
 
   const handleSelecionar = (servico: ServicoConfig) => {
     onSelecionar(servico);
+    setAberto(false);
   };
 
   const servicosFiltrados = servicos.filter(s => 
@@ -63,7 +64,7 @@ function SeletorServico({ onSelecionar }: { onSelecionar: (s: ServicoConfig) => 
       <button
         type="button"
         onClick={() => setAberto(a => !a)}
-        className="flex items-center gap-2 px-3 py-2 rounded-lg bg-brand-dark-5 border border-brand-dark-5 hover:border-brand-blue/40 hover:bg-brand-blue/10 text-gray-300 hover:text-brand-blue-light text-sm font-medium transition-all"
+        className="flex items-center gap-2 px-3 py-2 rounded-lg bg-brand-dark-5 border border-brand-dark-5 hover:border-brand-blue/40 hover:bg-brand-blue/10 text-gray-300 hover:text-brand-blue-light text-xs sm:text-sm font-medium transition-all"
       >
         <List size={14} />
         Adicionar serviço
@@ -71,55 +72,78 @@ function SeletorServico({ onSelecionar }: { onSelecionar: (s: ServicoConfig) => 
       </button>
 
       {aberto && (
-        <div className="absolute right-0 top-full mt-1 z-50 w-72 bg-brand-dark-2 border border-brand-dark-5 rounded-xl shadow-2xl overflow-hidden animate-fade-in">
-          <div className="p-2 border-b border-brand-dark-5 bg-brand-dark-3">
-            <div className="relative">
-              <Search size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500" />
-              <input 
-                ref={inputRef}
-                type="text"
-                className="w-full bg-brand-dark-4 border border-brand-dark-5 rounded-lg pl-7 pr-2 py-1.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-brand-blue/50 transition-all font-medium"
-                placeholder="Pesquisar serviço..."
-                value={busca}
-                onChange={e => setBusca(e.target.value)}
-              />
+        <>
+          {/* Backdrop no mobile para fechar ao tocar fora e evitar vazamento */}
+          <div
+            className="fixed inset-0 bg-black/70 backdrop-blur-xs z-50 sm:hidden"
+            onClick={() => setAberto(false)}
+          />
+
+          {/* Menu Dropdown com auto-ajuste inteligente para qualquer resolução de celular */}
+          <div className="
+            fixed inset-x-3 top-20 z-50 max-h-[75vh] flex flex-col bg-brand-dark-2 border border-brand-dark-5 rounded-2xl shadow-2xl overflow-hidden animate-scale-up
+            sm:absolute sm:inset-auto sm:right-0 sm:top-full sm:mt-1 sm:w-80 sm:rounded-xl sm:max-h-72
+          ">
+            <div className="p-2.5 sm:p-2 border-b border-brand-dark-5 bg-brand-dark-3 flex items-center gap-2">
+              <div className="relative flex-1">
+                <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-500" />
+                <input 
+                  ref={inputRef}
+                  type="text"
+                  className="w-full bg-brand-dark-4 border border-brand-dark-5 rounded-lg pl-8 pr-2 py-2 sm:py-1.5 text-sm sm:text-xs text-white placeholder-gray-500 focus:outline-none focus:border-brand-blue/50 transition-all font-medium"
+                  placeholder="Pesquisar serviço..."
+                  value={busca}
+                  onChange={e => setBusca(e.target.value)}
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => setAberto(false)}
+                className="p-1.5 text-gray-400 hover:text-white rounded-lg hover:bg-brand-dark-4 sm:hidden shrink-0"
+                title="Fechar"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="max-h-[60vh] sm:max-h-64 overflow-y-auto">
+              {servicosFiltrados.length === 0 ? (
+                <div className="p-4 text-center">
+                  <p className="text-xs text-gray-500 mb-2">
+                    {busca ? 'Nenhum serviço encontrado.' : 'Nenhum serviço cadastrado.'}
+                  </p>
+                  {!busca && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAberto(false);
+                        navigate('/configuracoes');
+                      }}
+                      className="text-xs text-brand-blue-light hover:underline"
+                    >
+                      Cadastrar em Configurações
+                    </button>
+                  )}
+                </div>
+              ) : (
+                servicosFiltrados.map((servico) => (
+                  <button
+                    key={servico.id}
+                    type="button"
+                    onClick={() => handleSelecionar(servico)}
+                    className="w-full text-left px-3.5 py-3 sm:py-2.5 text-xs sm:text-sm text-gray-200 hover:bg-brand-blue/20 hover:text-white transition-colors border-b border-brand-dark-5/50 last:border-0"
+                  >
+                    <div className="flex justify-between items-center gap-3">
+                      <span className="leading-snug break-words flex-1 font-medium">{servico.nome}</span>
+                      <span className="text-[11px] sm:text-[10px] bg-brand-dark-4 px-2 py-0.5 rounded text-brand-green font-bold shrink-0">
+                        R$ {servico.valorPadrao.toFixed(2).replace('.', ',')}
+                      </span>
+                    </div>
+                  </button>
+                ))
+              )}
             </div>
           </div>
-          <div className="max-h-64 overflow-y-auto">
-            {servicosFiltrados.length === 0 ? (
-              <div className="p-4 text-center">
-                <p className="text-xs text-gray-500 mb-2">
-                  {busca ? 'Nenhum serviço encontrado.' : 'Nenhum serviço cadastrado.'}
-                </p>
-                {!busca && (
-                  <button
-                    type="button"
-                    onClick={() => navigate('/configuracoes')}
-                    className="text-xs text-brand-blue-light hover:underline"
-                  >
-                    Cadastrar em Configurações
-                  </button>
-                )}
-              </div>
-            ) : (
-              servicosFiltrados.map((servico) => (
-                <button
-                  key={servico.id}
-                  type="button"
-                  onClick={() => handleSelecionar(servico)}
-                  className="w-full text-left px-3 py-2.5 text-sm text-gray-200 hover:bg-brand-blue/20 hover:text-white transition-colors border-b border-brand-dark-5/50 last:border-0"
-                >
-                  <div className="flex justify-between items-start gap-2">
-                    <span className="pr-2 leading-relaxed">{servico.nome}</span>
-                    <span className="text-[10px] bg-brand-dark-4 px-1.5 py-0.5 rounded text-brand-green flex-shrink-0 mt-0.5">
-                      R$ {servico.valorPadrao.toFixed(2).replace('.', ',')}
-                    </span>
-                  </div>
-                </button>
-              ))
-            )}
-          </div>
-        </div>
+        </>
       )}
     </div>
   );
@@ -757,14 +781,14 @@ export function FormularioOrcamento({ orcamentoExistente }: FormularioOrcamentoP
         </h3>
         
         <div className="flex flex-col md:flex-row gap-6 justify-between items-start md:items-center p-4 bg-brand-dark-2 rounded-xl border border-brand-dark-5 mb-5">
-          <div className="flex flex-col sm:flex-row items-center gap-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6 w-full md:w-auto">
             <div className="space-y-1 text-left sm:text-right">
               <p className="text-[10px] font-bold text-gray-500 uppercase">Honorários (Caixa): <span className="text-white ml-1">{formatarMoeda(form.servicos.filter(s => !s.pagoDireto).reduce((acc, s) => acc + (s.valor || 0), 0))}</span></p>
               <p className="text-[10px] font-bold text-amber-500 uppercase">Laudos (Terceiros): <span className="text-white ml-1">{formatarMoeda(form.servicos.filter(s => s.pagoDireto).reduce((acc, s) => acc + (s.valor || 0), 0))}</span></p>
             </div>
             <div>
               <p className="text-sm font-medium text-gray-400">Total faturado no Caixa</p>
-              <p className="text-3xl font-black text-brand-green">{formatarMoeda(form.valorTotal)}</p>
+              <p className="text-2xl sm:text-3xl font-black text-brand-green">{formatarMoeda(form.valorTotal)}</p>
               <p className="text-[10px] font-bold text-gray-500 uppercase mt-1">
                 Total Geral (Investimento Cliente): {formatarMoeda(form.servicos.reduce((acc, s) => acc + (s.valor || 0), 0))}
               </p>
@@ -773,13 +797,13 @@ export function FormularioOrcamento({ orcamentoExistente }: FormularioOrcamentoP
           
           <div className="w-full md:w-auto">
             <label className="text-sm font-medium text-gray-400 block mb-2 text-left md:text-right">Status Atual</label>
-            <div className="flex gap-2">
+            <div className="grid grid-cols-3 gap-2 w-full sm:flex sm:w-auto">
               {['Pendente', 'Aprovado', 'Recusado'].map((s) => (
                 <button
                   key={s}
                   type="button"
                   onClick={() => atualizar('status', s)}
-                  className={`px-4 py-2 text-sm font-semibold rounded-lg transition-colors border ${
+                  className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-semibold rounded-lg transition-colors border text-center ${
                     form.status === s 
                     ? s === 'Aprovado' ? 'bg-brand-green/20 text-brand-green border-brand-green/50'
                       : s === 'Recusado' ? 'bg-red-500/20 text-red-400 border-red-500/50'
@@ -802,17 +826,15 @@ export function FormularioOrcamento({ orcamentoExistente }: FormularioOrcamentoP
         </div>
       </div>
 
-      {/* ── Botões Abaixo ── */}
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-brand-dark-2 border-t border-brand-dark-5 z-40 sm:static sm:bg-transparent sm:border-0 sm:p-0">
-        <div className="flex gap-3 max-w-2xl mx-auto">
-          <button type="button" onClick={() => navigate(-1)} className="btn-ghost flex-1 py-3 text-base">
-            <X size={18} />Cancelar
-          </button>
-          <button type="submit" disabled={salvando} className="btn-primary flex-1 py-3 text-base bg-brand-green border-brand-green/60 hover:bg-brand-green/90 text-white shadow-[0_0_15px_rgba(109,190,69,0.3)]">
-            <Save size={18} />
-            {salvando ? 'Salvando...' : orcamentoExistente ? 'Atualizar Orçamento' : 'Salvar Orçamento'}
-          </button>
-        </div>
+      {/* ── Botões Abaixo (Fluxo natural, visível e acessível em qualquer tela) ── */}
+      <div className="mt-6 flex gap-3 pb-8 sm:pb-4 max-w-2xl mx-auto w-full">
+        <button type="button" onClick={() => navigate(-1)} className="btn-ghost flex-1 py-3 text-sm sm:text-base">
+          <X size={18} />Cancelar
+        </button>
+        <button type="submit" disabled={salvando} className="btn-primary flex-1 py-3 text-sm sm:text-base bg-brand-green border-brand-green/60 hover:bg-brand-green/90 text-white shadow-[0_0_15px_rgba(109,190,69,0.3)]">
+          <Save size={18} />
+          {salvando ? 'Salvando...' : orcamentoExistente ? 'Atualizar Orçamento' : 'Salvar Orçamento'}
+        </button>
       </div>
 
       <Notificacao {...notif} onFechar={fechar} />
