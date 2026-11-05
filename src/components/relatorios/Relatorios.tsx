@@ -31,7 +31,7 @@ import { useClientes } from '../../context/ClientesContext';
 import { useFinanceiro, CATEGORIAS_DESPESA } from '../../context/FinanceiroContext';
 import { useServicos } from '../../context/ServicosContext';
 import { buscarAlertasGlobais, buscarAlertasCacsVinculados } from '../../services/vencimentosService';
-import { formatarMoeda, formatarData, formatarCPF, formatarTelefone } from '../../utils/formatters';
+import { formatarMoeda, formatarData, formatarCPF, formatarTelefone, padronizarNomeServico, normalizarChaveServico, stemChaveServico } from '../../utils/formatters';
 import { 
   format, 
   parseISO, 
@@ -160,18 +160,38 @@ export function Relatorios() {
     return Array.from(nomes).sort();
   }, [ordens]);
 
-  // Obter lista única de nomes de serviços registrados nas OSs
+  // Obter lista única de nomes de serviços padronizados com base em "Gerenciar Serviços e Taxas"
   const listaNomesServicos = useMemo(() => {
-    const nomes = new Set<string>();
+    const mapCanonicalPorStem = new Map<string, string>();
+    const ordemFinal = new Set<string>();
+
+    // 1. Prioridade máxima: Serviços oficiais cadastrados em "Gerenciar Serviços e Taxas"
+    (servicosCatalog || []).forEach(sc => {
+      if (sc.nome && sc.nome.trim()) {
+        const canonical = sc.nome.trim();
+        const stem = stemChaveServico(canonical);
+        mapCanonicalPorStem.set(stem, canonical);
+        ordemFinal.add(canonical);
+      }
+    });
+
+    // 2. Serviços registrados nas OSs: padroniza contra o catálogo para eliminar duplicatas
+    // (ex: "TRANSFERENCIA ENTRE ACERVO", "TRANSFERÊNCIA ENTRE ACERVO", "TRANSFERÊNCIA ENTRE ACERVOS")
     ordens.forEach(o => {
       o.servicos?.forEach(s => {
-        if (s.nome) {
-          nomes.add(s.nome.trim());
+        if (s.nome && s.nome.trim()) {
+          const padronizado = padronizarNomeServico(s.nome, servicosCatalog);
+          const stem = stemChaveServico(padronizado);
+          if (!mapCanonicalPorStem.has(stem)) {
+            mapCanonicalPorStem.set(stem, padronizado);
+            ordemFinal.add(padronizado);
+          }
         }
       });
     });
-    return Array.from(nomes).sort();
-  }, [ordens]);
+
+    return Array.from(ordemFinal).sort((a, b) => a.localeCompare(b, 'pt-BR', { sensitivity: 'base' }));
+  }, [ordens, servicosCatalog]);
 
   // Manipular alteração de presets de data
   const handlePresetChange = (preset: PeriodoPreset) => {
@@ -299,7 +319,10 @@ export function Relatorios() {
 
       // 6. Filtro de Tipos de Serviço (Se vazio, ignora o filtro)
       if (filtroNomesServicos.length > 0) {
-        const temServicoTipo = o.servicos?.some(s => filtroNomesServicos.includes(s.nome?.trim() || ''));
+        const temServicoTipo = o.servicos?.some(s => {
+          const nomePadrao = padronizarNomeServico(s.nome, servicosCatalog);
+          return filtroNomesServicos.includes(nomePadrao);
+        });
         if (!temServicoTipo) return false;
       }
 
@@ -433,12 +456,16 @@ export function Relatorios() {
     return transacoes.sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime());
   }, [ordens, despesas, intervalFiltro, incluirEntradas, incluirSaidas, filtroFormaPagamento, filtroCategoriaDespesa]);
 
-  // Mapa de taxas padrão por nome de serviço cadastrado
+  // Mapa de taxas padrão por nome de serviço cadastrado (com chaves normalizadas)
   const catalogTaxaMap = useMemo(() => {
     const map: Record<string, number> = {};
     (servicosCatalog || []).forEach(sc => {
       if (sc.nome && typeof sc.taxaPF === 'number') {
         map[sc.nome.trim()] = sc.taxaPF;
+        const norm = normalizarChaveServico(sc.nome);
+        if (norm) map[norm] = sc.taxaPF;
+        const stem = stemChaveServico(sc.nome);
+        if (stem) map[stem] = sc.taxaPF;
       }
     });
     return map;
@@ -488,14 +515,14 @@ export function Relatorios() {
       const ehPago = o.status === 'Pago' || o.status === 'Parcialmente Pago';
 
       (o.servicos || []).forEach(s => {
-        const nomeServ = s.nome?.trim() || 'Serviço Não Identificado';
+        const nomeServ = padronizarNomeServico(s.nome, servicosCatalog) || 'Serviço Não Identificado';
         if (!map[nomeServ]) {
           map[nomeServ] = { nome: nomeServ, count: 0, bruto: 0, taxas: 0, liquido: 0 };
         }
 
         const servVal = (s.valor !== undefined && s.valor > 0) ? s.valor : (valorOS / (o.servicos.length || 1));
         const brutoProp = valorOS > 0 ? (servVal / valorOS) * valorPagoOS : servVal;
-        const taxaProp = ehPago ? (Number(s.taxaPF) || catalogTaxaMap[s.nome?.trim() || ''] || 0) : 0;
+        const taxaProp = ehPago ? (Number(s.taxaPF) || catalogTaxaMap[nomeServ] || 0) : 0;
         const liquidoProp = brutoProp - taxaProp;
 
         map[nomeServ].count += 1;
@@ -539,7 +566,8 @@ export function Relatorios() {
       ordensPagasNoPeriodo.forEach(o => {
         let taxaOS = Number(o.taxaPFTotal) || 0;
         const sumServ = (o.servicos || []).reduce((acc, s) => {
-          const t = Number(s.taxaPF) || catalogTaxaMap[s.nome?.trim() || ''] || 0;
+          const nomeServ = padronizarNomeServico(s.nome, servicosCatalog);
+          const t = Number(s.taxaPF) || catalogTaxaMap[nomeServ] || 0;
           return acc + t;
         }, 0);
         taxaOS = Math.max(taxaOS, sumServ);
@@ -831,7 +859,7 @@ export function Relatorios() {
         'Valor Pago': o.valorPago,
         'Status Financeiro': o.status,
         'Canal Atendimento': o.canalAtendimento || '',
-        'Serviços': o.servicos?.map(s => `${s.nome} (${s.statusExecucao || 'N/I'})`).join(' | ') || ''
+        'Serviços': o.servicos?.map(s => `${padronizarNomeServico(s.nome, servicosCatalog)} (${s.statusExecucao || 'N/I'})`).join(' | ') || ''
       }));
       const wsDet = XLSX.utils.json_to_sheet(detalheOS);
       XLSX.utils.book_append_sheet(wb, wsDet, 'Listagem OS');
@@ -853,7 +881,7 @@ export function Relatorios() {
       XLSX.utils.book_append_sheet(wb, wsRes, 'Resumo Financeiro');
 
       const servicosDet = servicosBreakdown.map(s => ({
-        'Serviço Prestado': s.nome,
+        'Serviço Prestado': padronizarNomeServico(s.nome, servicosCatalog),
         'Quantidade': s.count,
         'Faturamento Bruto (R$)': s.bruto,
         'Taxas PF / GRU (R$)': s.taxas,
@@ -2061,8 +2089,8 @@ export function Relatorios() {
                               {o.status}
                             </span>
                           </td>
-                          <td className="px-4 py-2.5 text-[10px] text-gray-400 max-w-[200px] truncate print:max-w-none print:whitespace-normal print:break-words print:text-black" title={o.servicos?.map(s => s.nome).join(', ')}>
-                            {o.servicos?.map(s => s.nome).join(', ')}
+                          <td className="px-4 py-2.5 text-[10px] text-gray-400 max-w-[200px] truncate print:max-w-none print:whitespace-normal print:break-words print:text-black" title={o.servicos?.map(s => padronizarNomeServico(s.nome, servicosCatalog)).join(', ')}>
+                            {o.servicos?.map(s => padronizarNomeServico(s.nome, servicosCatalog)).join(', ')}
                           </td>
                         </tr>
                       ))

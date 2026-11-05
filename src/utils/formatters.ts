@@ -493,6 +493,91 @@ export function ehServicoTransferenciaAcervo(nome: string): boolean {
   return n.includes('transferencia entre acervo') || n.includes('mudanca de acervo');
 }
 
+export function normalizarChaveServico(str: string): string {
+  if (!str) return '';
+  return str
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+export function stemChaveServico(str: string): string {
+  const norm = normalizarChaveServico(str);
+  if (!norm) return '';
+  return norm
+    .split(' ')
+    .map(w => (w.length > 3 && w.endsWith('s') ? w.slice(0, -1) : w))
+    .join(' ');
+}
+
+/**
+ * Padroniza o nome de um serviço contra a lista oficial de serviços cadastrados em "Gerenciar Serviços e Taxas".
+ * Resolve duplicidades de acentuação (TRANSFERENCIA vs TRANSFERÊNCIA), singular/plural (ACERVO vs ACERVOS)
+ * e variações textuais comuns.
+ */
+export function padronizarNomeServico(
+  nomeRaw: string | undefined | null,
+  catalogo?: ServicoConfig[]
+): string {
+  if (!nomeRaw || !nomeRaw.trim()) return '';
+  const raw = nomeRaw.trim();
+
+  if (!catalogo || catalogo.length === 0) {
+    return raw;
+  }
+
+  const rawLow = raw.toLowerCase();
+
+  // 1. Match exato ou case-insensitive
+  for (const s of catalogo) {
+    if (s.nome && s.nome.trim().toLowerCase() === rawLow) {
+      return s.nome.trim();
+    }
+  }
+
+  // 2. Match normalizado (sem acentos e pontuação)
+  const normRaw = normalizarChaveServico(raw);
+  for (const s of catalogo) {
+    if (s.nome && normalizarChaveServico(s.nome) === normRaw) {
+      return s.nome.trim();
+    }
+  }
+
+  // 3. Match stem (singular e plural, ex: "acervo" vs "acervos")
+  const stemRaw = stemChaveServico(raw);
+  for (const s of catalogo) {
+    if (s.nome && stemChaveServico(s.nome) === stemRaw) {
+      return s.nome.trim();
+    }
+  }
+
+  // 4. Match ignorando parênteses explicativos (ex: "Transferência entre acervos (mudança de acervo)")
+  const semParenRaw = stemChaveServico(raw.replace(/\(.*?\)/g, ''));
+  for (const s of catalogo) {
+    if (s.nome) {
+      const semParenCat = stemChaveServico(s.nome.replace(/\(.*?\)/g, ''));
+      if (semParenCat === semParenRaw || semParenCat === stemRaw || semParenRaw === stemChaveServico(s.nome)) {
+        return s.nome.trim();
+      }
+    }
+  }
+
+  // 5. Se o raw começar ou terminar com a chave do catálogo
+  for (const s of catalogo) {
+    if (s.nome) {
+      const stemCat = stemChaveServico(s.nome.replace(/\(.*?\)/g, ''));
+      if (stemCat.length >= 12 && (stemRaw.startsWith(stemCat) || stemCat.startsWith(stemRaw))) {
+        return s.nome.trim();
+      }
+    }
+  }
+
+  return raw;
+}
+
 export function buscarServicoNoCatalogo(
   catalogo: ServicoConfig[],
   termosOuPredicado: string[] | ((nomeNormalizado: string, serv: ServicoConfig) => boolean)
