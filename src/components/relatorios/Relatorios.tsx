@@ -1305,23 +1305,25 @@ export function Relatorios() {
 
           {/* 1. FILTROS DA ABA: ORDENS DE SERVIÇO */}
           {activeTab === 'ordens' && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-4">
               
               {/* Status Financeiro */}
-              <div className="space-y-2">
+              <div className="space-y-2 col-span-1 sm:col-span-1 lg:col-span-2 flex flex-col">
                 <label className="text-gray-400 font-bold uppercase block text-[10px] tracking-wider">Status Financeiro</label>
-                <div className="flex flex-col gap-2 bg-brand-dark-4/40 p-3 rounded-xl border border-brand-dark-5/50">
-                  {STATUS_OS.map(status => (
-                    <label key={status} className="flex items-center gap-2 cursor-pointer text-xs text-gray-300 hover:text-white select-none">
-                      <input
-                        type="checkbox"
-                        checked={filtroStatusOS.includes(status)}
-                        onChange={() => handleToggleFiltroStatusOS(status)}
-                        className="rounded border-brand-dark-5 bg-brand-dark-4 text-brand-blue focus:ring-0 w-3.5 h-3.5 cursor-pointer"
-                      />
-                      <span className="font-semibold uppercase tracking-tight">{status}</span>
-                    </label>
-                  ))}
+                <div className="flex flex-col gap-2 bg-brand-dark-4/40 p-3 rounded-xl border border-brand-dark-5/50 flex-1 justify-between">
+                  <div className="flex flex-col gap-2">
+                    {STATUS_OS.map(status => (
+                      <label key={status} className="flex items-center gap-2 cursor-pointer text-xs text-gray-300 hover:text-white select-none">
+                        <input
+                          type="checkbox"
+                          checked={filtroStatusOS.includes(status)}
+                          onChange={() => handleToggleFiltroStatusOS(status)}
+                          className="rounded border-brand-dark-5 bg-brand-dark-4 text-brand-blue focus:ring-0 w-3.5 h-3.5 cursor-pointer shrink-0"
+                        />
+                        <span className="font-semibold uppercase tracking-tight">{status}</span>
+                      </label>
+                    ))}
+                  </div>
                   <div className="flex gap-2 pt-1.5 border-t border-brand-dark-5/40 mt-1">
                     <button
                       type="button"
@@ -1343,23 +1345,25 @@ export function Relatorios() {
               </div>
 
               {/* Status de Execução */}
-              <div className="space-y-2">
+              <div className="space-y-2 col-span-1 sm:col-span-1 lg:col-span-3 xl:col-span-2 flex flex-col">
                 <label className="text-gray-400 font-bold uppercase block text-[10px] tracking-wider">Status de Execução</label>
-                <div className="flex flex-col gap-2 bg-brand-dark-4/40 p-3 rounded-xl border border-brand-dark-5/50">
-                  {STATUS_EXECUCAO_SERVICO.map(status => (
-                    <label key={status} className="flex items-center gap-2 cursor-pointer text-xs text-gray-300 hover:text-white select-none">
-                      <input
-                        type="checkbox"
-                        checked={filtroExecOS.includes(status)}
-                        onChange={() => handleToggleFiltroExecOS(status)}
-                        className="rounded border-brand-dark-5 bg-brand-dark-4 text-brand-blue focus:ring-0 w-3.5 h-3.5 cursor-pointer"
-                      />
-                      <span className="font-semibold uppercase tracking-tight text-left">
-                        {status === 'Iniciado — Montando Processo' ? 'Iniciado' : 
-                         status === 'Protocolado — Ag. PF' ? 'Protocolado' : status}
-                      </span>
-                    </label>
-                  ))}
+                <div className="flex flex-col gap-2 bg-brand-dark-4/40 p-3 rounded-xl border border-brand-dark-5/50 flex-1 justify-between">
+                  <div className="flex flex-col gap-2">
+                    {STATUS_EXECUCAO_SERVICO.map(status => (
+                      <label key={status} className="flex items-start gap-2 cursor-pointer text-xs text-gray-300 hover:text-white select-none">
+                        <input
+                          type="checkbox"
+                          checked={filtroExecOS.includes(status)}
+                          onChange={() => handleToggleFiltroExecOS(status)}
+                          className="mt-0.5 rounded border-brand-dark-5 bg-brand-dark-4 text-brand-blue focus:ring-0 w-3.5 h-3.5 cursor-pointer shrink-0"
+                        />
+                        <span className="font-semibold uppercase tracking-tight text-left leading-tight break-words">
+                          {status === 'Iniciado — Montando Processo' ? 'Iniciado' : 
+                           status === 'Protocolado — Ag. PF' ? 'Protocolado' : status}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
                   <div className="flex gap-2 pt-1.5 border-t border-brand-dark-5/40 mt-1">
                     <button
                       type="button"
@@ -1381,63 +1385,109 @@ export function Relatorios() {
               </div>
 
               {/* Tipos de Serviços */}
-              <div className="space-y-2">
-                <label className="text-gray-400 font-bold uppercase block text-[10px] tracking-wider">Tipos de Serviços</label>
-                <div className="flex flex-col gap-2 bg-brand-dark-4/40 p-3 rounded-xl border border-brand-dark-5/50 max-h-36 overflow-y-auto custom-scrollbar">
-                  {listaNomesServicos.length === 0 ? (
-                    <span className="text-[10px] text-gray-500 italic">Nenhum serviço registrado</span>
-                  ) : (
-                    listaNomesServicos.map(nome => (
-                      <label key={nome} className="flex items-center gap-2 cursor-pointer text-xs text-gray-300 hover:text-white select-none">
-                        <input
-                          type="checkbox"
-                          checked={filtroNomesServicos.includes(nome)}
-                          onChange={() => handleToggleFiltroNomesServicos(nome)}
-                          className="rounded border-brand-dark-5 bg-brand-dark-4 text-brand-blue focus:ring-0 w-3.5 h-3.5 cursor-pointer"
-                        />
-                        <span className="font-semibold uppercase tracking-tight truncate max-w-[140px]" title={nome}>
-                          {nome}
-                        </span>
-                      </label>
-                    ))
-                  )}
+              <div className="space-y-2 col-span-1 sm:col-span-2 lg:col-span-4 xl:col-span-4 flex flex-col">
+                <div className="flex items-center justify-between">
+                  <label className="text-gray-400 font-bold uppercase block text-[10px] tracking-wider">
+                    Tipos de Serviços
+                    {filtroNomesServicos.length > 0 && (
+                      <span className="ml-1 text-brand-blue-light font-bold">
+                        ({filtroNomesServicos.length})
+                      </span>
+                    )}
+                  </label>
                   {listaNomesServicos.length > 0 && (
-                    <div className="flex gap-2 pt-1.5 border-t border-brand-dark-5/40 mt-1 mt-auto">
+                    <div className="flex items-center gap-1.5 text-[9px] font-black uppercase">
                       <button
                         type="button"
                         onClick={() => setFiltroNomesServicos([...listaNomesServicos])}
-                        className="text-[9px] font-black uppercase text-brand-blue-light hover:underline"
+                        className="text-brand-blue-light hover:underline"
                       >
                         Todos
                       </button>
-                      <span className="text-gray-600 text-[9px] font-bold">|</span>
+                      <span className="text-gray-600 font-bold">|</span>
                       <button
                         type="button"
                         onClick={() => setFiltroNomesServicos([])}
-                        className="text-[9px] font-black uppercase text-red-400 hover:underline"
+                        className="text-red-400 hover:underline"
                       >
                         Nenhum
                       </button>
                     </div>
                   )}
                 </div>
+
+                <div className="flex-1 flex flex-col bg-brand-dark-4/40 p-2.5 rounded-xl border border-brand-dark-5/50 min-h-[180px] max-h-64 justify-between">
+                  <div className="flex flex-col gap-1.5 overflow-y-auto custom-scrollbar pr-1.5 flex-1">
+                    {listaNomesServicos.length === 0 ? (
+                      <span className="text-[10px] text-gray-500 italic py-2">Nenhum serviço registrado</span>
+                    ) : (
+                      listaNomesServicos.map(nome => {
+                        const isChecked = filtroNomesServicos.includes(nome);
+                        return (
+                          <label
+                            key={nome}
+                            className={`flex items-start gap-2.5 cursor-pointer text-xs rounded-lg px-2 py-1.5 select-none transition-colors ${
+                              isChecked ? 'bg-brand-blue/15 text-white border border-brand-blue/30' : 'text-gray-300 hover:text-white hover:bg-brand-dark-5/40 border border-transparent'
+                            }`}
+                            title={nome}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => handleToggleFiltroNomesServicos(nome)}
+                              className="mt-0.5 rounded border-brand-dark-5 bg-brand-dark-4 text-brand-blue focus:ring-0 w-3.5 h-3.5 cursor-pointer shrink-0"
+                            />
+                            <span className="font-semibold uppercase tracking-tight text-[11px] leading-snug break-words whitespace-normal flex-1">
+                              {nome}
+                            </span>
+                          </label>
+                        );
+                      })
+                    )}
+                  </div>
+
+                  {listaNomesServicos.length > 0 && (
+                    <div className="flex items-center justify-between pt-2 border-t border-brand-dark-5/40 mt-1 shrink-0 text-[9px] text-gray-400 px-1">
+                      <span>Total: <strong className="text-gray-200">{listaNomesServicos.length}</strong></span>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setFiltroNomesServicos([...listaNomesServicos])}
+                          className="font-black uppercase text-brand-blue-light hover:underline"
+                        >
+                          Marcar Todos
+                        </button>
+                        <span className="text-gray-600 font-bold">|</span>
+                        <button
+                          type="button"
+                          onClick={() => setFiltroNomesServicos([])}
+                          className="font-black uppercase text-red-400 hover:underline"
+                        >
+                          Desmarcar Todos
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Canal Atendimento */}
-              <div className="space-y-2">
+              <div className="space-y-2 col-span-1 sm:col-span-1 lg:col-span-3 xl:col-span-2 flex flex-col">
                 <label className="text-gray-400 font-bold uppercase block text-[10px] tracking-wider">Canal Atendimento</label>
-                <div className="flex flex-col gap-2 bg-brand-dark-4/40 p-3 rounded-xl border border-brand-dark-5/50">
-                  {['WhatsApp', 'Presencial', 'Ligação', 'E-mail', 'Outro'].map(canal => (
-                    <label key={canal} className="flex items-center gap-2 cursor-pointer text-xs text-gray-300 hover:text-white select-none">
-                      <input
-                        type="checkbox"
-                        checked={filtroCanalOS.includes(canal)}
-                        onChange={() => handleToggleFiltroCanalOS(canal)}
-                        className="rounded border-brand-dark-5 bg-brand-dark-4 text-brand-blue focus:ring-0 w-3.5 h-3.5 cursor-pointer"
-                      />
-                      <span className="font-semibold uppercase tracking-tight">{canal}</span>
-                    </label>
-                  ))}
+                <div className="flex flex-col gap-2 bg-brand-dark-4/40 p-3 rounded-xl border border-brand-dark-5/50 flex-1 justify-between">
+                  <div className="flex flex-col gap-2">
+                    {['WhatsApp', 'Presencial', 'Ligação', 'E-mail', 'Outro'].map(canal => (
+                      <label key={canal} className="flex items-center gap-2 cursor-pointer text-xs text-gray-300 hover:text-white select-none">
+                        <input
+                          type="checkbox"
+                          checked={filtroCanalOS.includes(canal)}
+                          onChange={() => handleToggleFiltroCanalOS(canal)}
+                          className="rounded border-brand-dark-5 bg-brand-dark-4 text-brand-blue focus:ring-0 w-3.5 h-3.5 cursor-pointer shrink-0"
+                        />
+                        <span className="font-semibold uppercase tracking-tight">{canal}</span>
+                      </label>
+                    ))}
+                  </div>
                   <div className="flex gap-2 pt-1.5 border-t border-brand-dark-5/40 mt-1">
                     <button
                       type="button"
@@ -1459,7 +1509,7 @@ export function Relatorios() {
               </div>
 
               {/* Responsável e Informação */}
-              <div className="space-y-3">
+              <div className="space-y-3 col-span-1 sm:col-span-1 lg:col-span-12 xl:col-span-2 flex flex-col justify-between">
                 <div className="space-y-2">
                   <label className="text-gray-400 font-bold uppercase block text-[10px] tracking-wider">Responsável pelo Serviço</label>
                   <select
@@ -1561,7 +1611,7 @@ export function Relatorios() {
                         onChange={() => handleToggleCategoriaDespesa(cat)}
                         className="rounded border-brand-dark-5 bg-brand-dark-4 text-brand-blue focus:ring-0 w-3.5 h-3.5 cursor-pointer"
                       />
-                      <span className="font-semibold uppercase tracking-tight truncate max-w-[150px]" title={cat}>{cat}</span>
+                      <span className="font-semibold uppercase tracking-tight break-words whitespace-normal text-xs" title={cat}>{cat}</span>
                     </label>
                   ))}
                   <div className="flex gap-2 pt-1.5 border-t border-brand-dark-5/40 mt-1">
@@ -1785,7 +1835,7 @@ export function Relatorios() {
                           onChange={() => handleToggleNivelAlerta(nivel.key)}
                           className="rounded border-brand-dark-5 bg-brand-dark-4 text-brand-blue focus:ring-0 w-3.5 h-3.5 cursor-pointer"
                         />
-                        <span className="font-semibold uppercase tracking-tight truncate max-w-[120px]" title={nivel.label}>{nivel.label}</span>
+                        <span className="font-semibold uppercase tracking-tight break-words whitespace-normal text-xs" title={nivel.label}>{nivel.label}</span>
                       </label>
                     ))}
                   </div>
