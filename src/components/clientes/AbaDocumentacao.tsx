@@ -246,6 +246,7 @@ export function AbaDocumentacao({ cliente, armaIdInicial, cacEmpresaId, podeEdit
             }));
           });
           setGtsPorArma(gtsMap);
+          carregadoUmaVez.current = true;
           setCarregando(false);
           return;
         }
@@ -268,13 +269,14 @@ export function AbaDocumentacao({ cliente, armaIdInicial, cacEmpresaId, podeEdit
     } catch (err) {
       console.error('Erro ao carregar documentos:', err);
     } finally {
+      carregadoUmaVez.current = true;
       setCarregando(false);
     }
   }, [buscarArmas, buscarGts, buscarManejos, cacEmpresaId, cliente.id, usuario?.empresaId]);
 
   useEffect(() => {
     carregarDados();
-  }, [carregarDados]);
+  }, [cliente.id, cacEmpresaId, carregarDados]);
 
   const armasTiro = useMemo(() => (armas || []).filter(a => categorizarTipoAcervo(a.acervo) === 'tiro'), [armas]);
   const armasCaca = useMemo(() => (armas || []).filter(a => categorizarTipoAcervo(a.acervo) === 'caca'), [armas]);

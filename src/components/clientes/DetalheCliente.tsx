@@ -55,6 +55,8 @@ export function DetalheCliente({ cliente }: DetalheClienteProps) {
   const [alertasCount, setAlertasCount] = useState<number>(0);
   const [isUsuarioPortal, setIsUsuarioPortal] = useState<boolean | undefined>(undefined);
   const [mostrarPromptCR, setMostrarPromptCR] = useState(false);
+  const sincronizadoPortalClienteIdRef = React.useRef<string | null>(null);
+  const sincronizadoResponsabilidadeRef = React.useRef<string | null>(null);
 
   useEffect(() => {
     const temCR = cliente.numeroCr && cliente.numeroCr.trim() !== '';
@@ -238,6 +240,7 @@ export function DetalheCliente({ cliente }: DetalheClienteProps) {
 
     async function sincronizarComPortal() {
       try {
+        if (sincronizadoPortalClienteIdRef.current === cliente.id) return;
         const cpfLimpo = cliente.cpf.replace(/\D/g, '');
         const cpfFormatado = cpfLimpo.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
 
@@ -299,20 +302,20 @@ export function DetalheCliente({ cliente }: DetalheClienteProps) {
 
         // 3. Compara e monta as atualizações
         const mudancas: Partial<Cliente> = {};
-        if (clienteCac.numero_cr && clienteCac.numero_cr !== cliente.numeroCr) mudancas.numeroCr = clienteCac.numero_cr;
-        if (clienteCac.vencimento_cr && clienteCac.vencimento_cr !== cliente.vencimentoCr) mudancas.vencimentoCr = clienteCac.vencimento_cr;
-        if (clienteCac.numero_cr_ibama && clienteCac.numero_cr_ibama !== cliente.numeroCrIbama) mudancas.numeroCrIbama = clienteCac.numero_cr_ibama;
-        if (clienteCac.vencimento_cr_ibama && clienteCac.vencimento_cr_ibama !== cliente.vencimentoCrIbama) mudancas.vencimentoCrIbama = clienteCac.vencimento_cr_ibama;
-        if (clienteCac.foto_url && clienteCac.foto_url !== cliente.fotoUrl) mudancas.fotoUrl = clienteCac.foto_url;
-        if (clienteCac.cr_url && clienteCac.cr_url !== cliente.crUrl) mudancas.crUrl = clienteCac.cr_url;
-        if (clienteCac.cr_ibama_url && clienteCac.cr_ibama_url !== cliente.crIbamaUrl) mudancas.crIbamaUrl = clienteCac.cr_ibama_url;
-        if (clienteCac.endereco && clienteCac.endereco !== cliente.endereco) mudancas.endereco = clienteCac.endereco;
-        if (clienteCac.contato && clienteCac.contato !== cliente.contato) mudancas.contato = clienteCac.contato;
-        if (clienteCac.data_nascimento && clienteCac.data_nascimento !== cliente.dataNascimento) mudancas.dataNascimento = clienteCac.data_nascimento;
+        if (clienteCac.numero_cr && clienteCac.numero_cr.trim() !== (cliente.numeroCr || '').trim()) mudancas.numeroCr = clienteCac.numero_cr;
+        if (clienteCac.vencimento_cr && clienteCac.vencimento_cr !== (cliente.vencimentoCr || '')) mudancas.vencimentoCr = clienteCac.vencimento_cr;
+        if (clienteCac.numero_cr_ibama && clienteCac.numero_cr_ibama.trim() !== (cliente.numeroCrIbama || '').trim()) mudancas.numeroCrIbama = clienteCac.numero_cr_ibama;
+        if (clienteCac.vencimento_cr_ibama && clienteCac.vencimento_cr_ibama !== (cliente.vencimentoCrIbama || '')) mudancas.vencimentoCrIbama = clienteCac.vencimento_cr_ibama;
+        if (clienteCac.foto_url && clienteCac.foto_url !== (cliente.fotoUrl || '')) mudancas.fotoUrl = clienteCac.foto_url;
+        if (clienteCac.cr_url && clienteCac.cr_url !== (cliente.crUrl || '')) mudancas.crUrl = clienteCac.cr_url;
+        if (clienteCac.cr_ibama_url && clienteCac.cr_ibama_url !== (cliente.crIbamaUrl || '')) mudancas.crIbamaUrl = clienteCac.cr_ibama_url;
+        if (clienteCac.endereco && clienteCac.endereco.trim().toUpperCase() !== (cliente.endereco || '').trim().toUpperCase()) mudancas.endereco = clienteCac.endereco;
+        if (clienteCac.contato && clienteCac.contato.replace(/\D/g, '') !== (cliente.contato || '').replace(/\D/g, '')) mudancas.contato = clienteCac.contato;
+        if (clienteCac.data_nascimento && clienteCac.data_nascimento !== (cliente.dataNascimento || '')) mudancas.dataNascimento = clienteCac.data_nascimento;
         if (clienteCac.cr_tiro_desportivo !== undefined && !!clienteCac.cr_tiro_desportivo !== !!cliente.crTiroDesportivo) mudancas.crTiroDesportivo = !!clienteCac.cr_tiro_desportivo;
         if (clienteCac.cr_caca !== undefined && !!clienteCac.cr_caca !== !!cliente.crCaca) mudancas.crCaca = !!clienteCac.cr_caca;
         if (clienteCac.cr_colecionamento !== undefined && !!clienteCac.cr_colecionamento !== !!cliente.crColecionamento) mudancas.crColecionamento = !!clienteCac.cr_colecionamento;
-        if (clienteCac.atirador_nivel !== undefined && clienteCac.atirador_nivel !== cliente.atiradorNivel) mudancas.atiradorNivel = clienteCac.atirador_nivel;
+        if (clienteCac.atirador_nivel !== undefined && (clienteCac.atirador_nivel ?? null) !== (cliente.atiradorNivel ?? null)) mudancas.atiradorNivel = clienteCac.atirador_nivel;
 
         if (Object.keys(mudancas).length > 0) {
           console.log('Sincronizando dados com o Portal GCAC:', mudancas);
@@ -582,6 +585,7 @@ export function DetalheCliente({ cliente }: DetalheClienteProps) {
               await supabase.from('autorizacoes_manejo').insert([payload]);
             }
           }
+          sincronizadoPortalClienteIdRef.current = cliente.id;
         } catch (syncAcervoErr) {
           console.error('Erro ao sincronizar acervo profundo:', syncAcervoErr);
         }
@@ -627,17 +631,23 @@ export function DetalheCliente({ cliente }: DetalheClienteProps) {
           const dataMaisRecente = new Date(maisRecente.atualizado_em);
           const dataLocal = cliente.atualizadoEm ? new Date(cliente.atualizadoEm) : new Date(0);
           
-          if (dataMaisRecente > dataLocal) {
-            const responsavelDiferente = maisRecente.responsavel_id !== cliente.responsavelId;
-            const alertasDiferentes = maisRecente.ignorar_mensagens_alertas !== cliente.ignorarMensagensAlertas;
+          const respMaisRecente = maisRecente.responsavel_id || '';
+          const respLocal = cliente.responsavelId || '';
+          const responsavelDiferente = respMaisRecente !== respLocal;
 
-            if (responsavelDiferente || alertasDiferentes) {
-              console.log('Sincronizando responsabilidade do cliente via CPF com outro despachante:', maisRecente);
-              await atualizarCliente(cliente.id, {
-                responsavelId: maisRecente.responsavel_id,
-                ignorarMensagensAlertas: maisRecente.ignorar_mensagens_alertas
-              });
-            }
+          const alertasMaisRecente = !!maisRecente.ignorar_mensagens_alertas;
+          const alertasLocal = !!cliente.ignorarMensagensAlertas;
+          const alertasDiferentes = alertasMaisRecente !== alertasLocal;
+
+          if (dataMaisRecente > dataLocal && (responsavelDiferente || alertasDiferentes)) {
+            const syncKey = cliente.id + '_' + respMaisRecente + '_' + (alertasMaisRecente ? '1' : '0');
+            if (sincronizadoResponsabilidadeRef.current === syncKey) return;
+            sincronizadoResponsabilidadeRef.current = syncKey;
+            console.log('Sincronizando responsabilidade do cliente via CPF com outro despachante:', maisRecente);
+            await atualizarCliente(cliente.id, {
+              responsavelId: respMaisRecente,
+              ignorarMensagensAlertas: alertasMaisRecente
+            });
           }
         }
       } catch (err) {

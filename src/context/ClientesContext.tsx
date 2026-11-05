@@ -174,6 +174,11 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
   const { usuario, estaAutenticado } = useAuth();
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [carregado, setCarregado] = useState(false);
+  const clientesRef = React.useRef<Cliente[]>(clientes);
+
+  useEffect(() => {
+    clientesRef.current = clientes;
+  }, [clientes]);
 
   const carregarClientes = useCallback(async () => {
     if (!usuario?.empresaId || !estaAutenticado) return;
@@ -864,7 +869,8 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
     }
 
     // 1. Identificar dados do cliente (CPF / Nome) para localizar possíveis vínculos ou cadastros correlatos
-    let clienteAlvo = clientes.find(c => c.id === clienteId);
+    const listaClientes = clientesRef.current;
+    let clienteAlvo = listaClientes.find(c => c.id === clienteId);
     if (!clienteAlvo) {
       try {
         const { data: cliRow } = await supabase
@@ -890,7 +896,7 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
       const nomeNorm = removerAcentos((clienteAlvo.nome || '').trim().toUpperCase().replace(/\s+/g, ' '));
 
       // Incluir outros registros em memória do mesmo cliente (mesmo CPF ou mesmo nome normalizado)
-      clientes.forEach(c => {
+      listaClientes.forEach(c => {
         const cCpf = (c.cpf || '').replace(/\D/g, '');
         const cNome = removerAcentos((c.nome || '').trim().toUpperCase().replace(/\s+/g, ' '));
         if ((cpfLimpo.length >= 11 && cCpf === cpfLimpo) || (nomeNorm.length > 0 && cNome === nomeNorm)) {
@@ -1007,7 +1013,7 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
       crafEmRenovacao: !!row.craf_em_renovacao,
       criadoEm: row.criado_em
     }));
-  }, [usuario, clientes]);
+  }, [usuario?.empresaId]);
 
   const salvarArma = useCallback(async (dados: Partial<Arma> & { clienteId: string }, overrideEmpresaId?: string) => {
     if (!usuario?.empresaId) throw new Error('Usuário não autenticado');
@@ -1173,7 +1179,8 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
       cacEmpresaIds.add(overrideEmpresaId);
     }
 
-    let clienteAlvo = clientes.find(c => c.id === clienteId);
+    const listaClientes = clientesRef.current;
+    let clienteAlvo = listaClientes.find(c => c.id === clienteId);
     if (!clienteAlvo) {
       try {
         const { data: cliRow } = await supabase
@@ -1198,7 +1205,7 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
       const cpfLimpo = (clienteAlvo.cpf || '').replace(/\D/g, '');
       const nomeNorm = removerAcentos((clienteAlvo.nome || '').trim().toUpperCase().replace(/\s+/g, ' '));
 
-      clientes.forEach(c => {
+      listaClientes.forEach(c => {
         const cCpf = (c.cpf || '').replace(/\D/g, '');
         const cNome = removerAcentos((c.nome || '').trim().toUpperCase().replace(/\s+/g, ' '));
         if ((cpfLimpo.length >= 11 && cCpf === cpfLimpo) || (nomeNorm.length > 0 && cNome === nomeNorm)) {
@@ -1290,7 +1297,7 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
       manejoEmRenovacao: !!row.manejo_em_renovacao,
       criadoEm: row.criado_em
     }));
-  }, [usuario, clientes]);
+  }, [usuario?.empresaId]);
 
   const salvarManejo = useCallback(async (dados: Partial<AutorizacaoManejo> & { clienteId: string }, overrideEmpresaId?: string) => {
     if (!usuario?.empresaId) throw new Error('Usuário não autenticado');
