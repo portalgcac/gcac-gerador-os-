@@ -17,7 +17,7 @@ interface OrdensContextType {
   atualizarProtocoloServico: (ordemId: string, servicoId: string, protocolo: string) => Promise<void>;
   deletarOrdem: (id: string) => Promise<void>;
   buscarOrdem: (id: string) => Promise<OrdemDeServico | undefined>;
-  registrarPagamento: (ordemId: string, valor: number, metodo: FormaPagamento) => Promise<void>;
+  registrarPagamento: (ordemId: string, valor: number, metodo: FormaPagamento, dataPagamento?: string) => Promise<void>;
   removerPagamento: (ordemId: string, pagamentoId: string) => Promise<void>;
   sincronizarComPerfil: (ordemId: string) => Promise<boolean>;
   sincronizarOrdem: (ordem: OrdemDeServico) => Promise<boolean>;
@@ -548,15 +548,30 @@ export function OrdensProvider({ children }: { children: React.ReactNode }) {
     return mapFromDB(data);
   }, [usuario]);
 
-  const registrarPagamento = useCallback(async (ordemId: string, valor: number, metodo: FormaPagamento) => {
+  const registrarPagamento = useCallback(async (ordemId: string, valor: number, metodo: FormaPagamento, dataPagamento?: string) => {
     const ordem = ordens.find(o => o.id === ordemId);
     if (!ordem) return;
+
+    let dataFinal = new Date().toISOString();
+    if (dataPagamento) {
+      if (dataPagamento.includes('T')) {
+        dataFinal = dataPagamento;
+      } else {
+        const partes = dataPagamento.split('-');
+        if (partes.length === 3) {
+          const ano = parseInt(partes[0], 10);
+          const mes = parseInt(partes[1], 10) - 1;
+          const dia = parseInt(partes[2], 10);
+          dataFinal = new Date(ano, mes, dia, 12, 0, 0).toISOString();
+        }
+      }
+    }
 
     const novoPagamento = {
       id: crypto.randomUUID(),
       valor,
       metodo,
-      data: new Date().toISOString()
+      data: dataFinal
     };
 
     const novoHistorico = [...(ordem.historicoPagamentos || []), novoPagamento];

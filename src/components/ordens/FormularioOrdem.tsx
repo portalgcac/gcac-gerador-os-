@@ -24,7 +24,9 @@ import {
   removerAcentos,
   gerarItensComboServico,
   buscarServicoNoCatalogo,
-  ehServicoTransferenciaAcervo
+  ehServicoTransferenciaAcervo,
+  extrairDataYMD,
+  formatarParaISO
 } from '../../utils/formatters';
 import { supabase } from '../../db/supabase';
 import { useAuth } from '../../context/AuthContext';
@@ -295,6 +297,8 @@ export function FormularioOrdem({ ordemExistente }: FormularioOrdemProps) {
     desconto:          ordemExistente?.desconto ?? 0,
     descontoTexto:     ordemExistente?.desconto ? String(ordemExistente.desconto).replace('.', ',') : '',
   });
+
+  const [dataPagamentoInput, setDataPagamentoInput] = useState(() => new Date().toISOString().split('T')[0]);
 
   const [clienteSelecionadoId, setClienteSelecionadoId] = useState<string | null>(() => {
     const state = location.state as { clientePreDefinido?: Cliente } | null;
@@ -1728,7 +1732,7 @@ export function FormularioOrdem({ ordemExistente }: FormularioOrdemProps) {
                           id: crypto.randomUUID(),
                           valor: valorAbater,
                           metodo: 'Crédito de Cliente' as FormaPagamento,
-                          data: new Date().toISOString()
+                          data: dataPagamentoInput ? formatarParaISO(dataPagamentoInput) : new Date().toISOString()
                         };
                         const novoHist = [...form.historicoPagamentos, novoP];
                         const novoTotal = novoHist.reduce((acc, curr) => acc + curr.valor, 0);
@@ -1750,9 +1754,23 @@ export function FormularioOrdem({ ordemExistente }: FormularioOrdemProps) {
             {form.historicoPagamentos.length > 0 ? (
               <div className="space-y-2">
                 {form.historicoPagamentos.map((p, idx) => (
-                  <div key={p.id} className="flex items-center justify-between p-2 bg-brand-dark-2 rounded border border-brand-dark-5 text-xs">
-                    <div className="flex items-center gap-3">
-                      <span className="text-gray-500">{new Date(p.data).toLocaleDateString('pt-BR')}</span>
+                  <div key={p.id} className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-2 p-2 bg-brand-dark-2 rounded border border-brand-dark-5 text-xs">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <input
+                        type="date"
+                        value={extrairDataYMD(p.data)}
+                        onChange={e => {
+                          const novaData = e.target.value;
+                          if (!novaData) return;
+                          const novoIso = formatarParaISO(novaData);
+                          const novoHist = form.historicoPagamentos.map((item, i) =>
+                            i === idx ? { ...item, data: novoIso } : item
+                          );
+                          atualizar('historicoPagamentos', novoHist);
+                        }}
+                        className="bg-brand-dark-3 border border-brand-dark-5 rounded px-2 py-1 text-xs text-gray-200 outline-none focus:border-brand-blue"
+                        title="Alterar data do pagamento"
+                      />
                       <select
                         value={p.metodo}
                         onChange={e => {
@@ -1798,6 +1816,7 @@ export function FormularioOrdem({ ordemExistente }: FormularioOrdemProps) {
                           else atualizar('status', 'Aguardando Pagamento');
                         }}
                         className="text-red-400 hover:text-red-300"
+                        title="Remover pagamento"
                       >
                         <X size={14} />
                       </button>
@@ -1809,12 +1828,12 @@ export function FormularioOrdem({ ordemExistente }: FormularioOrdemProps) {
               <p className="text-[10px] text-gray-500 italic">Nenhum pagamento registrado ainda.</p>
             )}
 
-            <div className="flex gap-2 pt-2 border-t border-brand-dark-5">
-              <div className="flex-1">
+            <div className="flex flex-wrap sm:flex-nowrap gap-2 pt-2 border-t border-brand-dark-5 items-center">
+              <div className="flex-1 min-w-[120px]">
                 <input 
                   type="number" 
                   id="add-pag-valor"
-                  className="input py-2 text-sm" 
+                  className="input py-2 text-sm w-full" 
                   placeholder="Valor R$" 
                   onKeyDown={e => {
                     if (e.key === 'Enter') {
@@ -1823,7 +1842,7 @@ export function FormularioOrdem({ ordemExistente }: FormularioOrdemProps) {
                       const metodo = (document.getElementById('add-pag-metodo') as HTMLSelectElement).value as FormaPagamento;
                       const valorLiquidoOS = Math.max(0, form.valor - (form.desconto || 0));
                       const pendenteOS = Math.max(0, valorLiquidoOS - form.valorPago);
-                      const val = parseFloat(input.value) || pendenteOS;
+                      const val = (input && input.value !== '') ? parseFloat(input.value) : pendenteOS;
                       if (val > 0) {
                         if (metodo === 'Crédito de Cliente') {
                           const creditoUsadoNoForm = form.historicoPagamentos
@@ -1835,7 +1854,8 @@ export function FormularioOrdem({ ordemExistente }: FormularioOrdemProps) {
                             return;
                           }
                         }
-                        const novoP = { id: crypto.randomUUID(), valor: val, metodo, data: new Date().toISOString() };
+                        const dataFinal = dataPagamentoInput ? formatarParaISO(dataPagamentoInput) : new Date().toISOString();
+                        const novoP = { id: crypto.randomUUID(), valor: val, metodo, data: dataFinal };
                         const novoHist = [...form.historicoPagamentos, novoP];
                         const novoTotal = novoHist.reduce((acc, curr) => acc + curr.valor, 0);
                         atualizar('historicoPagamentos', novoHist);
@@ -1849,13 +1869,25 @@ export function FormularioOrdem({ ordemExistente }: FormularioOrdemProps) {
                   }}
                 />
               </div>
-              <select id="add-pag-metodo" className="select py-2 text-sm w-48">
-                {FORMAS_PAGAMENTO.filter(f => f !== 'Pendente').map(f => (
-                  <option key={f} value={f}>
-                    {f === 'Crédito de Cliente' ? 'Crédito de Cliente (Saldo em Haver)' : f}
-                  </option>
-                ))}
-              </select>
+              <div className="w-full sm:w-44">
+                <select id="add-pag-metodo" className="select py-2 text-sm w-full">
+                  {FORMAS_PAGAMENTO.filter(f => f !== 'Pendente').map(f => (
+                    <option key={f} value={f}>
+                      {f === 'Crédito de Cliente' ? 'Crédito de Cliente (Saldo em Haver)' : f}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="w-full sm:w-40">
+                <input
+                  type="date"
+                  id="add-pag-data"
+                  value={dataPagamentoInput}
+                  onChange={e => setDataPagamentoInput(e.target.value)}
+                  className="input py-2 text-sm w-full text-white cursor-pointer"
+                  title="Data do Pagamento"
+                />
+              </div>
               <button 
                 type="button"
                 onClick={() => {
@@ -1863,7 +1895,7 @@ export function FormularioOrdem({ ordemExistente }: FormularioOrdemProps) {
                   const metodo = (document.getElementById('add-pag-metodo') as HTMLSelectElement).value as FormaPagamento;
                   const valorLiquidoOS = Math.max(0, form.valor - (form.desconto || 0));
                   const pendenteOS = Math.max(0, valorLiquidoOS - form.valorPago);
-                  const val = parseFloat(input.value) || pendenteOS;
+                  const val = (input && input.value !== '') ? parseFloat(input.value) : pendenteOS;
                   if (val > 0) {
                     if (metodo === 'Crédito de Cliente') {
                       const creditoUsadoNoForm = form.historicoPagamentos
@@ -1875,7 +1907,8 @@ export function FormularioOrdem({ ordemExistente }: FormularioOrdemProps) {
                         return;
                       }
                     }
-                    const novoP = { id: crypto.randomUUID(), valor: val, metodo, data: new Date().toISOString() };
+                    const dataFinal = dataPagamentoInput ? formatarParaISO(dataPagamentoInput) : new Date().toISOString();
+                    const novoP = { id: crypto.randomUUID(), valor: val, metodo, data: dataFinal };
                     const novoHist = [...form.historicoPagamentos, novoP];
                     const novoTotal = novoHist.reduce((acc, curr) => acc + curr.valor, 0);
                     atualizar('historicoPagamentos', novoHist);
@@ -1886,7 +1919,8 @@ export function FormularioOrdem({ ordemExistente }: FormularioOrdemProps) {
                     input.value = '';
                   }
                 }}
-                className="btn-primary px-3 py-0 h-10"
+                className="btn-primary px-3 py-0 h-10 shrink-0 font-bold"
+                title="Adicionar Pagamento"
               >
                 +
               </button>
@@ -1921,11 +1955,12 @@ export function FormularioOrdem({ ordemExistente }: FormularioOrdemProps) {
                           return;
                         }
                       }
+                      const dataFinal = dataPagamentoInput ? formatarParaISO(dataPagamentoInput) : new Date().toISOString();
                       atualizar('historicoPagamentos', [{ 
                         id: crypto.randomUUID(), 
                         valor: valorLiquidoOS, 
                         metodo: metodoSelecionado, 
-                        data: new Date().toISOString() 
+                        data: dataFinal 
                       }]);
                       atualizar('formaPagamento', metodoSelecionado);
                     }

@@ -714,3 +714,30 @@ export function gerarItensComboServico(
     }
   ];
 }
+
+export function extrairDataYMD(dataIso?: string): string {
+  if (!dataIso) return new Date().toISOString().split('T')[0];
+  try {
+    const d = new Date(dataIso);
+    if (isNaN(d.getTime())) return '';
+    const ano = d.getFullYear();
+    const mes = String(d.getMonth() + 1).padStart(2, '0');
+    const dia = String(d.getDate()).padStart(2, '0');
+    return `${ano}-${mes}-${dia}`;
+  } catch {
+    return (dataIso.split('T')[0] || '');
+  }
+}
+
+export function formatarParaISO(dataYMD: string): string {
+  if (!dataYMD) return new Date().toISOString();
+  const partes = dataYMD.split('-');
+  if (partes.length === 3) {
+    const ano = parseInt(partes[0], 10);
+    const mes = parseInt(partes[1], 10) - 1;
+    const dia = parseInt(partes[2], 10);
+    return new Date(ano, mes, dia, 12, 0, 0).toISOString();
+  }
+  return new Date().toISOString();
+}
+

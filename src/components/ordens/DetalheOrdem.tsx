@@ -29,7 +29,9 @@ import {
   removerAcentos,
   obterStatusOperacionalOS,
   ehServicoTransferenciaAcervo,
-  isServicoProgramadoLiberado
+  isServicoProgramadoLiberado,
+  extrairDataYMD,
+  formatarParaISO
 } from '../../utils/formatters';
 import { ModalEscolhaWhatsApp } from '../common/ModalEscolhaWhatsApp';
 import { Modal } from '../common/Modal';
@@ -1180,7 +1182,7 @@ export function DetalheOrdem({ ordem }: DetalheOrdemProps) {
                   </div>
                 )}
               {(ordem.valor - (ordem.desconto || 0)) > (ordem.valorPago || 0) && (
-                <div className="flex gap-2">
+                <div className="flex gap-2 items-center flex-wrap">
                   <input 
                     type="number" 
                     id="quick-pag-valor"
@@ -1197,10 +1199,19 @@ export function DetalheOrdem({ ordem }: DetalheOrdemProps) {
                       </option>
                     ))}
                   </select>
+                  <input
+                    type="date"
+                    id="quick-pag-data"
+                    defaultValue={new Date().toISOString().split('T')[0]}
+                    className="bg-brand-dark-3 border border-brand-dark-5 rounded px-2 py-1 text-xs text-white focus:border-brand-blue outline-none transition-colors cursor-pointer"
+                    title="Data do Pagamento"
+                  />
                     <button 
                       onClick={async () => {
                         const input = document.getElementById('quick-pag-valor') as HTMLInputElement;
                         const metodo = (document.getElementById('quick-pag-metodo') as HTMLSelectElement).value as FormaPagamento;
+                        const dataInput = document.getElementById('quick-pag-data') as HTMLInputElement | null;
+                        const dataIso = dataInput?.value ? formatarParaISO(dataInput.value) : new Date().toISOString();
                         const saldoDevedorAtual = Math.max(0, (ordem.valor - (ordem.desconto || 0)) - (ordem.valorPago || 0));
                         const valor = parseFloat(input.value) || (metodo === 'Crédito de Cliente' ? Math.min(saldoDevedorAtual, saldoCredito) : saldoDevedorAtual);
                         if (valor > 0) {
@@ -1223,7 +1234,7 @@ export function DetalheOrdem({ ordem }: DetalheOrdemProps) {
                             });
                           }
 
-                          await registrarPagamento(ordem.id, valor, metodo);
+                          await registrarPagamento(ordem.id, valor, metodo, dataIso);
                           
                           if (valor > saldoDevedorAtual && clienteDaOS && metodo !== 'Crédito de Cliente') {
                             const troco = valor - saldoDevedorAtual;
@@ -1266,7 +1277,26 @@ export function DetalheOrdem({ ordem }: DetalheOrdemProps) {
                   {(ordem.historicoPagamentos && ordem.historicoPagamentos.length > 0) ? (
                     ordem.historicoPagamentos.map((p) => (
                       <tr key={p.id} className="hover:bg-white/5 transition-colors">
-                        <td className="px-4 py-3 text-gray-400">{new Date(p.data).toLocaleDateString('pt-BR')}</td>
+                        <td className="px-4 py-3 text-gray-400">
+                          <input
+                            type="date"
+                            value={extrairDataYMD(p.data)}
+                            onChange={async (e) => {
+                              const novaData = e.target.value;
+                              if (!novaData) return;
+                              const novoIso = formatarParaISO(novaData);
+                              const novoHistorico = (ordem.historicoPagamentos || []).map(item =>
+                                item.id === p.id ? { ...item, data: novoIso } : item
+                              );
+                              await atualizarOrdem(ordem.id, {
+                                historicoPagamentos: novoHistorico
+                              });
+                              mostrar('sucesso', 'Data de pagamento atualizada!');
+                            }}
+                            className="bg-brand-dark-2 border border-brand-dark-5 rounded px-2 py-1 text-xs text-gray-200 outline-none focus:border-brand-blue cursor-pointer"
+                            title="Alterar data do pagamento"
+                          />
+                        </td>
                         <td className="px-4 py-3 font-bold text-white uppercase">
                           <select
                             value={p.metodo}
