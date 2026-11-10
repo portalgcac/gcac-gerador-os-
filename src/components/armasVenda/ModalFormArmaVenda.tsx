@@ -25,7 +25,9 @@ export function ModalFormArmaVenda({
   const { clientes } = useClientes();
 
   // Estados do Proprietário
+  const [tipoProprietario, setTipoProprietario] = useState<'cadastrado' | 'avulso'>('cadastrado');
   const [clienteSelecionadoId, setClienteSelecionadoId] = useState<string>('');
+  const [clienteSelecionadoObj, setClienteSelecionadoObj] = useState<Cliente | null>(null);
   const [buscaCliente, setBuscaCliente] = useState<string>('');
   const [proprietarioNome, setProprietarioNome] = useState<string>('');
   const [proprietarioTelefone, setProprietarioTelefone] = useState<string>('');
@@ -136,6 +138,7 @@ export function ModalFormArmaVenda({
   // Atualizar cliente selecionado
   const selecionarCliente = (c: Cliente) => {
     setClienteSelecionadoId(c.id);
+    setClienteSelecionadoObj(c);
     setProprietarioNome(c.nome);
     setProprietarioTelefone(c.contato || '');
     setProprietarioCpf(c.cpf || '');
@@ -360,115 +363,233 @@ export function ModalFormArmaVenda({
             )}
 
             {/* SEÇÃO 1: PROPRIETÁRIO DA ARMA */}
-            <div className="bg-brand-dark-3/40 border border-brand-dark-5 rounded-xl p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-gray-300 uppercase tracking-wider flex items-center gap-1.5">
-                  <User size={14} className="text-amber-400" /> 1. Proprietário Atual da Arma
+            <div className="bg-brand-dark-3/60 border border-brand-dark-5 rounded-2xl p-4 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-brand-dark-5/80 pb-3">
+                <span className="text-xs font-bold text-gray-200 uppercase tracking-wider flex items-center gap-2">
+                  <User size={15} className="text-amber-400" /> 1. Proprietário da Arma
                 </span>
-                {clienteSelecionadoId && (
+
+                {/* Alternador de Modo: Cliente Cadastrado vs Avulso */}
+                <div className="flex items-center bg-brand-dark-1 p-1 rounded-xl border border-brand-dark-5">
                   <button
                     type="button"
                     onClick={() => {
+                      setTipoProprietario('cadastrado');
+                    }}
+                    className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all ${
+                      tipoProprietario === 'cadastrado'
+                        ? 'bg-amber-500 text-black shadow-md'
+                        : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    👥 Cliente do Sistema
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTipoProprietario('avulso');
                       setClienteSelecionadoId('');
-                      setProprietarioNome('');
-                      setProprietarioTelefone('');
-                      setProprietarioCpf('');
-                      setProprietarioCr('');
+                      setClienteSelecionadoObj(null);
                       setArmasDoCliente([]);
                     }}
-                    className="text-[11px] text-amber-400 hover:underline"
+                    className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all ${
+                      tipoProprietario === 'avulso'
+                        ? 'bg-amber-500 text-black shadow-md'
+                        : 'text-gray-400 hover:text-white'
+                    }`}
                   >
-                    Desvincular Cliente
+                    ✍️ Cliente Avulso
                   </button>
-                )}
+                </div>
               </div>
 
-              {/* Busca rápida de cliente existente */}
-              {!clienteSelecionadoId && (
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={buscaCliente}
-                    onChange={e => setBuscaCliente(e.target.value)}
-                    placeholder="🔍 Buscar cliente já cadastrado por nome ou CPF..."
-                    className="input w-full text-xs py-2 bg-brand-dark-1"
-                  />
-                  {clientesFiltrados.length > 0 && (
-                    <div className="absolute top-full left-0 right-0 z-20 mt-1 bg-brand-dark-1 border border-brand-dark-5 rounded-xl shadow-xl overflow-hidden divide-y divide-brand-dark-5">
-                      {clientesFiltrados.map(c => (
-                        <button
-                          key={c.id}
-                          type="button"
-                          onClick={() => selecionarCliente(c)}
-                          className="w-full text-left p-2.5 hover:bg-brand-dark-3 text-xs text-gray-200 flex items-center justify-between transition-colors"
-                        >
-                          <div>
-                            <span className="font-bold text-white block">{c.nome}</span>
-                            <span className="text-[11px] text-gray-400">CPF: {c.cpf} {c.contato ? `• Tel: ${c.contato}` : ''}</span>
-                          </div>
-                          <span className="text-[10px] bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded font-bold">
-                            Selecionar
+              {/* MODO 1: CLIENTE CADASTRADO NO SISTEMA */}
+              {tipoProprietario === 'cadastrado' && (
+                <div className="space-y-3">
+                  {/* Se o cliente ainda NÃO foi selecionado: Campo de Busca com Lista Clara */}
+                  {!clienteSelecionadoId ? (
+                    <div className="space-y-2">
+                      <label className="text-[11px] font-semibold text-gray-300 block">
+                        Pesquisar Cliente Cadastrado por Nome ou CPF
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          value={buscaCliente}
+                          onChange={e => setBuscaCliente(e.target.value)}
+                          placeholder="Digite as primeiras letras do nome ou CPF..."
+                          className="input w-full text-xs py-2.5 bg-brand-dark-1 border-brand-dark-5 focus:border-amber-500 pl-3 pr-8"
+                          autoFocus
+                        />
+                        {buscaCliente && (
+                          <button
+                            type="button"
+                            onClick={() => setBuscaCliente('')}
+                            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white text-xs"
+                          >
+                            ✕
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Lista de Sugestões: Renderizada no fluxo (sem sobreposição feia) */}
+                      {buscaCliente.trim().length >= 2 && (
+                        <div className="bg-[#0b0e14] border border-amber-500/40 rounded-xl p-2 shadow-2xl space-y-1.5 animate-fade-in">
+                          <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider px-2 block">
+                            Clientes Encontrados ({clientesFiltrados.length})
                           </span>
+
+                          {clientesFiltrados.length === 0 ? (
+                            <div className="p-3 text-center text-xs text-gray-400">
+                              Nenhum cliente encontrado com "{buscaCliente}".
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setTipoProprietario('avulso');
+                                  setProprietarioNome(buscaCliente.toUpperCase());
+                                }}
+                                className="block mx-auto mt-2 text-amber-400 hover:underline font-bold text-[11px]"
+                              >
+                                Deseja cadastrar como cliente avulso?
+                              </button>
+                            </div>
+                          ) : (
+                            clientesFiltrados.map(c => (
+                              <div
+                                key={c.id}
+                                className="p-2.5 rounded-lg bg-brand-dark-2 hover:bg-brand-dark-3 border border-brand-dark-5 flex items-center justify-between gap-3 transition-colors"
+                              >
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                  <div className="w-8 h-8 rounded-full bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 font-bold text-xs shrink-0">
+                                    {c.nome.charAt(0).toUpperCase()}
+                                  </div>
+                                  <div className="min-w-0">
+                                    <h4 className="text-xs font-bold text-white truncate">{c.nome}</h4>
+                                    <div className="flex items-center gap-2 text-[10px] text-gray-400">
+                                      <span>CPF: {c.cpf || 'Não informado'}</span>
+                                      {c.contato && <span>• Tel: {c.contato}</span>}
+                                      {c.numeroCr && <span>• CR: {c.numeroCr}</span>}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <button
+                                  type="button"
+                                  onClick={() => selecionarCliente(c)}
+                                  className="btn-primary px-3 py-1.5 text-[11px] font-bold shrink-0 flex items-center gap-1"
+                                >
+                                  <Check size={13} /> Selecionar
+                                </button>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    /* Cliente Já Selecionado: Card Elegante e Limpo */
+                    <div className="bg-gradient-to-r from-emerald-500/15 via-brand-dark-2 to-brand-dark-2 border border-emerald-500/30 rounded-xl p-3.5 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 font-bold text-sm">
+                            {proprietarioNome.charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h4 className="text-sm font-extrabold text-white">{proprietarioNome}</h4>
+                              <span className="text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full">
+                                ✓ Cliente Vinculado
+                              </span>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-3 text-[11px] text-gray-300 mt-0.5">
+                              <span><strong>CPF:</strong> {proprietarioCpf || 'Não informado'}</span>
+                              <span><strong>Telefone:</strong> {proprietarioTelefone || 'Não informado'}</span>
+                              {proprietarioCr && <span><strong>CR:</strong> {proprietarioCr}</span>}
+                            </div>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setClienteSelecionadoId('');
+                            setClienteSelecionadoObj(null);
+                            setProprietarioNome('');
+                            setProprietarioTelefone('');
+                            setProprietarioCpf('');
+                            setProprietarioCr('');
+                            setArmasDoCliente([]);
+                          }}
+                          className="text-xs text-amber-400 hover:text-amber-300 font-semibold px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30 transition-colors"
+                        >
+                          Trocar Cliente
                         </button>
-                      ))}
+                      </div>
+
+                      {/* Se o cliente selecionado tiver armas no acervo cadastrado */}
+                      {armasDoCliente.length > 0 && (
+                        <div className="pt-2 border-t border-brand-dark-5/60 space-y-2">
+                          <span className="text-[11px] font-bold text-amber-400 flex items-center gap-1.5">
+                            <PackageCheck size={14} /> Armas no Acervo deste Cliente (Clique para preencher automático):
+                          </span>
+                          <div className="flex flex-wrap gap-2">
+                            {armasDoCliente.map(a => (
+                              <button
+                                key={a.id}
+                                type="button"
+                                onClick={() => importarArmaDoAcervo(a)}
+                                className="text-xs bg-brand-dark-3 hover:bg-brand-dark-4 border border-amber-500/40 text-amber-300 px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all shadow-sm"
+                              >
+                                <span>{a.fabricante} {a.modelo} ({a.calibre})</span>
+                                <ArrowRight size={12} />
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
               )}
 
-              {/* Campos do Dono */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
-                <div className="md:col-span-2">
-                  <label className="text-[11px] font-semibold text-gray-400 block mb-1">Nome do Proprietário *</label>
-                  <input
-                    type="text"
-                    value={proprietarioNome}
-                    onChange={e => setProprietarioNome(e.target.value)}
-                    required
-                    placeholder="Nome completo do dono"
-                    className="input w-full text-xs"
-                  />
-                </div>
-                <div>
-                  <label className="text-[11px] font-semibold text-gray-400 block mb-1">Telefone / WhatsApp</label>
-                  <input
-                    type="text"
-                    value={proprietarioTelefone}
-                    onChange={e => setProprietarioTelefone(e.target.value)}
-                    placeholder="(00) 00000-0000"
-                    className="input w-full text-xs"
-                  />
-                </div>
-                <div>
-                  <label className="text-[11px] font-semibold text-gray-400 block mb-1">CPF do Dono</label>
-                  <input
-                    type="text"
-                    value={proprietarioCpf}
-                    onChange={e => setProprietarioCpf(e.target.value)}
-                    placeholder="000.000.000-00"
-                    className="input w-full text-xs"
-                  />
-                </div>
-              </div>
-
-              {/* Se o cliente selecionado tiver armas no acervo cadastrado */}
-              {armasDoCliente.length > 0 && (
-                <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl space-y-2 mt-2">
-                  <span className="text-[11px] font-bold text-amber-400 flex items-center gap-1.5">
-                    <PackageCheck size={14} /> Armas no Acervo deste Cliente (Clique para preencher automático):
-                  </span>
-                  <div className="flex flex-wrap gap-2">
-                    {armasDoCliente.map(a => (
-                      <button
-                        key={a.id}
-                        type="button"
-                        onClick={() => importarArmaDoAcervo(a)}
-                        className="text-xs bg-brand-dark-3 hover:bg-brand-dark-4 border border-amber-500/40 text-amber-300 px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all"
-                      >
-                        <span>{a.fabricante} {a.modelo} ({a.calibre})</span>
-                        <ArrowRight size={12} />
-                      </button>
-                    ))}
+              {/* MODO 2: CLIENTE AVULSO (PREENCHIMENTO MANUAL DIRETO) */}
+              {tipoProprietario === 'avulso' && (
+                <div className="space-y-3">
+                  <p className="text-[11px] text-gray-400">
+                    Insira os dados do proprietário da arma manualmente abaixo:
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                    <div className="md:col-span-2">
+                      <label className="text-[11px] font-semibold text-gray-400 block mb-1">Nome do Proprietário *</label>
+                      <input
+                        type="text"
+                        value={proprietarioNome}
+                        onChange={e => setProprietarioNome(e.target.value.toUpperCase())}
+                        required
+                        placeholder="Nome completo do dono"
+                        className="input w-full text-xs"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-semibold text-gray-400 block mb-1">Telefone / WhatsApp</label>
+                      <input
+                        type="text"
+                        value={proprietarioTelefone}
+                        onChange={e => setProprietarioTelefone(e.target.value)}
+                        placeholder="(00) 00000-0000"
+                        className="input w-full text-xs"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-semibold text-gray-400 block mb-1">CPF do Dono</label>
+                      <input
+                        type="text"
+                        value={proprietarioCpf}
+                        onChange={e => setProprietarioCpf(e.target.value)}
+                        placeholder="000.000.000-00"
+                        className="input w-full text-xs"
+                      />
+                    </div>
                   </div>
                 </div>
               )}
