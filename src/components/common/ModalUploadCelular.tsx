@@ -101,9 +101,44 @@ export function ModalUploadCelular({
     setStatus('processando');
 
     try {
-      // Baixar imagem do Supabase Storage pública e converter para Base64 localmente
-      const response = await fetch(imageUrl);
-      const blob = await response.blob();
+      let blob: Blob | null = null;
+
+      // 1. Baixar diretamente via SDK do Supabase Storage (suporta buckets privados sem erro 404)
+      const matchPath = imageUrl.match(/documentos-clientes\/(.+)$/);
+      const storagePath = matchPath ? decodeURIComponent(matchPath[1]) : `temp-uploads/${sessionId}.jpg`;
+
+      const { data: storageBlob, error: downloadError } = await supabase.storage
+        .from('documentos-clientes')
+        .download(storagePath);
+
+      if (!downloadError && storageBlob) {
+        blob = storageBlob;
+      } else {
+        // 2. Fallback: URL assinada temporária (Signed URL)
+        const { data: signedData } = await supabase.storage
+          .from('documentos-clientes')
+          .createSignedUrl(storagePath, 60);
+
+        if (signedData?.signedUrl) {
+          const response = await fetch(signedData.signedUrl);
+          if (response.ok) {
+            blob = await response.blob();
+          }
+        }
+
+        // 3. Fallback: Fetch direto
+        if (!blob) {
+          const response = await fetch(imageUrl);
+          if (response.ok) {
+            blob = await response.blob();
+          }
+        }
+      }
+
+      if (!blob) {
+        throw new Error('Não foi possível transferir o arquivo baixado do cofre de uploads.');
+      }
+
       const reader = new FileReader();
       
       reader.onloadend = () => {

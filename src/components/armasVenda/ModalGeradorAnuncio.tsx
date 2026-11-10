@@ -40,9 +40,9 @@ export function ModalGeradorAnuncio({ arma, isOpen, onClose }: ModalGeradorAnunc
   const [chaveGeminiInput, setChaveGeminiInput] = useState(() => localStorage.getItem('gemini_api_key') || '');
 
   const dadosEmpresa = usuario?.dadosEmpresa;
-  const nomeLoja = dadosEmpresa?.razaoSocialFantasia || dadosEmpresa?.nome || usuario?.nome || 'Despachante & Clube de Tiro';
-  const telefoneLoja = dadosEmpresa?.contatoTelefone || '';
-  const cidadeLoja = dadosEmpresa?.endereco || '';
+  const nomeLoja = dadosEmpresa?.razaoSocialFantasia || dadosEmpresa?.nome || usuario?.nome || 'GCAC DESPACHANTE BÉLICO';
+  const telefoneLoja = dadosEmpresa?.contatoTelefone || '(64) 9.9995-9865';
+  const cidadeLoja = dadosEmpresa?.endereco || 'Av. Goiás, nº 1802, Sala 04 - Bairro Santa Maria - Jataí-GO';
 
   const listaFotos = arma.fotos && arma.fotos.length > 0
     ? arma.fotos
@@ -113,7 +113,7 @@ export function ModalGeradorAnuncio({ arma, isOpen, onClose }: ModalGeradorAnunc
     setTextoAnuncio(gerarTextoPadrao(tomIa));
   }, [arma, mostrarPreco, mostrarCalibre, mostrarAcessorios, mostrarEstado, mostrarContato, telefoneLoja, cidadeLoja, tomIa]);
 
-  // Função para desenhar no Canvas
+  // Função para desenhar no Canvas baseado no modelo oficial GCAC
   useEffect(() => {
     if (!isOpen) return;
 
@@ -124,261 +124,337 @@ export function ModalGeradorAnuncio({ arma, isOpen, onClose }: ModalGeradorAnunc
 
     setGerandoImagem(true);
 
+    // Formato Feed 1080x1350 (proporção 4:5 oficial) ou Stories 1080x1920
     const largura = 1080;
-    const altura = formato === 'quadrado' ? 1080 : 1920;
+    const altura = formato === 'quadrado' ? 1350 : 1920;
     canvas.width = largura;
     canvas.height = altura;
 
-    // Fundo Degradê Tático Premium
+    // 1. FUNDO AZUL MEIA-NOITE GRADIENTE PROFUNDO
     const bgGrad = ctx.createLinearGradient(0, 0, 0, altura);
-    bgGrad.addColorStop(0, '#0a0d14');
-    bgGrad.addColorStop(0.35, '#111827');
-    bgGrad.addColorStop(0.7, '#0f172a');
-    bgGrad.addColorStop(1, '#05070a');
+    bgGrad.addColorStop(0, '#010814');
+    bgGrad.addColorStop(0.2, '#03142e');
+    bgGrad.addColorStop(0.5, '#051f47');
+    bgGrad.addColorStop(0.8, '#03142e');
+    bgGrad.addColorStop(1, '#01060f');
     ctx.fillStyle = bgGrad;
     ctx.fillRect(0, 0, largura, altura);
 
-    // Efeito de malha/glow sutil dourado / azul
-    const glowGrad = ctx.createRadialGradient(largura / 2, altura * 0.45, 80, largura / 2, altura * 0.45, 500);
-    glowGrad.addColorStop(0, 'rgba(30, 58, 138, 0.25)');
-    glowGrad.addColorStop(0.5, 'rgba(217, 119, 6, 0.08)');
+    // Glow azul marinho central
+    const glowGrad = ctx.createRadialGradient(largura / 2, altura * 0.42, 50, largura / 2, altura * 0.42, 520);
+    glowGrad.addColorStop(0, 'rgba(29, 78, 216, 0.28)');
+    glowGrad.addColorStop(0.6, 'rgba(14, 165, 233, 0.08)');
     glowGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
     ctx.fillStyle = glowGrad;
     ctx.fillRect(0, 0, largura, altura);
 
-    // Borda tática sutil
-    ctx.strokeStyle = 'rgba(217, 119, 6, 0.35)';
-    ctx.lineWidth = 4;
-    ctx.strokeRect(24, 24, largura - 48, altura - 48);
+    // 2. TEXTO NO TOPO (Acima da moldura)
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 20px "Segoe UI", sans-serif';
+    ctx.fillText('CATÁLOGO DE ARMAS USADAS • INTERMEDIAÇÃO LEGALIZADA', largura / 2, 42);
 
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+    // 3. MOLDURA DOURADA COM DETALHES TÁTICOS
+    const pad = 46;
+    const molduraW = largura - pad * 2;
+    const molduraH = altura - pad * 2 - 20;
+    const molduraY = 56;
+
+    // Borda Dourada Externa
+    ctx.strokeStyle = '#c59b27';
+    ctx.lineWidth = 3.5;
+    ctx.beginPath();
+    ctx.roundRect(pad, molduraY, molduraW, molduraH, 24);
+    ctx.stroke();
+
+    // Borda Interna Ciano Fina Luminosa
+    ctx.strokeStyle = 'rgba(56, 189, 248, 0.35)';
     ctx.lineWidth = 1;
-    ctx.strokeRect(32, 32, largura - 64, altura - 64);
+    ctx.beginPath();
+    ctx.roundRect(pad + 6, molduraY + 6, molduraW - 12, molduraH - 12, 18);
+    ctx.stroke();
 
-    // Carregar Imagens auxiliares (Logo e Arma)
+    // Cantoneiras decorativas douradas
+    const cSize = 24;
+    ctx.strokeStyle = '#f59e0b';
+    ctx.lineWidth = 4;
+    // Canto Sup Esq
+    ctx.beginPath();
+    ctx.moveTo(pad, molduraY + cSize);
+    ctx.lineTo(pad, molduraY);
+    ctx.lineTo(pad + cSize, molduraY);
+    ctx.stroke();
+    // Canto Sup Dir
+    ctx.beginPath();
+    ctx.moveTo(pad + molduraW - cSize, molduraY);
+    ctx.lineTo(pad + molduraW, molduraY);
+    ctx.lineTo(pad + molduraW, molduraY + cSize);
+    ctx.stroke();
+    // Canto Inf Esq
+    ctx.beginPath();
+    ctx.moveTo(pad, molduraY + molduraH - cSize);
+    ctx.lineTo(pad, molduraY + molduraH);
+    ctx.lineTo(pad + cSize, molduraY + molduraH);
+    ctx.stroke();
+    // Canto Inf Dir
+    ctx.beginPath();
+    ctx.moveTo(pad + molduraW - cSize, molduraY + molduraH);
+    ctx.lineTo(pad + molduraW, molduraY + molduraH);
+    ctx.lineTo(pad + molduraW, molduraY + molduraH - cSize);
+    ctx.stroke();
+
+    // Carregar Imagens (Logo Oficial e Arma)
     const logoImg = new Image();
     const armaImg = new Image();
 
-    const logoSrc = dadosEmpresa?.logoUrl || '/logo_oficial_documentos.png';
+    // Logo oficial anexada salva em /logo_oficial_gcac.png
+    const logoSrc = '/logo_oficial_gcac.png';
 
-    // Apenas define crossOrigin se for URL remota (NUNCA em data:image base64)
-    if (logoSrc && (logoSrc.startsWith('http://') || logoSrc.startsWith('https://'))) {
-      logoImg.crossOrigin = 'anonymous';
-    }
     if (fotoAtual && (fotoAtual.startsWith('http://') || fotoAtual.startsWith('https://'))) {
       armaImg.crossOrigin = 'anonymous';
     }
 
     const renderConteudo = () => {
-      // 1. TOPO: Header com Logo e Nome
-      let topY = 70;
+      let topY = molduraY + 20;
 
-      if (mostrarLogo) {
-        try {
-          if (logoImg.complete && logoImg.naturalWidth > 0) {
-            const logoH = 75;
-            const logoW = (logoImg.naturalWidth / logoImg.naturalHeight) * logoH;
-            ctx.drawImage(logoImg, (largura - logoW) / 2, topY, logoW, logoH);
-            topY += logoH + 20;
-          }
-        } catch {
-          // Fallback caso imagem da logo falhe
-        }
+      // 4. LOGO OFICIAL CENTRALIZADA
+      if (mostrarLogo && logoImg.complete && logoImg.naturalWidth > 0) {
+        const logoH = 115;
+        const logoW = (logoImg.naturalWidth / logoImg.naturalHeight) * logoH;
+        ctx.drawImage(logoImg, (largura - logoW) / 2, topY, logoW, logoH);
+        topY += logoH + 20;
+      } else {
+        topY += 40;
       }
 
-      ctx.textAlign = 'center';
-      ctx.fillStyle = '#f59e0b';
-      ctx.font = 'bold 20px "Segoe UI", sans-serif';
-      ctx.fillText('CATÁLOGO DE ARMAS USADAS • INTERMEDIAÇÃO LEGALIZADA', largura / 2, topY + 10);
-      topY += 35;
-
-      ctx.fillStyle = '#ffffff';
-      ctx.font = '900 24px "Segoe UI", sans-serif';
-      ctx.fillText(nomeLoja.toUpperCase(), largura / 2, topY + 10);
-      topY += 40;
-
-      // Linha divisória
-      ctx.strokeStyle = 'rgba(217, 119, 6, 0.4)';
-      ctx.lineWidth = 2;
+      // Linha separadora luminosa
+      const sepGrad = ctx.createLinearGradient(pad + 60, 0, pad + molduraW - 60, 0);
+      sepGrad.addColorStop(0, 'rgba(56, 189, 248, 0)');
+      sepGrad.addColorStop(0.5, 'rgba(56, 189, 248, 0.45)');
+      sepGrad.addColorStop(1, 'rgba(56, 189, 248, 0)');
+      ctx.strokeStyle = sepGrad;
+      ctx.lineWidth = 1.5;
       ctx.beginPath();
-      ctx.moveTo(120, topY);
-      ctx.lineTo(largura - 120, topY);
+      ctx.moveTo(pad + 60, topY);
+      ctx.lineTo(pad + molduraW - 60, topY);
       ctx.stroke();
-      topY += 30;
+      topY += 28;
 
-      // 2. FOTO CENTRAL DA ARMA
-      const boxFotoW = largura - 160;
-      const boxFotoH = formato === 'quadrado' ? 380 : 620;
-      const boxFotoX = 80;
-      const boxFotoY = topY;
-
-      // Moldura da foto com fundo escuro e cantos arredondados
-      ctx.save();
-      ctx.fillStyle = '#05070b';
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
-      ctx.lineWidth = 2;
+      // 5. BADGES: [★ SEMINOVA REVISADA] (Esq) e [DISPONÍVEL] (Dir)
+      const badgeY = topY;
+      // Badge Esquerda Dourada
+      const bgBadgeDourada = ctx.createLinearGradient(pad + 40, 0, pad + 240, 0);
+      bgBadgeDourada.addColorStop(0, '#c69519');
+      bgBadgeDourada.addColorStop(1, '#eab308');
+      ctx.fillStyle = bgBadgeDourada;
       ctx.beginPath();
-      ctx.roundRect(boxFotoX, boxFotoY, boxFotoW, boxFotoH, 16);
+      ctx.roundRect(pad + 35, badgeY, 210, 36, 10);
+      ctx.fill();
+      ctx.fillStyle = '#0a0a0a';
+      ctx.font = '900 14px "Segoe UI", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('★ SEMINOVA REVISADA', pad + 35 + 105, badgeY + 23);
+
+      // Badge Direita Azul Neon
+      ctx.fillStyle = '#061733';
+      ctx.strokeStyle = '#38bdf8';
+      ctx.lineWidth = 1.8;
+      ctx.beginPath();
+      ctx.roundRect(pad + molduraW - 200, badgeY, 165, 36, 10);
       ctx.fill();
       ctx.stroke();
-      ctx.clip();
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 14px "Segoe UI", sans-serif';
+      ctx.fillText(arma.status === 'vendida' ? 'VENDIDA' : arma.status === 'reservada' ? 'RESERVADA' : 'DISPONÍVEL', pad + molduraW - 200 + 82, badgeY + 23);
+
+      topY += 45;
+
+      // 6. BLOCO CENTRAL: TÍTULO DA ARMA (Esq) + FOTO DA ARMA (Dir)
+      const blocoMeioY = topY;
+      const blocoMeioH = formato === 'quadrado' ? 380 : 540;
+
+      // Lado Esquerdo: NOME DA ARMA
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '800 30px "Segoe UI", sans-serif';
+      ctx.fillText(arma.fabricante.toUpperCase(), pad + 40, blocoMeioY + 85);
+
+      // Modelo Grande com Efeito Gradiente e Sombra
+      const modeloGrad = ctx.createLinearGradient(pad + 40, blocoMeioY + 110, pad + 40, blocoMeioY + 190);
+      modeloGrad.addColorStop(0, '#ffffff');
+      modeloGrad.addColorStop(1, '#93c5fd');
+      ctx.fillStyle = modeloGrad;
+      ctx.font = '900 60px "Segoe UI", sans-serif';
+      ctx.fillText(arma.modelo.toUpperCase(), pad + 40, blocoMeioY + 160);
+
+      // Calibre em destaque azul celeste
+      ctx.fillStyle = '#38bdf8';
+      ctx.font = 'bold 26px "Segoe UI", sans-serif';
+      ctx.fillText(`CALIBRE ${arma.calibre.toUpperCase()}`, pad + 40, blocoMeioY + 205);
+
+      if (arma.sigmaSinarm) {
+        ctx.fillStyle = '#e2e8f0';
+        ctx.font = '600 16px "Segoe UI", sans-serif';
+        ctx.fillText(`REGISTRO: ${arma.sigmaSinarm}`, pad + 40, blocoMeioY + 238);
+      }
+
+      // Lado Direito: FOTO DA ARMA COM MOLDURA ELEGANTE E SOMBRA
+      const boxFotoW = 540;
+      const boxFotoH = blocoMeioH - 40;
+      const boxFotoX = largura - pad - boxFotoW - 20;
+      const boxFotoY = blocoMeioY + 10;
+
+      ctx.save();
+      // Glow suave de fundo para destacar a arma
+      const fotoGlow = ctx.createRadialGradient(boxFotoX + boxFotoW / 2, boxFotoY + boxFotoH / 2, 40, boxFotoX + boxFotoW / 2, boxFotoY + boxFotoH / 2, boxFotoW / 2);
+      fotoGlow.addColorStop(0, 'rgba(56, 189, 248, 0.18)');
+      fotoGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = fotoGlow;
+      ctx.fillRect(boxFotoX, boxFotoY, boxFotoW, boxFotoH);
 
       const temFotoValida = armaImg.complete && armaImg.naturalWidth > 0 && !fotoAtual.includes('application/pdf');
 
       if (temFotoValida) {
-        // Ajuste proporcional (contain)
+        // Redimensionar proporcional com contain
         const scale = Math.min((boxFotoW - 20) / armaImg.naturalWidth, (boxFotoH - 20) / armaImg.naturalHeight);
         const w = armaImg.naturalWidth * scale;
         const h = armaImg.naturalHeight * scale;
         const x = boxFotoX + (boxFotoW - w) / 2;
         const y = boxFotoY + (boxFotoH - h) / 2;
+
+        // Sombra realista abaixo da arma
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
+        ctx.shadowBlur = 24;
+        ctx.shadowOffsetY = 12;
+
         ctx.drawImage(armaImg, x, y, w, h);
       } else {
-        // Placeholder caso não tenha foto
-        ctx.fillStyle = '#4b5563';
-        ctx.font = 'bold 24px sans-serif';
+        // Placeholder estilizado
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.6)';
+        ctx.strokeStyle = 'rgba(56, 189, 248, 0.2)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.roundRect(boxFotoX + 20, boxFotoY + 20, boxFotoW - 40, boxFotoH - 40, 16);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = '#64748b';
+        ctx.font = 'bold 20px "Segoe UI", sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillText('FOTO NÃO DISPONÍVEL', boxFotoX + boxFotoW / 2, boxFotoY + boxFotoH / 2 - 10);
-        ctx.font = '14px sans-serif';
-        ctx.fillStyle = '#9ca3af';
-        ctx.fillText('(Adicione fotos na edição da arma)', boxFotoX + boxFotoW / 2, boxFotoY + boxFotoH / 2 + 20);
+        ctx.fillText('FOTO NÃO DISPONÍVEL', boxFotoX + boxFotoW / 2, boxFotoY + boxFotoH / 2);
       }
       ctx.restore();
 
-      // Badge de "SEMINOVO SELECIONADO" sobre a foto
-      ctx.fillStyle = '#d97706';
-      ctx.beginPath();
-      ctx.roundRect(boxFotoX + 20, boxFotoY + 20, 220, 38, 8);
-      ctx.fill();
-      ctx.fillStyle = '#000000';
-      ctx.font = 'bold 15px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('★ SEMINOVO REVISADO', boxFotoX + 130, boxFotoY + 44);
+      topY += blocoMeioH + 5;
 
-      topY += boxFotoH + 35;
+      // 7. GRADE DE 6 CAIXAS DE INFORMAÇÕES (2 Linhas x 3 Colunas)
+      const gridW = molduraW - 70;
+      const gridX = pad + 35;
+      const boxW = (gridW - 30) / 3;
+      const boxH = 58;
 
-      // 3. TÍTULO E MODELO DA ARMA
-      ctx.textAlign = 'center';
-      ctx.fillStyle = '#93c5fd';
-      ctx.font = 'bold 22px sans-serif';
-      ctx.fillText(arma.fabricante.toUpperCase(), largura / 2, topY);
-      topY += 38;
+      const infos = [
+        { label: 'CALIBRE:', val: arma.calibre },
+        { label: 'CAPACIDADE:', val: arma.capacidade || '17+1' },
+        { label: 'INCLUI:', val: arma.quantidadeCarregadores ? `0${arma.quantidadeCarregadores} CARREGADORES` : (arma.acessorios ? arma.acessorios.slice(0, 16) : 'ORIGINAL') },
+        { label: 'ACABAMENTO:', val: arma.acabamento || 'OXIDADO' },
+        { label: 'ESTADO:', val: arma.estadoConservacao.split(' ')[0].toUpperCase() },
+        { label: 'SISTEMA:', val: arma.sigmaSinarm || 'SIGMA (CAC)' }
+      ];
 
-      ctx.fillStyle = '#ffffff';
-      ctx.font = '900 42px "Segoe UI", sans-serif';
-      ctx.fillText(arma.modelo.toUpperCase(), largura / 2, topY);
-      topY += 45;
+      infos.forEach((info, idx) => {
+        const col = idx % 3;
+        const row = Math.floor(idx / 3);
+        const bx = gridX + col * (boxW + 15);
+        const by = topY + row * (boxH + 12);
 
-      // 4. BADGES TÉCNICAS (Calibre, Capacidade, Acabamento, Estado)
-      const badges: string[] = [];
-      if (mostrarCalibre) badges.push(`CAL: ${arma.calibre}`);
-      if (arma.sigmaSinarm) badges.push(arma.sigmaSinarm);
-      if (arma.capacidade) badges.push(`CAP: ${arma.capacidade}`);
-      if (arma.acabamento) badges.push(arma.acabamento);
-      if (mostrarEstado) badges.push(arma.estadoConservacao);
+        // Box Fundo Azul Meia-Noite
+        ctx.fillStyle = '#041733';
+        ctx.strokeStyle = '#1e4b85';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.roundRect(bx, by, boxW, boxH, 12);
+        ctx.fill();
+        ctx.stroke();
 
-      if (badges.length > 0) {
-        ctx.font = 'bold 16px sans-serif';
-        const totalW = badges.reduce((acc, b) => acc + ctx.measureText(b).width + 36, 0);
-        let startX = (largura - totalW) / 2;
-
-        badges.forEach(b => {
-          const textW = ctx.measureText(b).width;
-          const badgeW = textW + 28;
-
-          ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
-          ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
-          ctx.lineWidth = 1;
-          ctx.beginPath();
-          ctx.roundRect(startX, topY - 24, badgeW, 34, 17);
-          ctx.fill();
-          ctx.stroke();
-
-          ctx.fillStyle = '#e5e7eb';
-          ctx.textAlign = 'center';
-          ctx.fillText(b, startX + badgeW / 2, topY);
-
-          startX += badgeW + 8;
-        });
-
-        topY += 45;
-      }
-
-      // 5. ACESSÓRIOS
-      if (mostrarAcessorios && (arma.acessorios || arma.quantidadeCarregadores)) {
-        const itens = [];
-        if (arma.quantidadeCarregadores) itens.push(`${arma.quantidadeCarregadores} Carregador(es)`);
-        if (arma.acessorios) itens.push(arma.acessorios);
-        const txtAcessorios = `INCLUSO: ${itens.join(' • ')}`;
-
-        ctx.fillStyle = '#38bdf8';
-        ctx.font = 'italic 16px sans-serif';
+        // Rótulo
         ctx.textAlign = 'center';
-        ctx.fillText(txtAcessorios.slice(0, 95), largura / 2, topY);
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = 'bold 11px "Segoe UI", sans-serif';
+        ctx.fillText(info.label, bx + boxW / 2, by + 20);
+
+        // Valor
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '900 15px "Segoe UI", sans-serif';
+        ctx.fillText(info.val.toUpperCase(), bx + boxW / 2, by + 43);
+      });
+
+      topY += (boxH * 2) + 26;
+
+      // 8. FAIXA DOURADA DE PREÇO
+      if (mostrarPreco) {
+        const faixaW = gridW;
+        const faixaH = 82;
+        const faixaX = gridX;
+        const faixaY = topY + 12;
+
+        const douradoGrad = ctx.createLinearGradient(faixaX, 0, faixaX + faixaW, 0);
+        douradoGrad.addColorStop(0, '#c7981b');
+        douradoGrad.addColorStop(0.3, '#f5c842');
+        douradoGrad.addColorStop(0.7, '#eab308');
+        douradoGrad.addColorStop(1, '#b48512');
+
+        ctx.fillStyle = douradoGrad;
+        ctx.beginPath();
+        ctx.roundRect(faixaX, faixaY, faixaW, faixaH, 16);
+        ctx.fill();
+
+        ctx.fillStyle = '#261601';
+        ctx.font = 'bold 13px "Segoe UI", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('VALOR DE INVESTIMENTO', largura / 2, faixaY + 24);
+
+        ctx.fillStyle = '#0a0a0a';
+        ctx.font = '900 44px "Segoe UI", sans-serif';
+        ctx.fillText(formatarMoeda(arma.valorAnunciado), largura / 2, faixaY + 65);
+
+        topY += faixaH + 26;
+      } else {
         topY += 35;
       }
 
-      // 6. BLOCO DE PREÇO
-      if (formato === 'stories') {
-        topY += 30;
-      }
-
-      if (mostrarPreco) {
-        // Box Dourado de Preço
-        const boxPrecoW = 460;
-        const boxPrecoH = 75;
-        const boxPrecoX = (largura - boxPrecoW) / 2;
-        const boxPrecoY = topY;
-
-        const precoGrad = ctx.createLinearGradient(boxPrecoX, 0, boxPrecoX + boxPrecoW, 0);
-        precoGrad.addColorStop(0, '#d97706');
-        precoGrad.addColorStop(1, '#f59e0b');
-
-        ctx.fillStyle = precoGrad;
-        ctx.beginPath();
-        ctx.roundRect(boxPrecoX, boxPrecoY, boxPrecoW, boxPrecoH, 12);
-        ctx.fill();
-
-        ctx.fillStyle = '#000000';
-        ctx.font = 'bold 15px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText('VALOR DE INVESTIMENTO', largura / 2, boxPrecoY + 24);
-
-        ctx.font = '900 36px "Segoe UI", sans-serif';
-        ctx.fillText(formatarMoeda(arma.valorAnunciado), largura / 2, boxPrecoY + 60);
-
-        topY += boxPrecoH + 35;
-      } else {
-        ctx.fillStyle = '#f59e0b';
-        ctx.font = '900 26px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText('CONSULTE VALOR E CONDIÇÕES', largura / 2, topY + 20);
-        topY += 50;
-      }
-
-      // 7. RODAPÉ DE CONTATO E SEGURANÇA
-      const rodapeY = altura - (formato === 'quadrado' ? 85 : 120);
+      // 9. RODAPÉ DE CONTATOS DO ESCRITÓRIO
+      const rodapeY = altura - pad - 60;
 
       if (mostrarContato) {
-        ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 22px sans-serif';
+        // Ícone verde e WhatsApp
         ctx.textAlign = 'center';
-        ctx.fillText(`📲 WhatsApp: ${telefoneLoja || 'Consulte nosso escritório'}`, largura / 2, rodapeY);
+        ctx.fillStyle = '#22c55e';
+        ctx.font = 'bold 24px sans-serif';
+        ctx.fillText('💬', largura / 2 - 180, rodapeY);
 
-        if (cidadeLoja) {
-          ctx.fillStyle = '#9ca3af';
-          ctx.font = '16px sans-serif';
-          ctx.fillText(`📍 ${cidadeLoja}`, largura / 2, rodapeY + 25);
-        }
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '900 24px "Segoe UI", sans-serif';
+        ctx.fillText(`WhatsApp: ${telefoneLoja}`, largura / 2, rodapeY);
+
+        // Endereço e Cidade
+        ctx.fillStyle = '#f87171';
+        ctx.font = 'bold 15px sans-serif';
+        ctx.fillText('📍', largura / 2 - 240, rodapeY + 28);
+
+        ctx.fillStyle = '#cbd5e1';
+        ctx.font = '500 15px "Segoe UI", sans-serif';
+        ctx.fillText(cidadeLoja, largura / 2, rodapeY + 28);
       }
 
-      ctx.fillStyle = '#6b7280';
-      ctx.font = '11px sans-serif';
+      // 10. TEXTO LEGAL FINAL FORA DA MOLDURA
+      ctx.fillStyle = '#64748b';
+      ctx.font = '11px "Segoe UI", sans-serif';
       ctx.textAlign = 'center';
       ctx.fillText(
         'Venda autorizada sob intermediação legal. Transferência obrigatória pelo SIGMA/SINARM.',
         largura / 2,
-        altura - 24
+        altura - 16
       );
 
       setGerandoImagem(false);
@@ -413,10 +489,10 @@ export function ModalGeradorAnuncio({ arma, isOpen, onClose }: ModalGeradorAnunc
       dispararRender();
     }
 
-    // Timeout de segurança: se as imagens demorarem mais de 500ms, renderiza de qualquer forma!
+    // Timeout de segurança
     const timer = setTimeout(() => {
       dispararRender();
-    }, 500);
+    }, 450);
 
     return () => clearTimeout(timer);
   }, [
@@ -558,13 +634,13 @@ Mantenha emojis de armas/tiro/fogo, bullet points claros e destaque a exigência
             </div>
             <div>
               <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                Gerador de Anúncio e Flyer
+                Gerador de Anúncio Oficial GCAC
                 <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
                   {arma.fabricante} {arma.modelo}
                 </span>
               </h2>
               <p className="text-xs text-gray-400">
-                Gere a imagem oficial pronta com a sua logo para WhatsApp, Instagram e Redes
+                Arte premium oficial do escritório pronta para WhatsApp, Instagram e Redes
               </p>
             </div>
           </div>
@@ -582,7 +658,7 @@ Mantenha emojis de armas/tiro/fogo, bullet points claros e destaque a exigência
           <div className="lg:col-span-7 flex flex-col items-center">
             <div className="flex items-center justify-between w-full mb-3">
               <span className="text-xs font-bold text-gray-300 flex items-center gap-1.5 uppercase tracking-wider">
-                <Eye size={14} className="text-amber-400" /> Pré-visualização da Arte
+                <Eye size={14} className="text-amber-400" /> Pré-visualização da Arte Oficial
               </span>
 
               {/* Seletor de Formato */}
@@ -596,7 +672,7 @@ Mantenha emojis de armas/tiro/fogo, bullet points claros e destaque a exigência
                       : 'text-gray-400 hover:text-white'
                   }`}
                 >
-                  <LayoutGrid size={13} /> Feed (1:1)
+                  <LayoutGrid size={13} /> Feed (4:5)
                 </button>
                 <button
                   type="button"
@@ -613,17 +689,17 @@ Mantenha emojis de armas/tiro/fogo, bullet points claros e destaque a exigência
             </div>
 
             {/* Canvas Container com Zoom Adaptativo */}
-            <div className="relative w-full flex items-center justify-center p-3 bg-[#0a0d14] border border-brand-dark-5 rounded-2xl overflow-hidden min-h-[460px]">
+            <div className="relative w-full flex items-center justify-center p-3 bg-[#0a0d14] border border-brand-dark-5 rounded-2xl overflow-hidden min-h-[500px]">
               {gerandoImagem && (
                 <div className="absolute inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-10 text-amber-400 gap-2 text-xs font-bold">
-                  <RefreshCw size={18} className="animate-spin" /> Renderizando Flyer...
+                  <RefreshCw size={18} className="animate-spin" /> Renderizando Flyer Oficial...
                 </div>
               )}
               <canvas
                 ref={canvasRef}
                 style={{
                   maxWidth: '100%',
-                  maxHeight: formato === 'quadrado' ? '460px' : '520px',
+                  maxHeight: formato === 'quadrado' ? '500px' : '560px',
                   objectFit: 'contain',
                   borderRadius: '12px',
                   boxShadow: '0 20px 40px rgba(0,0,0,0.6)'
@@ -720,7 +796,7 @@ Mantenha emojis de armas/tiro/fogo, bullet points claros e destaque a exigência
                     onChange={e => setMostrarLogo(e.target.checked)}
                     className="rounded border-gray-600 text-amber-500 focus:ring-amber-500"
                   />
-                  Logo do Escritório
+                  Logo Oficial GCAC
                 </label>
               </div>
 
