@@ -50,7 +50,7 @@ CREATE TABLE IF NOT EXISTS public.armas_venda (
     comprador_telefone TEXT,
     comprador_cpf TEXT,
     data_venda TIMESTAMPTZ,
-    ordem_servico_id UUID REFERENCES public.ordens_servico(id) ON DELETE SET NULL,
+    ordem_servico_id UUID REFERENCES public.ordens(id) ON DELETE SET NULL,
     
     criado_por_nome TEXT,
     criado_em TIMESTAMPTZ DEFAULT NOW(),
@@ -62,7 +62,7 @@ CREATE INDEX IF NOT EXISTS idx_armas_venda_empresa_id ON public.armas_venda(empr
 CREATE INDEX IF NOT EXISTS idx_armas_venda_status ON public.armas_venda(status);
 CREATE INDEX IF NOT EXISTS idx_armas_venda_cliente_id ON public.armas_venda(cliente_id);
 
--- Ativar RLS
+-- Ativar RLS (Segurança Multi-Tenant)
 ALTER TABLE public.armas_venda ENABLE ROW LEVEL SECURITY;
 
 -- Políticas de Acesso
