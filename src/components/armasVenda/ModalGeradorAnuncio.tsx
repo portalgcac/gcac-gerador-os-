@@ -2,11 +2,13 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   X, Download, Copy, Check, Sparkles, Image as ImageIcon,
   Share2, Shield, Eye, Smartphone, LayoutGrid, AlertCircle, RefreshCw,
-  Key, ExternalLink
+  Key, ExternalLink, Camera, QrCode, Upload, Trash2
 } from 'lucide-react';
 import { ArmaVenda } from '../../types';
 import { useAuth } from '../../context/AuthContext';
+import { useArmasVenda } from '../../context/ArmasVendaContext';
 import { formatarMoeda } from '../../utils/formatters';
+import { ModalUploadCelular } from '../common/ModalUploadCelular';
 
 interface ModalGeradorAnuncioProps {
   arma: ArmaVenda;
@@ -14,8 +16,39 @@ interface ModalGeradorAnuncioProps {
   onClose: () => void;
 }
 
+// Utilitário para remover o fundo branco da logo oficial (JPG) e torná-la transparente
+function criarImagemComFundoTransparente(img: HTMLImageElement): HTMLCanvasElement {
+  const c = document.createElement('canvas');
+  c.width = img.naturalWidth || img.width;
+  c.height = img.naturalHeight || img.height;
+  const ctx = c.getContext('2d');
+  if (!ctx || c.width === 0 || c.height === 0) return c;
+
+  ctx.drawImage(img, 0, 0);
+
+  try {
+    const imgData = ctx.getImageData(0, 0, c.width, c.height);
+    const data = imgData.data;
+    // Percorre pixels: se r, g, b forem muito claros (fundo branco do JPEG), deixa transparente
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+      if (r > 220 && g > 220 && b > 220) {
+        data[i + 3] = 0; // Alpha = 0 (100% transparente)
+      }
+    }
+    ctx.putImageData(imgData, 0, 0);
+  } catch (err) {
+    console.warn('Não foi possível remover fundo branco da logo por restrição de canvas:', err);
+  }
+
+  return c;
+}
+
 export function ModalGeradorAnuncio({ arma, isOpen, onClose }: ModalGeradorAnuncioProps) {
   const { usuario } = useAuth();
+  const { atualizarArmaVenda } = useArmasVenda();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   // Opções de personalização visual
@@ -26,7 +59,12 @@ export function ModalGeradorAnuncio({ arma, isOpen, onClose }: ModalGeradorAnunc
   const [mostrarEstado, setMostrarEstado] = useState(true);
   const [mostrarContato, setMostrarContato] = useState(true);
   const [mostrarLogo, setMostrarLogo] = useState(true);
+
+  // Fotos gerenciadas localmente (permite adicionar/trocar foto na hora sem sair do modal)
+  const [fotosLocais, setFotosLocais] = useState<string[]>([]);
   const [fotoSelecionadaIdx, setFotoSelecionadaIdx] = useState(0);
+  const [modalQrAberto, setModalQrAberto] = useState(false);
+  const [salvandoFoto, setSalvandoFoto] = useState(false);
 
   // Status de cópia e downloads
   const [copiado, setCopiado] = useState(false);
@@ -44,11 +82,98 @@ export function ModalGeradorAnuncio({ arma, isOpen, onClose }: ModalGeradorAnunc
   const telefoneLoja = dadosEmpresa?.contatoTelefone || '(64) 9.9995-9865';
   const cidadeLoja = dadosEmpresa?.endereco || 'Av. Goiás, nº 1802, Sala 04 - Bairro Santa Maria - Jataí-GO';
 
-  const listaFotos = arma.fotos && arma.fotos.length > 0
-    ? arma.fotos
-    : (arma.fotoPrincipal ? [arma.fotoPrincipal] : []);
+  // Sincronizar fotos da arma com estado local
+  useEffect(() => {
+    const lista = arma.fotos && arma.fotos.length > 0
+      ? arma.fotos
+      : (arma.fotoPrincipal ? [arma.fotoPrincipal] : []);
+    setFotosLocais(lista);
+    setFotoSelecionadaIdx(0);
+  }, [arma]);
 
-  const fotoAtual = listaFotos[fotoSelecionadaIdx] || arma.fotoPrincipal || '';
+  const fotoAtual = fotosLocais[fotoSelecionadaIdx] || arma.fotoPrincipal || '';
+
+  // Função para comprimir e otimizar foto enviada pelo usuário
+  const otimizarFoto = (fonte: string | File): Promise<string> => {
+    return new Promise((resolve) => {
+      if (typeof fonte === 'string' && (fonte.startsWith('data:application/pdf') || fonte.includes('.pdf'))) {
+        alert('Atenção: Foi recebido um arquivo em PDF. Por favor tire uma foto da arma em formato JPEG ou PNG.');
+        resolve('');
+        return;
+      }
+
+      const img = new Image();
+      img.onload = () => {
+        const MAX_DIM = 1280;
+        let w = img.width;
+        let h = img.height;
+        if (w > MAX_DIM || h > MAX_DIM) {
+          if (w > h) {
+            h = Math.round((h * MAX_DIM) / w);
+            w = MAX_DIM;
+          } else {
+            w = Math.round((w * MAX_DIM) / h);
+            h = MAX_DIM;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, w, h);
+          resolve(canvas.toDataURL('image/jpeg', 0.85));
+        } else {
+          resolve(typeof fonte === 'string' ? fonte : '');
+        }
+      };
+
+      img.onerror = () => {
+        resolve(typeof fonte === 'string' ? fonte : '');
+      };
+
+      if (typeof fonte === 'string') {
+        img.src = fonte;
+      } else {
+        const reader = new FileReader();
+        reader.onload = () => {
+          img.src = reader.result as string;
+        };
+        reader.readAsDataURL(fonte);
+      }
+    });
+  };
+
+  // Adicionar foto diretamente no gerador e atualizar no banco
+  const handleAdicionarFoto = async (fonte: string | File) => {
+    try {
+      setSalvandoFoto(true);
+      const imagemOtimizada = await otimizarFoto(fonte);
+      if (!imagemOtimizada) return;
+
+      const novasFotos = [imagemOtimizada, ...fotosLocais];
+      setFotosLocais(novasFotos);
+      setFotoSelecionadaIdx(0);
+
+      // Persistir na arma no banco de dados
+      await atualizarArmaVenda(arma.id, {
+        fotos: novasFotos,
+        fotoPrincipal: imagemOtimizada
+      });
+    } catch (err) {
+      console.error('Erro ao salvar foto na arma:', err);
+    } finally {
+      setSalvandoFoto(false);
+    }
+  };
+
+  // Upload local de arquivo do computador
+  const handleUploadComputador = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    await handleAdicionarFoto(file);
+    e.target.value = '';
+  };
 
   // Gerar texto padrão para WhatsApp
   const gerarTextoPadrao = (estilo: 'comercial' | 'tecnico' | 'curto') => {
@@ -113,7 +238,7 @@ export function ModalGeradorAnuncio({ arma, isOpen, onClose }: ModalGeradorAnunc
     setTextoAnuncio(gerarTextoPadrao(tomIa));
   }, [arma, mostrarPreco, mostrarCalibre, mostrarAcessorios, mostrarEstado, mostrarContato, telefoneLoja, cidadeLoja, tomIa]);
 
-  // Função para desenhar no Canvas baseado no modelo oficial GCAC
+  // Função mestre de renderização no HTML5 Canvas
   useEffect(() => {
     if (!isOpen) return;
 
@@ -130,54 +255,55 @@ export function ModalGeradorAnuncio({ arma, isOpen, onClose }: ModalGeradorAnunc
     canvas.width = largura;
     canvas.height = altura;
 
-    // 1. FUNDO AZUL MEIA-NOITE GRADIENTE PROFUNDO
+    // 1. FUNDO AZUL MEIA-NOITE PROFUNDO GRADIENTE TÁTICO
     const bgGrad = ctx.createLinearGradient(0, 0, 0, altura);
-    bgGrad.addColorStop(0, '#010814');
-    bgGrad.addColorStop(0.2, '#03142e');
-    bgGrad.addColorStop(0.5, '#051f47');
-    bgGrad.addColorStop(0.8, '#03142e');
-    bgGrad.addColorStop(1, '#01060f');
+    bgGrad.addColorStop(0, '#010915');
+    bgGrad.addColorStop(0.18, '#031633');
+    bgGrad.addColorStop(0.5, '#05234f');
+    bgGrad.addColorStop(0.82, '#03142e');
+    bgGrad.addColorStop(1, '#010712');
     ctx.fillStyle = bgGrad;
     ctx.fillRect(0, 0, largura, altura);
 
-    // Glow azul marinho central
-    const glowGrad = ctx.createRadialGradient(largura / 2, altura * 0.42, 50, largura / 2, altura * 0.42, 520);
-    glowGrad.addColorStop(0, 'rgba(29, 78, 216, 0.28)');
-    glowGrad.addColorStop(0.6, 'rgba(14, 165, 233, 0.08)');
+    // Glow radial azul ciano de alto contraste no centro
+    const glowGrad = ctx.createRadialGradient(largura / 2, altura * 0.4, 40, largura / 2, altura * 0.4, 550);
+    glowGrad.addColorStop(0, 'rgba(30, 95, 230, 0.32)');
+    glowGrad.addColorStop(0.55, 'rgba(14, 165, 233, 0.12)');
     glowGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
     ctx.fillStyle = glowGrad;
     ctx.fillRect(0, 0, largura, altura);
 
-    // 2. TEXTO NO TOPO (Acima da moldura)
+    // 2. TEXTO SUPERIOR (Acima da moldura)
     ctx.textAlign = 'center';
     ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 20px "Segoe UI", sans-serif';
-    ctx.fillText('CATÁLOGO DE ARMAS USADAS • INTERMEDIAÇÃO LEGALIZADA', largura / 2, 42);
+    ctx.font = 'bold 22px "Segoe UI", sans-serif';
+    ctx.letterSpacing = '1px';
+    ctx.fillText('CATÁLOGO DE ARMAS USADAS • INTERMEDIAÇÃO LEGALIZADA', largura / 2, 40);
 
-    // 3. MOLDURA DOURADA COM DETALHES TÁTICOS
-    const pad = 46;
+    // 3. MOLDURA DOURADA COM DESIGN TÁTICO EXPANDIDO
+    const pad = 34; // Reduzido de 46 para 34 para ganho expressivo de área útil
     const molduraW = largura - pad * 2;
-    const molduraH = altura - pad * 2 - 20;
-    const molduraY = 56;
+    const molduraH = altura - pad * 2 - 16;
+    const molduraY = 52;
 
-    // Borda Dourada Externa
+    // Moldura Dourada Principal
     ctx.strokeStyle = '#c59b27';
     ctx.lineWidth = 3.5;
     ctx.beginPath();
-    ctx.roundRect(pad, molduraY, molduraW, molduraH, 24);
+    ctx.roundRect(pad, molduraY, molduraW, molduraH, 26);
     ctx.stroke();
 
-    // Borda Interna Ciano Fina Luminosa
-    ctx.strokeStyle = 'rgba(56, 189, 248, 0.35)';
-    ctx.lineWidth = 1;
+    // Borda Interna Ciano Luminosa
+    ctx.strokeStyle = 'rgba(56, 189, 248, 0.4)';
+    ctx.lineWidth = 1.2;
     ctx.beginPath();
-    ctx.roundRect(pad + 6, molduraY + 6, molduraW - 12, molduraH - 12, 18);
+    ctx.roundRect(pad + 7, molduraY + 7, molduraW - 14, molduraH - 14, 20);
     ctx.stroke();
 
-    // Cantoneiras decorativas douradas
-    const cSize = 24;
+    // Cantoneiras decorativas douradas reforçadas
+    const cSize = 28;
     ctx.strokeStyle = '#f59e0b';
-    ctx.lineWidth = 4;
+    ctx.lineWidth = 4.5;
     // Canto Sup Esq
     ctx.beginPath();
     ctx.moveTo(pad, molduraY + cSize);
@@ -203,11 +329,9 @@ export function ModalGeradorAnuncio({ arma, isOpen, onClose }: ModalGeradorAnunc
     ctx.lineTo(pad + molduraW, molduraY + molduraH - cSize);
     ctx.stroke();
 
-    // Carregar Imagens (Logo Oficial e Arma)
+    // Carregar Imagens
     const logoImg = new Image();
     const armaImg = new Image();
-
-    // Logo oficial anexada salva em /logo_oficial_gcac.png
     const logoSrc = '/logo_oficial_gcac.png';
 
     if (fotoAtual && (fotoAtual.startsWith('http://') || fotoAtual.startsWith('https://'))) {
@@ -215,99 +339,129 @@ export function ModalGeradorAnuncio({ arma, isOpen, onClose }: ModalGeradorAnunc
     }
 
     const renderConteudo = () => {
-      let topY = molduraY + 20;
+      let topY = molduraY + 18;
 
-      // 4. LOGO OFICIAL CENTRALIZADA
+      // 4. LOGO OFICIAL CENTRALIZADA COM REMOÇÃO AUTOMÁTICA DE FUNDO BRANCO
       if (mostrarLogo && logoImg.complete && logoImg.naturalWidth > 0) {
-        const logoH = 115;
-        const logoW = (logoImg.naturalWidth / logoImg.naturalHeight) * logoH;
-        ctx.drawImage(logoImg, (largura - logoW) / 2, topY, logoW, logoH);
+        const logoCanvas = criarImagemComFundoTransparente(logoImg);
+        const logoH = 130; // Aumentado para máximo impacto visual
+        const logoW = (logoCanvas.width / logoCanvas.height) * logoH;
+        const logoX = (largura - logoW) / 2;
+
+        // Glow suave atrás da logo
+        const logoGlow = ctx.createRadialGradient(largura / 2, topY + logoH / 2, 20, largura / 2, topY + logoH / 2, logoW * 0.7);
+        logoGlow.addColorStop(0, 'rgba(56, 189, 248, 0.22)');
+        logoGlow.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = logoGlow;
+        ctx.fillRect(logoX - 40, topY - 15, logoW + 80, logoH + 30);
+
+        ctx.drawImage(logoCanvas, logoX, topY, logoW, logoH);
         topY += logoH + 20;
       } else {
-        topY += 40;
+        topY += 36;
       }
 
-      // Linha separadora luminosa
-      const sepGrad = ctx.createLinearGradient(pad + 60, 0, pad + molduraW - 60, 0);
+      // Linha divisória luminosa
+      const sepGrad = ctx.createLinearGradient(pad + 40, 0, pad + molduraW - 40, 0);
       sepGrad.addColorStop(0, 'rgba(56, 189, 248, 0)');
-      sepGrad.addColorStop(0.5, 'rgba(56, 189, 248, 0.45)');
+      sepGrad.addColorStop(0.5, 'rgba(56, 189, 248, 0.5)');
       sepGrad.addColorStop(1, 'rgba(56, 189, 248, 0)');
       ctx.strokeStyle = sepGrad;
-      ctx.lineWidth = 1.5;
+      ctx.lineWidth = 1.8;
       ctx.beginPath();
-      ctx.moveTo(pad + 60, topY);
-      ctx.lineTo(pad + molduraW - 60, topY);
+      ctx.moveTo(pad + 40, topY);
+      ctx.lineTo(pad + molduraW - 40, topY);
       ctx.stroke();
-      topY += 28;
+      topY += 26;
 
       // 5. BADGES: [★ SEMINOVA REVISADA] (Esq) e [DISPONÍVEL] (Dir)
       const badgeY = topY;
+      const badgeH = 42; // Aumentado
+
       // Badge Esquerda Dourada
-      const bgBadgeDourada = ctx.createLinearGradient(pad + 40, 0, pad + 240, 0);
-      bgBadgeDourada.addColorStop(0, '#c69519');
+      const bgBadgeDourada = ctx.createLinearGradient(pad + 30, 0, pad + 270, 0);
+      bgBadgeDourada.addColorStop(0, '#b8860b');
+      bgBadgeDourada.addColorStop(0.5, '#f59e0b');
       bgBadgeDourada.addColorStop(1, '#eab308');
       ctx.fillStyle = bgBadgeDourada;
       ctx.beginPath();
-      ctx.roundRect(pad + 35, badgeY, 210, 36, 10);
+      ctx.roundRect(pad + 30, badgeY, 235, badgeH, 12);
       ctx.fill();
-      ctx.fillStyle = '#0a0a0a';
-      ctx.font = '900 14px "Segoe UI", sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('★ SEMINOVA REVISADA', pad + 35 + 105, badgeY + 23);
 
-      // Badge Direita Azul Neon
+      ctx.fillStyle = '#050505';
+      ctx.font = '900 16px "Segoe UI", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('★ SEMINOVA REVISADA', pad + 30 + 117, badgeY + 27);
+
+      // Badge Direita Status
+      const statusTexto = arma.status === 'vendida' ? 'VENDIDA' : arma.status === 'reservada' ? 'RESERVADA' : 'DISPONÍVEL';
+      const statusCor = arma.status === 'vendida' ? '#ef4444' : arma.status === 'reservada' ? '#f59e0b' : '#38bdf8';
+
       ctx.fillStyle = '#061733';
-      ctx.strokeStyle = '#38bdf8';
-      ctx.lineWidth = 1.8;
+      ctx.strokeStyle = statusCor;
+      ctx.lineWidth = 2.2;
       ctx.beginPath();
-      ctx.roundRect(pad + molduraW - 200, badgeY, 165, 36, 10);
+      ctx.roundRect(pad + molduraW - 220, badgeY, 190, badgeH, 12);
       ctx.fill();
       ctx.stroke();
-      ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 14px "Segoe UI", sans-serif';
-      ctx.fillText(arma.status === 'vendida' ? 'VENDIDA' : arma.status === 'reservada' ? 'RESERVADA' : 'DISPONÍVEL', pad + molduraW - 200 + 82, badgeY + 23);
 
-      topY += 45;
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 16px "Segoe UI", sans-serif';
+      ctx.fillText(statusTexto, pad + molduraW - 220 + 95, badgeY + 27);
+
+      topY += badgeH + 20;
 
       // 6. BLOCO CENTRAL: TÍTULO DA ARMA (Esq) + FOTO DA ARMA (Dir)
       const blocoMeioY = topY;
-      const blocoMeioH = formato === 'quadrado' ? 380 : 540;
+      const blocoMeioH = formato === 'quadrado' ? 390 : 540;
 
       // Lado Esquerdo: NOME DA ARMA
       ctx.textAlign = 'left';
-      ctx.fillStyle = '#ffffff';
-      ctx.font = '800 30px "Segoe UI", sans-serif';
-      ctx.fillText(arma.fabricante.toUpperCase(), pad + 40, blocoMeioY + 85);
 
-      // Modelo Grande com Efeito Gradiente e Sombra
-      const modeloGrad = ctx.createLinearGradient(pad + 40, blocoMeioY + 110, pad + 40, blocoMeioY + 190);
+      // Fabricante
+      ctx.fillStyle = '#f8fafc';
+      ctx.font = '800 34px "Segoe UI", sans-serif';
+      ctx.fillText(arma.fabricante.toUpperCase(), pad + 35, blocoMeioY + 80);
+
+      // Modelo Grande com Gradiente Prata / Branco e Sombra
+      const modeloGrad = ctx.createLinearGradient(pad + 35, blocoMeioY + 100, pad + 35, blocoMeioY + 185);
       modeloGrad.addColorStop(0, '#ffffff');
       modeloGrad.addColorStop(1, '#93c5fd');
+
+      ctx.save();
       ctx.fillStyle = modeloGrad;
-      ctx.font = '900 60px "Segoe UI", sans-serif';
-      ctx.fillText(arma.modelo.toUpperCase(), pad + 40, blocoMeioY + 160);
+      ctx.font = '900 74px "Segoe UI", sans-serif';
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+      ctx.shadowOffsetY = 6;
+      ctx.shadowBlur = 16;
+      ctx.fillText(arma.modelo.toUpperCase(), pad + 35, blocoMeioY + 160);
+      ctx.restore();
 
-      // Calibre em destaque azul celeste
+      // Calibre em destaque Ciano Neon
       ctx.fillStyle = '#38bdf8';
-      ctx.font = 'bold 26px "Segoe UI", sans-serif';
-      ctx.fillText(`CALIBRE ${arma.calibre.toUpperCase()}`, pad + 40, blocoMeioY + 205);
+      ctx.font = 'bold 30px "Segoe UI", sans-serif';
+      ctx.fillText(`CALIBRE ${arma.calibre.toUpperCase()}`, pad + 35, blocoMeioY + 215);
 
+      // Registro
       if (arma.sigmaSinarm) {
         ctx.fillStyle = '#e2e8f0';
-        ctx.font = '600 16px "Segoe UI", sans-serif';
-        ctx.fillText(`REGISTRO: ${arma.sigmaSinarm}`, pad + 40, blocoMeioY + 238);
+        ctx.font = '700 20px "Segoe UI", sans-serif';
+        ctx.fillText(`REGISTRO: ${arma.sigmaSinarm}`, pad + 35, blocoMeioY + 255);
       }
 
       // Lado Direito: FOTO DA ARMA COM MOLDURA ELEGANTE E SOMBRA
-      const boxFotoW = 540;
-      const boxFotoH = blocoMeioH - 40;
-      const boxFotoX = largura - pad - boxFotoW - 20;
-      const boxFotoY = blocoMeioY + 10;
+      const boxFotoW = 570; // Expandido para aproveitar toda a largura
+      const boxFotoH = blocoMeioH - 20;
+      const boxFotoX = largura - pad - boxFotoW - 15;
+      const boxFotoY = blocoMeioY;
 
       ctx.save();
-      // Glow suave de fundo para destacar a arma
-      const fotoGlow = ctx.createRadialGradient(boxFotoX + boxFotoW / 2, boxFotoY + boxFotoH / 2, 40, boxFotoX + boxFotoW / 2, boxFotoY + boxFotoH / 2, boxFotoW / 2);
-      fotoGlow.addColorStop(0, 'rgba(56, 189, 248, 0.18)');
+      // Glow suave de fundo para destacar o relevo da arma
+      const fotoGlow = ctx.createRadialGradient(
+        boxFotoX + boxFotoW / 2, boxFotoY + boxFotoH / 2, 40,
+        boxFotoX + boxFotoW / 2, boxFotoY + boxFotoH / 2, boxFotoW * 0.55
+      );
+      fotoGlow.addColorStop(0, 'rgba(56, 189, 248, 0.25)');
       fotoGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
       ctx.fillStyle = fotoGlow;
       ctx.fillRect(boxFotoX, boxFotoY, boxFotoW, boxFotoH);
@@ -315,7 +469,7 @@ export function ModalGeradorAnuncio({ arma, isOpen, onClose }: ModalGeradorAnunc
       const temFotoValida = armaImg.complete && armaImg.naturalWidth > 0 && !fotoAtual.includes('application/pdf');
 
       if (temFotoValida) {
-        // Redimensionar proporcional com contain
+        // Redimensionar proporcional com contain para não distorcer a arma
         const scale = Math.min((boxFotoW - 20) / armaImg.naturalWidth, (boxFotoH - 20) / armaImg.naturalHeight);
         const w = armaImg.naturalWidth * scale;
         const h = armaImg.naturalHeight * scale;
@@ -323,138 +477,186 @@ export function ModalGeradorAnuncio({ arma, isOpen, onClose }: ModalGeradorAnunc
         const y = boxFotoY + (boxFotoH - h) / 2;
 
         // Sombra realista abaixo da arma
-        ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
-        ctx.shadowBlur = 24;
-        ctx.shadowOffsetY = 12;
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.85)';
+        ctx.shadowBlur = 32;
+        ctx.shadowOffsetY = 16;
 
         ctx.drawImage(armaImg, x, y, w, h);
       } else {
-        // Placeholder estilizado
-        ctx.fillStyle = 'rgba(15, 23, 42, 0.6)';
-        ctx.strokeStyle = 'rgba(56, 189, 248, 0.2)';
-        ctx.lineWidth = 1.5;
+        // Moldura Placeholder Estilizada com Mira Central
+        ctx.fillStyle = 'rgba(6, 23, 51, 0.7)';
+        ctx.strokeStyle = 'rgba(56, 189, 248, 0.35)';
+        ctx.lineWidth = 1.8;
         ctx.beginPath();
-        ctx.roundRect(boxFotoX + 20, boxFotoY + 20, boxFotoW - 40, boxFotoH - 40, 16);
+        ctx.roundRect(boxFotoX + 15, boxFotoY + 15, boxFotoW - 30, boxFotoH - 30, 18);
         ctx.fill();
         ctx.stroke();
 
-        ctx.fillStyle = '#64748b';
-        ctx.font = 'bold 20px "Segoe UI", sans-serif';
+        // Desenhar mira tática decorativa
+        const miraX = boxFotoX + boxFotoW / 2;
+        const miraY = boxFotoY + boxFotoH / 2 - 20;
+        ctx.strokeStyle = '#38bdf8';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(miraX, miraY, 36, 0, Math.PI * 2);
+        ctx.moveTo(miraX - 48, miraY);
+        ctx.lineTo(miraX + 48, miraY);
+        ctx.moveTo(miraX, miraY - 48);
+        ctx.lineTo(miraX, miraY + 48);
+        ctx.stroke();
+
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = 'bold 22px "Segoe UI", sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillText('FOTO NÃO DISPONÍVEL', boxFotoX + boxFotoW / 2, boxFotoY + boxFotoH / 2);
+        ctx.fillText('FOTO NÃO CADASTRADA', miraX, miraY + 68);
+
+        ctx.fillStyle = '#64748b';
+        ctx.font = '14px "Segoe UI", sans-serif';
+        ctx.fillText('Clique em "Anexar Foto" para adicionar agora', miraX, miraY + 92);
       }
       ctx.restore();
 
-      topY += blocoMeioH + 5;
+      topY += blocoMeioH + 10;
 
-      // 7. GRADE DE 6 CAIXAS DE INFORMAÇÕES (2 Linhas x 3 Colunas)
-      const gridW = molduraW - 70;
-      const gridX = pad + 35;
-      const boxW = (gridW - 30) / 3;
-      const boxH = 58;
+      // 7. GRADE DE 6 ESPECIFICAÇÕES TÉCNICAS (2 Linhas x 3 Colunas)
+      const gridW = molduraW - 60;
+      const gridX = pad + 30;
+      const boxW = (gridW - 24) / 3;
+      const boxH = 82; // Aumentado de 58px para 82px
+
+      const formatarValorSeguro = (val?: string) => {
+        if (!val) return 'ORIGINAL';
+        return val.trim();
+      };
 
       const infos = [
-        { label: 'CALIBRE:', val: arma.calibre },
-        { label: 'CAPACIDADE:', val: arma.capacidade || '17+1' },
-        { label: 'INCLUI:', val: arma.quantidadeCarregadores ? `0${arma.quantidadeCarregadores} CARREGADORES` : (arma.acessorios ? arma.acessorios.slice(0, 16) : 'ORIGINAL') },
-        { label: 'ACABAMENTO:', val: arma.acabamento || 'OXIDADO' },
-        { label: 'ESTADO:', val: arma.estadoConservacao.split(' ')[0].toUpperCase() },
-        { label: 'SISTEMA:', val: arma.sigmaSinarm || 'SIGMA (CAC)' }
+        { label: 'CALIBRE:', val: arma.calibre.toUpperCase() },
+        { label: 'CAPACIDADE:', val: arma.capacidade || '17+1 TIROS' },
+        {
+          label: 'INCLUI:',
+          val: arma.quantidadeCarregadores
+            ? `${arma.quantidadeCarregadores.toString().padStart(2, '0')} CARREGADORES`
+            : formatarValorSeguro(arma.acessorios)
+        },
+        { label: 'ACABAMENTO:', val: formatarValorSeguro(arma.acabamento).toUpperCase() },
+        { label: 'ESTADO:', val: arma.estadoConservacao.toUpperCase() },
+        { label: 'SISTEMA:', val: (arma.sigmaSinarm || 'SIGMA (CAC)').toUpperCase() }
       ];
 
       infos.forEach((info, idx) => {
         const col = idx % 3;
         const row = Math.floor(idx / 3);
-        const bx = gridX + col * (boxW + 15);
+        const bx = gridX + col * (boxW + 12);
         const by = topY + row * (boxH + 12);
 
-        // Box Fundo Azul Meia-Noite
-        ctx.fillStyle = '#041733';
-        ctx.strokeStyle = '#1e4b85';
-        ctx.lineWidth = 1.5;
+        // Box Fundo Azul Meia-Noite com Borda Tática
+        ctx.fillStyle = '#041838';
+        ctx.strokeStyle = '#1d4880';
+        ctx.lineWidth = 1.8;
         ctx.beginPath();
-        ctx.roundRect(bx, by, boxW, boxH, 12);
+        ctx.roundRect(bx, by, boxW, boxH, 14);
         ctx.fill();
         ctx.stroke();
 
-        // Rótulo
+        // Rótulo Superior Ciano Claro
         ctx.textAlign = 'center';
-        ctx.fillStyle = '#94a3b8';
-        ctx.font = 'bold 11px "Segoe UI", sans-serif';
-        ctx.fillText(info.label, bx + boxW / 2, by + 20);
+        ctx.fillStyle = '#7dd3fc';
+        ctx.font = 'bold 14px "Segoe UI", sans-serif';
+        ctx.fillText(info.label, bx + boxW / 2, by + 26);
 
-        // Valor
+        // Valor Principal Branco com Ajuste Inteligente de Tamanho de Fonte
         ctx.fillStyle = '#ffffff';
-        ctx.font = '900 15px "Segoe UI", sans-serif';
-        ctx.fillText(info.val.toUpperCase(), bx + boxW / 2, by + 43);
+        const tamanhoFonte = info.val.length > 15 ? 18 : 23;
+        ctx.font = `900 ${tamanhoFonte}px "Segoe UI", sans-serif`;
+
+        // Se o valor for muito grande, trunca com reticências para não vazar o box
+        let valExibicao = info.val;
+        if (valExibicao.length > 22) {
+          valExibicao = valExibicao.slice(0, 20) + '...';
+        }
+        ctx.fillText(valExibicao, bx + boxW / 2, by + 58);
       });
 
-      topY += (boxH * 2) + 26;
+      topY += (boxH * 2) + 24;
 
       // 8. FAIXA DOURADA DE PREÇO
       if (mostrarPreco) {
         const faixaW = gridW;
-        const faixaH = 82;
+        const faixaH = 104; // Aumentado de 82px para 104px
         const faixaX = gridX;
-        const faixaY = topY + 12;
+        const faixaY = topY + 8;
 
         const douradoGrad = ctx.createLinearGradient(faixaX, 0, faixaX + faixaW, 0);
         douradoGrad.addColorStop(0, '#c7981b');
-        douradoGrad.addColorStop(0.3, '#f5c842');
-        douradoGrad.addColorStop(0.7, '#eab308');
+        douradoGrad.addColorStop(0.25, '#fbbf24');
+        douradoGrad.addColorStop(0.5, '#fef08a');
+        douradoGrad.addColorStop(0.75, '#fbbf24');
         douradoGrad.addColorStop(1, '#b48512');
 
+        ctx.save();
+        ctx.shadowColor = 'rgba(234, 179, 8, 0.4)';
+        ctx.shadowBlur = 24;
         ctx.fillStyle = douradoGrad;
         ctx.beginPath();
-        ctx.roundRect(faixaX, faixaY, faixaW, faixaH, 16);
+        ctx.roundRect(faixaX, faixaY, faixaW, faixaH, 18);
         ctx.fill();
+        ctx.restore();
 
-        ctx.fillStyle = '#261601';
-        ctx.font = 'bold 13px "Segoe UI", sans-serif';
+        ctx.fillStyle = '#361e01';
+        ctx.font = 'bold 16px "Segoe UI", sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillText('VALOR DE INVESTIMENTO', largura / 2, faixaY + 24);
+        ctx.fillText('VALOR DE INVESTIMENTO', largura / 2, faixaY + 30);
 
-        ctx.fillStyle = '#0a0a0a';
-        ctx.font = '900 44px "Segoe UI", sans-serif';
-        ctx.fillText(formatarMoeda(arma.valorAnunciado), largura / 2, faixaY + 65);
+        ctx.fillStyle = '#050505';
+        ctx.font = '900 58px "Segoe UI", sans-serif';
+        ctx.fillText(formatarMoeda(arma.valorAnunciado), largura / 2, faixaY + 84);
 
-        topY += faixaH + 26;
+        topY += faixaH + 28;
       } else {
         topY += 35;
       }
 
-      // 9. RODAPÉ DE CONTATOS DO ESCRITÓRIO
-      const rodapeY = altura - pad - 60;
+      // 9. RODAPÉ DE CONTATOS OFICIAL DO ESCRITÓRIO
+      const rodapeY = altura - pad - 68;
 
       if (mostrarContato) {
-        // Ícone verde e WhatsApp
+        // Badge WhatsApp Central
         ctx.textAlign = 'center';
+
+        // Desenhar Badge / Círculo Verde Neon WhatsApp
+        const zapX = largura / 2 - 200;
         ctx.fillStyle = '#22c55e';
-        ctx.font = 'bold 24px sans-serif';
-        ctx.fillText('💬', largura / 2 - 180, rodapeY);
+        ctx.beginPath();
+        ctx.arc(zapX, rodapeY - 8, 16, 0, Math.PI * 2);
+        ctx.fill();
 
         ctx.fillStyle = '#ffffff';
-        ctx.font = '900 24px "Segoe UI", sans-serif';
-        ctx.fillText(`WhatsApp: ${telefoneLoja}`, largura / 2, rodapeY);
+        ctx.font = 'bold 18px sans-serif';
+        ctx.fillText('📞', zapX, rodapeY - 2);
+
+        // Texto do WhatsApp em 28px Font-Black
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '900 28px "Segoe UI", sans-serif';
+        ctx.fillText(`WhatsApp: ${telefoneLoja}`, largura / 2 + 10, rodapeY);
 
         // Endereço e Cidade
         ctx.fillStyle = '#f87171';
-        ctx.font = 'bold 15px sans-serif';
-        ctx.fillText('📍', largura / 2 - 240, rodapeY + 28);
+        ctx.font = 'bold 18px sans-serif';
+        ctx.fillText('📍', largura / 2 - 280, rodapeY + 34);
 
-        ctx.fillStyle = '#cbd5e1';
-        ctx.font = '500 15px "Segoe UI", sans-serif';
-        ctx.fillText(cidadeLoja, largura / 2, rodapeY + 28);
+        ctx.fillStyle = '#e2e8f0';
+        ctx.font = '600 19px "Segoe UI", sans-serif';
+        ctx.fillText(cidadeLoja, largura / 2, rodapeY + 34);
       }
 
       // 10. TEXTO LEGAL FINAL FORA DA MOLDURA
       ctx.fillStyle = '#64748b';
-      ctx.font = '11px "Segoe UI", sans-serif';
+      ctx.font = '13px "Segoe UI", sans-serif';
       ctx.textAlign = 'center';
       ctx.fillText(
         'Venda autorizada sob intermediação legal. Transferência obrigatória pelo SIGMA/SINARM.',
         largura / 2,
-        altura - 16
+        altura - 14
       );
 
       setGerandoImagem(false);
@@ -489,7 +691,6 @@ export function ModalGeradorAnuncio({ arma, isOpen, onClose }: ModalGeradorAnunc
       dispararRender();
     }
 
-    // Timeout de segurança
     const timer = setTimeout(() => {
       dispararRender();
     }, 450);
@@ -538,12 +739,11 @@ export function ModalGeradorAnuncio({ arma, isOpen, onClose }: ModalGeradorAnunc
     }
   };
 
-  // Chamada ao Gemini IA para gerar copy persuasiva com fallback multi-modelos e fallback local
+  // Chamada ao Gemini IA para gerar copy persuasiva com fallback multi-modelos e local
   const gerarComGemini = async () => {
     const key = import.meta.env.VITE_GEMINI_API_KEY || localStorage.getItem('gemini_api_key') || chaveGeminiInput.trim();
 
     if (!key) {
-      // Abre o mini formulário para inserir a chave facilmente sem travar
       setMostrarConfigChave(true);
       return;
     }
@@ -609,7 +809,6 @@ Mantenha emojis de armas/tiro/fogo, bullet points claros e destaque a exigência
       if (textoGerado) {
         setTextoAnuncio(textoGerado);
       } else {
-        // Se a chave for inválida ou todos os endpoints falharem, gera localmente com altíssima qualidade
         setTextoAnuncio(gerarTextoPadrao(tomIa));
         setMostrarConfigChave(true);
       }
@@ -624,297 +823,340 @@ Mantenha emojis de armas/tiro/fogo, bullet points claros e destaque a exigência
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm overflow-y-auto">
-      <div className="bg-brand-dark-2 border border-brand-dark-5 rounded-2xl w-full max-w-5xl overflow-hidden shadow-2xl my-8">
-        {/* Top Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-brand-dark-5 bg-brand-dark-3/50">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
-              <Sparkles size={20} />
-            </div>
-            <div>
-              <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                Gerador de Anúncio Oficial GCAC
-                <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                  {arma.fabricante} {arma.modelo}
-                </span>
-              </h2>
-              <p className="text-xs text-gray-400">
-                Arte premium oficial do escritório pronta para WhatsApp, Instagram e Redes
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-2 rounded-xl text-gray-400 hover:text-white hover:bg-brand-dark-4 transition-colors"
-          >
-            <X size={20} />
-          </button>
-        </div>
-
-        {/* Conteúdo Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 p-6">
-          {/* Coluna Esquerda: Preview do Canvas (Imagem Gerada) */}
-          <div className="lg:col-span-7 flex flex-col items-center">
-            <div className="flex items-center justify-between w-full mb-3">
-              <span className="text-xs font-bold text-gray-300 flex items-center gap-1.5 uppercase tracking-wider">
-                <Eye size={14} className="text-amber-400" /> Pré-visualização da Arte Oficial
-              </span>
-
-              {/* Seletor de Formato */}
-              <div className="flex items-center bg-brand-dark-3 p-1 rounded-xl border border-brand-dark-5">
-                <button
-                  type="button"
-                  onClick={() => setFormato('quadrado')}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                    formato === 'quadrado'
-                      ? 'bg-amber-500 text-black shadow-md'
-                      : 'text-gray-400 hover:text-white'
-                  }`}
-                >
-                  <LayoutGrid size={13} /> Feed (4:5)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setFormato('stories')}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                    formato === 'stories'
-                      ? 'bg-amber-500 text-black shadow-md'
-                      : 'text-gray-400 hover:text-white'
-                  }`}
-                >
-                  <Smartphone size={13} /> Stories (9:16)
-                </button>
+    <>
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm overflow-y-auto">
+        <div className="bg-brand-dark-2 border border-brand-dark-5 rounded-2xl w-full max-w-5xl overflow-hidden shadow-2xl my-8">
+          {/* Top Header */}
+          <div className="flex items-center justify-between px-6 py-4 border-b border-brand-dark-5 bg-brand-dark-3/50">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
+                <Sparkles size={20} />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                  Gerador de Anúncio Oficial GCAC
+                  <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                    {arma.fabricante} {arma.modelo}
+                  </span>
+                </h2>
+                <p className="text-xs text-gray-400">
+                  Arte premium oficial do escritório pronta para WhatsApp, Instagram e Redes
+                </p>
               </div>
             </div>
-
-            {/* Canvas Container com Zoom Adaptativo */}
-            <div className="relative w-full flex items-center justify-center p-3 bg-[#0a0d14] border border-brand-dark-5 rounded-2xl overflow-hidden min-h-[500px]">
-              {gerandoImagem && (
-                <div className="absolute inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-10 text-amber-400 gap-2 text-xs font-bold">
-                  <RefreshCw size={18} className="animate-spin" /> Renderizando Flyer Oficial...
-                </div>
-              )}
-              <canvas
-                ref={canvasRef}
-                style={{
-                  maxWidth: '100%',
-                  maxHeight: formato === 'quadrado' ? '500px' : '560px',
-                  objectFit: 'contain',
-                  borderRadius: '12px',
-                  boxShadow: '0 20px 40px rgba(0,0,0,0.6)'
-                }}
-              />
-            </div>
-
-            {/* Miniaturas de fotos da arma para escolher */}
-            {listaFotos.length > 1 && (
-              <div className="flex items-center gap-2 mt-3 w-full overflow-x-auto pb-2">
-                <span className="text-[11px] text-gray-400 font-medium shrink-0">Foto no Card:</span>
-                {listaFotos.map((f, i) => (
-                  <button
-                    key={i}
-                    type="button"
-                    onClick={() => setFotoSelecionadaIdx(i)}
-                    className={`relative w-12 h-12 rounded-lg overflow-hidden border-2 transition-all shrink-0 ${
-                      fotoSelecionadaIdx === i ? 'border-amber-400 scale-105' : 'border-brand-dark-5 opacity-60 hover:opacity-100'
-                    }`}
-                  >
-                    <img src={f} alt="" className="w-full h-full object-cover" />
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {/* Botão Principal de Download da Imagem */}
             <button
-              type="button"
-              onClick={baixarImagem}
-              className="mt-4 w-full flex items-center justify-center gap-2.5 py-3.5 px-6 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black font-extrabold text-sm shadow-lg shadow-amber-500/20 transition-all active:scale-[0.99]"
+              onClick={onClose}
+              className="p-2 rounded-xl text-gray-400 hover:text-white hover:bg-brand-dark-4 transition-colors"
             >
-              <Download size={18} /> Baixar Imagem Oficial do Anúncio (PNG)
+              <X size={20} />
             </button>
           </div>
 
-          {/* Coluna Direita: Personalização e Texto WhatsApp com Gemini */}
-          <div className="lg:col-span-5 flex flex-col gap-4">
-            {/* Bloco de Opções Visuais */}
-            <div className="p-4 rounded-xl bg-brand-dark-3/60 border border-brand-dark-5 space-y-2.5">
-              <span className="text-xs font-bold text-gray-300 uppercase tracking-wider block">
-                Elementos Visíveis na Imagem
-              </span>
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                <label className="flex items-center gap-2 text-gray-300 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={mostrarPreco}
-                    onChange={e => setMostrarPreco(e.target.checked)}
-                    className="rounded border-gray-600 text-amber-500 focus:ring-amber-500"
-                  />
-                  Preço de Venda
-                </label>
-                <label className="flex items-center gap-2 text-gray-300 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={mostrarCalibre}
-                    onChange={e => setMostrarCalibre(e.target.checked)}
-                    className="rounded border-gray-600 text-amber-500 focus:ring-amber-500"
-                  />
-                  Calibre da Arma
-                </label>
-                <label className="flex items-center gap-2 text-gray-300 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={mostrarAcessorios}
-                    onChange={e => setMostrarAcessorios(e.target.checked)}
-                    className="rounded border-gray-600 text-amber-500 focus:ring-amber-500"
-                  />
-                  Acessórios Inclusos
-                </label>
-                <label className="flex items-center gap-2 text-gray-300 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={mostrarEstado}
-                    onChange={e => setMostrarEstado(e.target.checked)}
-                    className="rounded border-gray-600 text-amber-500 focus:ring-amber-500"
-                  />
-                  Estado / Condição
-                </label>
-                <label className="flex items-center gap-2 text-gray-300 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={mostrarContato}
-                    onChange={e => setMostrarContato(e.target.checked)}
-                    className="rounded border-gray-600 text-amber-500 focus:ring-amber-500"
-                  />
-                  Contato / WhatsApp
-                </label>
-                <label className="flex items-center gap-2 text-gray-300 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={mostrarLogo}
-                    onChange={e => setMostrarLogo(e.target.checked)}
-                    className="rounded border-gray-600 text-amber-500 focus:ring-amber-500"
-                  />
-                  Logo Oficial GCAC
-                </label>
-              </div>
-
-              <div className="flex items-center gap-1.5 text-[11px] text-emerald-400 bg-emerald-500/10 p-2 rounded-lg border border-emerald-500/20 mt-2">
-                <Shield size={13} className="shrink-0" />
-                <span>Sigilo Ativo: Nome do antigo dono e Nº de Série ficam sempre ocultos do público.</span>
-              </div>
-            </div>
-
-            {/* Bloco de Texto / WhatsApp com Gemini IA */}
-            <div className="p-4 rounded-xl bg-brand-dark-3/60 border border-brand-dark-5 flex-1 flex flex-col">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-bold text-gray-300 uppercase tracking-wider flex items-center gap-1.5">
-                  <Share2 size={14} className="text-amber-400" /> Legenda para WhatsApp / Redes
+          {/* Conteúdo Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 p-6">
+            {/* Coluna Esquerda: Preview do Canvas (Imagem Gerada) */}
+            <div className="lg:col-span-7 flex flex-col items-center">
+              <div className="flex items-center justify-between w-full mb-3">
+                <span className="text-xs font-bold text-gray-300 flex items-center gap-1.5 uppercase tracking-wider">
+                  <Eye size={14} className="text-amber-400" /> Pré-visualização da Arte Oficial
                 </span>
 
-                <div className="flex items-center gap-1.5">
-                  <select
-                    value={tomIa}
-                    onChange={e => setTomIa(e.target.value as any)}
-                    className="bg-brand-dark-4 text-[11px] text-gray-300 rounded-lg px-2 py-1 border border-brand-dark-5"
-                  >
-                    <option value="comercial">Comercial</option>
-                    <option value="tecnico">Técnico</option>
-                    <option value="curto">Rápido / Status</option>
-                  </select>
-
+                {/* Seletor de Formato */}
+                <div className="flex items-center bg-brand-dark-3 p-1 rounded-xl border border-brand-dark-5">
                   <button
                     type="button"
-                    onClick={gerarComGemini}
-                    disabled={gerandoIa}
-                    className="flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-lg bg-indigo-600/30 text-indigo-300 border border-indigo-500/40 hover:bg-indigo-600/50 transition-colors"
+                    onClick={() => setFormato('quadrado')}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                      formato === 'quadrado'
+                        ? 'bg-amber-500 text-black shadow-md'
+                        : 'text-gray-400 hover:text-white'
+                    }`}
                   >
-                    <Sparkles size={12} className={gerandoIa ? 'animate-spin' : ''} />
-                    {gerandoIa ? 'Gerando...' : 'Gemini IA'}
+                    <LayoutGrid size={13} /> Feed (4:5)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFormato('stories')}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                      formato === 'stories'
+                        ? 'bg-amber-500 text-black shadow-md'
+                        : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    <Smartphone size={13} /> Stories (9:16)
                   </button>
                 </div>
               </div>
 
-              {/* Painel Amigável para Inserir Chave Gemini caso ainda não configurada */}
-              {mostrarConfigChave && (
-                <div className="mb-3 p-3 bg-indigo-500/10 border border-indigo-500/30 rounded-xl space-y-2 text-xs animate-fade-in">
-                  <div className="flex items-center justify-between text-indigo-300 font-bold">
-                    <span className="flex items-center gap-1.5">
-                      <Key size={13} /> Ativar Assistente Gemini IA
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setMostrarConfigChave(false)}
-                      className="text-gray-400 hover:text-white"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                  <p className="text-[11px] text-gray-300">
-                    Cole sua chave da API do Google Gemini (gratuita) para gerar copies persuasivas:
-                  </p>
-                  <div className="flex gap-1.5">
-                    <input
-                      type="password"
-                      value={chaveGeminiInput}
-                      onChange={e => setChaveGeminiInput(e.target.value)}
-                      placeholder="AIzaSy..."
-                      className="input flex-1 text-xs py-1.5 bg-[#0a0d14]"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleSalvarChaveGemini}
-                      disabled={!chaveGeminiInput.trim()}
-                      className="btn-primary text-xs px-3 py-1.5 font-bold shrink-0"
-                    >
-                      Salvar & Gerar
-                    </button>
-                  </div>
-                  <a
-                    href="https://aistudio.google.com/app/apikey"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-[10px] text-indigo-400 hover:underline flex items-center gap-1 mt-1"
+              {/* Barra de Ações Rápidas de Foto (Caso a foto não tenha sido cadastrada ou precise trocar) */}
+              <div className="flex items-center justify-between w-full mb-2 px-3 py-2 bg-brand-dark-3/70 border border-brand-dark-5 rounded-xl text-xs">
+                <span className="text-gray-300 flex items-center gap-1.5 font-medium">
+                  <Camera size={14} className="text-amber-400" />
+                  {fotosLocais.length > 0 ? `${fotosLocais.length} foto(s) da arma` : 'Arma sem foto ainda'}
+                </span>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setModalQrAberto(true)}
+                    className="flex items-center gap-1 text-[11px] font-bold text-amber-300 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 px-2.5 py-1 rounded-lg transition-colors"
                   >
-                    Obter chave gratuita no Google AI Studio <ExternalLink size={10} />
-                  </a>
+                    <QrCode size={13} /> Foto Celular
+                  </button>
+
+                  <label className="flex items-center gap-1 text-[11px] font-bold text-gray-200 bg-brand-dark-4 hover:bg-brand-dark-5 border border-brand-dark-5 px-2.5 py-1 rounded-lg cursor-pointer transition-colors">
+                    <Upload size={13} /> Anexar Foto
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleUploadComputador}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+              </div>
+
+              {/* Canvas Container com Zoom Adaptativo */}
+              <div className="relative w-full flex items-center justify-center p-3 bg-[#0a0d14] border border-brand-dark-5 rounded-2xl overflow-hidden min-h-[500px]">
+                {(gerandoImagem || salvandoFoto) && (
+                  <div className="absolute inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center z-10 text-amber-400 gap-2 text-xs font-bold">
+                    <RefreshCw size={18} className="animate-spin" />
+                    {salvandoFoto ? 'Salvando foto na arma...' : 'Renderizando Flyer Oficial...'}
+                  </div>
+                )}
+                <canvas
+                  ref={canvasRef}
+                  style={{
+                    maxWidth: '100%',
+                    maxHeight: formato === 'quadrado' ? '500px' : '560px',
+                    objectFit: 'contain',
+                    borderRadius: '12px',
+                    boxShadow: '0 20px 40px rgba(0,0,0,0.6)'
+                  }}
+                />
+              </div>
+
+              {/* Miniaturas de fotos da arma para escolher */}
+              {fotosLocais.length > 1 && (
+                <div className="flex items-center gap-2 mt-3 w-full overflow-x-auto pb-2">
+                  <span className="text-[11px] text-gray-400 font-medium shrink-0">Foto em Destaque:</span>
+                  {fotosLocais.map((f, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => setFotoSelecionadaIdx(i)}
+                      className={`relative w-12 h-12 rounded-lg overflow-hidden border-2 transition-all shrink-0 ${
+                        fotoSelecionadaIdx === i ? 'border-amber-400 scale-105' : 'border-brand-dark-5 opacity-60 hover:opacity-100'
+                      }`}
+                    >
+                      <img src={f} alt="" className="w-full h-full object-cover" />
+                    </button>
+                  ))}
                 </div>
               )}
 
-              {/* Textarea 100% legível com fundo escuro sólido e texto claro */}
-              <textarea
-                value={textoAnuncio}
-                onChange={e => setTextoAnuncio(e.target.value)}
-                rows={11}
-                style={{ backgroundColor: '#0c1017', color: '#f3f4f6' }}
-                className="w-full flex-1 bg-[#0c1017] text-gray-100 border border-gray-700/80 rounded-xl p-3 text-xs font-sans leading-relaxed resize-none focus:border-amber-500 focus:outline-none shadow-inner"
-                placeholder="Texto do anúncio..."
-              />
-
+              {/* Botão Principal de Download da Imagem */}
               <button
                 type="button"
-                onClick={copiarTexto}
-                className={`mt-3 w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl font-bold text-xs transition-all ${
-                  copiado
-                    ? 'bg-emerald-600 text-white'
-                    : 'bg-brand-dark-4 hover:bg-brand-dark-5 text-gray-200 border border-brand-dark-5'
-                }`}
+                onClick={baixarImagem}
+                className="mt-4 w-full flex items-center justify-center gap-2.5 py-3.5 px-6 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black font-extrabold text-sm shadow-lg shadow-amber-500/20 transition-all active:scale-[0.99]"
               >
-                {copiado ? (
-                  <>
-                    <Check size={16} /> Texto Copiado para a Área de Transferência!
-                  </>
-                ) : (
-                  <>
-                    <Copy size={16} /> Copiar Texto para o WhatsApp
-                  </>
-                )}
+                <Download size={18} /> Baixar Imagem Oficial do Anúncio (PNG)
               </button>
+            </div>
+
+            {/* Coluna Direita: Personalização e Texto WhatsApp com Gemini */}
+            <div className="lg:col-span-5 flex flex-col gap-4">
+              {/* Bloco de Opções Visuais */}
+              <div className="p-4 rounded-xl bg-brand-dark-3/60 border border-brand-dark-5 space-y-2.5">
+                <span className="text-xs font-bold text-gray-300 uppercase tracking-wider block">
+                  Elementos Visíveis na Imagem
+                </span>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <label className="flex items-center gap-2 text-gray-300 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={mostrarPreco}
+                      onChange={e => setMostrarPreco(e.target.checked)}
+                      className="rounded border-gray-600 text-amber-500 focus:ring-amber-500"
+                    />
+                    Preço de Venda
+                  </label>
+                  <label className="flex items-center gap-2 text-gray-300 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={mostrarCalibre}
+                      onChange={e => setMostrarCalibre(e.target.checked)}
+                      className="rounded border-gray-600 text-amber-500 focus:ring-amber-500"
+                    />
+                    Calibre da Arma
+                  </label>
+                  <label className="flex items-center gap-2 text-gray-300 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={mostrarAcessorios}
+                      onChange={e => setMostrarAcessorios(e.target.checked)}
+                      className="rounded border-gray-600 text-amber-500 focus:ring-amber-500"
+                    />
+                    Acessórios Inclusos
+                  </label>
+                  <label className="flex items-center gap-2 text-gray-300 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={mostrarEstado}
+                      onChange={e => setMostrarEstado(e.target.checked)}
+                      className="rounded border-gray-600 text-amber-500 focus:ring-amber-500"
+                    />
+                    Estado / Condição
+                  </label>
+                  <label className="flex items-center gap-2 text-gray-300 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={mostrarContato}
+                      onChange={e => setMostrarContato(e.target.checked)}
+                      className="rounded border-gray-600 text-amber-500 focus:ring-amber-500"
+                    />
+                    Contato / WhatsApp
+                  </label>
+                  <label className="flex items-center gap-2 text-gray-300 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={mostrarLogo}
+                      onChange={e => setMostrarLogo(e.target.checked)}
+                      className="rounded border-gray-600 text-amber-500 focus:ring-amber-500"
+                    />
+                    Logo Oficial GCAC
+                  </label>
+                </div>
+
+                <div className="flex items-center gap-1.5 text-[11px] text-emerald-400 bg-emerald-500/10 p-2 rounded-lg border border-emerald-500/20 mt-2">
+                  <Shield size={13} className="shrink-0" />
+                  <span>Sigilo Ativo: Nome do antigo dono e Nº de Série ficam sempre ocultos do público.</span>
+                </div>
+              </div>
+
+              {/* Bloco de Texto / WhatsApp com Gemini IA */}
+              <div className="p-4 rounded-xl bg-brand-dark-3/60 border border-brand-dark-5 flex-1 flex flex-col">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-bold text-gray-300 uppercase tracking-wider flex items-center gap-1.5">
+                    <Share2 size={14} className="text-amber-400" /> Legenda para WhatsApp / Redes
+                  </span>
+
+                  <div className="flex items-center gap-1.5">
+                    <select
+                      value={tomIa}
+                      onChange={e => setTomIa(e.target.value as any)}
+                      className="bg-brand-dark-4 text-[11px] text-gray-300 rounded-lg px-2 py-1 border border-brand-dark-5"
+                    >
+                      <option value="comercial">Comercial</option>
+                      <option value="tecnico">Técnico</option>
+                      <option value="curto">Rápido / Status</option>
+                    </select>
+
+                    <button
+                      type="button"
+                      onClick={gerarComGemini}
+                      disabled={gerandoIa}
+                      className="flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-lg bg-indigo-600/30 text-indigo-300 border border-indigo-500/40 hover:bg-indigo-600/50 transition-colors"
+                    >
+                      <Sparkles size={12} className={gerandoIa ? 'animate-spin' : ''} />
+                      {gerandoIa ? 'Gerando...' : 'Gemini IA'}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Painel Amigável para Inserir Chave Gemini caso ainda não configurada */}
+                {mostrarConfigChave && (
+                  <div className="mb-3 p-3 bg-indigo-500/10 border border-indigo-500/30 rounded-xl space-y-2 text-xs animate-fade-in">
+                    <div className="flex items-center justify-between text-indigo-300 font-bold">
+                      <span className="flex items-center gap-1.5">
+                        <Key size={13} /> Ativar Assistente Gemini IA
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setMostrarConfigChave(false)}
+                        className="text-gray-400 hover:text-white"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                    <p className="text-[11px] text-gray-300">
+                      Cole sua chave da API do Google Gemini (gratuita) para gerar copies persuasivas:
+                    </p>
+                    <div className="flex gap-1.5">
+                      <input
+                        type="password"
+                        value={chaveGeminiInput}
+                        onChange={e => setChaveGeminiInput(e.target.value)}
+                        placeholder="AIzaSy..."
+                        className="input flex-1 text-xs py-1.5 bg-[#0a0d14]"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleSalvarChaveGemini}
+                        disabled={!chaveGeminiInput.trim()}
+                        className="btn-primary text-xs px-3 py-1.5 font-bold shrink-0"
+                      >
+                        Salvar & Gerar
+                      </button>
+                    </div>
+                    <a
+                      href="https://aistudio.google.com/app/apikey"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-[10px] text-indigo-400 hover:underline flex items-center gap-1 mt-1"
+                    >
+                      Obter chave gratuita no Google AI Studio <ExternalLink size={10} />
+                    </a>
+                  </div>
+                )}
+
+                {/* Textarea 100% legível com fundo escuro sólido e texto claro */}
+                <textarea
+                  value={textoAnuncio}
+                  onChange={e => setTextoAnuncio(e.target.value)}
+                  rows={11}
+                  style={{ backgroundColor: '#0c1017', color: '#f3f4f6' }}
+                  className="w-full flex-1 bg-[#0c1017] text-gray-100 border border-gray-700/80 rounded-xl p-3 text-xs font-sans leading-relaxed resize-none focus:border-amber-500 focus:outline-none shadow-inner"
+                  placeholder="Texto do anúncio..."
+                />
+
+                <button
+                  type="button"
+                  onClick={copiarTexto}
+                  className={`mt-3 w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl font-bold text-xs transition-all ${
+                    copiado
+                      ? 'bg-emerald-600 text-white'
+                      : 'bg-brand-dark-4 hover:bg-brand-dark-5 text-gray-200 border border-brand-dark-5'
+                  }`}
+                >
+                  {copiado ? (
+                    <>
+                      <Check size={16} /> Texto Copiado para a Área de Transferência!
+                    </>
+                  ) : (
+                    <>
+                      <Copy size={16} /> Copiar Texto para o WhatsApp
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
+
+      {/* Modal QR Code para fotografar direto pelo celular sem sair do gerador */}
+      <ModalUploadCelular
+        isOpen={modalQrAberto}
+        onClose={() => setModalQrAberto(false)}
+        titulo="Fotografar Arma com o Celular"
+        onUploadSuccess={async (url) => {
+          if (!url) return;
+          await handleAdicionarFoto(url);
+          setModalQrAberto(false);
+        }}
+      />
+    </>
   );
 }
