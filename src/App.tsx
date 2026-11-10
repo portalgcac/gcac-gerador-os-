@@ -54,6 +54,8 @@ import { GerenciadorDeclaracoes } from './components/declaracoes/GerenciadorDecl
 import { HomePagePublica } from './pages/HomePagePublica';
 import { SolicitarServicoPage } from './pages/SolicitarServicoPage';
 import { UploadCelularPage } from './pages/UploadCelularPage';
+import { ArmasVendaProvider } from './context/ArmasVendaContext';
+import { ArmasVendaPage } from './pages/ArmasVendaPage';
 
 const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
@@ -299,11 +301,12 @@ export default function App() {
           <OrdensProvider>
             <OrcamentosProvider>
               <ClientesProvider>
-                <ServicosProvider>
-                  <RecibosProvider>
-                    <AgendamentosProvider>
-                      <FinanceiroProvider>
-                        <LembretesProvider>
+                <ArmasVendaProvider>
+                  <ServicosProvider>
+                    <RecibosProvider>
+                      <AgendamentosProvider>
+                        <FinanceiroProvider>
+                          <LembretesProvider>
                           <BrowserRouter>
                           <Routes>
                             {/* Rotas Públicas */}
@@ -387,6 +390,9 @@ export default function App() {
                               } />
                               <Route path="recibos/:id" element={<RotaProtegida modulo="recibos"><PaginaDetalheRecibo /></RotaProtegida>} />
 
+                              {/* Armas à Venda (Consignados) */}
+                              <Route path="armas-venda" element={<RotaProtegida modulo="ordens"><ArmasVendaPage /></RotaProtegida>} />
+
                               {/* Admin: Gestão de Atiradores CAC Individual */}
                               <Route path="admin/atiradores" element={
                                 <RotaProtegida modulo="painel">
@@ -416,10 +422,11 @@ export default function App() {
                   </AgendamentosProvider>
                 </RecibosProvider>
               </ServicosProvider>
-            </ClientesProvider>
-          </OrcamentosProvider>
-        </OrdensProvider>
-      </NotificacoesSistemaProvider>
+            </ArmasVendaProvider>
+          </ClientesProvider>
+        </OrcamentosProvider>
+      </OrdensProvider>
+    </NotificacoesSistemaProvider>
     </AuthProvider>
   </GoogleOAuthProvider>
 );

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
-  LayoutDashboard, FileText, Plus, Settings, LogOut, Cloud, CloudOff, Loader, X, Users, Receipt, Calendar, BarChart3, ListTodo, Bell, Shield, FileSpreadsheet, Building2, UserPlus, MessageSquare, BadgeDollarSign, Target, Scale, ArrowRightLeft, Menu, Clock
+  LayoutDashboard, FileText, Plus, Settings, LogOut, Cloud, CloudOff, Loader, X, Users, Receipt, Calendar, BarChart3, ListTodo, Bell, Shield, FileSpreadsheet, Building2, UserPlus, MessageSquare, BadgeDollarSign, Target, Scale, ArrowRightLeft, Menu, Clock, Crosshair
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../db/supabase';
@@ -18,6 +18,7 @@ export const LINKS_MENU_BASE = [
   { to: '/rotina',        label: 'Rotina Diária',         icon: ListTodo,        slug: 'rotina' },
   { to: '/ordens',        label: 'Ordens de Serviço',     icon: FileText,        slug: 'ordens' },
   { to: '/orcamentos',    label: 'Orçamentos',            icon: Receipt,         slug: 'orcamentos' },
+  { to: '/armas-venda',   label: 'Armas à Venda',         icon: Crosshair,       slug: 'armas-venda' },
   { to: '/clientes',      label: 'Meus Clientes',         icon: Users,           slug: 'clientes' },
   { to: '/agenda',        label: 'Agenda / Lembretes',    icon: ListTodo,        slug: 'agenda' },
   { to: '/agendamentos',  label: 'Agendamentos',          icon: Calendar,        slug: 'agendamentos' },
@@ -107,6 +108,10 @@ export const temAcessoLink = (link: typeof LINKS_MENU_BASE[0], usuario: any, tem
   }
 
   if (link.slug === 'ponto') {
+    return usuario?.tipoConta !== 'cac_individual';
+  }
+
+  if (link.slug === 'armas-venda') {
     return usuario?.tipoConta !== 'cac_individual';
   }
 

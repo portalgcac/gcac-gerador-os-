@@ -647,3 +647,57 @@ export interface FechamentoColaborador {
   criadoEm: string;
   atualizadoEm?: string;
 }
+
+// ─── Armas à Venda (Consignados / Vitrine) ──────────────────────────────────
+
+export type StatusArmaVenda =
+  | 'disponivel'
+  | 'reservada'
+  | 'em_transferencia'
+  | 'vendida'
+  | 'devolvida';
+
+export interface ArmaVenda {
+  id: string;
+  empresaId: string;
+  clienteId?: string;
+  proprietarioNome: string;
+  proprietarioTelefone?: string;
+  proprietarioCpf?: string;
+  proprietarioCr?: string;
+  tipo: string;
+  fabricante: string;
+  modelo: string;
+  calibre: string;
+  numeroSerie?: string;
+  sigmaSinarm?: string;
+  numeroCraf?: string;
+  crafValidade?: string;
+  capacidade?: string;
+  acabamento?: string;
+  comprimentoCano?: string;
+  estadoConservacao: string;
+  quantidadeCarregadores?: number;
+  acessorios?: string;
+  localArma: 'proprietario' | 'loja_custodia';
+  fotos: string[];
+  fotoPrincipal?: string;
+  valorCliente: number;
+  comissaoTipo: 'percentual' | 'fixo';
+  comissaoValor: number;
+  valorAnunciado: number;
+  lucroEstimado: number;
+  status: StatusArmaVenda;
+  observacoesInternas?: string;
+  anuncioTitulo?: string;
+  anuncioDescricao?: string;
+  compradorNome?: string;
+  compradorTelefone?: string;
+  compradorCpf?: string;
+  dataVenda?: string;
+  ordemServicoId?: string;
+  criadoPorNome?: string;
+  criadoEm: string;
+  atualizadoEm?: string;
+}
+
