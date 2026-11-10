@@ -352,18 +352,26 @@ export function ArmasVendaPage() {
               >
                 {/* Imagem de Capa com Badges */}
                 <div className="relative aspect-video bg-black/60 overflow-hidden">
-                  {foto ? (
+                  {foto && !foto.includes('application/pdf') ? (
                     <img
                       src={foto}
                       alt={`${arma.fabricante} ${arma.modelo}`}
+                      onError={(e) => {
+                        (e.target as HTMLElement).style.display = 'none';
+                        const parent = (e.target as HTMLElement).parentElement;
+                        const fallback = parent?.querySelector('.foto-fallback-card') as HTMLElement;
+                        if (fallback) fallback.style.display = 'flex';
+                      }}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     />
-                  ) : (
-                    <div className="w-full h-full flex flex-col items-center justify-center text-gray-600 gap-2">
-                      <Crosshair size={32} />
-                      <span className="text-[11px] font-semibold">Sem Foto Cadastrada</span>
-                    </div>
-                  )}
+                  ) : null}
+                  <div
+                    style={{ display: (foto && !foto.includes('application/pdf')) ? 'none' : 'flex' }}
+                    className="foto-fallback-card w-full h-full flex flex-col items-center justify-center text-gray-500 gap-2 bg-brand-dark-3"
+                  >
+                    <Crosshair size={32} className="text-gray-600" />
+                    <span className="text-[11px] font-semibold text-gray-400">Sem Foto Cadastrada</span>
+                  </div>
 
                   {/* Status Badge */}
                   <div className="absolute top-3 left-3">

@@ -227,24 +227,73 @@ export function ModalFormArmaVenda({
     }
   };
 
+  // Função utilitária para comprimir e otimizar fotos da arma (reduz de 15MB para ~150KB)
+  const otimizarImagemParaFoto = async (fonte: string | File): Promise<string> => {
+    return new Promise((resolve) => {
+      // Se for PDF (caso upload celular tenha compilado PDF), avisa ou tenta tratar
+      if (typeof fonte === 'string' && (fonte.startsWith('data:application/pdf') || fonte.includes('.pdf'))) {
+        alert('Atenção: Foi recebido um arquivo em PDF. Para o anúncio da arma, por favor tire fotos individuais em formato de imagem (JPEG/PNG).');
+        resolve('');
+        return;
+      }
+
+      const img = new Image();
+      img.onload = () => {
+        const MAX_DIM = 1280;
+        let w = img.width;
+        let h = img.height;
+        if (w > MAX_DIM || h > MAX_DIM) {
+          if (w > h) {
+            h = Math.round((h * MAX_DIM) / w);
+            w = MAX_DIM;
+          } else {
+            w = Math.round((w * MAX_DIM) / h);
+            h = MAX_DIM;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, w, h);
+          resolve(canvas.toDataURL('image/jpeg', 0.82));
+        } else {
+          resolve(typeof fonte === 'string' ? fonte : '');
+        }
+      };
+
+      img.onerror = () => {
+        resolve(typeof fonte === 'string' ? fonte : '');
+      };
+
+      if (typeof fonte === 'string') {
+        img.src = fonte;
+      } else {
+        const reader = new FileReader();
+        reader.onload = () => {
+          img.src = reader.result as string;
+        };
+        reader.readAsDataURL(fonte);
+      }
+    });
+  };
+
   // Fotos Upload
-  const handleUploadArquivo = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleUploadArquivo = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
-    Array.from(files).forEach(file => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        if (typeof reader.result === 'string') {
-          setFotos(prev => {
-            const novas = [...prev, reader.result as string];
-            if (!fotoPrincipal) setFotoPrincipal(reader.result as string);
-            return novas;
-          });
-        }
-      };
-      reader.readAsDataURL(file);
-    });
+    for (const file of Array.from(files)) {
+      const imagemComprimida = await otimizarImagemParaFoto(file);
+      if (imagemComprimida) {
+        setFotos(prev => {
+          const novas = [...prev, imagemComprimida];
+          if (!fotoPrincipal) setFotoPrincipal(imagemComprimida);
+          return novas;
+        });
+      }
+    }
   };
 
   const removerFoto = (index: number) => {
@@ -1015,12 +1064,16 @@ export function ModalFormArmaVenda({
         isOpen={modalQrAberto}
         onClose={() => setModalQrAberto(false)}
         titulo="Fotografar Arma com o Celular"
-        onUploadSuccess={(url) => {
-          setFotos(prev => {
-            const novas = [...prev, url];
-            if (!fotoPrincipal) setFotoPrincipal(url);
-            return novas;
-          });
+        onUploadSuccess={async (url) => {
+          if (!url) return;
+          const imagemOtimizada = await otimizarImagemParaFoto(url);
+          if (imagemOtimizada) {
+            setFotos(prev => {
+              const novas = [...prev, imagemOtimizada];
+              if (!fotoPrincipal) setFotoPrincipal(imagemOtimizada);
+              return novas;
+            });
+          }
           setModalQrAberto(false);
         }}
       />

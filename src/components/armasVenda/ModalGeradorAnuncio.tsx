@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   X, Download, Copy, Check, Sparkles, Image as ImageIcon,
-  Share2, Shield, Eye, Smartphone, LayoutGrid, AlertCircle, RefreshCw
+  Share2, Shield, Eye, Smartphone, LayoutGrid, AlertCircle, RefreshCw,
+  Key, ExternalLink
 } from 'lucide-react';
 import { ArmaVenda } from '../../types';
 import { useAuth } from '../../context/AuthContext';
@@ -35,6 +36,8 @@ export function ModalGeradorAnuncio({ arma, isOpen, onClose }: ModalGeradorAnunc
   const [textoAnuncio, setTextoAnuncio] = useState('');
   const [gerandoIa, setGerandoIa] = useState(false);
   const [tomIa, setTomIa] = useState<'comercial' | 'tecnico' | 'curto'>('comercial');
+  const [mostrarConfigChave, setMostrarConfigChave] = useState(false);
+  const [chaveGeminiInput, setChaveGeminiInput] = useState(() => localStorage.getItem('gemini_api_key') || '');
 
   const dadosEmpresa = usuario?.dadosEmpresa;
   const nomeLoja = dadosEmpresa?.razaoSocialFantasia || dadosEmpresa?.nome || usuario?.nome || 'Despachante & Clube de Tiro';
@@ -48,8 +51,42 @@ export function ModalGeradorAnuncio({ arma, isOpen, onClose }: ModalGeradorAnunc
   const fotoAtual = listaFotos[fotoSelecionadaIdx] || arma.fotoPrincipal || '';
 
   // Gerar texto padrão para WhatsApp
-  useEffect(() => {
-    const linhas = [
+  const gerarTextoPadrao = (estilo: 'comercial' | 'tecnico' | 'curto') => {
+    if (estilo === 'curto') {
+      return [
+        `🎯 *DISPONÍVEL: ${arma.fabricante} ${arma.modelo}*`,
+        `💥 Calibre: ${arma.calibre}${arma.sigmaSinarm ? ` | Reg: ${arma.sigmaSinarm}` : ''}`,
+        `✨ Condição: ${arma.estadoConservacao}`,
+        mostrarPreco ? `💵 Valor: ${formatarMoeda(arma.valorAnunciado)}` : '💵 Valor: Sob consulta',
+        `📲 Fale conosco: ${telefoneLoja || 'Chame no direct'}`
+      ].join('\n');
+    }
+
+    if (estilo === 'tecnico') {
+      return [
+        `📋 *ESPECIFICAÇÕES TÉCNICAS | ${arma.fabricante} ${arma.modelo}*`,
+        '',
+        `🔹 *Fabricante:* ${arma.fabricante}`,
+        `🔹 *Modelo:* ${arma.modelo}`,
+        `🔹 *Tipo:* ${arma.tipo}`,
+        `🔹 *Calibre:* ${arma.calibre}`,
+        arma.sigmaSinarm ? `🔹 *Registro Atual:* ${arma.sigmaSinarm}` : '',
+        arma.capacidade ? `🔹 *Capacidade:* ${arma.capacidade}` : '',
+        arma.acabamento ? `🔹 *Acabamento:* ${arma.acabamento}` : '',
+        `🔹 *Estado de Conservação:* ${arma.estadoConservacao}`,
+        arma.acessorios ? `🔹 *Acessórios:* ${arma.acessorios}` : '',
+        arma.quantidadeCarregadores ? `🔹 *Carregadores:* ${arma.quantidadeCarregadores} unidade(s)` : '',
+        '',
+        mostrarPreco ? `💰 *Investimento:* ${formatarMoeda(arma.valorAnunciado)}` : '💰 *Valor:* Consulte condições',
+        '',
+        '⚖️ *Aviso Legal:* Transferência de propriedade obrigatória conforme portarias do Exército e PF. Venda restrita a CACs ou autorizados.',
+        mostrarContato && telefoneLoja ? `📲 *Atendimento:* ${telefoneLoja}` : '',
+        mostrarContato && cidadeLoja ? `📍 *Local:* ${cidadeLoja}` : ''
+      ].filter(Boolean).join('\n');
+    }
+
+    // Estilo Comercial Padrão
+    return [
       `🔥 *OPORTUNIDADE DE SEMINOVO | ${arma.fabricante} ${arma.modelo}* 🔥`,
       '',
       `🔹 *Tipo:* ${arma.tipo}`,
@@ -69,10 +106,12 @@ export function ModalGeradorAnuncio({ arma, isOpen, onClose }: ModalGeradorAnunc
       '',
       mostrarContato && telefoneLoja ? `📲 *Interessados entrar em contato:* ${telefoneLoja}` : '',
       mostrarContato && cidadeLoja ? `📍 *Local:* ${cidadeLoja}` : '',
-    ].filter(Boolean);
+    ].filter(Boolean).join('\n');
+  };
 
-    setTextoAnuncio(linhas.join('\n'));
-  }, [arma, mostrarPreco, mostrarCalibre, mostrarAcessorios, mostrarEstado, mostrarContato, telefoneLoja, cidadeLoja]);
+  useEffect(() => {
+    setTextoAnuncio(gerarTextoPadrao(tomIa));
+  }, [arma, mostrarPreco, mostrarCalibre, mostrarAcessorios, mostrarEstado, mostrarContato, telefoneLoja, cidadeLoja, tomIa]);
 
   // Função para desenhar no Canvas
   useEffect(() => {
@@ -118,16 +157,16 @@ export function ModalGeradorAnuncio({ arma, isOpen, onClose }: ModalGeradorAnunc
 
     // Carregar Imagens auxiliares (Logo e Arma)
     const logoImg = new Image();
-    logoImg.crossOrigin = 'anonymous';
-
     const armaImg = new Image();
-    armaImg.crossOrigin = 'anonymous';
 
     const logoSrc = dadosEmpresa?.logoUrl || '/logo_oficial_documentos.png';
-    logoImg.src = logoSrc;
 
-    if (fotoAtual) {
-      armaImg.src = fotoAtual;
+    // Apenas define crossOrigin se for URL remota (NUNCA em data:image base64)
+    if (logoSrc && (logoSrc.startsWith('http://') || logoSrc.startsWith('https://'))) {
+      logoImg.crossOrigin = 'anonymous';
+    }
+    if (fotoAtual && (fotoAtual.startsWith('http://') || fotoAtual.startsWith('https://'))) {
+      armaImg.crossOrigin = 'anonymous';
     }
 
     const renderConteudo = () => {
@@ -184,7 +223,9 @@ export function ModalGeradorAnuncio({ arma, isOpen, onClose }: ModalGeradorAnunc
       ctx.stroke();
       ctx.clip();
 
-      if (armaImg.complete && armaImg.naturalWidth > 0) {
+      const temFotoValida = armaImg.complete && armaImg.naturalWidth > 0 && !fotoAtual.includes('application/pdf');
+
+      if (temFotoValida) {
         // Ajuste proporcional (contain)
         const scale = Math.min((boxFotoW - 20) / armaImg.naturalWidth, (boxFotoH - 20) / armaImg.naturalHeight);
         const w = armaImg.naturalWidth * scale;
@@ -194,10 +235,13 @@ export function ModalGeradorAnuncio({ arma, isOpen, onClose }: ModalGeradorAnunc
         ctx.drawImage(armaImg, x, y, w, h);
       } else {
         // Placeholder caso não tenha foto
-        ctx.fillStyle = '#9ca3af';
-        ctx.font = 'bold 22px sans-serif';
+        ctx.fillStyle = '#4b5563';
+        ctx.font = 'bold 24px sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillText('FOTO NÃO DISPONÍVEL', boxFotoX + boxFotoW / 2, boxFotoY + boxFotoH / 2);
+        ctx.fillText('FOTO NÃO DISPONÍVEL', boxFotoX + boxFotoW / 2, boxFotoY + boxFotoH / 2 - 10);
+        ctx.font = '14px sans-serif';
+        ctx.fillStyle = '#9ca3af';
+        ctx.fillText('(Adicione fotos na edição da arma)', boxFotoX + boxFotoW / 2, boxFotoY + boxFotoH / 2 + 20);
       }
       ctx.restore();
 
@@ -228,6 +272,7 @@ export function ModalGeradorAnuncio({ arma, isOpen, onClose }: ModalGeradorAnunc
       // 4. BADGES TÉCNICAS (Calibre, Capacidade, Acabamento, Estado)
       const badges: string[] = [];
       if (mostrarCalibre) badges.push(`CAL: ${arma.calibre}`);
+      if (arma.sigmaSinarm) badges.push(arma.sigmaSinarm);
       if (arma.capacidade) badges.push(`CAP: ${arma.capacidade}`);
       if (arma.acabamento) badges.push(arma.acabamento);
       if (mostrarEstado) badges.push(arma.estadoConservacao);
@@ -339,24 +384,41 @@ export function ModalGeradorAnuncio({ arma, isOpen, onClose }: ModalGeradorAnunc
       setGerandoImagem(false);
     };
 
-    let carregadas = 0;
-    const checarTermino = () => {
-      carregadas++;
-      if (carregadas >= 2) {
-        renderConteudo();
+    let executou = false;
+    const dispararRender = () => {
+      if (executou) return;
+      executou = true;
+      renderConteudo();
+    };
+
+    let totalParaCarregar = (mostrarLogo && logoSrc ? 1 : 0) + (fotoAtual ? 1 : 0);
+    let concluidas = 0;
+
+    const onImagemFinalizada = () => {
+      concluidas++;
+      if (concluidas >= totalParaCarregar) {
+        dispararRender();
       }
     };
 
-    logoImg.onload = checarTermino;
-    logoImg.onerror = checarTermino;
+    logoImg.onload = onImagemFinalizada;
+    logoImg.onerror = onImagemFinalizada;
+    armaImg.onload = onImagemFinalizada;
+    armaImg.onerror = onImagemFinalizada;
 
-    if (fotoAtual) {
-      armaImg.onload = checarTermino;
-      armaImg.onerror = checarTermino;
-    } else {
-      carregadas++;
-      if (logoImg.complete) renderConteudo();
+    if (mostrarLogo && logoSrc) logoImg.src = logoSrc;
+    if (fotoAtual) armaImg.src = fotoAtual;
+
+    if (totalParaCarregar === 0) {
+      dispararRender();
     }
+
+    // Timeout de segurança: se as imagens demorarem mais de 500ms, renderiza de qualquer forma!
+    const timer = setTimeout(() => {
+      dispararRender();
+    }, 500);
+
+    return () => clearTimeout(timer);
   }, [
     isOpen,
     arma,
@@ -391,17 +453,27 @@ export function ModalGeradorAnuncio({ arma, isOpen, onClose }: ModalGeradorAnunc
     setTimeout(() => setCopiado(false), 2500);
   };
 
+  // Salvar Chave do Gemini e executar
+  const handleSalvarChaveGemini = () => {
+    if (chaveGeminiInput.trim()) {
+      localStorage.setItem('gemini_api_key', chaveGeminiInput.trim());
+      setMostrarConfigChave(false);
+      gerarComGemini();
+    }
+  };
+
   // Chamada ao Gemini IA para gerar copy persuasiva
   const gerarComGemini = async () => {
+    const key = import.meta.env.VITE_GEMINI_API_KEY || localStorage.getItem('gemini_api_key') || chaveGeminiInput.trim();
+
+    if (!key) {
+      // Abre o mini formulário para inserir a chave facilmente sem travar
+      setMostrarConfigChave(true);
+      return;
+    }
+
     try {
       setGerandoIa(true);
-      const key = import.meta.env.VITE_GEMINI_API_KEY || localStorage.getItem('gemini_api_key');
-
-      if (!key) {
-        alert('Para usar a IA, insira sua chave da API do Gemini nas configurações do sistema ou no campo Gemini.');
-        setGerandoIa(false);
-        return;
-      }
 
       const promptInstrucao = `
 Você é um especialista em marketing bélico e despachante para CACs e atiradores.
@@ -410,6 +482,7 @@ Crie um anúncio persuasivo para WhatsApp / Redes Sociais da seguinte arma à ve
 - Modelo: ${arma.modelo}
 - Tipo: ${arma.tipo}
 - Calibre: ${arma.calibre}
+- Registro: ${arma.sigmaSinarm || 'SIGMA'}
 - Capacidade: ${arma.capacidade || 'Padrão'}
 - Acabamento: ${arma.acabamento || 'Original'}
 - Estado de Conservação: ${arma.estadoConservacao}
@@ -436,10 +509,13 @@ Mantenha emojis de armas/tiro/fogo, bullet points claros e destaque a exigência
       const resposta = json.candidates?.[0]?.content?.parts?.[0]?.text;
       if (resposta) {
         setTextoAnuncio(resposta.trim());
+      } else if (json.error) {
+        alert('Erro do Gemini: ' + (json.error.message || 'Verifique a chave de API.'));
       }
     } catch (e: any) {
       console.error('Erro na IA:', e);
-      alert('Não foi possível conectar à IA do Gemini no momento. Verifique a chave de API.');
+      // Se falhar a conexão, usa a inteligência padrão sem travar
+      setTextoAnuncio(gerarTextoPadrao(tomIa));
     } finally {
       setGerandoIa(false);
     }
@@ -513,7 +589,7 @@ Mantenha emojis de armas/tiro/fogo, bullet points claros e destaque a exigência
             </div>
 
             {/* Canvas Container com Zoom Adaptativo */}
-            <div className="relative w-full flex items-center justify-center p-3 bg-brand-dark-1/80 border border-brand-dark-5 rounded-2xl overflow-hidden min-h-[460px]">
+            <div className="relative w-full flex items-center justify-center p-3 bg-[#0a0d14] border border-brand-dark-5 rounded-2xl overflow-hidden min-h-[460px]">
               {gerandoImagem && (
                 <div className="absolute inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-10 text-amber-400 gap-2 text-xs font-bold">
                   <RefreshCw size={18} className="animate-spin" /> Renderizando Flyer...
@@ -637,11 +713,11 @@ Mantenha emojis de armas/tiro/fogo, bullet points claros e destaque a exigência
                   <Share2 size={14} className="text-amber-400" /> Legenda para WhatsApp / Redes
                 </span>
 
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1.5">
                   <select
                     value={tomIa}
                     onChange={e => setTomIa(e.target.value as any)}
-                    className="bg-brand-dark-4 text-[11px] text-gray-300 rounded px-2 py-1 border border-brand-dark-5"
+                    className="bg-brand-dark-4 text-[11px] text-gray-300 rounded-lg px-2 py-1 border border-brand-dark-5"
                   >
                     <option value="comercial">Comercial</option>
                     <option value="tecnico">Técnico</option>
@@ -652,7 +728,7 @@ Mantenha emojis de armas/tiro/fogo, bullet points claros e destaque a exigência
                     type="button"
                     onClick={gerarComGemini}
                     disabled={gerandoIa}
-                    className="flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded bg-indigo-600/30 text-indigo-300 border border-indigo-500/40 hover:bg-indigo-600/50 transition-colors"
+                    className="flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-lg bg-indigo-600/30 text-indigo-300 border border-indigo-500/40 hover:bg-indigo-600/50 transition-colors"
                   >
                     <Sparkles size={12} className={gerandoIa ? 'animate-spin' : ''} />
                     {gerandoIa ? 'Gerando...' : 'Gemini IA'}
@@ -660,11 +736,59 @@ Mantenha emojis de armas/tiro/fogo, bullet points claros e destaque a exigência
                 </div>
               </div>
 
+              {/* Painel Amigável para Inserir Chave Gemini caso ainda não configurada */}
+              {mostrarConfigChave && (
+                <div className="mb-3 p-3 bg-indigo-500/10 border border-indigo-500/30 rounded-xl space-y-2 text-xs animate-fade-in">
+                  <div className="flex items-center justify-between text-indigo-300 font-bold">
+                    <span className="flex items-center gap-1.5">
+                      <Key size={13} /> Ativar Assistente Gemini IA
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setMostrarConfigChave(false)}
+                      className="text-gray-400 hover:text-white"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-gray-300">
+                    Cole sua chave da API do Google Gemini (gratuita) para gerar copies persuasivas:
+                  </p>
+                  <div className="flex gap-1.5">
+                    <input
+                      type="password"
+                      value={chaveGeminiInput}
+                      onChange={e => setChaveGeminiInput(e.target.value)}
+                      placeholder="AIzaSy..."
+                      className="input flex-1 text-xs py-1.5 bg-[#0a0d14]"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleSalvarChaveGemini}
+                      disabled={!chaveGeminiInput.trim()}
+                      className="btn-primary text-xs px-3 py-1.5 font-bold shrink-0"
+                    >
+                      Salvar & Gerar
+                    </button>
+                  </div>
+                  <a
+                    href="https://aistudio.google.com/app/apikey"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-[10px] text-indigo-400 hover:underline flex items-center gap-1 mt-1"
+                  >
+                    Obter chave gratuita no Google AI Studio <ExternalLink size={10} />
+                  </a>
+                </div>
+              )}
+
+              {/* Textarea 100% legível com fundo escuro sólido e texto claro */}
               <textarea
                 value={textoAnuncio}
                 onChange={e => setTextoAnuncio(e.target.value)}
-                rows={10}
-                className="w-full flex-1 bg-brand-dark-1 border border-brand-dark-5 rounded-xl p-3 text-xs text-gray-200 font-mono resize-none focus:border-amber-500 focus:outline-none"
+                rows={11}
+                style={{ backgroundColor: '#0c1017', color: '#f3f4f6' }}
+                className="w-full flex-1 bg-[#0c1017] text-gray-100 border border-gray-700/80 rounded-xl p-3 text-xs font-sans leading-relaxed resize-none focus:border-amber-500 focus:outline-none shadow-inner"
                 placeholder="Texto do anúncio..."
               />
 
