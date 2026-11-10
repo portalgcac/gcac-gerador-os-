@@ -43,7 +43,7 @@ export function ModalFormArmaVenda({
   const [modelo, setModelo] = useState<string>('');
   const [calibre, setCalibre] = useState<string>('');
   const [numeroSerie, setNumeroSerie] = useState<string>('');
-  const [sigmaSinarm, setSigmaSinarm] = useState<'SIGMA' | 'SINARM' | 'OUTRO'>('SIGMA');
+  const [sigmaSinarm, setSigmaSinarm] = useState<string>('SIGMA (CAC)');
   const [numeroCraf, setNumeroCraf] = useState<string>('');
   const [crafValidade, setCrafValidade] = useState<string>('');
   const [capacidade, setCapacidade] = useState<string>('');
@@ -83,7 +83,7 @@ export function ModalFormArmaVenda({
       setModelo(armaParaEditar.modelo || '');
       setCalibre(armaParaEditar.calibre || '');
       setNumeroSerie(armaParaEditar.numeroSerie || '');
-      setSigmaSinarm((armaParaEditar.sigmaSinarm as any) || 'SIGMA');
+      setSigmaSinarm(armaParaEditar.sigmaSinarm || 'SIGMA (CAC)');
       setNumeroCraf(armaParaEditar.numeroCraf || '');
       setCrafValidade(armaParaEditar.crafValidade || '');
       setCapacidade(armaParaEditar.capacidade || '');
@@ -114,7 +114,7 @@ export function ModalFormArmaVenda({
       setModelo('');
       setCalibre('');
       setNumeroSerie('');
-      setSigmaSinarm('SIGMA');
+      setSigmaSinarm('SIGMA (CAC)');
       setNumeroCraf('');
       setCrafValidade('');
       setCapacidade('');
@@ -159,7 +159,7 @@ export function ModalFormArmaVenda({
     if (arma.numeroSerie) setNumeroSerie(arma.numeroSerie);
     if (arma.numeroSigma) {
       setNumeroCraf(arma.numeroSigma);
-      setSigmaSinarm('SIGMA');
+      setSigmaSinarm('SIGMA (CAC)');
     }
     if (arma.vencimentoCraf) setCrafValidade(arma.vencimentoCraf);
   };
@@ -705,16 +705,17 @@ export function ModalFormArmaVenda({
                   />
                 </div>
 
-                {/* Sistema */}
+                {/* Sistema de Registro */}
                 <div>
                   <label className="text-[11px] font-semibold text-gray-400 block mb-1">Registro</label>
                   <select
                     value={sigmaSinarm}
-                    onChange={e => setSigmaSinarm(e.target.value as any)}
+                    onChange={e => setSigmaSinarm(e.target.value)}
                     className="input w-full text-xs"
                   >
-                    <option value="SIGMA">SIGMA (Exército)</option>
-                    <option value="SINARM">SINARM (Polícia Federal)</option>
+                    <option value="SIGMA (CAC)">SIGMA (CAC)</option>
+                    <option value="SINARM DEFESA">SINARM DEFESA</option>
+                    <option value="SINARM (OUTRO)">SINARM (Outro / Funcional)</option>
                     <option value="OUTRO">Outro</option>
                   </select>
                 </div>

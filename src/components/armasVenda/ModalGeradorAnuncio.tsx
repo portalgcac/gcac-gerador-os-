@@ -54,6 +54,7 @@ export function ModalGeradorAnuncio({ arma, isOpen, onClose }: ModalGeradorAnunc
       '',
       `🔹 *Tipo:* ${arma.tipo}`,
       mostrarCalibre ? `🔹 *Calibre:* ${arma.calibre}` : '',
+      arma.sigmaSinarm ? `🔹 *Registro:* ${arma.sigmaSinarm}` : '',
       arma.capacidade ? `🔹 *Capacidade:* ${arma.capacidade}` : '',
       arma.acabamento ? `🔹 *Acabamento:* ${arma.acabamento}` : '',
       mostrarEstado ? `🔹 *Condição:* ${arma.estadoConservacao}` : '',

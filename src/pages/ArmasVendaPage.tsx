@@ -403,6 +403,11 @@ export function ArmasVendaPage() {
 
                     {/* Tags Rápidas */}
                     <div className="flex flex-wrap gap-1.5 mt-2.5 text-[10px]">
+                      {arma.sigmaSinarm && (
+                        <span className="bg-amber-500/10 text-amber-300 px-2 py-0.5 rounded border border-amber-500/30 font-bold">
+                          {arma.sigmaSinarm}
+                        </span>
+                      )}
                       <span className="bg-brand-dark-3 text-gray-300 px-2 py-0.5 rounded border border-brand-dark-5">
                         {arma.estadoConservacao}
                       </span>
