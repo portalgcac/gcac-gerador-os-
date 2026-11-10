@@ -462,7 +462,7 @@ export function ModalGeradorAnuncio({ arma, isOpen, onClose }: ModalGeradorAnunc
     }
   };
 
-  // Chamada ao Gemini IA para gerar copy persuasiva
+  // Chamada ao Gemini IA para gerar copy persuasiva com fallback multi-modelos e fallback local
   const gerarComGemini = async () => {
     const key = import.meta.env.VITE_GEMINI_API_KEY || localStorage.getItem('gemini_api_key') || chaveGeminiInput.trim();
 
@@ -494,27 +494,51 @@ Estilo: ${tomIa === 'comercial' ? 'Altamente comercial, com gatilhos de oportuni
 Mantenha emojis de armas/tiro/fogo, bullet points claros e destaque a exigência legal de transferência obrigatória (SIGMA/SINARM).
 `;
 
-      const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: promptInstrucao }] }]
-          })
-        }
-      );
+      const endpoints = [
+        { ver: 'v1beta', mod: 'gemini-2.5-flash' },
+        { ver: 'v1beta', mod: 'gemini-1.5-flash' },
+        { ver: 'v1', mod: 'gemini-1.5-flash' },
+        { ver: 'v1beta', mod: 'gemini-2.0-flash' },
+        { ver: 'v1', mod: 'gemini-pro' }
+      ];
 
-      const json = await res.json();
-      const resposta = json.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (resposta) {
-        setTextoAnuncio(resposta.trim());
-      } else if (json.error) {
-        alert('Erro do Gemini: ' + (json.error.message || 'Verifique a chave de API.'));
+      let textoGerado = '';
+
+      for (const ep of endpoints) {
+        try {
+          const res = await fetch(
+            `https://generativelanguage.googleapis.com/${ep.ver}/models/${ep.mod}:generateContent?key=${key}`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                contents: [{ parts: [{ text: promptInstrucao }] }]
+              })
+            }
+          );
+
+          if (!res.ok) continue;
+
+          const json = await res.json();
+          const resposta = json.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (resposta && resposta.trim()) {
+            textoGerado = resposta.trim();
+            break;
+          }
+        } catch {
+          // tenta próximo endpoint
+        }
+      }
+
+      if (textoGerado) {
+        setTextoAnuncio(textoGerado);
+      } else {
+        // Se a chave for inválida ou todos os endpoints falharem, gera localmente com altíssima qualidade
+        setTextoAnuncio(gerarTextoPadrao(tomIa));
+        setMostrarConfigChave(true);
       }
     } catch (e: any) {
       console.error('Erro na IA:', e);
-      // Se falhar a conexão, usa a inteligência padrão sem travar
       setTextoAnuncio(gerarTextoPadrao(tomIa));
     } finally {
       setGerandoIa(false);
