@@ -785,35 +785,88 @@ export function ModalGeradorAnuncio({ arma, isOpen, onClose }: ModalGeradorAnunc
       }
 
       // 9. RODAPÉ DE CONTATOS OFICIAL DO ESCRITÓRIO
-      const rodapeY = altura - pad - (isQuadrado ? 45 : 60);
+      const rodapeY = altura - pad - (isQuadrado ? 48 : 62);
 
       if (mostrarContato) {
-        ctx.textAlign = 'center';
+        // Texto formatado do WhatsApp
+        const textoZap = `WhatsApp: ${telefoneLoja}`;
+        const tamFonteZap = isQuadrado ? 24 : 28;
+        ctx.font = `900 ${tamFonteZap}px "Segoe UI", sans-serif`;
+        const metricsZap = ctx.measureText(textoZap);
+        const zapTextW = metricsZap.width;
 
-        // Badge / Círculo Verde WhatsApp
-        const zapX = largura / 2 - 200;
-        ctx.fillStyle = '#22c55e';
-        ctx.beginPath();
-        ctx.arc(zapX, rodapeY - 8, isQuadrado ? 14 : 16, 0, Math.PI * 2);
-        ctx.fill();
+        const zapIconTamanho = isQuadrado ? 32 : 36;
+        const gapZap = 12;
+        const totalLinhaZapW = zapIconTamanho + gapZap + zapTextW;
 
+        // Posição inicial para centralizar perfeitamente todo o bloco [Ícone Oficial + Texto]
+        const startZapX = (largura - totalLinhaZapW) / 2;
+        const zapIconCenterX = startZapX + (zapIconTamanho / 2);
+        const zapIconCenterY = rodapeY - (tamFonteZap * 0.35);
+
+        // 9.1 Renderiza Ícone Vetorial Oficial do WhatsApp (#25D366 com Telefone Branco)
+        ctx.save();
+        ctx.translate(zapIconCenterX, zapIconCenterY);
+        const zapScale = zapIconTamanho / 24;
+        ctx.scale(zapScale, zapScale);
+        ctx.translate(-12, -12);
+
+        // Sombra de brilho suave esmeralda
+        ctx.shadowColor = 'rgba(37, 211, 102, 0.45)';
+        ctx.shadowBlur = 10;
+
+        // Balão Verde Oficial WhatsApp (#25D366)
+        ctx.fillStyle = '#25D366';
+        if (typeof Path2D !== 'undefined') {
+          const fundoZapPath = new Path2D(
+            "M12.004 2C6.48 2 2 6.48 2 12c0 1.76.46 3.42 1.26 4.88L2 22l5.24-1.24A9.957 9.957 0 0012.004 22C17.524 22 22 17.52 22 12s-4.476-10-9.996-10z"
+          );
+          ctx.fill(fundoZapPath);
+
+          // Telefone Branco Oficial
+          ctx.shadowColor = 'transparent';
+          ctx.shadowBlur = 0;
+          ctx.fillStyle = '#ffffff';
+          const foneZapPath = new Path2D(
+            "M17.472 14.382c-.301-.15-1.782-.88-2.058-.98-.276-.1-.476-.15-.677.15-.201.3-.778.98-.953 1.18-.176.2-.351.226-.652.075-.301-.15-1.272-.469-2.423-1.496-.895-.798-1.5-1.785-1.675-2.086-.176-.301-.019-.464.132-.614.135-.135.301-.351.451-.527.15-.175.201-.3.301-.501.101-.2.05-.376-.025-.526-.075-.15-.677-1.631-.928-2.233-.244-.586-.493-.506-.677-.515-.175-.009-.376-.011-.577-.011s-.527.075-.803.376c-.276.3-1.053 1.029-1.053 2.509s1.078 2.91 1.229 3.111c.15.201 2.122 3.24 5.141 4.544.718.31 1.279.496 1.716.635.722.23 1.38.197 1.9-.119.58-.352 1.782-.728 2.033-1.431.251-.703.251-1.305.176-1.431-.076-.126-.276-.201-.577-.351z"
+          );
+          ctx.fill(foneZapPath);
+        } else {
+          // Fallback nativo caso Path2D não esteja disponível
+          ctx.beginPath();
+          ctx.arc(12, 12, 10, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.restore();
+
+        // 9.2 Texto do WhatsApp perfeitamente posicionado ao lado do ícone
+        ctx.textAlign = 'left';
         ctx.fillStyle = '#ffffff';
-        ctx.font = `bold ${isQuadrado ? 15 : 18}px sans-serif`;
-        ctx.fillText('📞', zapX, rodapeY - 2);
+        ctx.font = `900 ${tamFonteZap}px "Segoe UI", sans-serif`;
+        ctx.fillText(textoZap, startZapX + zapIconTamanho + gapZap, rodapeY);
 
-        // Texto do WhatsApp em 28px Font-Black
-        ctx.fillStyle = '#ffffff';
-        ctx.font = `900 ${isQuadrado ? 24 : 28}px "Segoe UI", sans-serif`;
-        ctx.fillText(`WhatsApp: ${telefoneLoja}`, largura / 2 + 10, rodapeY);
+        // 9.3 Endereço e Cidade com Pin perfeitamente centralizado
+        if (cidadeLoja) {
+          const enderecoY = rodapeY + (isQuadrado ? 28 : 34);
+          const tamFonteEnd = isQuadrado ? 15 : 18;
+          ctx.font = `600 ${tamFonteEnd}px "Segoe UI", sans-serif`;
+          const endMetrics = ctx.measureText(cidadeLoja);
+          const endTextW = endMetrics.width;
 
-        // Endereço e Cidade
-        ctx.fillStyle = '#f87171';
-        ctx.font = `bold ${isQuadrado ? 15 : 18}px sans-serif`;
-        ctx.fillText('📍', largura / 2 - 280, rodapeY + (isQuadrado ? 26 : 32));
+          const pinLargura = tamFonteEnd;
+          const gapPin = 8;
+          const totalEndW = pinLargura + gapPin + endTextW;
+          const startEndX = (largura - totalEndW) / 2;
 
-        ctx.fillStyle = '#e2e8f0';
-        ctx.font = `600 ${isQuadrado ? 15 : 18}px "Segoe UI", sans-serif`;
-        ctx.fillText(cidadeLoja, largura / 2, rodapeY + (isQuadrado ? 26 : 32));
+          ctx.textAlign = 'left';
+          ctx.fillStyle = '#f87171';
+          ctx.font = `bold ${tamFonteEnd}px sans-serif`;
+          ctx.fillText('📍', startEndX, enderecoY);
+
+          ctx.fillStyle = '#e2e8f0';
+          ctx.font = `600 ${tamFonteEnd}px "Segoe UI", sans-serif`;
+          ctx.fillText(cidadeLoja, startEndX + pinLargura + gapPin, enderecoY);
+        }
       }
 
       // 10. TEXTO LEGAL FINAL FORA DA MOLDURA
