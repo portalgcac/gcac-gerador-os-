@@ -60,6 +60,12 @@ export function ModalGeradorAnuncio({ arma, isOpen, onClose }: ModalGeradorAnunc
   const [mostrarContato, setMostrarContato] = useState(true);
   const [mostrarLogo, setMostrarLogo] = useState(true);
 
+  // Controles de enquadramento, zoom e ajuste da foto da arma
+  const [modoFoto, setModoFoto] = useState<'conter' | 'preencher'>('conter');
+  const [zoomFoto, setZoomFoto] = useState(105);
+  const [posicaoYFoto, setPosicaoYFoto] = useState(0);
+  const [posicaoXFoto, setPosicaoXFoto] = useState(0);
+
   // Fotos gerenciadas localmente (permite adicionar/trocar foto na hora sem sair do modal)
   const [fotosLocais, setFotosLocais] = useState<string[]>([]);
   const [fotoSelecionadaIdx, setFotoSelecionadaIdx] = useState(0);
@@ -332,39 +338,52 @@ export function ModalGeradorAnuncio({ arma, isOpen, onClose }: ModalGeradorAnunc
     // Carregar Imagens
     const logoImg = new Image();
     const armaImg = new Image();
-    const logoSrc = '/logo_oficial_gcac.png';
+    const logoSrc = usuario?.dadosEmpresa?.logoUrl || '/logo_gcac_vetor.png';
 
     if (fotoAtual && (fotoAtual.startsWith('http://') || fotoAtual.startsWith('https://'))) {
       armaImg.crossOrigin = 'anonymous';
     }
+    if (logoSrc && (logoSrc.startsWith('http://') || logoSrc.startsWith('https://'))) {
+      logoImg.crossOrigin = 'anonymous';
+    }
 
     const renderConteudo = () => {
-      let topY = molduraY + 18;
+      let topY = molduraY + 14;
 
-      // 4. LOGO OFICIAL CENTRALIZADA COM REMOÇÃO AUTOMÁTICA DE FUNDO BRANCO
+      // 4. LOGO OFICIAL DO ESCRITÓRIO (Alta Definição e Tamanho Destacado)
       if (mostrarLogo && logoImg.complete && logoImg.naturalWidth > 0) {
-        const logoCanvas = criarImagemComFundoTransparente(logoImg);
-        const logoH = 130; // Aumentado para máximo impacto visual
-        const logoW = (logoCanvas.width / logoCanvas.height) * logoH;
+        // Logo oficial vetorizada com altura ampliada para total legibilidade
+        const logoH = formato === 'quadrado' ? 170 : 210;
+        const logoW = (logoImg.naturalWidth / logoImg.naturalHeight) * logoH;
         const logoX = (largura - logoW) / 2;
 
-        // Glow suave atrás da logo
-        const logoGlow = ctx.createRadialGradient(largura / 2, topY + logoH / 2, 20, largura / 2, topY + logoH / 2, logoW * 0.7);
-        logoGlow.addColorStop(0, 'rgba(56, 189, 248, 0.22)');
-        logoGlow.addColorStop(1, 'rgba(0,0,0,0)');
+        // Glow azul ciano tático atrás da logo oficial
+        const logoGlow = ctx.createRadialGradient(
+          largura / 2, topY + logoH / 2, 20,
+          largura / 2, topY + logoH / 2, logoW * 0.75
+        );
+        logoGlow.addColorStop(0, 'rgba(56, 189, 248, 0.28)');
+        logoGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
         ctx.fillStyle = logoGlow;
-        ctx.fillRect(logoX - 40, topY - 15, logoW + 80, logoH + 30);
+        ctx.fillRect(logoX - 50, topY - 15, logoW + 100, logoH + 30);
 
-        ctx.drawImage(logoCanvas, logoX, topY, logoW, logoH);
-        topY += logoH + 20;
+        // Se for imagem externa customizada com fundo branco, limpa; se for a oficial com canal alfa, desenha direto
+        if (usuario?.dadosEmpresa?.logoUrl && usuario.dadosEmpresa.logoUrl.endsWith('.jpg')) {
+          const logoCanvas = criarImagemComFundoTransparente(logoImg);
+          ctx.drawImage(logoCanvas, logoX, topY, logoW, logoH);
+        } else {
+          ctx.drawImage(logoImg, logoX, topY, logoW, logoH);
+        }
+
+        topY += logoH + 18;
       } else {
-        topY += 36;
+        topY += 30;
       }
 
       // Linha divisória luminosa
       const sepGrad = ctx.createLinearGradient(pad + 40, 0, pad + molduraW - 40, 0);
       sepGrad.addColorStop(0, 'rgba(56, 189, 248, 0)');
-      sepGrad.addColorStop(0.5, 'rgba(56, 189, 248, 0.5)');
+      sepGrad.addColorStop(0.5, 'rgba(56, 189, 248, 0.55)');
       sepGrad.addColorStop(1, 'rgba(56, 189, 248, 0)');
       ctx.strokeStyle = sepGrad;
       ctx.lineWidth = 1.8;
@@ -372,26 +391,26 @@ export function ModalGeradorAnuncio({ arma, isOpen, onClose }: ModalGeradorAnunc
       ctx.moveTo(pad + 40, topY);
       ctx.lineTo(pad + molduraW - 40, topY);
       ctx.stroke();
-      topY += 26;
+      topY += 20;
 
       // 5. BADGES: [★ SEMINOVA REVISADA] (Esq) e [DISPONÍVEL] (Dir)
       const badgeY = topY;
-      const badgeH = 42; // Aumentado
+      const badgeH = formato === 'quadrado' ? 38 : 44;
 
       // Badge Esquerda Dourada
-      const bgBadgeDourada = ctx.createLinearGradient(pad + 30, 0, pad + 270, 0);
+      const bgBadgeDourada = ctx.createLinearGradient(pad + 26, 0, pad + 265, 0);
       bgBadgeDourada.addColorStop(0, '#b8860b');
       bgBadgeDourada.addColorStop(0.5, '#f59e0b');
       bgBadgeDourada.addColorStop(1, '#eab308');
       ctx.fillStyle = bgBadgeDourada;
       ctx.beginPath();
-      ctx.roundRect(pad + 30, badgeY, 235, badgeH, 12);
+      ctx.roundRect(pad + 26, badgeY, 235, badgeH, 10);
       ctx.fill();
 
       ctx.fillStyle = '#050505';
-      ctx.font = '900 16px "Segoe UI", sans-serif';
+      ctx.font = '900 15px "Segoe UI", sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText('★ SEMINOVA REVISADA', pad + 30 + 117, badgeY + 27);
+      ctx.fillText('★ SEMINOVA REVISADA', pad + 26 + 117, badgeY + (badgeH / 2) + 5);
 
       // Badge Direita Status
       const statusTexto = arma.status === 'vendida' ? 'VENDIDA' : arma.status === 'reservada' ? 'RESERVADA' : 'DISPONÍVEL';
@@ -401,128 +420,164 @@ export function ModalGeradorAnuncio({ arma, isOpen, onClose }: ModalGeradorAnunc
       ctx.strokeStyle = statusCor;
       ctx.lineWidth = 2.2;
       ctx.beginPath();
-      ctx.roundRect(pad + molduraW - 220, badgeY, 190, badgeH, 12);
+      ctx.roundRect(pad + molduraW - 216, badgeY, 190, badgeH, 10);
       ctx.fill();
       ctx.stroke();
 
       ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 16px "Segoe UI", sans-serif';
-      ctx.fillText(statusTexto, pad + molduraW - 220 + 95, badgeY + 27);
+      ctx.font = 'bold 15px "Segoe UI", sans-serif';
+      ctx.fillText(statusTexto, pad + molduraW - 216 + 95, badgeY + (badgeH / 2) + 5);
 
-      topY += badgeH + 20;
+      topY += badgeH + 16;
 
-      // 6. BLOCO CENTRAL: TÍTULO DA ARMA (Esq) + FOTO DA ARMA (Dir)
+      // 6. BLOCO CENTRAL: TÍTULO DA ARMA (Esq) + VITRINE DA ARMA EXPANDIDA (Dir)
       const blocoMeioY = topY;
-      const blocoMeioH = formato === 'quadrado' ? 390 : 540;
+      // Altura ampliada de 390px para 515px no Feed (e 750px em Stories)
+      const blocoMeioH = formato === 'quadrado' ? 515 : 750;
 
-      // Lado Esquerdo: NOME DA ARMA
+      // Lado Esquerdo: NOME DA ARMA E INFORMAÇÕES BÉLICAS
       ctx.textAlign = 'left';
 
       // Fabricante
+      const fabTexto = arma.fabricante.toUpperCase();
+      const fabTamanho = fabTexto.length > 14 ? 26 : 32;
       ctx.fillStyle = '#f8fafc';
-      ctx.font = '800 34px "Segoe UI", sans-serif';
-      ctx.fillText(arma.fabricante.toUpperCase(), pad + 35, blocoMeioY + 80);
+      ctx.font = `800 ${fabTamanho}px "Segoe UI", sans-serif`;
+      ctx.fillText(fabTexto, pad + 26, blocoMeioY + 60);
 
       // Modelo Grande com Gradiente Prata / Branco e Sombra
-      const modeloGrad = ctx.createLinearGradient(pad + 35, blocoMeioY + 100, pad + 35, blocoMeioY + 185);
+      const modeloTexto = arma.modelo.toUpperCase();
+      const modeloTamanho = modeloTexto.length > 12 ? 46 : modeloTexto.length > 7 ? 58 : 72;
+      const modeloGrad = ctx.createLinearGradient(pad + 26, blocoMeioY + 80, pad + 26, blocoMeioY + 160);
       modeloGrad.addColorStop(0, '#ffffff');
       modeloGrad.addColorStop(1, '#93c5fd');
 
       ctx.save();
       ctx.fillStyle = modeloGrad;
-      ctx.font = '900 74px "Segoe UI", sans-serif';
-      ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+      ctx.font = `900 ${modeloTamanho}px "Segoe UI", sans-serif`;
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.85)';
       ctx.shadowOffsetY = 6;
       ctx.shadowBlur = 16;
-      ctx.fillText(arma.modelo.toUpperCase(), pad + 35, blocoMeioY + 160);
+      ctx.fillText(modeloTexto, pad + 24, blocoMeioY + 130);
       ctx.restore();
 
       // Calibre em destaque Ciano Neon
       ctx.fillStyle = '#38bdf8';
-      ctx.font = 'bold 30px "Segoe UI", sans-serif';
-      ctx.fillText(`CALIBRE ${arma.calibre.toUpperCase()}`, pad + 35, blocoMeioY + 215);
+      ctx.font = 'bold 26px "Segoe UI", sans-serif';
+      ctx.fillText(`CALIBRE ${arma.calibre.toUpperCase()}`, pad + 26, blocoMeioY + 185);
 
       // Registro
       if (arma.sigmaSinarm) {
         ctx.fillStyle = '#e2e8f0';
-        ctx.font = '700 20px "Segoe UI", sans-serif';
-        ctx.fillText(`REGISTRO: ${arma.sigmaSinarm}`, pad + 35, blocoMeioY + 255);
+        ctx.font = '700 19px "Segoe UI", sans-serif';
+        ctx.fillText(`REGISTRO: ${arma.sigmaSinarm}`, pad + 26, blocoMeioY + 225);
       }
 
-      // Lado Direito: FOTO DA ARMA COM MOLDURA ELEGANTE E SOMBRA
-      const boxFotoW = 570; // Expandido para aproveitar toda a largura
-      const boxFotoH = blocoMeioH - 20;
-      const boxFotoX = largura - pad - boxFotoW - 15;
-      const boxFotoY = blocoMeioY;
+      // Selo de Procedência & Segurança Jurídica
+      const badgeSeloY = blocoMeioY + 270;
+      ctx.fillStyle = 'rgba(6, 23, 51, 0.8)';
+      ctx.strokeStyle = 'rgba(56, 189, 248, 0.4)';
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.roundRect(pad + 26, badgeSeloY, 260, 36, 8);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = '#38bdf8';
+      ctx.font = 'bold 12px "Segoe UI", sans-serif';
+      ctx.fillText('🛡️  PROCEDÊNCIA VERIFICADA', pad + 38, badgeSeloY + 23);
+
+      // Lado Direito: VITRINE DA ARMA EXPANDIDA COM MOLDURA GLASS E MÁXIMA VISIBILIDADE
+      // Largura ampliada para 635px e altura para blocoMeioH - 15 (aproveitando 100% do espaço útil)
+      const boxFotoW = 635;
+      const boxFotoH = blocoMeioH - 15;
+      const boxFotoX = largura - pad - boxFotoW - 14;
+      const boxFotoY = blocoMeioY + 5;
 
       ctx.save();
-      // Glow suave de fundo para destacar o relevo da arma
-      const fotoGlow = ctx.createRadialGradient(
-        boxFotoX + boxFotoW / 2, boxFotoY + boxFotoH / 2, 40,
+      // Moldura da Vitrine com Fundo Escuro Glass e Bordas Táticas
+      ctx.fillStyle = 'rgba(2, 14, 33, 0.75)';
+      ctx.strokeStyle = 'rgba(56, 189, 248, 0.35)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.roundRect(boxFotoX, boxFotoY, boxFotoW, boxFotoH, 18);
+      ctx.fill();
+      ctx.stroke();
+
+      // Glow suave de profundidade no centro da vitrine
+      const vitrineGlow = ctx.createRadialGradient(
+        boxFotoX + boxFotoW / 2, boxFotoY + boxFotoH / 2, 30,
         boxFotoX + boxFotoW / 2, boxFotoY + boxFotoH / 2, boxFotoW * 0.55
       );
-      fotoGlow.addColorStop(0, 'rgba(56, 189, 248, 0.25)');
-      fotoGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
-      ctx.fillStyle = fotoGlow;
-      ctx.fillRect(boxFotoX, boxFotoY, boxFotoW, boxFotoH);
+      vitrineGlow.addColorStop(0, 'rgba(14, 165, 233, 0.22)');
+      vitrineGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = vitrineGlow;
+      ctx.beginPath();
+      ctx.roundRect(boxFotoX, boxFotoY, boxFotoW, boxFotoH, 18);
+      ctx.fill();
 
       const temFotoValida = armaImg.complete && armaImg.naturalWidth > 0 && !fotoAtual.includes('application/pdf');
 
       if (temFotoValida) {
-        // Redimensionar proporcional com contain para não distorcer a arma
-        const scale = Math.min((boxFotoW - 20) / armaImg.naturalWidth, (boxFotoH - 20) / armaImg.naturalHeight);
-        const w = armaImg.naturalWidth * scale;
-        const h = armaImg.naturalHeight * scale;
-        const x = boxFotoX + (boxFotoW - w) / 2;
-        const y = boxFotoY + (boxFotoH - h) / 2;
+        // Aplica máscara com cantos arredondados para a foto ficar impecavelmente integrada
+        ctx.beginPath();
+        ctx.roundRect(boxFotoX + 4, boxFotoY + 4, boxFotoW - 8, boxFotoH - 8, 16);
+        ctx.clip();
+
+        // Cálculo da escala de acordo com o modo escolhido (conter = 100% visível; preencher = zoom foco)
+        let baseScale = modoFoto === 'preencher'
+          ? Math.max(boxFotoW / armaImg.naturalWidth, boxFotoH / armaImg.naturalHeight)
+          : Math.min((boxFotoW - 16) / armaImg.naturalWidth, (boxFotoH - 16) / armaImg.naturalHeight);
+
+        // Aplica o multiplicador de zoom do usuário (ex: 100% = 1.0, 130% = 1.3)
+        const finalScale = baseScale * (zoomFoto / 100);
+        const w = armaImg.naturalWidth * finalScale;
+        const h = armaImg.naturalHeight * finalScale;
+
+        // Deslocamentos configurados pelo usuário para centralizar perfeitamente
+        const offsetX = (posicaoXFoto / 100) * boxFotoW;
+        const offsetY = (posicaoYFoto / 100) * boxFotoH;
+        const x = boxFotoX + (boxFotoW - w) / 2 + offsetX;
+        const y = boxFotoY + (boxFotoH - h) / 2 + offsetY;
 
         // Sombra realista abaixo da arma
-        ctx.shadowColor = 'rgba(0, 0, 0, 0.85)';
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
         ctx.shadowBlur = 32;
         ctx.shadowOffsetY = 16;
 
         ctx.drawImage(armaImg, x, y, w, h);
       } else {
         // Moldura Placeholder Estilizada com Mira Central
-        ctx.fillStyle = 'rgba(6, 23, 51, 0.7)';
-        ctx.strokeStyle = 'rgba(56, 189, 248, 0.35)';
-        ctx.lineWidth = 1.8;
-        ctx.beginPath();
-        ctx.roundRect(boxFotoX + 15, boxFotoY + 15, boxFotoW - 30, boxFotoH - 30, 18);
-        ctx.fill();
-        ctx.stroke();
-
-        // Desenhar mira tática decorativa
         const miraX = boxFotoX + boxFotoW / 2;
         const miraY = boxFotoY + boxFotoH / 2 - 20;
         ctx.strokeStyle = '#38bdf8';
         ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.arc(miraX, miraY, 36, 0, Math.PI * 2);
-        ctx.moveTo(miraX - 48, miraY);
-        ctx.lineTo(miraX + 48, miraY);
-        ctx.moveTo(miraX, miraY - 48);
-        ctx.lineTo(miraX, miraY + 48);
+        ctx.arc(miraX, miraY, 42, 0, Math.PI * 2);
+        ctx.moveTo(miraX - 56, miraY);
+        ctx.lineTo(miraX + 56, miraY);
+        ctx.moveTo(miraX, miraY - 56);
+        ctx.lineTo(miraX, miraY + 56);
         ctx.stroke();
 
         ctx.fillStyle = '#94a3b8';
         ctx.font = 'bold 22px "Segoe UI", sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillText('FOTO NÃO CADASTRADA', miraX, miraY + 68);
+        ctx.fillText('FOTO NÃO CADASTRADA', miraX, miraY + 76);
 
         ctx.fillStyle = '#64748b';
         ctx.font = '14px "Segoe UI", sans-serif';
-        ctx.fillText('Clique em "Anexar Foto" para adicionar agora', miraX, miraY + 92);
+        ctx.fillText('Clique em "Anexar Foto" para adicionar agora', miraX, miraY + 102);
       }
       ctx.restore();
 
-      topY += blocoMeioH + 10;
+      topY += blocoMeioH + 14;
 
       // 7. GRADE DE 6 ESPECIFICAÇÕES TÉCNICAS (2 Linhas x 3 Colunas)
-      const gridW = molduraW - 60;
-      const gridX = pad + 30;
+      const gridW = molduraW - 48;
+      const gridX = pad + 24;
       const boxW = (gridW - 24) / 3;
-      const boxH = 82; // Aumentado de 58px para 82px
+      const boxH = formato === 'quadrado' ? 76 : 88;
 
       const formatarValorSeguro = (val?: string) => {
         if (!val) return 'ORIGINAL';
@@ -547,42 +602,41 @@ export function ModalGeradorAnuncio({ arma, isOpen, onClose }: ModalGeradorAnunc
         const col = idx % 3;
         const row = Math.floor(idx / 3);
         const bx = gridX + col * (boxW + 12);
-        const by = topY + row * (boxH + 12);
+        const by = topY + row * (boxH + 10);
 
         // Box Fundo Azul Meia-Noite com Borda Tática
         ctx.fillStyle = '#041838';
         ctx.strokeStyle = '#1d4880';
         ctx.lineWidth = 1.8;
         ctx.beginPath();
-        ctx.roundRect(bx, by, boxW, boxH, 14);
+        ctx.roundRect(bx, by, boxW, boxH, 12);
         ctx.fill();
         ctx.stroke();
 
         // Rótulo Superior Ciano Claro
         ctx.textAlign = 'center';
         ctx.fillStyle = '#7dd3fc';
-        ctx.font = 'bold 14px "Segoe UI", sans-serif';
-        ctx.fillText(info.label, bx + boxW / 2, by + 26);
+        ctx.font = 'bold 13px "Segoe UI", sans-serif';
+        ctx.fillText(info.label, bx + boxW / 2, by + 24);
 
         // Valor Principal Branco com Ajuste Inteligente de Tamanho de Fonte
         ctx.fillStyle = '#ffffff';
-        const tamanhoFonte = info.val.length > 15 ? 18 : 23;
+        const tamanhoFonte = info.val.length > 15 ? 17 : 21;
         ctx.font = `900 ${tamanhoFonte}px "Segoe UI", sans-serif`;
 
-        // Se o valor for muito grande, trunca com reticências para não vazar o box
         let valExibicao = info.val;
         if (valExibicao.length > 22) {
           valExibicao = valExibicao.slice(0, 20) + '...';
         }
-        ctx.fillText(valExibicao, bx + boxW / 2, by + 58);
+        ctx.fillText(valExibicao, bx + boxW / 2, by + 54);
       });
 
-      topY += (boxH * 2) + 24;
+      topY += (boxH * 2) + 20;
 
       // 8. FAIXA DOURADA DE PREÇO
       if (mostrarPreco) {
         const faixaW = gridW;
-        const faixaH = 104; // Aumentado de 82px para 104px
+        const faixaH = formato === 'quadrado' ? 102 : 116;
         const faixaX = gridX;
         const faixaY = topY + 8;
 
@@ -598,32 +652,31 @@ export function ModalGeradorAnuncio({ arma, isOpen, onClose }: ModalGeradorAnunc
         ctx.shadowBlur = 24;
         ctx.fillStyle = douradoGrad;
         ctx.beginPath();
-        ctx.roundRect(faixaX, faixaY, faixaW, faixaH, 18);
+        ctx.roundRect(faixaX, faixaY, faixaW, faixaH, 16);
         ctx.fill();
         ctx.restore();
 
         ctx.fillStyle = '#361e01';
-        ctx.font = 'bold 16px "Segoe UI", sans-serif';
+        ctx.font = 'bold 15px "Segoe UI", sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillText('VALOR DE INVESTIMENTO', largura / 2, faixaY + 30);
+        ctx.fillText('VALOR DE INVESTIMENTO', largura / 2, faixaY + 28);
 
         ctx.fillStyle = '#050505';
-        ctx.font = '900 58px "Segoe UI", sans-serif';
-        ctx.fillText(formatarMoeda(arma.valorAnunciado), largura / 2, faixaY + 84);
+        ctx.font = '900 56px "Segoe UI", sans-serif';
+        ctx.fillText(formatarMoeda(arma.valorAnunciado), largura / 2, faixaY + 80);
 
-        topY += faixaH + 28;
+        topY += faixaH + 24;
       } else {
-        topY += 35;
+        topY += 30;
       }
 
       // 9. RODAPÉ DE CONTATOS OFICIAL DO ESCRITÓRIO
-      const rodapeY = altura - pad - 68;
+      const rodapeY = altura - pad - 60;
 
       if (mostrarContato) {
-        // Badge WhatsApp Central
         ctx.textAlign = 'center';
 
-        // Desenhar Badge / Círculo Verde Neon WhatsApp
+        // Badge / Círculo Verde WhatsApp
         const zapX = largura / 2 - 200;
         ctx.fillStyle = '#22c55e';
         ctx.beginPath();
@@ -642,11 +695,11 @@ export function ModalGeradorAnuncio({ arma, isOpen, onClose }: ModalGeradorAnunc
         // Endereço e Cidade
         ctx.fillStyle = '#f87171';
         ctx.font = 'bold 18px sans-serif';
-        ctx.fillText('📍', largura / 2 - 280, rodapeY + 34);
+        ctx.fillText('📍', largura / 2 - 280, rodapeY + 32);
 
         ctx.fillStyle = '#e2e8f0';
-        ctx.font = '600 19px "Segoe UI", sans-serif';
-        ctx.fillText(cidadeLoja, largura / 2, rodapeY + 34);
+        ctx.font = '600 18px "Segoe UI", sans-serif';
+        ctx.fillText(cidadeLoja, largura / 2, rodapeY + 32);
       }
 
       // 10. TEXTO LEGAL FINAL FORA DA MOLDURA
@@ -706,6 +759,10 @@ export function ModalGeradorAnuncio({ arma, isOpen, onClose }: ModalGeradorAnunc
     mostrarEstado,
     mostrarContato,
     mostrarLogo,
+    modoFoto,
+    zoomFoto,
+    posicaoYFoto,
+    posicaoXFoto,
     fotoAtual,
     nomeLoja,
     telefoneLoja,
@@ -1032,6 +1089,91 @@ Mantenha emojis de armas/tiro/fogo, bullet points claros e destaque a exigência
                 <div className="flex items-center gap-1.5 text-[11px] text-emerald-400 bg-emerald-500/10 p-2 rounded-lg border border-emerald-500/20 mt-2">
                   <Shield size={13} className="shrink-0" />
                   <span>Sigilo Ativo: Nome do antigo dono e Nº de Série ficam sempre ocultos do público.</span>
+                </div>
+              </div>
+
+              {/* Bloco de Enquadramento e Zoom da Arma */}
+              <div className="p-4 rounded-xl bg-brand-dark-3/60 border border-brand-dark-5 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-gray-300 uppercase tracking-wider flex items-center gap-1.5">
+                    <Sparkles size={14} className="text-amber-400" /> Destaque & Zoom da Arma
+                  </span>
+                  {(zoomFoto !== 105 || modoFoto !== 'conter' || posicaoYFoto !== 0) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setModoFoto('conter');
+                        setZoomFoto(105);
+                        setPosicaoYFoto(0);
+                        setPosicaoXFoto(0);
+                      }}
+                      className="text-[10px] text-amber-400 hover:text-amber-300 underline font-medium"
+                    >
+                      Redefinir
+                    </button>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setModoFoto('conter')}
+                    className={`py-1.5 px-3 rounded-lg border font-semibold transition-all ${
+                      modoFoto === 'conter'
+                        ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 shadow-xs'
+                        : 'bg-brand-dark-4 text-gray-400 border-brand-dark-5 hover:text-white'
+                    }`}
+                  >
+                    Foto Inteira (Conter)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setModoFoto('preencher');
+                      if (zoomFoto < 110) setZoomFoto(115);
+                    }}
+                    className={`py-1.5 px-3 rounded-lg border font-semibold transition-all ${
+                      modoFoto === 'preencher'
+                        ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 shadow-xs'
+                        : 'bg-brand-dark-4 text-gray-400 border-brand-dark-5 hover:text-white'
+                    }`}
+                  >
+                    Preencher Vitrine (Zoom)
+                  </button>
+                </div>
+
+                <div className="space-y-2 pt-1 text-xs">
+                  <div>
+                    <div className="flex justify-between text-gray-300 text-[11px] mb-1">
+                      <span>Tamanho / Zoom da Arma na Vitrine:</span>
+                      <span className="font-bold text-amber-400">{zoomFoto}%</span>
+                    </div>
+                    <input
+                      type="range"
+                      min={90}
+                      max={180}
+                      step={5}
+                      value={zoomFoto}
+                      onChange={e => setZoomFoto(Number(e.target.value))}
+                      className="w-full h-1.5 bg-brand-dark-4 rounded-lg appearance-none cursor-pointer accent-amber-500"
+                    />
+                  </div>
+
+                  <div>
+                    <div className="flex justify-between text-gray-300 text-[11px] mb-1">
+                      <span>Ajuste de Posição Vertical:</span>
+                      <span className="font-bold text-cyan-400">{posicaoYFoto > 0 ? `+${posicaoYFoto}%` : `${posicaoYFoto}%`}</span>
+                    </div>
+                    <input
+                      type="range"
+                      min={-35}
+                      max={35}
+                      step={2}
+                      value={posicaoYFoto}
+                      onChange={e => setPosicaoYFoto(Number(e.target.value))}
+                      className="w-full h-1.5 bg-brand-dark-4 rounded-lg appearance-none cursor-pointer accent-cyan-500"
+                    />
+                  </div>
                 </div>
               </div>
 
