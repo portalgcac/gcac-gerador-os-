@@ -15,7 +15,7 @@ export const CALIBRES_BASE = [
   '.45 ACP', '.454 CASULL', '12 GA', '20 GA', '28 GA', '36 GA'
 ];
 export const FABRICANTES_BASE = [
-  'AMADEU ROSSI', 'BENELLI', 'BERETTA', 'BOITO', 'BROWNING', 'CANIK', 'CBC', 'COLT', 'CZ', 
+  'AMADEO ROSSI', 'BENELLI', 'BERETTA', 'BOITO', 'BROWNING', 'CANIK', 'CBC', 'COLT', 'CZ', 
   'GLOCK', 'IMBEL', 'REMINGTON', 'ROSSI', 'RUGER', 'SIG SAUER', 
   'SMITH & WESSON', 'SPRINGFIELD ARMORY', 'STOEGER', 'TANFOGLIO', 
   'TAURUS', 'WALTHER', 'WINCHESTER'
@@ -283,32 +283,20 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
     const fabricantes = new Set<string>();
     const tipoNorm = normalizarTipoArma(tipo);
 
-    // 1. Fabricantes do catálogo associados a este tipo de arma
+    // Filtra os fabricantes estritamente associados ao tipo de arma selecionado
     catalogoArmas.forEach(item => {
       if (!tipoNorm || normalizarTipoArma(item.tipo) === tipoNorm) {
         if (item.fabricante) fabricantes.add(normalizarFabricante(item.fabricante));
       }
     });
 
-    // 2. Fabricantes personalizados cadastrados pelo usuário em Opções de Armas
-    opcoesArmas.forEach(op => {
-      if (op.tipo === 'fabricante' && op.nome) {
-        fabricantes.add(normalizarFabricante(op.nome));
-      }
-    });
-
-    // 3. Fabricantes já aprendidos / registrados nos acervos de clientes
-    fabricantesRegistrados.forEach(f => {
-      if (f) fabricantes.add(normalizarFabricante(f));
-    });
-
-    // 4. Caso vazio ou sem opções, disponibiliza a base
     if (fabricantes.size === 0) {
       FABRICANTES_BASE.forEach(f => fabricantes.add(normalizarFabricante(f)));
+      fabricantesRegistrados.forEach(f => fabricantes.add(normalizarFabricante(f)));
     }
 
     return Array.from(fabricantes).filter(Boolean).sort();
-  }, [catalogoArmas, opcoesArmas, fabricantesRegistrados]);
+  }, [catalogoArmas, fabricantesRegistrados]);
 
   const obterModelosPorTipoEFabricante = useCallback((tipo?: string, fabricante?: string): string[] => {
     const modelos = new Set<string>();

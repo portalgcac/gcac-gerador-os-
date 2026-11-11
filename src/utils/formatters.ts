@@ -454,18 +454,18 @@ export function normalizarFabricante(fabricante: string | undefined | null): str
   if (!fabricante) return '';
   let f = fabricante.trim().toUpperCase();
   
-  // Amadeu Rossi / Amadeo Rossi e correções de grafia / erros comuns (ex: erro de digitação "AMADEO ROSSE")
+  // Amadeo Rossi e correções de grafia / erros comuns (ex: erro de digitação "AMADEO ROSSE" ou "AMADEU ROSSI")
   if (
-    f === 'AMADEU ROSSI' || 
     f === 'AMADEO ROSSI' || 
+    f === 'AMADEU ROSSI' || 
     f === 'AMADEO ROSSE' || 
     f === 'AMADEU ROSSE' || 
-    f.startsWith('AMADEU ROSS') || 
-    f.startsWith('AMADEO ROSS') ||
-    f.includes('AMADEU ROSSI') ||
-    f.includes('AMADEO ROSSI')
+    f.startsWith('AMADEO ROSS') || 
+    f.startsWith('AMADEU ROSS') ||
+    f.includes('AMADEO ROSSI') ||
+    f.includes('AMADEU ROSSI')
   ) {
-    return 'AMADEU ROSSI';
+    return 'AMADEO ROSSI';
   }
 
   if (f === 'ROSSI') {
@@ -496,9 +496,9 @@ export function fabricantesEquivalentes(fab1?: string | null, fab2?: string | nu
   const f1 = normalizarFabricante(fab1);
   const f2 = normalizarFabricante(fab2);
   if (f1 === f2) return true;
-  // Amadeu Rossi e Rossi compartilham o mesmo catálogo histórico de modelos e calibres (Puma, revólveres)
-  const isRossi1 = f1 === 'ROSSI' || f1 === 'AMADEU ROSSI';
-  const isRossi2 = f2 === 'ROSSI' || f2 === 'AMADEU ROSSI';
+  // Amadeo Rossi e Rossi compartilham o mesmo catálogo histórico de modelos e calibres (Puma, revólveres)
+  const isRossi1 = f1 === 'ROSSI' || f1 === 'AMADEO ROSSI';
+  const isRossi2 = f2 === 'ROSSI' || f2 === 'AMADEO ROSSI';
   return isRossi1 && isRossi2;
 }
 
