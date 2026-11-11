@@ -1508,7 +1508,8 @@ export function ModalArma({ armaParaEditar, acervoPadrao, onFechar, onSalvar }: 
                   className="input uppercase font-bold text-xs"
                   placeholder="Ex: CANIK, CZ..."
                   value={form.fabricante}
-                  onChange={e => setForm({ ...form, fabricante: normalizarFabricante(e.target.value) })}
+                  onChange={e => setForm({ ...form, fabricante: e.target.value.toUpperCase() })}
+                  onBlur={e => setForm({ ...form, fabricante: normalizarFabricante(e.target.value) })}
                   autoFocus
                 />
               ) : (

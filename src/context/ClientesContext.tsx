@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { Cliente, Arma, GuiaTrafego, AutorizacaoManejo, CreditoCliente, ModeloDeclaracao, OpcaoArma, ItemCatalogoArma } from '../types';
 import { supabase } from '../db/supabase';
 import { uploadBase64File } from '../utils/fileUtils';
-import { normalizarCalibre, normalizarModelo, normalizarFabricante, removerAcentos } from '../utils/formatters';
+import { normalizarCalibre, normalizarModelo, normalizarFabricante, fabricantesEquivalentes, removerAcentos } from '../utils/formatters';
 import { CATALOGO_BASE_ARMAS, normalizarTipoArma, obterCalibresCompativeis, obterDadosPorModelo } from '../data/catalogoArmas';
 
 import { useAuth } from './AuthContext';
@@ -15,7 +15,7 @@ export const CALIBRES_BASE = [
   '.45 ACP', '.454 CASULL', '12 GA', '20 GA', '28 GA', '36 GA'
 ];
 export const FABRICANTES_BASE = [
-  'BENELLI', 'BERETTA', 'BOITO', 'BROWNING', 'CANIK', 'CBC', 'COLT', 'CZ', 
+  'AMADEU ROSSI', 'BENELLI', 'BERETTA', 'BOITO', 'BROWNING', 'CANIK', 'CBC', 'COLT', 'CZ', 
   'GLOCK', 'IMBEL', 'REMINGTON', 'ROSSI', 'RUGER', 'SIG SAUER', 
   'SMITH & WESSON', 'SPRINGFIELD ARMORY', 'STOEGER', 'TANFOGLIO', 
   'TAURUS', 'WALTHER', 'WINCHESTER'
@@ -207,6 +207,8 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
   const [calibresRegistrados, setCalibresRegistrados] = useState<string[]>([]);
   const [fabricantesRegistrados, setFabricantesRegistrados] = useState<string[]>([]);
   const [catalogoArmas, setCatalogoArmas] = useState<ItemCatalogoArma[]>(CATALOGO_BASE_ARMAS);
+  const [opcoesArmas, setOpcoesArmas] = useState<OpcaoArma[]>([]);
+  const [carregandoOpcoes, setCarregandoOpcoes] = useState(false);
 
   const carregarMetadadosArmas = useCallback(async () => {
     if (!usuario?.empresaId) return;
@@ -281,19 +283,32 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
     const fabricantes = new Set<string>();
     const tipoNorm = normalizarTipoArma(tipo);
 
+    // 1. Fabricantes do catálogo associados a este tipo de arma
     catalogoArmas.forEach(item => {
       if (!tipoNorm || normalizarTipoArma(item.tipo) === tipoNorm) {
         if (item.fabricante) fabricantes.add(normalizarFabricante(item.fabricante));
       }
     });
 
+    // 2. Fabricantes personalizados cadastrados pelo usuário em Opções de Armas
+    opcoesArmas.forEach(op => {
+      if (op.tipo === 'fabricante' && op.nome) {
+        fabricantes.add(normalizarFabricante(op.nome));
+      }
+    });
+
+    // 3. Fabricantes já aprendidos / registrados nos acervos de clientes
+    fabricantesRegistrados.forEach(f => {
+      if (f) fabricantes.add(normalizarFabricante(f));
+    });
+
+    // 4. Caso vazio ou sem opções, disponibiliza a base
     if (fabricantes.size === 0) {
-      FABRICANTES_BASE.forEach(f => fabricantes.add(f));
-      fabricantesRegistrados.forEach(f => fabricantes.add(f));
+      FABRICANTES_BASE.forEach(f => fabricantes.add(normalizarFabricante(f)));
     }
 
     return Array.from(fabricantes).filter(Boolean).sort();
-  }, [catalogoArmas, fabricantesRegistrados]);
+  }, [catalogoArmas, opcoesArmas, fabricantesRegistrados]);
 
   const obterModelosPorTipoEFabricante = useCallback((tipo?: string, fabricante?: string): string[] => {
     const modelos = new Set<string>();
@@ -302,7 +317,10 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
 
     catalogoArmas.forEach(item => {
       const matchTipo = !tipoNorm || normalizarTipoArma(item.tipo) === tipoNorm;
-      const matchFab = !fabNorm || normalizarFabricante(item.fabricante) === fabNorm;
+      const matchFab = !fabNorm || 
+        normalizarFabricante(item.fabricante) === fabNorm || 
+        fabricantesEquivalentes(item.fabricante, fabNorm);
+
       if (matchTipo && matchFab && item.modelo) {
         modelos.add(normalizarModelo(item.modelo));
       }
@@ -323,7 +341,7 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
 
     const exato = catalogoArmas.find(item => 
       normalizarModelo(item.modelo) === modNorm &&
-      (!fabNorm || normalizarFabricante(item.fabricante) === fabNorm) &&
+      (!fabNorm || normalizarFabricante(item.fabricante) === fabNorm || fabricantesEquivalentes(item.fabricante, fabNorm)) &&
       (!tipoNorm || normalizarTipoArma(item.tipo) === tipoNorm) &&
       item.calibrePadrao
     );
@@ -396,9 +414,6 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
       }
     }
   }, [usuario]);
-
-  const [opcoesArmas, setOpcoesArmas] = useState<OpcaoArma[]>([]);
-  const [carregandoOpcoes, setCarregandoOpcoes] = useState(false);
 
   const carregarOpcoesArmas = useCallback(async () => {
     if (!usuario?.empresaId) return;

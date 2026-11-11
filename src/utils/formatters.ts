@@ -454,9 +454,24 @@ export function normalizarFabricante(fabricante: string | undefined | null): str
   if (!fabricante) return '';
   let f = fabricante.trim().toUpperCase();
   
-  if (f === 'ROSSI' || f === 'AMADEO ROSSI' || f.includes('ROSSI')) {
+  // Amadeu Rossi / Amadeo Rossi e correções de grafia / erros comuns (ex: erro de digitação "AMADEO ROSSE")
+  if (
+    f === 'AMADEU ROSSI' || 
+    f === 'AMADEO ROSSI' || 
+    f === 'AMADEO ROSSE' || 
+    f === 'AMADEU ROSSE' || 
+    f.startsWith('AMADEU ROSS') || 
+    f.startsWith('AMADEO ROSS') ||
+    f.includes('AMADEU ROSSI') ||
+    f.includes('AMADEO ROSSI')
+  ) {
+    return 'AMADEU ROSSI';
+  }
+
+  if (f === 'ROSSI') {
     return 'ROSSI';
   }
+
   if (f === 'TAURUS' || f === 'FORJA TAURUS' || f === 'FORJAS TAURUS' || f.includes('TAURUS')) {
     return 'TAURUS';
   }
@@ -474,6 +489,17 @@ export function normalizarFabricante(fabricante: string | undefined | null): str
   }
   
   return f;
+}
+
+export function fabricantesEquivalentes(fab1?: string | null, fab2?: string | null): boolean {
+  if (!fab1 || !fab2) return false;
+  const f1 = normalizarFabricante(fab1);
+  const f2 = normalizarFabricante(fab2);
+  if (f1 === f2) return true;
+  // Amadeu Rossi e Rossi compartilham o mesmo catálogo histórico de modelos e calibres (Puma, revólveres)
+  const isRossi1 = f1 === 'ROSSI' || f1 === 'AMADEU ROSSI';
+  const isRossi2 = f2 === 'ROSSI' || f2 === 'AMADEU ROSSI';
+  return isRossi1 && isRossi2;
 }
 
 // ─── Inteligência Operacional: Combos e Etapas Sequenciais ──────────────────

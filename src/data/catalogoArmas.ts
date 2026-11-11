@@ -181,12 +181,17 @@ export const CATALOGO_BASE_ARMAS: ItemCatalogoArma[] = [
   { tipo: 'REVÓLVER', fabricante: 'SMITH & WESSON', modelo: 'MODEL 60', calibrePadrao: '.357 MAG' },
   { tipo: 'REVÓLVER', fabricante: 'SMITH & WESSON', modelo: 'MODEL 29', calibrePadrao: '.44 MAG' },
 
-  // ROSSI
+  // ROSSI / AMADEU ROSSI
   { tipo: 'REVÓLVER', fabricante: 'ROSSI', modelo: 'R972', calibrePadrao: '.357 MAG' },
   { tipo: 'REVÓLVER', fabricante: 'ROSSI', modelo: 'R851', calibrePadrao: '.38 SPL' },
   { tipo: 'REVÓLVER', fabricante: 'ROSSI', modelo: 'RP63', calibrePadrao: '.357 MAG' },
   { tipo: 'REVÓLVER', fabricante: 'ROSSI', modelo: 'RM66', calibrePadrao: '.357 MAG' },
   { tipo: 'REVÓLVER', fabricante: 'ROSSI', modelo: 'PRINCESS', calibrePadrao: '.22 LR' },
+  { tipo: 'REVÓLVER', fabricante: 'AMADEU ROSSI', modelo: 'R972', calibrePadrao: '.357 MAG' },
+  { tipo: 'REVÓLVER', fabricante: 'AMADEU ROSSI', modelo: 'R851', calibrePadrao: '.38 SPL' },
+  { tipo: 'REVÓLVER', fabricante: 'AMADEU ROSSI', modelo: 'RP63', calibrePadrao: '.357 MAG' },
+  { tipo: 'REVÓLVER', fabricante: 'AMADEU ROSSI', modelo: 'RM66', calibrePadrao: '.357 MAG' },
+  { tipo: 'REVÓLVER', fabricante: 'AMADEU ROSSI', modelo: 'PRINCESS', calibrePadrao: '.22 LR' },
 
   // COLT
   { tipo: 'REVÓLVER', fabricante: 'COLT', modelo: 'PYTHON', calibrePadrao: '.357 MAG' },
@@ -213,11 +218,15 @@ export const CATALOGO_BASE_ARMAS: ItemCatalogoArma[] = [
   { tipo: 'CARABINA / FUZIL', fabricante: 'CBC', modelo: 'DELTA', calibrePadrao: '.22 LR' },
   { tipo: 'CARABINA / FUZIL', fabricante: 'CBC', modelo: '122', calibrePadrao: '.22 LR' },
 
-  // ROSSI
+  // ROSSI / AMADEU ROSSI
   { tipo: 'CARABINA / FUZIL', fabricante: 'ROSSI', modelo: 'PUMA .357', calibrePadrao: '.357 MAG' },
   { tipo: 'CARABINA / FUZIL', fabricante: 'ROSSI', modelo: 'PUMA .38', calibrePadrao: '.38 SPL' },
   { tipo: 'CARABINA / FUZIL', fabricante: 'ROSSI', modelo: 'PUMA .44', calibrePadrao: '.44 MAG' },
   { tipo: 'CARABINA / FUZIL', fabricante: 'ROSSI', modelo: 'GALLERY', calibrePadrao: '.22 LR' },
+  { tipo: 'CARABINA / FUZIL', fabricante: 'AMADEU ROSSI', modelo: 'PUMA .357', calibrePadrao: '.357 MAG' },
+  { tipo: 'CARABINA / FUZIL', fabricante: 'AMADEU ROSSI', modelo: 'PUMA .38', calibrePadrao: '.38 SPL' },
+  { tipo: 'CARABINA / FUZIL', fabricante: 'AMADEU ROSSI', modelo: 'PUMA .44', calibrePadrao: '.44 MAG' },
+  { tipo: 'CARABINA / FUZIL', fabricante: 'AMADEU ROSSI', modelo: 'GALLERY', calibrePadrao: '.22 LR' },
 
   // IMBEL
   { tipo: 'CARABINA / FUZIL', fabricante: 'IMBEL', modelo: 'IA2 5.56', calibrePadrao: '.223 REM / 5.56 NATO' },
