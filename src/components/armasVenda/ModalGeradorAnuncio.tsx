@@ -997,40 +997,60 @@ Mantenha emojis de armas/tiro/fogo, bullet points claros e destaque a exigência
     }
   };
 
+  // Fechar com a tecla ESC
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   return (
     <>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm overflow-y-auto">
-        <div className="bg-brand-dark-2 border border-brand-dark-5 rounded-2xl w-full max-w-5xl overflow-hidden shadow-2xl my-8">
-          {/* Top Header */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-brand-dark-5 bg-brand-dark-3/50">
+      <div
+        onClick={(e) => {
+          if (e.target === e.currentTarget) onClose();
+        }}
+        className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-sm overflow-hidden"
+      >
+        <div className="bg-brand-dark-2 border border-brand-dark-5 rounded-2xl w-full max-w-6xl max-h-[96vh] flex flex-col shadow-2xl overflow-hidden animate-fade-in">
+          {/* Top Header Fixo / Sticky que NUNCA sai da tela */}
+          <div className="flex items-center justify-between px-5 py-3.5 border-b border-brand-dark-5 bg-[#0d121a] shrink-0 sticky top-0 z-30 shadow-sm">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
-                <Sparkles size={20} />
+              <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
+                <Sparkles size={18} />
               </div>
               <div>
-                <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                <h2 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
                   Gerador de Anúncio Oficial GCAC
                   <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
                     {arma.fabricante} {arma.modelo}
                   </span>
                 </h2>
-                <p className="text-xs text-gray-400">
+                <p className="text-[11px] sm:text-xs text-gray-400">
                   Arte premium oficial do escritório pronta para WhatsApp, Instagram e Redes
                 </p>
               </div>
             </div>
             <button
+              type="button"
               onClick={onClose}
-              className="p-2 rounded-xl text-gray-400 hover:text-white hover:bg-brand-dark-4 transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-brand-dark-4 hover:bg-red-500/20 text-gray-300 hover:text-red-400 border border-brand-dark-5 hover:border-red-500/30 transition-all font-semibold text-xs"
+              title="Fechar janela (Esc)"
             >
-              <X size={20} />
+              <span>Fechar</span>
+              <X size={16} />
             </button>
           </div>
 
-          {/* Conteúdo Grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 p-6">
+          {/* Conteúdo Grid com Scroll Interno Independente */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 p-4 sm:p-6 overflow-y-auto flex-1 custom-scrollbar">
             {/* Coluna Esquerda: Preview do Canvas (Imagem Gerada) */}
             <div className="lg:col-span-7 flex flex-col items-center">
               <div className="flex items-center justify-between w-full mb-3">
