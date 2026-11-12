@@ -1169,13 +1169,13 @@ export function FormularioOrdem({ ordemExistente }: FormularioOrdemProps) {
 
                 {/* Cabeçalho do card: nome + valor + status */}
                 <div className="flex flex-col gap-3 mb-3 pr-8">
-                  <div className="flex items-center gap-3">
-                    <span className="w-5 h-5 rounded-md bg-brand-dark-5 text-gray-400 text-xs flex items-center justify-center font-bold flex-shrink-0">{index + 1}</span>
+                  <div className="flex items-start sm:items-center gap-3">
+                    <span className="w-5 h-5 rounded-md bg-brand-dark-5 text-gray-400 text-xs flex items-center justify-center font-bold flex-shrink-0 mt-0.5 sm:mt-0">{index + 1}</span>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <h4 className="text-sm font-bold text-white truncate">{serv.nome}</h4>
+                        <h4 className="text-sm font-bold text-white break-words leading-snug">{serv.nome}</h4>
                         {serv.etapaOrigemNome && (
-                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-bold">
+                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-bold shrink-0">
                             🔗 Etapa de: {serv.etapaOrigemNome}
                           </span>
                         )}
@@ -1183,7 +1183,7 @@ export function FormularioOrdem({ ordemExistente }: FormularioOrdemProps) {
                           <button
                             type="button"
                             onClick={() => atualizarPagoDireto(serv.id, !serv.pagoDireto)}
-                            className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase transition-all ${
+                            className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase transition-all shrink-0 ${
                               serv.pagoDireto 
                                 ? 'bg-amber-500/20 text-amber-500 border border-amber-500/30' 
                                 : 'bg-brand-dark-5 text-gray-500 border border-transparent'
@@ -1195,7 +1195,7 @@ export function FormularioOrdem({ ordemExistente }: FormularioOrdemProps) {
                         )}
                       </div>
                     </div>
-                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                    <div className="flex items-center gap-1.5 flex-shrink-0 self-start sm:self-center">
                       <span className="text-xs text-gray-500 font-medium">R$</span>
                       <input
                         type="number"

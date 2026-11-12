@@ -791,7 +791,7 @@ export function DetalheOrdem({ ordem }: DetalheOrdemProps) {
                 <div className="flex items-start justify-between gap-4 mb-2">
                   <div className="flex flex-col items-start gap-1 flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <p className="font-bold text-white text-base leading-tight">• {serv.nome}</p>
+                      <p className="font-bold text-white text-base leading-tight break-words">• {serv.nome}</p>
                       {serv.etapaOrigemNome && (
                         <span className="text-[9px] px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-bold">
                           🔗 Etapa de: {serv.etapaOrigemNome}

@@ -694,15 +694,15 @@ export function FormularioOrcamento({ orcamentoExistente }: FormularioOrcamentoP
                 </button>
                 
                 <div className="pr-6">
-                  <div className="flex items-center gap-2 mb-2">
-                    <h4 className="text-sm font-bold text-brand-blue-light">
+                  <div className="flex items-center gap-2 mb-2 flex-wrap">
+                    <h4 className="text-sm font-bold text-brand-blue-light break-words leading-snug">
                       {serv.nome}
                     </h4>
                     {isLaudoExame(serv.categoria || '', usuario?.dadosEmpresa?.categoriasServico) && (
                       <button
                         type="button"
                         onClick={() => atualizarPagoDireto(serv.id, !serv.pagoDireto)}
-                        className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase transition-all ${
+                        className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase transition-all shrink-0 ${
                           serv.pagoDireto 
                             ? 'bg-amber-500/20 text-amber-500 border border-amber-500/30' 
                             : 'bg-brand-dark-5 text-gray-500 border border-transparent'
