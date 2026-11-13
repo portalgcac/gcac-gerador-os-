@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
-  Save, X, Users, ChevronDown, List, Trash2, Eye, EyeOff, Search,
+  Save, X, Users, ChevronDown, List, Trash2, Copy, Check, Plus, Eye, EyeOff, Search,
   AlertTriangle, Sparkles
 } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
@@ -27,11 +27,16 @@ interface FormularioOrcamentoProps {
 }
 
 // ── Dropdown de serviços (Simplificado) ──────────────────────────────────────────────────
-function SeletorServico({ onSelecionar }: { onSelecionar: (s: ServicoConfig) => void }) {
+// ── Dropdown de serviços com Multiplicador de Quantidade e Multi-Seleção ──
+function SeletorServico({ onSelecionar }: { onSelecionar: (s: ServicoConfig, quantidade?: number) => void }) {
   const navigate = useNavigate();
   const { servicos } = useServicos();
   const [aberto, setAberto] = useState(false);
   const [busca, setBusca] = useState('');
+  const [quantidade, setQuantidade] = useState<number>(1);
+  const [manterAberto, setManterAberto] = useState<boolean>(true);
+  const [ultimoAdicionado, setUltimoAdicionado] = useState<{ id: string; nome: string; qtd: number } | null>(null);
+  const [totalAdicionados, setTotalAdicionados] = useState<number>(0);
   const ref = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -47,17 +52,27 @@ function SeletorServico({ onSelecionar }: { onSelecionar: (s: ServicoConfig) => 
     if (aberto) {
       setTimeout(() => inputRef.current?.focus(), 100);
       setBusca('');
+      setUltimoAdicionado(null);
+      setTotalAdicionados(0);
     }
   }, [aberto]);
 
-  const handleSelecionar = (servico: ServicoConfig) => {
-    onSelecionar(servico);
-    setAberto(false);
+  const handleSelecionar = (servico: ServicoConfig, qtdPersonalizada?: number) => {
+    const qtdParaAdicionar = qtdPersonalizada ?? quantidade;
+    onSelecionar(servico, qtdParaAdicionar);
+    setTotalAdicionados(prev => prev + qtdParaAdicionar);
+    setUltimoAdicionado({ id: servico.id, nome: servico.nome, qtd: qtdParaAdicionar });
+
+    if (!manterAberto) {
+      setAberto(false);
+    }
   };
 
   const servicosFiltrados = servicos.filter(s => 
     removerAcentos(s.nome.toLowerCase()).includes(removerAcentos(busca.toLowerCase()))
   );
+
+  const presetsQtd = [1, 2, 3, 5, 10, 13];
 
   return (
     <div ref={ref} className="relative">
@@ -73,39 +88,122 @@ function SeletorServico({ onSelecionar }: { onSelecionar: (s: ServicoConfig) => 
 
       {aberto && (
         <>
-          {/* Backdrop no mobile para fechar ao tocar fora e evitar vazamento */}
+          {/* Backdrop mobile */}
           <div
             className="fixed inset-0 bg-black/70 backdrop-blur-xs z-50 sm:hidden"
             onClick={() => setAberto(false)}
           />
 
-          {/* Menu Dropdown com auto-ajuste inteligente para qualquer resolução de celular */}
+          {/* Menu Dropdown com auto-ajuste inteligente */}
           <div className="
-            fixed inset-x-3 top-20 z-50 max-h-[75vh] flex flex-col bg-brand-dark-2 border border-brand-dark-5 rounded-2xl shadow-2xl overflow-hidden animate-scale-up
-            sm:absolute sm:inset-auto sm:right-0 sm:top-full sm:mt-1 sm:w-80 sm:rounded-xl sm:max-h-72
+            fixed inset-x-3 top-20 z-50 max-h-[82vh] flex flex-col bg-brand-dark-2 border border-brand-dark-5 rounded-2xl shadow-2xl overflow-hidden animate-scale-up
+            sm:absolute sm:inset-auto sm:right-0 sm:top-full sm:mt-1 sm:w-[440px] sm:rounded-xl sm:max-h-[500px]
           ">
-            <div className="p-2.5 sm:p-2 border-b border-brand-dark-5 bg-brand-dark-3 flex items-center gap-2">
-              <div className="relative flex-1">
-                <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-500" />
-                <input 
-                  ref={inputRef}
-                  type="text"
-                  className="w-full bg-brand-dark-4 border border-brand-dark-5 rounded-lg pl-8 pr-2 py-2 sm:py-1.5 text-sm sm:text-xs text-white placeholder-gray-500 focus:outline-none focus:border-brand-blue/50 transition-all font-medium"
-                  placeholder="Pesquisar serviço..."
-                  value={busca}
-                  onChange={e => setBusca(e.target.value)}
-                />
+            <div className="p-2.5 sm:p-2 border-b border-brand-dark-5 bg-brand-dark-3 space-y-2">
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1">
+                  <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-500" />
+                  <input 
+                    ref={inputRef}
+                    type="text"
+                    className="w-full bg-brand-dark-4 border border-brand-dark-5 rounded-lg pl-8 pr-7 py-2 sm:py-1.5 text-sm sm:text-xs text-white placeholder-gray-500 focus:outline-none focus:border-brand-blue/50 transition-all font-medium"
+                    placeholder="Pesquisar serviço..."
+                    value={busca}
+                    onChange={e => setBusca(e.target.value)}
+                  />
+                  {busca && (
+                    <button
+                      type="button"
+                      onClick={() => setBusca('')}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white"
+                    >
+                      <X size={13} />
+                    </button>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setAberto(false)}
+                  className="p-1.5 text-gray-400 hover:text-white rounded-lg hover:bg-brand-dark-4 shrink-0"
+                  title="Fechar"
+                >
+                  <X size={16} />
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={() => setAberto(false)}
-                className="p-1.5 text-gray-400 hover:text-white rounded-lg hover:bg-brand-dark-4 sm:hidden shrink-0"
-                title="Fechar"
-              >
-                <X size={18} />
-              </button>
+
+              {/* Barra de Quantidade */}
+              <div className="flex items-center justify-between gap-2 pt-1 border-t border-brand-dark-5/50">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+                    Qtd:
+                  </span>
+                  <div className="flex items-center bg-brand-dark-4 rounded-md border border-brand-dark-5">
+                    <button
+                      type="button"
+                      onClick={() => setQuantidade(q => Math.max(1, q - 1))}
+                      className="px-2 py-0.5 text-gray-400 hover:text-white hover:bg-brand-dark-5 font-bold text-xs transition-colors rounded-l-md"
+                    >
+                      -
+                    </button>
+                    <input
+                      type="number"
+                      min={1}
+                      max={50}
+                      value={quantidade}
+                      onChange={e => setQuantidade(Math.max(1, Math.min(50, parseInt(e.target.value) || 1)))}
+                      className="w-10 text-center bg-transparent text-xs font-black text-amber-400 outline-none py-0.5"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setQuantidade(q => Math.min(50, q + 1))}
+                      className="px-2 py-0.5 text-gray-400 hover:text-white hover:bg-brand-dark-5 font-bold text-xs transition-colors rounded-r-md"
+                    >
+                      +
+                    </button>
+                  </div>
+
+                  <div className="flex items-center gap-1">
+                    {presetsQtd.map(p => (
+                      <button
+                        key={p}
+                        type="button"
+                        onClick={() => setQuantidade(p)}
+                        className={`text-[10px] font-bold px-1.5 py-0.5 rounded transition-all ${
+                          quantidade === p
+                            ? 'bg-amber-500 text-black shadow-xs font-black'
+                            : 'bg-brand-dark-4 text-gray-400 hover:text-white hover:bg-brand-dark-5'
+                        }`}
+                      >
+                        {p}x
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <label className="flex items-center gap-1.5 text-[10px] text-gray-400 hover:text-gray-300 cursor-pointer select-none shrink-0">
+                  <input
+                    type="checkbox"
+                    checked={manterAberto}
+                    onChange={e => setManterAberto(e.target.checked)}
+                    className="rounded border-gray-600 text-brand-blue focus:ring-0 w-3 h-3"
+                  />
+                  <span>Manter aberto</span>
+                </label>
+              </div>
             </div>
-            <div className="max-h-[60vh] sm:max-h-64 overflow-y-auto">
+
+            {ultimoAdicionado && (
+              <div className="px-3 py-1.5 bg-emerald-500/15 border-b border-emerald-500/30 flex items-center justify-between animate-fade-in text-emerald-300 text-xs">
+                <span className="font-semibold truncate">
+                  ✓ Adicionado {ultimoAdicionado.qtd > 1 ? `${ultimoAdicionado.qtd}x` : '1x'}: {ultimoAdicionado.nome}
+                </span>
+                <span className="text-[10px] bg-emerald-500/20 px-1.5 py-0.5 rounded font-black text-emerald-200 shrink-0 ml-2">
+                  Total: {totalAdicionados}
+                </span>
+              </div>
+            )}
+
+            <div className="max-h-[50vh] sm:max-h-72 overflow-y-auto divide-y divide-brand-dark-5/40">
               {servicosFiltrados.length === 0 ? (
                 <div className="p-4 text-center">
                   <p className="text-xs text-gray-500 mb-2">
@@ -125,22 +223,66 @@ function SeletorServico({ onSelecionar }: { onSelecionar: (s: ServicoConfig) => 
                   )}
                 </div>
               ) : (
-                servicosFiltrados.map((servico) => (
-                  <button
-                    key={servico.id}
-                    type="button"
-                    onClick={() => handleSelecionar(servico)}
-                    className="w-full text-left px-3.5 py-3 sm:py-2.5 text-xs sm:text-sm text-gray-200 hover:bg-brand-blue/20 hover:text-white transition-colors border-b border-brand-dark-5/50 last:border-0"
-                  >
-                    <div className="flex justify-between items-center gap-3">
-                      <span className="leading-snug break-words flex-1 font-medium">{servico.nome}</span>
-                      <span className="text-[11px] sm:text-[10px] bg-brand-dark-4 px-2 py-0.5 rounded text-brand-green font-bold shrink-0">
-                        R$ {servico.valorPadrao.toFixed(2).replace('.', ',')}
-                      </span>
+                servicosFiltrados.map((servico) => {
+                  const valorTotalPreview = servico.valorPadrao * quantidade;
+                  return (
+                    <div
+                      key={servico.id}
+                      className="w-full px-3 py-2 text-xs text-gray-200 hover:bg-brand-blue/15 hover:text-white transition-colors flex items-center justify-between gap-2 group"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => handleSelecionar(servico)}
+                        className="text-left flex-1 min-w-0 pr-1 py-1"
+                        title={`Clique para adicionar ${quantidade}x este serviço`}
+                      >
+                        <div className="font-bold text-gray-100 group-hover:text-cyan-300 transition-colors leading-snug break-words">
+                          {servico.nome}
+                        </div>
+                        <div className="text-[10px] text-gray-400 flex items-center gap-2 mt-0.5">
+                          <span className="text-brand-green font-bold">
+                            R$ {servico.valorPadrao.toFixed(2).replace('.', ',')} unid.
+                          </span>
+                          {quantidade > 1 && (
+                            <span className="text-amber-400 font-extrabold bg-amber-500/15 px-1 rounded">
+                              {quantidade}x = R$ {valorTotalPreview.toFixed(2).replace('.', ',')}
+                            </span>
+                          )}
+                        </div>
+                      </button>
+
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => handleSelecionar(servico)}
+                          className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-brand-dark-5 group-hover:bg-brand-blue text-gray-200 group-hover:text-white font-bold text-xs transition-all active:scale-95"
+                        >
+                          <Plus size={12} />
+                          <span>Adicionar {quantidade > 1 ? `${quantidade}x` : ''}</span>
+                        </button>
+                      </div>
                     </div>
-                  </button>
-                ))
+                  );
+                })
               )}
+            </div>
+
+            <div className="p-2 border-t border-brand-dark-5 bg-brand-dark-3 flex items-center justify-between text-xs">
+              <span className="text-gray-400 text-[11px]">
+                {totalAdicionados > 0 ? (
+                  <strong className="text-emerald-400 font-bold">{totalAdicionados} serviço(s) adicionados</strong>
+                ) : (
+                  <span>Selecione quantos desejar</span>
+                )}
+              </span>
+
+              <button
+                type="button"
+                onClick={() => setAberto(false)}
+                className="px-3 py-1 rounded-lg bg-brand-dark-5 hover:bg-brand-dark-4 text-gray-200 hover:text-white font-bold text-xs transition-all"
+              >
+                Concluir Seleção
+              </button>
             </div>
           </div>
         </>
@@ -149,7 +291,7 @@ function SeletorServico({ onSelecionar }: { onSelecionar: (s: ServicoConfig) => 
   );
 }
 
-// ── Formulário Principal ─────────────────────────────────────────────────
+
 export function FormularioOrcamento({ orcamentoExistente }: FormularioOrcamentoProps) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -283,9 +425,15 @@ export function FormularioOrcamento({ orcamentoExistente }: FormularioOrcamentoP
     atualizar('contato', f);
   };
 
-  const adicionarServico = (serv: ServicoConfig) => {
-    const itens = gerarItensComboServico(serv, servicos);
-    const novosBlocos = itens.map(item => {
+  const adicionarServico = (serv: ServicoConfig, quantidade: number = 1) => {
+    const qtd = Math.max(1, Math.min(50, quantidade || 1));
+    const itensBase = gerarItensComboServico(serv, servicos);
+    const todosItens: typeof itensBase = [];
+    for (let i = 0; i < qtd; i++) {
+      todosItens.push(...itensBase);
+    }
+
+    const novosBlocos = todosItens.map(item => {
       const valorAplicado = form.filiadoProTiro ? (item.valorFiliado || item.valorPadrao) : item.valorPadrao;
       const isLaudo = isLaudoExame(item.categoria || '', usuario?.dadosEmpresa?.categoriasServico);
       return {
@@ -307,12 +455,33 @@ export function FormularioOrcamento({ orcamentoExistente }: FormularioOrcamentoP
     });
     setErros(e => { const n = { ...e }; delete n['servicos']; return n; });
 
-    if (novosBlocos.length > 1) {
+    if (qtd > 1) {
+      mostrar('sucesso', `✨ ${qtd}x "${serv.nome}" adicionados ao orçamento!`);
+    } else if (novosBlocos.length > 1) {
       mostrar(
         'sucesso',
         `✨ Combo Inteligente: ${novosBlocos.length} etapas adicionadas ao orçamento (${novosBlocos.map(b => b.nome).join(' + ')})!`
       );
     }
+  };
+
+  const duplicarServico = (servicoId: string) => {
+    const original = form.servicos.find(s => s.id === servicoId);
+    if (!original) return;
+
+    const novoBloco = {
+      ...original,
+      id: uuidv4(),
+      detalhes: ''
+    };
+
+    setForm(f => {
+      const novosServicos = [...f.servicos, novoBloco];
+      const novoTotal = novosServicos.filter(s => !s.pagoDireto).reduce((acc, s) => acc + s.valor, 0);
+      return { ...f, servicos: novosServicos, valorTotal: novoTotal };
+    });
+
+    mostrar('sucesso', `✨ Item "${original.nome}" duplicado no orçamento!`);
   };
 
   const atualizarPagoDireto = (id: string, pago: boolean) => {
@@ -685,13 +854,25 @@ export function FormularioOrcamento({ orcamentoExistente }: FormularioOrcamentoP
                 key={serv.id} 
                 className="relative bg-brand-dark-4 border border-brand-dark-5 p-4 rounded-xl animate-scale-up grid grid-cols-1 md:grid-cols-[1fr,150px] gap-4"
               >
-                <button
-                  type="button"
-                  onClick={() => removerServico(serv.id)}
-                  className="absolute top-3 right-3 text-gray-500 hover:text-red-400 p-1"
-                >
-                  <Trash2 size={16} />
-                </button>
+                <div className="absolute top-3 right-3 flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => duplicarServico(serv.id)}
+                    className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-brand-dark-5 hover:bg-brand-dark-3 text-gray-300 hover:text-cyan-300 border border-brand-dark-5 text-[11px] font-bold transition-all"
+                    title="Duplicar este serviço"
+                  >
+                    <Copy size={13} />
+                    <span className="hidden sm:inline">Duplicar</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => removerServico(serv.id)}
+                    className="text-gray-500 hover:text-red-400 p-1"
+                    title="Remover Serviço"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
                 
                 <div className="pr-6">
                   <div className="flex items-center gap-2 mb-2 flex-wrap">
