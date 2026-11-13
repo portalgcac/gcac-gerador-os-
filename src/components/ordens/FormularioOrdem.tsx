@@ -686,8 +686,8 @@ export function FormularioOrdem({ ordemExistente }: FormularioOrdemProps) {
         statusExecucao: item.statusInicial,
         etapaOrigemNome: item.etapaOrigemNome,
         acervoDestino: isTransfAcervo ? ('Caça' as const) : undefined,
-        armaId: armaJaSelecionada && exigeVinculoArma(item.nome) ? armaJaSelecionada.armaId : undefined,
-        armaModelo: armaJaSelecionada && exigeVinculoArma(item.nome) ? armaJaSelecionada.armaModelo : undefined,
+        armaId: (item.etapaOrigemNome && armaJaSelecionada && exigeVinculoArma(item.nome)) ? armaJaSelecionada.armaId : undefined,
+        armaModelo: (item.etapaOrigemNome && armaJaSelecionada && exigeVinculoArma(item.nome)) ? armaJaSelecionada.armaModelo : undefined,
         categoria: item.categoria || 'Honorário',
         pagoDireto: isLaudo
       };
@@ -1575,7 +1575,7 @@ export function FormularioOrdem({ ordemExistente }: FormularioOrdemProps) {
                           value={serv.armaId || ''}
                           onChange={e => {
                             const val = e.target.value;
-                            const arma = [...armasCliente, ...novasArmas].find(a => a.id === val || a.tempId === val);
+                            const arma = val ? [...armasCliente, ...novasArmas].find(a => (a.id && a.id === val) || (a.tempId && a.tempId === val)) : null;
                             if (arma) {
                               const tipoPrefixo = arma.tipo ? `[${arma.tipo.toUpperCase()}] ` : '';
                               atualizarArmaServico(serv.id, val, `${tipoPrefixo}${arma.fabricante} ${arma.modelo} (${arma.calibre})`);
@@ -1607,7 +1607,8 @@ export function FormularioOrdem({ ordemExistente }: FormularioOrdemProps) {
 
                       {/* Badge com Tipo e Dados Detalhados da Arma Selecionada */}
                       {(() => {
-                        const armaSel = [...armasCliente, ...novasArmas].find(a => a.id === serv.armaId || a.tempId === serv.armaId);
+                        if (!serv.armaId) return null;
+                        const armaSel = [...armasCliente, ...novasArmas].find(a => (a.id && a.id === serv.armaId) || (a.tempId && a.tempId === serv.armaId));
                         if (!armaSel) return null;
                         return (
                           <div className="flex items-center gap-2 mt-2 px-2.5 py-1 rounded-md bg-brand-dark-4 border border-brand-dark-5 text-[11px] text-gray-300 flex-wrap animate-fade-in">
@@ -1657,7 +1658,8 @@ export function FormularioOrdem({ ordemExistente }: FormularioOrdemProps) {
 
                     {/* Automação de Guias / GT baseada no Acervo da Arma */}
                     {(() => {
-                      const selectedArma = [...armasCliente, ...novasArmas].find(a => a.id === serv.armaId || a.tempId === serv.armaId);
+                      if (!serv.armaId) return null;
+                      const selectedArma = [...armasCliente, ...novasArmas].find(a => (a.id && a.id === serv.armaId) || (a.tempId && a.tempId === serv.armaId));
                       const isGuia = serv.nome.toUpperCase().includes('GUIA') || serv.nome.toUpperCase().includes('GT');
                       if (!selectedArma || !isGuia) return null;
 
