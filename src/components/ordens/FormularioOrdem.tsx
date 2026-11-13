@@ -1352,65 +1352,72 @@ export function FormularioOrdem({ ordemExistente }: FormularioOrdemProps) {
 
                 return (
                 <div key={serv.id} className="relative bg-brand-dark-4 border border-brand-dark-5 p-4 rounded-xl animate-scale-up">
-                  <div className="absolute top-3.5 right-3.5 flex items-center gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => duplicarServico(serv.id)}
-                      className="flex items-center gap-1 px-2 py-1 rounded-lg bg-brand-dark-5 hover:bg-brand-dark-3 text-gray-300 hover:text-cyan-300 border border-brand-dark-5 text-[11px] font-bold transition-all"
-                      title="Duplicar este serviço (+1 arma/item)"
-                    >
-                      <Copy size={13} />
-                      <span className="hidden sm:inline">Duplicar</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => removerServico(serv.id)}
-                      className="p-1 rounded-lg text-gray-500 hover:text-red-400 hover:bg-brand-dark-5 transition-colors"
-                      title="Remover Serviço"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
 
-                {/* Cabeçalho do card: nome + valor + status */}
-                <div className="flex flex-col gap-3 mb-3 pr-8">
-                  <div className="flex items-start sm:items-center gap-3">
-                    <span className="w-5 h-5 rounded-md bg-brand-dark-5 text-gray-400 text-xs flex items-center justify-center font-bold flex-shrink-0 mt-0.5 sm:mt-0">{index + 1}</span>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <h4 className="text-sm font-bold text-white break-words leading-snug">{serv.nome}</h4>
-                        {serv.etapaOrigemNome && (
-                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-bold shrink-0">
-                            🔗 Etapa de: {serv.etapaOrigemNome}
-                          </span>
-                        )}
-                        {isLaudoExame(serv.categoria || '', usuario?.dadosEmpresa?.categoriasServico) && (
-                          <button
-                            type="button"
-                            onClick={() => atualizarPagoDireto(serv.id, !serv.pagoDireto)}
-                            className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase transition-all shrink-0 ${
-                              serv.pagoDireto 
-                                ? 'bg-amber-500/20 text-amber-500 border border-amber-500/30' 
-                                : 'bg-brand-dark-5 text-gray-500 border border-transparent'
-                            }`}
-                            title={serv.pagoDireto ? "Pago diretamente ao colaborador/psicóloga" : "Alterar para pagamento direto"}
-                          >
-                            {serv.pagoDireto ? 'Pago Direto' : 'Pago p/ GCAC'}
-                          </button>
-                        )}
+                {/* Cabeçalho do card: nome + valor + duplicar + remover (em fluxo flex unificado, sem sobreposição) */}
+                <div className="flex flex-col gap-3 mb-3">
+                  <div className="flex items-start sm:items-center justify-between gap-3 flex-wrap sm:flex-nowrap">
+                    {/* Esquerda: Número + Nome + Badges */}
+                    <div className="flex items-start sm:items-center gap-3 flex-1 min-w-[200px]">
+                      <span className="w-5 h-5 rounded-md bg-brand-dark-5 text-gray-400 text-xs flex items-center justify-center font-bold flex-shrink-0 mt-0.5 sm:mt-0">{index + 1}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h4 className="text-sm font-bold text-white break-words leading-snug">{serv.nome}</h4>
+                          {serv.etapaOrigemNome && (
+                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-bold shrink-0">
+                              🔗 Etapa de: {serv.etapaOrigemNome}
+                            </span>
+                          )}
+                          {isLaudoExame(serv.categoria || '', usuario?.dadosEmpresa?.categoriasServico) && (
+                            <button
+                              type="button"
+                              onClick={() => atualizarPagoDireto(serv.id, !serv.pagoDireto)}
+                              className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase transition-all shrink-0 ${
+                                serv.pagoDireto 
+                                  ? 'bg-amber-500/20 text-amber-500 border border-amber-500/30' 
+                                  : 'bg-brand-dark-5 text-gray-500 border border-transparent'
+                              }`}
+                              title={serv.pagoDireto ? "Pago diretamente ao colaborador/psicóloga" : "Alterar para pagamento direto"}
+                            >
+                              {serv.pagoDireto ? 'Pago Direto' : 'Pago p/ GCAC'}
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-1.5 flex-shrink-0 self-start sm:self-center">
-                      <span className="text-xs text-gray-500 font-medium">R$</span>
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        className="w-20 text-right bg-brand-dark-3 border border-brand-dark-5 focus:border-brand-blue/50 rounded-lg px-2 py-1 text-sm font-bold text-brand-green-light outline-none transition-colors"
-                        value={serv.valor ?? 0}
-                        onChange={e => atualizarValorServico(serv.id, parseFloat(e.target.value) || 0)}
-                        title="Editar valor deste serviço"
-                      />
+
+                    {/* Direita: Valor R$ [input] + Botão Duplicar + Botão Excluir */}
+                    <div className="flex items-center gap-2 shrink-0 self-start sm:self-center">
+                      <div className="flex items-center gap-1.5 bg-brand-dark-3 px-2.5 py-1 rounded-lg border border-brand-dark-5">
+                        <span className="text-xs text-gray-500 font-bold">R$</span>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          className="w-20 text-right bg-transparent text-sm font-bold text-brand-green-light outline-none"
+                          value={serv.valor ?? 0}
+                          onChange={e => atualizarValorServico(serv.id, parseFloat(e.target.value) || 0)}
+                          title="Editar valor deste serviço"
+                        />
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => duplicarServico(serv.id)}
+                        className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-brand-dark-5 hover:bg-brand-dark-3 text-gray-300 hover:text-cyan-300 border border-brand-dark-5 text-xs font-bold transition-all shadow-xs active:scale-95"
+                        title="Duplicar este serviço (+1 arma/item)"
+                      >
+                        <Copy size={13} />
+                        <span>Duplicar</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => removerServico(serv.id)}
+                        className="p-1.5 rounded-lg text-gray-400 hover:text-red-400 hover:bg-brand-dark-5 transition-colors"
+                        title="Remover Serviço"
+                      >
+                        <Trash2 size={16} />
+                      </button>
                     </div>
                   </div>
 
