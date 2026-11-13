@@ -767,3 +767,35 @@ export function formatarParaISO(dataYMD: string): string {
   return new Date().toISOString();
 }
 
+
+export function formatarArmaComTipo(
+  armaModelo?: string,
+  armaId?: string,
+  listaArmas: Array<{ id?: string; tipo?: string; modelo?: string; fabricante?: string; calibre?: string; numeroSerie?: string }> = []
+): string {
+  if (!armaModelo && !armaId) return '';
+
+  const armaObj = armaId
+    ? listaArmas.find(a => a.id === armaId)
+    : listaArmas.find(a => {
+        if (!armaModelo) return false;
+        const modeloUpper = (a.modelo || '').toUpperCase();
+        const serieUpper = (a.numeroSerie || '').toUpperCase();
+        const alvoUpper = armaModelo.toUpperCase();
+        return (modeloUpper && alvoUpper.includes(modeloUpper)) || (serieUpper && alvoUpper.includes(serieUpper));
+      });
+
+  const tipo = armaObj?.tipo?.trim();
+  const textoBase = armaModelo || (armaObj ? `${armaObj.fabricante || ''} ${armaObj.modelo || ''} (${armaObj.calibre || ''})`.trim() : '');
+
+  // Se já possui [TIPO] no textoBase, retorna direto
+  if (textoBase.startsWith('[') && textoBase.includes(']')) {
+    return textoBase;
+  }
+
+  if (tipo) {
+    return `[${tipo.toUpperCase()}] ${textoBase}`;
+  }
+
+  return textoBase;
+}

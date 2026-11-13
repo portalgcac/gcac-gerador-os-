@@ -18,7 +18,7 @@ import { Notificacao, useNotificacao } from '../common/Notificacao';
 import { useClientes } from '../../context/ClientesContext';
 import { ModalArma } from '../clientes/AbaDocumentacao';
 import {
-  formatarMoeda,
+  formatarMoeda, formatarArmaComTipo,
   formatarData,
   formatarDataHora,
   formatarNumeroOS,
@@ -274,11 +274,8 @@ export function DetalheOrdem({ ordem }: DetalheOrdemProps) {
         msg += `✅ *SERVIÇOS EXECUTADOS COM SUCESSO:*\n`;
         concluidos.forEach(s => {
           let armaInfo = '';
-          if (s.armaId) {
-            const arma = armasCliente.find(a => a.id === s.armaId);
-            if (arma) armaInfo = ` (${arma.fabricante} ${arma.modelo})`;
-          } else if (s.armaModelo) {
-            armaInfo = ` (${s.armaModelo})`;
+          if (s.armaId || s.armaModelo) {
+            armaInfo = ` (${formatarArmaComTipo(s.armaModelo, s.armaId, armasCliente)})`;
           }
           const obs = s.detalhes?.trim() ? ` - _${s.detalhes.trim()}_` : '';
           msg += `• ${s.nome}${armaInfo}${obs}\n`;
@@ -927,10 +924,10 @@ export function DetalheOrdem({ ordem }: DetalheOrdemProps) {
                     </div>
                   )}
 
-                  {serv.armaModelo && (
+                  {(serv.armaModelo || serv.armaId) && (
                     <div className="flex items-center gap-2 flex-wrap">
                        <span className="text-[10px] font-black text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20 uppercase tracking-widest flex items-center gap-1.5" title="Armamento Vinculado">
-                         ⚔️ ARMA: {serv.armaModelo}
+                         ⚔️ ARMA: {formatarArmaComTipo(serv.armaModelo, serv.armaId, armasCliente)}
                        </span>
                        {serv.acervoDestino && (
                          <span className="text-[10px] font-black text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 uppercase tracking-widest">
