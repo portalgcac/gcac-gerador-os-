@@ -21,7 +21,7 @@ export const LINKS_MENU_BASE = [
   { to: '/armas-venda',   label: 'Armas à Venda',         icon: Crosshair,       slug: 'armas-venda' },
   { to: '/clientes',      label: 'Meus Clientes',         icon: Users,           slug: 'clientes' },
   { to: '/agenda',        label: 'Agenda / Lembretes',    icon: ListTodo,        slug: 'agenda' },
-  { to: '/agendamentos',  label: 'Agendamentos',          icon: Calendar,        slug: 'agendamentos' },
+  { to: '/agendamentos',  label: 'Agendamentos de Laudos', icon: Calendar,        slug: 'agendamentos' },
   { to: '/declaracoes',   label: 'Declarações',           icon: FileText,        slug: 'declaracoes' },
   { to: '/recibos',       label: 'Recibos',               icon: Receipt,         slug: 'recibos' },
   { to: '/ponto',         label: 'Registro de Ponto',     icon: Clock,           slug: 'ponto' },
@@ -572,7 +572,7 @@ export function NavegacaoInferior({ onAbrirMenu }: NavegacaoInferiorProps = {}) 
     if (label === 'Ordens de Serviço') return 'Ordens';
     if (label === 'Meus Clientes') return 'Clientes';
     if (label === 'Configurações') return 'Config';
-    if (label === 'Agendamentos') return 'Agenda';
+    if (label === 'Agendamentos' || label === 'Agendamentos de Laudos') return 'Laudos';
     if (label === 'Equipe do Escritório') return 'Equipe';
     return label;
   };

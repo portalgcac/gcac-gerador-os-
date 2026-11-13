@@ -209,7 +209,7 @@ export function DetalheCliente({ cliente }: DetalheClienteProps) {
     { id: 'ordens', label: 'O.S.', slug: 'ordens', count: todasOrdensCliente.length, badgeText: undefined as string | undefined },
     { id: 'orcamentos', label: 'Orçamentos', slug: 'orcamentos', count: orcamentosCliente.length, badgeText: undefined as string | undefined },
     { id: 'recibos', label: 'Recibos', slug: 'recibos', count: recibosCliente.length, badgeText: undefined as string | undefined },
-    { id: 'agendamentos', label: 'Agendamentos', slug: 'agendamentos', count: agendamentosCliente.length, badgeText: undefined as string | undefined },
+    { id: 'agendamentos', label: 'Agendamentos de Laudos', slug: 'agendamentos', count: agendamentosCliente.length, badgeText: undefined as string | undefined },
     { id: 'documentos', label: 'Acervo & Docs', slug: null, count: alertasCount, badgeText: undefined as string | undefined },
     { id: 'creditos', label: 'Haver', slug: null, count: 0, badgeText: saldoHaverCliente > 0 ? formatarMoeda(saldoHaverCliente) : undefined },
   ].filter(tab => {

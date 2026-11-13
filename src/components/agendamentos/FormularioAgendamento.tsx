@@ -10,6 +10,7 @@ import { removerAcentos } from '../../utils/formatters';
 
 interface FormularioAgendamentoProps {
   agendamentoExistente?: Agendamento;
+  dataInicial?: string;
   onSuccess?: () => void;
   onCancel?: () => void;
 }
@@ -27,7 +28,7 @@ const DEFAULTS = {
   }
 };
 
-export function FormularioAgendamento({ agendamentoExistente, onSuccess, onCancel }: FormularioAgendamentoProps) {
+export function FormularioAgendamento({ agendamentoExistente, dataInicial, onSuccess, onCancel }: FormularioAgendamentoProps) {
   const location = useLocation();
   const { 
     criarAgendamento, atualizarAgendamento, buscarAgendamentoPorCPF,
@@ -49,7 +50,7 @@ export function FormularioAgendamento({ agendamentoExistente, onSuccess, onCance
     clienteContato:     agendamentoExistente?.clienteContato    ?? '',
     clienteEndereco:    agendamentoExistente?.clienteEndereco   ?? '',
     arma:               agendamentoExistente?.arma              ?? '',
-    data:               agendamentoExistente?.data              ?? '',
+    data:               agendamentoExistente?.data              ?? dataInicial ?? '',
     horario:            agendamentoExistente?.horario           ?? '',
     local:              agendamentoExistente?.local             ?? DEFAULTS['Psicológico'].local,
     profissional:       agendamentoExistente?.profissional      ?? (usuario?.role === 'colaborador' ? usuario.nome : DEFAULTS['Psicológico'].profissional),
