@@ -3,7 +3,7 @@ import {
   X, Download, Copy, Check, Sparkles, Image as ImageIcon,
   Share2, Shield, Eye, Smartphone, LayoutGrid, AlertCircle, RefreshCw,
   Key, ExternalLink, Camera, QrCode, Upload, Trash2,
-  RotateCw, FlipHorizontal, SunMedium, Palette, Tag, Square,
+  RotateCw, FlipHorizontal, SunMedium, Palette, Tag, Square, Type, Move, SlidersHorizontal, ZoomIn,
   ChevronLeft, ChevronRight, Star, Plus
 } from 'lucide-react';
 import { ArmaVenda } from '../../types';
@@ -17,6 +17,50 @@ interface ModalGeradorAnuncioProps {
   isOpen: boolean;
   onClose: () => void;
 }
+
+export interface AjustesSlotFoto {
+  zoom: number;
+  posX: number;
+  posY: number;
+  rotacao: number;
+  espelhar: boolean;
+  filtroRealce: boolean;
+  modo: 'conter' | 'preencher';
+}
+
+export interface AjustesLayoutFolder {
+  offsetFonteModelo: number;
+  offsetFonteFabricante: number;
+  offsetFonteCalibre: number;
+  offsetPosicaoYTextos: number;
+  offsetPosicaoXTextos: number;
+  offsetFontePreco: number;
+  offsetPosicaoYPreco: number;
+  offsetFonteSpecs: number;
+  offsetPosicaoYSpecs: number;
+}
+
+const AJUSTE_SLOT_PADRAO: AjustesSlotFoto = {
+  zoom: 105,
+  posX: 0,
+  posY: 0,
+  rotacao: 0,
+  espelhar: false,
+  filtroRealce: false,
+  modo: 'conter'
+};
+
+const AJUSTES_LAYOUT_PADRAO: AjustesLayoutFolder = {
+  offsetFonteModelo: 0,
+  offsetFonteFabricante: 0,
+  offsetFonteCalibre: 0,
+  offsetPosicaoYTextos: 0,
+  offsetPosicaoXTextos: 0,
+  offsetFontePreco: 0,
+  offsetPosicaoYPreco: 0,
+  offsetFonteSpecs: 0,
+  offsetPosicaoYSpecs: 0
+};
 
 export const OPCOES_SELOS = [
   '★ SEMINOVA REVISADA',
@@ -86,14 +130,174 @@ export function ModalGeradorAnuncio({ arma, isOpen, onClose }: ModalGeradorAnunc
   const [seloPrincipal, setSeloPrincipal] = useState<string>('★ SEMINOVA REVISADA');
   const [baloesAtivos, setBaloesAtivos] = useState<string[]>(['💳 Parcela no Cartão']);
 
-  // Controles de enquadramento, rotação, flip, realce e zoom da foto da arma
-  const [modoFoto, setModoFoto] = useState<'conter' | 'preencher'>('conter');
-  const [rotacaoFoto, setRotacaoFoto] = useState<number>(0); // 0, 90, 180, 270
-  const [espelharFoto, setEspelharFoto] = useState<boolean>(false);
-  const [filtroRealce, setFiltroRealce] = useState<boolean>(false);
-  const [zoomFoto, setZoomFoto] = useState(105);
-  const [posicaoYFoto, setPosicaoYFoto] = useState(0);
-  const [posicaoXFoto, setPosicaoXFoto] = useState(0);
+  // Controles de enquadramento independentes por slot (até 4 fotos)
+  const [ajustesSlots, setAjustesSlots] = useState<AjustesSlotFoto[]>([
+    { ...AJUSTE_SLOT_PADRAO },
+    { ...AJUSTE_SLOT_PADRAO },
+    { ...AJUSTE_SLOT_PADRAO },
+    { ...AJUSTE_SLOT_PADRAO }
+  ]);
+  const [slotAtivoEdicao, setSlotAtivoEdicao] = useState<number>(0);
+
+  // Controles de personalização de textos, fontes e layout do folder
+  const [ajustesLayout, setAjustesLayout] = useState<AjustesLayoutFolder>({ ...AJUSTES_LAYOUT_PADRAO });
+  const [abaEdicao, setAbaEdicao] = useState<'fotos' | 'textos'>('fotos');
+
+  // Interação e arrasto no canvas
+  const canvasHitAreasRef = useRef<{
+    type: 'foto' | 'textos' | 'preco' | 'specs';
+    slot?: number;
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+  }[]>([]);
+  const renderRef = useRef<(() => void) | null>(null);
+  const desenhandoParaDownloadRef = useRef(false);
+  const [isDraggingCanvas, setIsDraggingCanvas] = useState(false);
+  const dragDataRef = useRef<{
+    startX: number;
+    startY: number;
+    hasMoved: boolean;
+    targetType: 'foto' | 'textos' | 'preco' | 'specs' | null;
+    targetSlot: number;
+    initialSlotX: number;
+    initialSlotY: number;
+    initialTextX: number;
+    initialTextY: number;
+    initialPriceY: number;
+    initialSpecsY: number;
+  }>({
+    startX: 0,
+    startY: 0,
+    hasMoved: false,
+    targetType: null,
+    targetSlot: 0,
+    initialSlotX: 0,
+    initialSlotY: 0,
+    initialTextX: 0,
+    initialTextY: 0,
+    initialPriceY: 0,
+    initialSpecsY: 0
+  });
+
+  const slotAtivo = ajustesSlots[slotAtivoEdicao] || AJUSTE_SLOT_PADRAO;
+  const atualizarSlotAtivo = (campo: keyof AjustesSlotFoto, valor: any) => {
+    setAjustesSlots(prev => {
+      const novo = [...prev];
+      novo[slotAtivoEdicao] = {
+        ...(novo[slotAtivoEdicao] || AJUSTE_SLOT_PADRAO),
+        [campo]: valor
+      };
+      return novo;
+    });
+  };
+
+  const redefinirSlotAtivo = () => {
+    setAjustesSlots(prev => {
+      const novo = [...prev];
+      novo[slotAtivoEdicao] = { ...AJUSTE_SLOT_PADRAO };
+      return novo;
+    });
+  };
+
+  const redefinirTodosSlots = () => {
+    setAjustesSlots([
+      { ...AJUSTE_SLOT_PADRAO },
+      { ...AJUSTE_SLOT_PADRAO },
+      { ...AJUSTE_SLOT_PADRAO },
+      { ...AJUSTE_SLOT_PADRAO }
+    ]);
+  };
+
+  const redefinirLayoutFolder = () => {
+    setAjustesLayout({ ...AJUSTES_LAYOUT_PADRAO });
+  };
+
+  // Handlers para clique e arrasto no canvas
+  const handleCanvasMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const clickX = (e.clientX - rect.left) * scaleX;
+    const clickY = (e.clientY - rect.top) * scaleY;
+
+    // Verificar se clicou em uma área interativa (prioriza fotos)
+    const hits = canvasHitAreasRef.current;
+    let hit = hits.find(h => h.type === 'foto' && clickX >= h.x && clickX <= h.x + h.w && clickY >= h.y && clickY <= h.y + h.h);
+    if (!hit) {
+      hit = hits.find(h => clickX >= h.x && clickX <= h.x + h.w && clickY >= h.y && clickY <= h.y + h.h);
+    }
+
+    if (hit) {
+      if (hit.type === 'foto' && typeof hit.slot === 'number') {
+        setSlotAtivoEdicao(hit.slot);
+        setAbaEdicao('fotos');
+      } else if (hit.type === 'textos' || hit.type === 'preco' || hit.type === 'specs') {
+        setAbaEdicao('textos');
+      }
+
+      dragDataRef.current = {
+        startX: e.clientX,
+        startY: e.clientY,
+        hasMoved: false,
+        targetType: hit.type,
+        targetSlot: hit.slot ?? 0,
+        initialSlotX: hit.slot !== undefined ? (ajustesSlots[hit.slot]?.posX || 0) : 0,
+        initialSlotY: hit.slot !== undefined ? (ajustesSlots[hit.slot]?.posY || 0) : 0,
+        initialTextX: ajustesLayout.offsetPosicaoXTextos,
+        initialTextY: ajustesLayout.offsetPosicaoYTextos,
+        initialPriceY: ajustesLayout.offsetPosicaoYPreco,
+        initialSpecsY: ajustesLayout.offsetPosicaoYSpecs
+      };
+      setIsDraggingCanvas(true);
+    }
+  };
+
+  const handleCanvasMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!isDraggingCanvas || !dragDataRef.current.targetType) return;
+    const dx = e.clientX - dragDataRef.current.startX;
+    const dy = e.clientY - dragDataRef.current.startY;
+
+    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+      dragDataRef.current.hasMoved = true;
+    }
+
+    if (!dragDataRef.current.hasMoved) return;
+
+    const target = dragDataRef.current.targetType;
+    if (target === 'foto') {
+      const slot = dragDataRef.current.targetSlot;
+      const sensibilidade = 0.35;
+      const novoX = Math.round(Math.min(50, Math.max(-50, dragDataRef.current.initialSlotX + dx * sensibilidade)));
+      const novoY = Math.round(Math.min(50, Math.max(-50, dragDataRef.current.initialSlotY + dy * sensibilidade)));
+      setAjustesSlots(prev => {
+        const copy = [...prev];
+        copy[slot] = { ...(copy[slot] || AJUSTE_SLOT_PADRAO), posX: novoX, posY: novoY };
+        return copy;
+      });
+    } else if (target === 'textos') {
+      const sensibilidade = 0.7;
+      const novoX = Math.round(Math.min(40, Math.max(-40, dragDataRef.current.initialTextX + dx * sensibilidade)));
+      const novoY = Math.round(Math.min(60, Math.max(-60, dragDataRef.current.initialTextY + dy * sensibilidade)));
+      setAjustesLayout(prev => ({ ...prev, offsetPosicaoXTextos: novoX, offsetPosicaoYTextos: novoY }));
+    } else if (target === 'preco') {
+      const sensibilidade = 0.7;
+      const novoY = Math.round(Math.min(50, Math.max(-50, dragDataRef.current.initialPriceY + dy * sensibilidade)));
+      setAjustesLayout(prev => ({ ...prev, offsetPosicaoYPreco: novoY }));
+    } else if (target === 'specs') {
+      const sensibilidade = 0.7;
+      const novoY = Math.round(Math.min(40, Math.max(-40, dragDataRef.current.initialSpecsY + dy * sensibilidade)));
+      setAjustesLayout(prev => ({ ...prev, offsetPosicaoYSpecs: novoY }));
+    }
+  };
+
+  const handleCanvasMouseUp = () => {
+    setIsDraggingCanvas(false);
+    dragDataRef.current.targetType = null;
+  };
 
   // Fotos gerenciadas localmente (permite adicionar/trocar foto na hora sem sair do modal)
   const [fotosLocais, setFotosLocais] = useState<string[]>([]);
@@ -515,6 +719,7 @@ export function ModalGeradorAnuncio({ arma, isOpen, onClose }: ModalGeradorAnunc
     });
 
     const renderConteudo = () => {
+      canvasHitAreasRef.current = [];
       let topY = molduraY + 14;
 
       // 4. LOGO OFICIAL DO ESCRITÓRIO (Alta Definição e Tamanho Destacado)
@@ -606,12 +811,21 @@ export function ModalGeradorAnuncio({ arma, isOpen, onClose }: ModalGeradorAnunc
       const boxFotoY = blocoMeioY + 5;
 
       // Largura máxima de segurança para os textos à esquerda nunca sobreporem a imagem
-      const leftStartX = pad + 26;
-      const maxTextW = boxFotoX - leftStartX - 18;
+      const leftStartX = pad + 26 + ajustesLayout.offsetPosicaoXTextos;
+      const maxTextW = Math.max(120, boxFotoX - leftStartX - 18);
+
+      // Registrar área do bloco de textos para clique e arrasto
+      canvasHitAreasRef.current.push({
+        type: 'textos',
+        x: pad + 16,
+        y: blocoMeioY,
+        w: boxFotoX - pad - 20,
+        h: blocoMeioH
+      });
 
       // Lado Esquerdo: NOME DA ARMA E INFORMAÇÕES BÉLICAS COM ENCAIXE INTELIGENTE (Auto-Fit & Wrap)
       ctx.textAlign = 'left';
-      let currentLeftY = blocoMeioY + (isQuadrado ? 26 : 38);
+      let currentLeftY = blocoMeioY + (isQuadrado ? 26 : 38) + ajustesLayout.offsetPosicaoYTextos;
 
       // 1. Tipo de Arma (se preenchido e não for 'OUTRO')
       if (arma.tipo && arma.tipo.toUpperCase() !== 'OUTRO') {
@@ -621,9 +835,10 @@ export function ModalGeradorAnuncio({ arma, isOpen, onClose }: ModalGeradorAnunc
         currentLeftY += isQuadrado ? 16 : 22;
       }
 
-      // 2. Fabricante com auto-fit de largura
+      // 2. Fabricante com auto-fit de largura e ajuste manual
       const fabTexto = (arma.fabricante || '').toUpperCase();
-      let fabFontSize = isQuadrado ? (fabTexto.length > 14 ? 19 : 23) : (fabTexto.length > 14 ? 24 : 30);
+      let fabFontSize = (isQuadrado ? (fabTexto.length > 14 ? 19 : 23) : (fabTexto.length > 14 ? 24 : 30)) + ajustesLayout.offsetFonteFabricante;
+      fabFontSize = Math.max(12, fabFontSize);
       ctx.font = `800 ${fabFontSize}px "Segoe UI", sans-serif`;
       while (ctx.measureText(fabTexto).width > maxTextW && fabFontSize > 13) {
         fabFontSize -= 1;
@@ -636,7 +851,8 @@ export function ModalGeradorAnuncio({ arma, isOpen, onClose }: ModalGeradorAnunc
       // 3. Modelo Grande com quebra em linhas (auto-wrap) e ajuste de fonte proporcional
       const modeloTexto = (arma.modelo || '').toUpperCase();
       const palavrasModelo = modeloTexto.split(/\s+/).filter(Boolean);
-      let modeloFontSize = isQuadrado ? 38 : 50;
+      let modeloFontSize = (isQuadrado ? 38 : 50) + ajustesLayout.offsetFonteModelo;
+      modeloFontSize = Math.max(16, modeloFontSize);
 
       const calcularLinhasModelo = (tamFonte: number) => {
         ctx.font = `900 ${tamFonte}px "Segoe UI", sans-serif`;
@@ -696,10 +912,11 @@ export function ModalGeradorAnuncio({ arma, isOpen, onClose }: ModalGeradorAnunc
 
       currentLeftY += isQuadrado ? 14 : 20;
 
-      // 4. Calibre em destaque Neon com auto-fit
+      // 4. Calibre em destaque Neon com auto-fit e ajuste manual
       if (mostrarCalibre && arma.calibre) {
         const calTexto = `CALIBRE ${arma.calibre.toUpperCase()}`;
-        let calFontSize = isQuadrado ? 17 : 22;
+        let calFontSize = (isQuadrado ? 17 : 22) + ajustesLayout.offsetFonteCalibre;
+        calFontSize = Math.max(11, calFontSize);
         ctx.font = `bold ${calFontSize}px "Segoe UI", sans-serif`;
         while (ctx.measureText(calTexto).width > maxTextW && calFontSize > 12) {
           calFontSize -= 1;
@@ -740,6 +957,7 @@ export function ModalGeradorAnuncio({ arma, isOpen, onClose }: ModalGeradorAnunc
       ctx.fillText('🛡️  PROCEDÊNCIA VERIFICADA', leftStartX + 12, currentLeftY + (badgeSeloH / 2) + 4);
 
       // Função para renderizar cada foto em sua área com enquadramento
+      // Função para renderizar cada foto em sua área com enquadramento individual
       const renderFotoNoBox = (
         img: HTMLImageElement | null,
         subX: number,
@@ -747,8 +965,20 @@ export function ModalGeradorAnuncio({ arma, isOpen, onClose }: ModalGeradorAnunc
         subW: number,
         subH: number,
         rotulo?: string,
-        usarControles: boolean = false
+        slotIdx: number = 0
       ) => {
+        // Registrar área para clique interativo e arrasto
+        canvasHitAreasRef.current.push({
+          type: 'foto',
+          slot: slotIdx,
+          x: subX,
+          y: subY,
+          w: subW,
+          h: subH
+        });
+
+        const aj = ajustesSlots[slotIdx] || AJUSTE_SLOT_PADRAO;
+
         ctx.save();
         // Moldura interna Glass
         ctx.fillStyle = 'rgba(4, 9, 20, 0.65)';
@@ -765,26 +995,26 @@ export function ModalGeradorAnuncio({ arma, isOpen, onClose }: ModalGeradorAnunc
           ctx.roundRect(subX + 3, subY + 3, subW - 6, subH - 6, 12);
           ctx.clip();
 
-          if (filtroRealce) {
+          if (aj.filtroRealce) {
             ctx.filter = 'brightness(1.1) contrast(1.16) saturate(1.1)';
           }
 
-          const rot = usarControles ? rotacaoFoto : 0;
+          const rot = aj.rotacao;
           const isRot90 = rot === 90 || rot === 270;
           const effectiveW = isRot90 ? img.naturalHeight : img.naturalWidth;
           const effectiveH = isRot90 ? img.naturalWidth : img.naturalHeight;
 
-          const baseScale = (usarControles && modoFoto === 'preencher')
+          const baseScale = (aj.modo === 'preencher')
             ? Math.max(subW / effectiveW, subH / effectiveH)
             : Math.min((subW - 14) / effectiveW, (subH - 14) / effectiveH);
 
-          const zoom = usarControles ? (zoomFoto / 100) : 1.0;
+          const zoom = aj.zoom / 100;
           const finalScale = baseScale * zoom;
           const drawW = img.naturalWidth * finalScale;
           const drawH = img.naturalHeight * finalScale;
 
-          const posX = usarControles ? (posicaoXFoto / 100) * subW : 0;
-          const posY = usarControles ? (posicaoYFoto / 100) * subH : 0;
+          const posX = (aj.posX / 100) * subW;
+          const posY = (aj.posY / 100) * subH;
           const centerX = subX + subW / 2 + posX;
           const centerY = subY + subH / 2 + posY;
 
@@ -794,7 +1024,7 @@ export function ModalGeradorAnuncio({ arma, isOpen, onClose }: ModalGeradorAnunc
             ctx.rotate((rot * Math.PI) / 180);
           }
 
-          if (usarControles && espelharFoto) {
+          if (aj.espelhar) {
             ctx.scale(-1, 1);
           }
 
@@ -810,8 +1040,6 @@ export function ModalGeradorAnuncio({ arma, isOpen, onClose }: ModalGeradorAnunc
           ctx.lineWidth = 1.4;
           ctx.beginPath();
           ctx.arc(miraX, miraY, 22, 0, Math.PI * 2);
-          ctx.moveTo(miraX - 30, miraY);
-          ctx.lineTo(miraX + 30, miraY);
           ctx.moveTo(miraX - 30, miraY);
           ctx.lineTo(miraX + 30, miraY);
           ctx.stroke();
@@ -841,6 +1069,27 @@ export function ModalGeradorAnuncio({ arma, isOpen, onClose }: ModalGeradorAnunc
           ctx.fillText(rotulo, subX + 8 + 43, subY + 8 + 14);
           ctx.restore();
         }
+
+        // Borda de seleção visual interativa (apenas durante preview, nunca no download final)
+        if (!desenhandoParaDownloadRef.current && slotIdx === slotAtivoEdicao && Number(layoutFotos) > 1) {
+          ctx.save();
+          ctx.strokeStyle = '#38bdf8';
+          ctx.lineWidth = 3.5;
+          ctx.setLineDash([8, 6]);
+          ctx.beginPath();
+          ctx.roundRect(subX + 2, subY + 2, subW - 4, subH - 4, 13);
+          ctx.stroke();
+
+          ctx.fillStyle = '#0284c7';
+          ctx.beginPath();
+          ctx.roundRect(subX + subW - 96, subY + 8, 88, 20, 6);
+          ctx.fill();
+          ctx.fillStyle = '#ffffff';
+          ctx.font = 'bold 10px "Segoe UI", sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText('✏️ EM EDIÇÃO', subX + subW - 52, subY + 22);
+          ctx.restore();
+        }
       };
 
       const innerPad = 6;
@@ -850,28 +1099,28 @@ export function ModalGeradorAnuncio({ arma, isOpen, onClose }: ModalGeradorAnunc
       const innerY = boxFotoY + innerPad;
 
       if (layoutFotos === '1') {
-        renderFotoNoBox(armaImgs[0] || null, innerX, innerY, innerW, innerH, undefined, true);
+        renderFotoNoBox(armaImgs[0] || null, innerX, innerY, innerW, innerH, undefined, 0);
       } else if (layoutFotos === '2') {
         const gap = 10;
         const subH = Math.floor((innerH - gap) / 2);
-        renderFotoNoBox(armaImgs[0] || null, innerX, innerY, innerW, subH, '★ LADO A', true);
-        renderFotoNoBox(armaImgs[1] || armaImgs[0] || null, innerX, innerY + subH + gap, innerW, subH, '★ LADO B', false);
+        renderFotoNoBox(armaImgs[0] || null, innerX, innerY, innerW, subH, '★ LADO A', 0);
+        renderFotoNoBox(armaImgs[1] || armaImgs[0] || null, innerX, innerY + subH + gap, innerW, subH, '★ LADO B', 1);
       } else if (layoutFotos === '3') {
         const gap = 8;
         const topH = Math.floor(innerH * 0.58);
         const botH = innerH - topH - gap;
         const halfW = Math.floor((innerW - gap) / 2);
-        renderFotoNoBox(armaImgs[0] || null, innerX, innerY, innerW, topH, '★ PRINCIPAL', true);
-        renderFotoNoBox(armaImgs[1] || armaImgs[0] || null, innerX, innerY + topH + gap, halfW, botH, 'DETALHE 1', false);
-        renderFotoNoBox(armaImgs[2] || armaImgs[0] || null, innerX + halfW + gap, innerY + topH + gap, halfW, botH, 'DETALHE 2', false);
+        renderFotoNoBox(armaImgs[0] || null, innerX, innerY, innerW, topH, '★ PRINCIPAL', 0);
+        renderFotoNoBox(armaImgs[1] || armaImgs[0] || null, innerX, innerY + topH + gap, halfW, botH, 'DETALHE 1', 1);
+        renderFotoNoBox(armaImgs[2] || armaImgs[0] || null, innerX + halfW + gap, innerY + topH + gap, halfW, botH, 'DETALHE 2', 2);
       } else if (layoutFotos === '4') {
         const gap = 8;
         const halfW = Math.floor((innerW - gap) / 2);
         const halfH = Math.floor((innerH - gap) / 2);
-        renderFotoNoBox(armaImgs[0] || null, innerX, innerY, halfW, halfH, 'FOTO 1', true);
-        renderFotoNoBox(armaImgs[1] || armaImgs[0] || null, innerX + halfW + gap, innerY, halfW, halfH, 'FOTO 2', false);
-        renderFotoNoBox(armaImgs[2] || armaImgs[0] || null, innerX, innerY + halfH + gap, halfW, halfH, 'FOTO 3', false);
-        renderFotoNoBox(armaImgs[3] || armaImgs[0] || null, innerX + halfW + gap, innerY + halfH + gap, halfW, halfH, 'FOTO 4', false);
+        renderFotoNoBox(armaImgs[0] || null, innerX, innerY, halfW, halfH, 'FOTO 1', 0);
+        renderFotoNoBox(armaImgs[1] || armaImgs[0] || null, innerX + halfW + gap, innerY, halfW, halfH, 'FOTO 2', 1);
+        renderFotoNoBox(armaImgs[2] || armaImgs[0] || null, innerX, innerY + halfH + gap, halfW, halfH, 'FOTO 3', 2);
+        renderFotoNoBox(armaImgs[3] || armaImgs[0] || null, innerX + halfW + gap, innerY + halfH + gap, halfW, halfH, 'FOTO 4', 3);
       }
 
       ctx.restore();
@@ -943,11 +1192,20 @@ export function ModalGeradorAnuncio({ arma, isOpen, onClose }: ModalGeradorAnunc
         { label: 'SISTEMA:', val: (arma.sigmaSinarm || 'SIGMA (CAC)').toUpperCase() }
       ];
 
+      // Registrar área de especificações para clique e arrasto
+      canvasHitAreasRef.current.push({
+        type: 'specs',
+        x: gridX,
+        y: topY + ajustesLayout.offsetPosicaoYSpecs,
+        w: gridW,
+        h: (boxH * 2) + (isQuadrado ? 8 : 10)
+      });
+
       infos.forEach((info, idx) => {
         const col = idx % 3;
         const row = Math.floor(idx / 3);
         const bx = gridX + col * (boxW + 12);
-        const by = topY + row * (boxH + (isQuadrado ? 8 : 10));
+        const by = topY + row * (boxH + (isQuadrado ? 8 : 10)) + ajustesLayout.offsetPosicaoYSpecs;
 
         // Box Fundo com Borda Tática conforme Tema
         ctx.fillStyle = tema.specBg;
@@ -964,9 +1222,10 @@ export function ModalGeradorAnuncio({ arma, isOpen, onClose }: ModalGeradorAnunc
         ctx.font = `bold ${isQuadrado ? 11 : 13}px "Segoe UI", sans-serif`;
         ctx.fillText(info.label, bx + boxW / 2, by + (isQuadrado ? 20 : 24));
 
-        // Valor Principal Branco com Ajuste Inteligente de Tamanho de Fonte
+        // Valor Principal Branco com Ajuste Inteligente de Tamanho de Fonte e Offset Manual
         ctx.fillStyle = '#ffffff';
-        const tamanhoFonte = isQuadrado ? (info.val.length > 15 ? 14 : 17) : (info.val.length > 15 ? 17 : 21);
+        let tamanhoFonte = (isQuadrado ? (info.val.length > 15 ? 14 : 17) : (info.val.length > 15 ? 17 : 21)) + ajustesLayout.offsetFonteSpecs;
+        tamanhoFonte = Math.max(10, tamanhoFonte);
         ctx.font = `900 ${tamanhoFonte}px "Segoe UI", sans-serif`;
 
         let valExibicao = info.val;
@@ -983,7 +1242,16 @@ export function ModalGeradorAnuncio({ arma, isOpen, onClose }: ModalGeradorAnunc
         const faixaW = gridW;
         const faixaH = isQuadrado ? 86 : isStories ? 116 : 102;
         const faixaX = gridX;
-        const faixaY = topY + 6;
+        const faixaY = topY + 6 + ajustesLayout.offsetPosicaoYPreco;
+
+        // Registrar área do preço para clique e arrasto
+        canvasHitAreasRef.current.push({
+          type: 'preco',
+          x: faixaX,
+          y: faixaY,
+          w: faixaW,
+          h: faixaH
+        });
 
         const douradoGrad = ctx.createLinearGradient(faixaX, 0, faixaX + faixaW, 0);
         douradoGrad.addColorStop(0, '#c7981b');
@@ -1007,7 +1275,9 @@ export function ModalGeradorAnuncio({ arma, isOpen, onClose }: ModalGeradorAnunc
         ctx.fillText('VALOR DE INVESTIMENTO', largura / 2, faixaY + (isQuadrado ? 22 : 28));
 
         ctx.fillStyle = '#050505';
-        ctx.font = `900 ${isQuadrado ? 44 : 56}px "Segoe UI", sans-serif`;
+        let tamPrecoFonte = (isQuadrado ? 44 : 56) + ajustesLayout.offsetFontePreco;
+        tamPrecoFonte = Math.max(20, tamPrecoFonte);
+        ctx.font = `900 ${tamPrecoFonte}px "Segoe UI", sans-serif`;
         ctx.fillText(formatarMoeda(arma.valorAnunciado), largura / 2, faixaY + (isQuadrado ? 66 : 80));
 
         topY += faixaH + (isQuadrado ? 14 : 24);
@@ -1113,6 +1383,8 @@ export function ModalGeradorAnuncio({ arma, isOpen, onClose }: ModalGeradorAnunc
       setGerandoImagem(false);
     };
 
+    renderRef.current = renderConteudo;
+
     let executou = false;
     const dispararRender = () => {
       if (executou) return;
@@ -1168,13 +1440,9 @@ export function ModalGeradorAnuncio({ arma, isOpen, onClose }: ModalGeradorAnunc
     mostrarEstado,
     mostrarContato,
     mostrarLogo,
-    modoFoto,
-    rotacaoFoto,
-    espelharFoto,
-    filtroRealce,
-    zoomFoto,
-    posicaoYFoto,
-    posicaoXFoto,
+    ajustesSlots,
+    ajustesLayout,
+    slotAtivoEdicao,
     fotoAtual,
     fotosLocais,
     layoutFotos,
@@ -1183,15 +1451,21 @@ export function ModalGeradorAnuncio({ arma, isOpen, onClose }: ModalGeradorAnunc
     cidadeLoja
   ]);
 
-  // Função para baixar a imagem PNG gerada
+  // Função para baixar a imagem PNG gerada limpa (sem guias de edição)
   const baixarImagem = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+
+    desenhandoParaDownloadRef.current = true;
+    renderRef.current?.();
 
     const link = document.createElement('a');
     link.download = `Anuncio_${arma.fabricante}_${arma.modelo}_${formato}.png`;
     link.href = canvas.toDataURL('image/png');
     link.click();
+
+    desenhandoParaDownloadRef.current = false;
+    renderRef.current?.();
   };
 
   // Copiar legenda para o WhatsApp
@@ -1429,14 +1703,30 @@ Mantenha emojis de armas/tiro/fogo, bullet points claros e destaque a exigência
                 )}
                 <canvas
                   ref={canvasRef}
+                  onMouseDown={handleCanvasMouseDown}
+                  onMouseMove={handleCanvasMouseMove}
+                  onMouseUp={handleCanvasMouseUp}
+                  onMouseLeave={handleCanvasMouseUp}
                   style={{
                     maxWidth: '100%',
                     maxHeight: formato === 'quadrado' ? '500px' : '560px',
                     objectFit: 'contain',
                     borderRadius: '12px',
-                    boxShadow: '0 20px 40px rgba(0,0,0,0.6)'
+                    boxShadow: '0 20px 40px rgba(0,0,0,0.6)',
+                    cursor: isDraggingCanvas ? 'grabbing' : 'crosshair'
                   }}
+                  title="Clique na foto ou arraste para ajustar posição e textos na arte"
                 />
+              </div>
+
+              <div className="flex items-center justify-between text-[11px] text-gray-400 px-1">
+                <span className="flex items-center gap-1.5 text-amber-300/90 font-medium">
+                  <Move size={12} className="text-amber-400" />
+                  Clique em qualquer foto ou arraste elementos na arte para ajustar
+                </span>
+                <span className="text-gray-400">
+                  Foto selecionada: <strong className="text-amber-400">#{slotAtivoEdicao + 1}</strong>
+                </span>
               </div>
 
               {/* Gerenciador Completo de Fotos da Arma no Anúncio */}
@@ -1667,153 +1957,441 @@ Mantenha emojis de armas/tiro/fogo, bullet points claros e destaque a exigência
                 </div>
               </div>
 
-              {/* Bloco 2: Ferramentas da Imagem da Arma (Rotação, Flip, Realce e Zoom) */}
-              <div className="p-4 rounded-xl bg-brand-dark-3/60 border border-brand-dark-5 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-gray-300 uppercase tracking-wider flex items-center gap-1.5">
-                    <Sparkles size={14} className="text-amber-400" /> Edição & Enquadramento da Arma
-                  </span>
-                  {(zoomFoto !== 105 || modoFoto !== 'conter' || posicaoYFoto !== 0 || posicaoXFoto !== 0 || rotacaoFoto !== 0 || espelharFoto || filtroRealce) && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setModoFoto('conter');
-                        setZoomFoto(105);
-                        setPosicaoYFoto(0);
-                        setPosicaoXFoto(0);
-                        setRotacaoFoto(0);
-                        setEspelharFoto(false);
-                        setFiltroRealce(false);
-                      }}
-                      className="text-[10px] text-amber-400 hover:text-amber-300 underline font-medium"
-                    >
-                      Redefinir
-                    </button>
-                  )}
-                </div>
-
-                {/* Ações Rápidas: Girar, Espelhar e Realce de Iluminação */}
-                <div className="grid grid-cols-3 gap-2 text-xs">
+              {/* Bloco 2: Edição & Customização Avançada (Fotos & Layout do Folder) */}
+              <div className="p-4 rounded-xl bg-brand-dark-3/60 border border-brand-dark-5 space-y-3.5">
+                {/* Abas Superiores de Alternância de Edição */}
+                <div className="grid grid-cols-2 gap-2 p-1 bg-brand-dark-4/90 rounded-xl border border-brand-dark-5">
                   <button
                     type="button"
-                    onClick={() => setRotacaoFoto(prev => (prev + 90) % 360)}
-                    className="flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg bg-brand-dark-4 hover:bg-brand-dark-5 text-gray-200 border border-brand-dark-5 font-semibold transition-all active:scale-95"
-                    title="Girar imagem 90 graus"
+                    onClick={() => setAbaEdicao('fotos')}
+                    className={`flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-xs font-bold transition-all ${
+                      abaEdicao === 'fotos'
+                        ? 'bg-amber-500 text-black shadow-md'
+                        : 'text-gray-400 hover:text-white hover:bg-brand-dark-5'
+                    }`}
                   >
-                    <RotateCw size={13} className="text-cyan-400" />
-                    <span>Girar {rotacaoFoto > 0 ? `${rotacaoFoto}°` : '90°'}</span>
+                    <Sparkles size={14} className={abaEdicao === 'fotos' ? 'text-black' : 'text-amber-400'} />
+                    Enquadrar Fotos ({layoutFotos})
                   </button>
 
                   <button
                     type="button"
-                    onClick={() => setEspelharFoto(prev => !prev)}
-                    className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg border font-semibold transition-all active:scale-95 ${
-                      espelharFoto
-                        ? 'bg-amber-500/25 text-amber-300 border-amber-500/40'
-                        : 'bg-brand-dark-4 hover:bg-brand-dark-5 text-gray-200 border-brand-dark-5'
+                    onClick={() => setAbaEdicao('textos')}
+                    className={`flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-xs font-bold transition-all ${
+                      abaEdicao === 'textos'
+                        ? 'bg-amber-500 text-black shadow-md'
+                        : 'text-gray-400 hover:text-white hover:bg-brand-dark-5'
                     }`}
-                    title="Inverter direção da arma horizontalmente"
                   >
-                    <FlipHorizontal size={13} className="text-amber-400" />
-                    <span>Espelhar</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setFiltroRealce(prev => !prev)}
-                    className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg border font-semibold transition-all active:scale-95 ${
-                      filtroRealce
-                        ? 'bg-emerald-500/25 text-emerald-300 border-emerald-500/40'
-                        : 'bg-brand-dark-4 hover:bg-brand-dark-5 text-gray-200 border-brand-dark-5'
-                    }`}
-                    title="Realçar iluminação, contraste e nitidez da arma"
-                  >
-                    <SunMedium size={13} className="text-emerald-400" />
-                    <span>Realce HD</span>
+                    <Type size={14} className={abaEdicao === 'textos' ? 'text-black' : 'text-cyan-400'} />
+                    Textos & Layout
                   </button>
                 </div>
 
-                {/* Modo de Ajuste: Conter vs Preencher */}
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <button
-                    type="button"
-                    onClick={() => setModoFoto('conter')}
-                    className={`py-1.5 px-3 rounded-lg border font-semibold transition-all ${
-                      modoFoto === 'conter'
-                        ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 shadow-xs'
-                        : 'bg-brand-dark-4 text-gray-400 border-brand-dark-5 hover:text-white'
-                    }`}
-                  >
-                    Foto Inteira (Conter)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setModoFoto('preencher');
-                      if (zoomFoto < 110) setZoomFoto(115);
-                    }}
-                    className={`py-1.5 px-3 rounded-lg border font-semibold transition-all ${
-                      modoFoto === 'preencher'
-                        ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 shadow-xs'
-                        : 'bg-brand-dark-4 text-gray-400 border-brand-dark-5 hover:text-white'
-                    }`}
-                  >
-                    Preencher Vitrine (Zoom)
-                  </button>
-                </div>
+                {/* CONTEÚDO DA ABA 1: ENQUADRAMENTO DE FOTOS */}
+                {abaEdicao === 'fotos' && (
+                  <div className="space-y-3">
+                    {/* Seletor de Foto do Layout quando houver mais de 1 foto */}
+                    {Number(layoutFotos) > 1 && (
+                      <div className="space-y-1.5 pb-1 border-b border-brand-dark-5">
+                        <div className="flex items-center justify-between text-[11px] text-gray-300">
+                          <span className="font-semibold flex items-center gap-1">
+                            <ImageIcon size={12} className="text-amber-400" />
+                            Foto em Edição:
+                          </span>
+                          <span className="text-cyan-400 font-semibold text-[10px]">
+                            Clique na imagem na arte para selecionar
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                          {Array.from({ length: Number(layoutFotos) }).map((_, idx) => {
+                            const isAtivo = slotAtivoEdicao === idx;
+                            const rotuloSlot = layoutFotos === '2'
+                              ? (idx === 0 ? 'Foto 1 (Lado A)' : 'Foto 2 (Lado B)')
+                              : layoutFotos === '3'
+                              ? (idx === 0 ? 'Foto 1 (Principal)' : idx === 1 ? 'Foto 2 (Det. 1)' : 'Foto 3 (Det. 2)')
+                              : `Foto ${idx + 1}`;
+                            const fotoThumb = fotosLocais[idx] || fotosLocais[0];
+                            return (
+                              <button
+                                key={idx}
+                                type="button"
+                                onClick={() => setSlotAtivoEdicao(idx)}
+                                className={`flex items-center gap-1.5 p-1.5 rounded-lg text-[11px] font-bold transition-all border ${
+                                  isAtivo
+                                    ? 'bg-amber-500/20 text-amber-300 border-amber-400 ring-1 ring-amber-400/50 shadow-xs'
+                                    : 'bg-brand-dark-4 text-gray-400 border-brand-dark-5 hover:text-white hover:bg-brand-dark-5'
+                                }`}
+                              >
+                                {fotoThumb ? (
+                                  <img src={fotoThumb} alt="" className="w-5 h-5 rounded object-cover border border-white/20 shrink-0" />
+                                ) : (
+                                  <ImageIcon size={14} className="shrink-0" />
+                                )}
+                                <span className="truncate">{rotuloSlot}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
 
-                {/* Sliders: Zoom, Posição Vertical e Posição Horizontal */}
-                <div className="space-y-2 pt-1 text-xs">
-                  <div>
-                    <div className="flex justify-between text-gray-300 text-[11px] mb-1">
-                      <span>Tamanho / Zoom da Arma na Vitrine:</span>
-                      <span className="font-bold text-amber-400">{zoomFoto}%</span>
+                    {/* Cabeçalho de Ações da Foto Selecionada */}
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-gray-300 uppercase tracking-wider flex items-center gap-1.5">
+                        <Sparkles size={13} className="text-amber-400" />
+                        Ajustes da Foto #{slotAtivoEdicao + 1}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        {(slotAtivo.zoom !== 105 || slotAtivo.modo !== 'conter' || slotAtivo.posY !== 0 || slotAtivo.posX !== 0 || slotAtivo.rotacao !== 0 || slotAtivo.espelhar || slotAtivo.filtroRealce) && (
+                          <button
+                            type="button"
+                            onClick={redefinirSlotAtivo}
+                            className="text-[10px] text-amber-400 hover:text-amber-300 underline font-medium"
+                          >
+                            Redefinir Esta
+                          </button>
+                        )}
+                        {Number(layoutFotos) > 1 && (
+                          <button
+                            type="button"
+                            onClick={redefinirTodosSlots}
+                            className="text-[10px] text-gray-400 hover:text-gray-300 font-medium"
+                            title="Redefinir ajustes de todas as fotos para o padrão"
+                          >
+                            Redefinir Todas
+                          </button>
+                        )}
+                      </div>
                     </div>
-                    <input
-                      type="range"
-                      min={80}
-                      max={190}
-                      step={5}
-                      value={zoomFoto}
-                      onChange={e => setZoomFoto(Number(e.target.value))}
-                      className="w-full h-1.5 bg-brand-dark-4 rounded-lg appearance-none cursor-pointer accent-amber-500"
-                    />
-                  </div>
 
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <div className="flex justify-between text-gray-300 text-[11px] mb-1">
-                        <span>Ajuste Vertical:</span>
-                        <span className="font-bold text-cyan-400">{posicaoYFoto > 0 ? `+${posicaoYFoto}%` : `${posicaoYFoto}%`}</span>
+                    {/* Ações Rápidas: Girar, Espelhar e Realce HD */}
+                    <div className="grid grid-cols-3 gap-2 text-xs">
+                      <button
+                        type="button"
+                        onClick={() => atualizarSlotAtivo('rotacao', (slotAtivo.rotacao + 90) % 360)}
+                        className="flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg bg-brand-dark-4 hover:bg-brand-dark-5 text-gray-200 border border-brand-dark-5 font-semibold transition-all active:scale-95"
+                        title="Girar imagem 90 graus"
+                      >
+                        <RotateCw size={13} className="text-cyan-400" />
+                        <span>Girar {slotAtivo.rotacao > 0 ? `${slotAtivo.rotacao}°` : '90°'}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => atualizarSlotAtivo('espelhar', !slotAtivo.espelhar)}
+                        className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg border font-semibold transition-all active:scale-95 ${
+                          slotAtivo.espelhar
+                            ? 'bg-amber-500/25 text-amber-300 border-amber-500/40'
+                            : 'bg-brand-dark-4 hover:bg-brand-dark-5 text-gray-200 border-brand-dark-5'
+                        }`}
+                        title="Inverter direção da arma horizontalmente"
+                      >
+                        <FlipHorizontal size={13} className="text-amber-400" />
+                        <span>Espelhar</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => atualizarSlotAtivo('filtroRealce', !slotAtivo.filtroRealce)}
+                        className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg border font-semibold transition-all active:scale-95 ${
+                          slotAtivo.filtroRealce
+                            ? 'bg-emerald-500/25 text-emerald-300 border-emerald-500/40'
+                            : 'bg-brand-dark-4 hover:bg-brand-dark-5 text-gray-200 border-brand-dark-5'
+                        }`}
+                        title="Realçar iluminação, nitidez e contraste HD"
+                      >
+                        <SunMedium size={13} className="text-emerald-400" />
+                        <span>Realce HD</span>
+                      </button>
+                    </div>
+
+                    {/* Modo de Ajuste: Conter vs Preencher */}
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <button
+                        type="button"
+                        onClick={() => atualizarSlotAtivo('modo', 'conter')}
+                        className={`py-1.5 px-3 rounded-lg border font-semibold transition-all ${
+                          slotAtivo.modo === 'conter'
+                            ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 shadow-xs'
+                            : 'bg-brand-dark-4 text-gray-400 border-brand-dark-5 hover:text-white'
+                        }`}
+                      >
+                        Foto Inteira (Conter)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          atualizarSlotAtivo('modo', 'preencher');
+                          if (slotAtivo.zoom < 110) atualizarSlotAtivo('zoom', 115);
+                        }}
+                        className={`py-1.5 px-3 rounded-lg border font-semibold transition-all ${
+                          slotAtivo.modo === 'preencher'
+                            ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 shadow-xs'
+                            : 'bg-brand-dark-4 text-gray-400 border-brand-dark-5 hover:text-white'
+                        }`}
+                      >
+                        Preencher Vitrine (Zoom)
+                      </button>
+                    </div>
+
+                    {/* Sliders da Foto Selecionada: Zoom, Vertical e Horizontal */}
+                    <div className="space-y-2 pt-1 text-xs">
+                      <div>
+                        <div className="flex justify-between text-gray-300 text-[11px] mb-1">
+                          <span className="flex items-center gap-1">
+                            <ZoomIn size={12} className="text-amber-400" />
+                            Zoom da Foto #{slotAtivoEdicao + 1}:
+                          </span>
+                          <span className="font-bold text-amber-400">{slotAtivo.zoom}%</span>
+                        </div>
+                        <input
+                          type="range"
+                          min={80}
+                          max={200}
+                          step={5}
+                          value={slotAtivo.zoom}
+                          onChange={e => atualizarSlotAtivo('zoom', Number(e.target.value))}
+                          className="w-full h-1.5 bg-brand-dark-4 rounded-lg appearance-none cursor-pointer accent-amber-500"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <div className="flex justify-between text-gray-300 text-[11px] mb-1">
+                            <span>Ajuste Vertical:</span>
+                            <span className="font-bold text-cyan-400">
+                              {slotAtivo.posY > 0 ? `+${slotAtivo.posY}%` : `${slotAtivo.posY}%`}
+                            </span>
+                          </div>
+                          <input
+                            type="range"
+                            min={-50}
+                            max={50}
+                            step={2}
+                            value={slotAtivo.posY}
+                            onChange={e => atualizarSlotAtivo('posY', Number(e.target.value))}
+                            className="w-full h-1.5 bg-brand-dark-4 rounded-lg appearance-none cursor-pointer accent-cyan-500"
+                          />
+                        </div>
+
+                        <div>
+                          <div className="flex justify-between text-gray-300 text-[11px] mb-1">
+                            <span>Ajuste Horizontal:</span>
+                            <span className="font-bold text-cyan-400">
+                              {slotAtivo.posX > 0 ? `+${slotAtivo.posX}%` : `${slotAtivo.posX}%`}
+                            </span>
+                          </div>
+                          <input
+                            type="range"
+                            min={-50}
+                            max={50}
+                            step={2}
+                            value={slotAtivo.posX}
+                            onChange={e => atualizarSlotAtivo('posX', Number(e.target.value))}
+                            className="w-full h-1.5 bg-brand-dark-4 rounded-lg appearance-none cursor-pointer accent-cyan-500"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* CONTEÚDO DA ABA 2: AJUSTES DE TEXTOS & LAYOUT DO FOLDER */}
+                {abaEdicao === 'textos' && (
+                  <div className="space-y-3 text-xs">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-gray-300 uppercase tracking-wider flex items-center gap-1.5">
+                        <SlidersHorizontal size={13} className="text-cyan-400" />
+                        Fontes & Posicionamento
+                      </span>
+                      {(ajustesLayout.offsetFonteModelo !== 0 ||
+                        ajustesLayout.offsetPosicaoYTextos !== 0 ||
+                        ajustesLayout.offsetPosicaoXTextos !== 0 ||
+                        ajustesLayout.offsetFonteFabricante !== 0 ||
+                        ajustesLayout.offsetFonteCalibre !== 0 ||
+                        ajustesLayout.offsetFontePreco !== 0 ||
+                        ajustesLayout.offsetPosicaoYPreco !== 0 ||
+                        ajustesLayout.offsetFonteSpecs !== 0 ||
+                        ajustesLayout.offsetPosicaoYSpecs !== 0) && (
+                        <button
+                          type="button"
+                          onClick={redefinirLayoutFolder}
+                          className="text-[10px] text-amber-400 hover:text-amber-300 underline font-medium"
+                        >
+                          Redefinir Padrão
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Bloco 1: Nome e Modelo da Arma */}
+                    <div className="p-2.5 rounded-lg bg-brand-dark-4/70 border border-brand-dark-5 space-y-2">
+                      <div className="flex items-center justify-between text-gray-200 font-bold text-[11px]">
+                        <span className="flex items-center gap-1.5">
+                          <Type size={12} className="text-amber-400" />
+                          Nome / Modelo da Arma:
+                        </span>
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => setAjustesLayout(prev => ({ ...prev, offsetFonteModelo: Math.max(-14, prev.offsetFonteModelo - 2) }))}
+                            className="px-1.5 py-0.5 rounded bg-brand-dark-3 hover:bg-brand-dark-5 text-gray-300 text-[10px]"
+                            title="Diminuir fonte do modelo"
+                          >
+                            A-
+                          </button>
+                          <span className="text-amber-400 font-bold min-w-[32px] text-center">
+                            {ajustesLayout.offsetFonteModelo > 0 ? `+${ajustesLayout.offsetFonteModelo}px` : `${ajustesLayout.offsetFonteModelo}px`}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setAjustesLayout(prev => ({ ...prev, offsetFonteModelo: Math.min(20, prev.offsetFonteModelo + 2) }))}
+                            className="px-1.5 py-0.5 rounded bg-brand-dark-3 hover:bg-brand-dark-5 text-gray-300 text-[10px]"
+                            title="Aumentar fonte do modelo"
+                          >
+                            A+
+                          </button>
+                        </div>
                       </div>
                       <input
                         type="range"
-                        min={-40}
-                        max={40}
-                        step={2}
-                        value={posicaoYFoto}
-                        onChange={e => setPosicaoYFoto(Number(e.target.value))}
-                        className="w-full h-1.5 bg-brand-dark-4 rounded-lg appearance-none cursor-pointer accent-cyan-500"
+                        min={-14}
+                        max={20}
+                        step={1}
+                        value={ajustesLayout.offsetFonteModelo}
+                        onChange={e => setAjustesLayout(prev => ({ ...prev, offsetFonteModelo: Number(e.target.value) }))}
+                        className="w-full h-1.5 bg-brand-dark-5 rounded-lg appearance-none cursor-pointer accent-amber-500"
                       />
+
+                      {/* Posição Vertical e Horizontal dos Textos */}
+                      <div className="grid grid-cols-2 gap-2 pt-1">
+                        <div>
+                          <div className="flex justify-between text-gray-300 text-[10px] mb-1">
+                            <span>Subir / Descer Texto:</span>
+                            <span className="text-cyan-400 font-bold">
+                              {ajustesLayout.offsetPosicaoYTextos > 0 ? `+${ajustesLayout.offsetPosicaoYTextos}px` : `${ajustesLayout.offsetPosicaoYTextos}px`}
+                            </span>
+                          </div>
+                          <input
+                            type="range"
+                            min={-60}
+                            max={60}
+                            step={2}
+                            value={ajustesLayout.offsetPosicaoYTextos}
+                            onChange={e => setAjustesLayout(prev => ({ ...prev, offsetPosicaoYTextos: Number(e.target.value) }))}
+                            className="w-full h-1.5 bg-brand-dark-5 rounded-lg appearance-none cursor-pointer accent-cyan-500"
+                          />
+                        </div>
+
+                        <div>
+                          <div className="flex justify-between text-gray-300 text-[10px] mb-1">
+                            <span>Mover Esq / Dir:</span>
+                            <span className="text-cyan-400 font-bold">
+                              {ajustesLayout.offsetPosicaoXTextos > 0 ? `+${ajustesLayout.offsetPosicaoXTextos}px` : `${ajustesLayout.offsetPosicaoXTextos}px`}
+                            </span>
+                          </div>
+                          <input
+                            type="range"
+                            min={-40}
+                            max={40}
+                            step={2}
+                            value={ajustesLayout.offsetPosicaoXTextos}
+                            onChange={e => setAjustesLayout(prev => ({ ...prev, offsetPosicaoXTextos: Number(e.target.value) }))}
+                            className="w-full h-1.5 bg-brand-dark-5 rounded-lg appearance-none cursor-pointer accent-cyan-500"
+                          />
+                        </div>
+                      </div>
                     </div>
 
-                    <div>
-                      <div className="flex justify-between text-gray-300 text-[11px] mb-1">
-                        <span>Ajuste Horizontal:</span>
-                        <span className="font-bold text-cyan-400">{posicaoXFoto > 0 ? `+${posicaoXFoto}%` : `${posicaoXFoto}%`}</span>
+                    {/* Bloco 2: Faixa de Preço */}
+                    {mostrarPreco && (
+                      <div className="p-2.5 rounded-lg bg-brand-dark-4/70 border border-brand-dark-5 space-y-2">
+                        <div className="flex items-center justify-between text-gray-200 font-bold text-[11px]">
+                          <span>Faixa de Preço Dourada:</span>
+                          <span className="text-amber-400 font-bold">
+                            {ajustesLayout.offsetFontePreco > 0 ? `+${ajustesLayout.offsetFontePreco}px` : `${ajustesLayout.offsetFontePreco}px`}
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <div className="flex justify-between text-gray-300 text-[10px] mb-1">
+                              <span>Tamanho Fonte Preço:</span>
+                            </div>
+                            <input
+                              type="range"
+                              min={-14}
+                              max={20}
+                              step={2}
+                              value={ajustesLayout.offsetFontePreco}
+                              onChange={e => setAjustesLayout(prev => ({ ...prev, offsetFontePreco: Number(e.target.value) }))}
+                              className="w-full h-1.5 bg-brand-dark-5 rounded-lg appearance-none cursor-pointer accent-amber-500"
+                            />
+                          </div>
+                          <div>
+                            <div className="flex justify-between text-gray-300 text-[10px] mb-1">
+                              <span>Posição Vertical:</span>
+                              <span className="text-cyan-400 font-bold">
+                                {ajustesLayout.offsetPosicaoYPreco > 0 ? `+${ajustesLayout.offsetPosicaoYPreco}px` : `${ajustesLayout.offsetPosicaoYPreco}px`}
+                              </span>
+                            </div>
+                            <input
+                              type="range"
+                              min={-50}
+                              max={50}
+                              step={2}
+                              value={ajustesLayout.offsetPosicaoYPreco}
+                              onChange={e => setAjustesLayout(prev => ({ ...prev, offsetPosicaoYPreco: Number(e.target.value) }))}
+                              className="w-full h-1.5 bg-brand-dark-5 rounded-lg appearance-none cursor-pointer accent-cyan-500"
+                            />
+                          </div>
+                        </div>
                       </div>
-                      <input
-                        type="range"
-                        min={-40}
-                        max={40}
-                        step={2}
-                        value={posicaoXFoto}
-                        onChange={e => setPosicaoXFoto(Number(e.target.value))}
-                        className="w-full h-1.5 bg-brand-dark-4 rounded-lg appearance-none cursor-pointer accent-cyan-500"
-                      />
+                    )}
+
+                    {/* Bloco 3: Cards de Especificações Técnicas */}
+                    <div className="p-2.5 rounded-lg bg-brand-dark-4/70 border border-brand-dark-5 space-y-2">
+                      <div className="flex items-center justify-between text-gray-200 font-bold text-[11px]">
+                        <span>Cards de Especificações Técnicas:</span>
+                        <span className="text-cyan-400 font-bold">
+                          {ajustesLayout.offsetPosicaoYSpecs > 0 ? `+${ajustesLayout.offsetPosicaoYSpecs}px` : `${ajustesLayout.offsetPosicaoYSpecs}px`}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <div className="flex justify-between text-gray-300 text-[10px] mb-1">
+                            <span>Tamanho dos Dados:</span>
+                            <span className="text-gray-300 font-bold">
+                              {ajustesLayout.offsetFonteSpecs > 0 ? `+${ajustesLayout.offsetFonteSpecs}px` : `${ajustesLayout.offsetFonteSpecs}px`}
+                            </span>
+                          </div>
+                          <input
+                            type="range"
+                            min={-6}
+                            max={8}
+                            step={1}
+                            value={ajustesLayout.offsetFonteSpecs}
+                            onChange={e => setAjustesLayout(prev => ({ ...prev, offsetFonteSpecs: Number(e.target.value) }))}
+                            className="w-full h-1.5 bg-brand-dark-5 rounded-lg appearance-none cursor-pointer accent-cyan-500"
+                          />
+                        </div>
+                        <div>
+                          <div className="flex justify-between text-gray-300 text-[10px] mb-1">
+                            <span>Posição Vertical:</span>
+                          </div>
+                          <input
+                            type="range"
+                            min={-40}
+                            max={40}
+                            step={2}
+                            value={ajustesLayout.offsetPosicaoYSpecs}
+                            onChange={e => setAjustesLayout(prev => ({ ...prev, offsetPosicaoYSpecs: Number(e.target.value) }))}
+                            className="w-full h-1.5 bg-brand-dark-5 rounded-lg appearance-none cursor-pointer accent-cyan-500"
+                          />
+                        </div>
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
               </div>
 
               {/* Bloco 3: Selos e Balões Promocionais (Gatilhos de Venda) */}
