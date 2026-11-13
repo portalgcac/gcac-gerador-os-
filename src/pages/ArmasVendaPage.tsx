@@ -389,6 +389,13 @@ export function ArmasVendaPage() {
                   <div className="absolute bottom-2 left-3 bg-black/70 backdrop-blur-md px-2 py-0.5 rounded text-[10px] text-gray-300">
                     {arma.localArma === 'loja_custodia' ? '📍 No cofre da loja' : '🏠 Com o proprietário'}
                   </div>
+
+                  {/* Qtd Fotos Badge */}
+                  {arma.fotos && arma.fotos.length > 1 && (
+                    <div className="absolute bottom-2 right-3 bg-black/75 backdrop-blur-md px-2 py-0.5 rounded text-[10px] text-amber-300 font-bold border border-amber-500/30 flex items-center gap-1">
+                      <span>📷</span> {arma.fotos.length} fotos
+                    </div>
+                  )}
                 </div>
 
                 {/* Conteúdo do Card */}

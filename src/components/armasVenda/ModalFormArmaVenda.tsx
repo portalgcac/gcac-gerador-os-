@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import {
   X, Camera, QrCode, Upload, DollarSign, User, Shield, Crosshair,
-  PackageCheck, HelpCircle, Check, Trash2, Star, AlertTriangle, ArrowRight
+  PackageCheck, HelpCircle, Check, Trash2, Star, AlertTriangle, ArrowRight,
+  ChevronLeft, ChevronRight, Plus
 } from 'lucide-react';
 import { ArmaVenda, Cliente, Arma } from '../../types';
 import { useClientes } from '../../context/ClientesContext';
@@ -37,8 +38,53 @@ export function ModalFormArmaVenda({
   // Armas do acervo do cliente selecionado
   const [armasDoCliente, setArmasDoCliente] = useState<Arma[]>([]);
 
+  // Lista base de Tipos de Arma
+  const TIPOS_ARMA_PADRAO = [
+    'PISTOLA',
+    'REVÓLVER',
+    'ESPINGARDA',
+    'CARABINA',
+    'RIFLE',
+    'FUZIL',
+    'BALESTRA',
+    'ARCO E FLECHA',
+    'CARABINA DE PRESSÃO / PCP',
+    'PISTOLETE',
+    'OUTRO'
+  ];
+
   // Características da Arma
   const [tipo, setTipo] = useState<string>('PISTOLA');
+  const [tiposCustomizados, setTiposCustomizados] = useState<string[]>(() => {
+    try {
+      const salvo = localStorage.getItem('gcac_tipos_armas_venda');
+      return salvo ? JSON.parse(salvo) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [digitandoNovoTipo, setDigitandoNovoTipo] = useState<boolean>(false);
+  const [novoTipoTexto, setNovoTipoTexto] = useState<string>('');
+
+  const salvarNovoTipo = () => {
+    const formatado = novoTipoTexto.trim().toUpperCase();
+    if (!formatado) {
+      setDigitandoNovoTipo(false);
+      return;
+    }
+    if (!TIPOS_ARMA_PADRAO.includes(formatado) && !tiposCustomizados.includes(formatado)) {
+      const novaLista = [...tiposCustomizados, formatado];
+      setTiposCustomizados(novaLista);
+      try {
+        localStorage.setItem('gcac_tipos_armas_venda', JSON.stringify(novaLista));
+      } catch (err) {
+        console.warn('Erro ao salvar tipo no localStorage:', err);
+      }
+    }
+    setTipo(formatado);
+    setDigitandoNovoTipo(false);
+    setNovoTipoTexto('');
+  };
   const [fabricante, setFabricante] = useState<string>('');
   const [modelo, setModelo] = useState<string>('');
   const [calibre, setCalibre] = useState<string>('');
@@ -78,7 +124,11 @@ export function ModalFormArmaVenda({
       setProprietarioTelefone(armaParaEditar.proprietarioTelefone || '');
       setProprietarioCpf(armaParaEditar.proprietarioCpf || '');
       setProprietarioCr(armaParaEditar.proprietarioCr || '');
-      setTipo(armaParaEditar.tipo || 'PISTOLA');
+      const tipoCarregado = (armaParaEditar.tipo || 'PISTOLA').toUpperCase();
+      setTipo(tipoCarregado);
+      if (!TIPOS_ARMA_PADRAO.includes(tipoCarregado) && !tiposCustomizados.includes(tipoCarregado)) {
+        setTiposCustomizados(prev => [...prev, tipoCarregado]);
+      }
       setFabricante(armaParaEditar.fabricante || '');
       setModelo(armaParaEditar.modelo || '');
       setCalibre(armaParaEditar.calibre || '');
@@ -307,6 +357,21 @@ export function ModalFormArmaVenda({
 
   const definirFotoPrincipal = (url: string) => {
     setFotoPrincipal(url);
+    // Colocar a foto principal como primeira da lista para ser a capa do anúncio
+    setFotos(prev => [url, ...prev.filter(f => f !== url)]);
+  };
+
+  const moverFoto = (idxOrigem: number, direcao: 'esquerda' | 'direita') => {
+    const idxDestino = direcao === 'esquerda' ? idxOrigem - 1 : idxOrigem + 1;
+    if (idxDestino < 0 || idxDestino >= fotos.length) return;
+    const novasFotos = [...fotos];
+    const temp = novasFotos[idxOrigem];
+    novasFotos[idxOrigem] = novasFotos[idxDestino];
+    novasFotos[idxDestino] = temp;
+    setFotos(novasFotos);
+    if (idxDestino === 0) {
+      setFotoPrincipal(novasFotos[0]);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -651,21 +716,100 @@ export function ModalFormArmaVenda({
               </span>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
-                {/* Tipo */}
-                <div>
-                  <label className="text-[11px] font-semibold text-gray-400 block mb-1">Tipo de Arma</label>
-                  <select
-                    value={tipo}
-                    onChange={e => setTipo(e.target.value)}
-                    className="input w-full text-xs"
-                  >
-                    <option value="PISTOLA">Pistola</option>
-                    <option value="REVÓLVER">Revólver</option>
-                    <option value="ESPINGARDA">Espingarda</option>
-                    <option value="CARABINA">Carabina</option>
-                    <option value="RIFLE">Rifle</option>
-                    <option value="OUTRO">Outro</option>
-                  </select>
+                {/* Tipo de Arma com suporte a cadastrar novo tipo */}
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-semibold text-gray-400 block">Tipo de Arma</label>
+                    {!digitandoNovoTipo ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDigitandoNovoTipo(true);
+                          setNovoTipoTexto('');
+                        }}
+                        className="text-[10px] font-bold text-amber-400 hover:text-amber-300 hover:underline flex items-center gap-1"
+                      >
+                        <Plus size={11} /> + Cadastrar Tipo
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setDigitandoNovoTipo(false)}
+                        className="text-[10px] text-gray-400 hover:text-gray-200"
+                      >
+                        Voltar à lista
+                      </button>
+                    )}
+                  </div>
+
+                  {!digitandoNovoTipo ? (
+                    <select
+                      value={tipo}
+                      onChange={e => {
+                        const val = e.target.value;
+                        if (val === '__CADASTRAR_NOVO__') {
+                          setDigitandoNovoTipo(true);
+                          setNovoTipoTexto('');
+                        } else {
+                          setTipo(val);
+                        }
+                      }}
+                      className="input w-full text-xs font-semibold"
+                    >
+                      <optgroup label="Tipos de Armas">
+                        {TIPOS_ARMA_PADRAO.map(t => (
+                          <option key={t} value={t}>
+                            {t}
+                          </option>
+                        ))}
+                      </optgroup>
+                      {tiposCustomizados.length > 0 && (
+                        <optgroup label="Seus Tipos Cadastrados">
+                          {tiposCustomizados.map(t => (
+                            <option key={t} value={t}>
+                              ⭐ {t}
+                            </option>
+                          ))}
+                        </optgroup>
+                      )}
+                      <option value="__CADASTRAR_NOVO__" className="font-bold text-amber-400">
+                        + Digitar / Cadastrar Novo Tipo...
+                      </option>
+                    </select>
+                  ) : (
+                    <div className="flex items-center gap-1.5 animate-scale-up">
+                      <input
+                        type="text"
+                        value={novoTipoTexto}
+                        onChange={e => setNovoTipoTexto(e.target.value.toUpperCase())}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            salvarNovoTipo();
+                          }
+                        }}
+                        autoFocus
+                        placeholder="Ex: BALESTRA, FUZIL, PCP..."
+                        className="input flex-1 text-xs uppercase font-bold text-amber-300 border-amber-500/50"
+                      />
+                      <button
+                        type="button"
+                        onClick={salvarNovoTipo}
+                        className="px-2.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold transition-all shrink-0"
+                        title="Salvar novo tipo"
+                      >
+                        <Check size={14} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDigitandoNovoTipo(false)}
+                        className="p-1.5 rounded-lg bg-brand-dark-4 hover:bg-brand-dark-5 text-gray-400 hover:text-white transition-all shrink-0"
+                        title="Cancelar"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 {/* Fabricante */}
@@ -895,46 +1039,74 @@ export function ModalFormArmaVenda({
               {/* Galeria de Fotos */}
               {fotos.length === 0 ? (
                 <div className="border-2 border-dashed border-brand-dark-5 rounded-xl p-6 text-center text-gray-500 text-xs">
-                  Nenhuma foto anexada ainda. Use o botão acima para enviar arquivos ou use o leitor de QR Code para bater fotos direto do celular!
+                  Nenhuma foto anexada ainda. Use o botão acima para enviar arquivos (permite selecionar vários) ou use o QR Code para fotografar pelo celular!
                 </div>
               ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-3">
-                  {fotos.map((url, idx) => (
-                    <div
-                      key={idx}
-                      className={`relative group rounded-xl overflow-hidden border-2 aspect-video bg-black/40 ${
-                        fotoPrincipal === url ? 'border-amber-400 ring-2 ring-amber-400/30' : 'border-brand-dark-5'
-                      }`}
-                    >
-                      <img src={url} alt="" className="w-full h-full object-cover" />
+                <div className="space-y-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-3">
+                    {fotos.map((url, idx) => (
+                      <div
+                        key={idx}
+                        className={`relative group rounded-xl overflow-hidden border-2 aspect-video bg-black/40 ${
+                          fotoPrincipal === url ? 'border-amber-400 ring-2 ring-amber-400/30' : 'border-brand-dark-5'
+                        }`}
+                      >
+                        <img src={url} alt="" className="w-full h-full object-cover" />
 
-                      {/* Overlay com Ações */}
-                      <div className="absolute inset-0 bg-black/70 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => definirFotoPrincipal(url)}
-                          title="Definir como foto principal"
-                          className="p-1.5 rounded-lg bg-amber-500 text-black hover:bg-amber-400 transition-colors"
-                        >
-                          <Star size={14} />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => removerFoto(idx)}
-                          title="Excluir foto"
-                          className="p-1.5 rounded-lg bg-red-600 text-white hover:bg-red-500 transition-colors"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-
-                      {fotoPrincipal === url && (
-                        <div className="absolute top-1 left-1 bg-amber-500 text-black text-[9px] font-black px-1.5 py-0.5 rounded shadow">
-                          CAPA
+                        {/* Overlay com Ações */}
+                        <div className="absolute inset-0 bg-black/75 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1.5 p-1">
+                          {idx > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => moverFoto(idx, 'esquerda')}
+                              title="Mover foto para esquerda"
+                              className="p-1 rounded bg-brand-dark-4 hover:bg-brand-dark-5 text-white"
+                            >
+                              <ChevronLeft size={13} />
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => definirFotoPrincipal(url)}
+                            title="Definir como foto de capa (Posição #1)"
+                            className="p-1 rounded bg-amber-500 text-black hover:bg-amber-400 transition-colors"
+                          >
+                            <Star size={13} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => removerFoto(idx)}
+                            title="Excluir foto"
+                            className="p-1 rounded bg-red-600 text-white hover:bg-red-500 transition-colors"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                          {idx < fotos.length - 1 && (
+                            <button
+                              type="button"
+                              onClick={() => moverFoto(idx, 'direita')}
+                              title="Mover foto para direita"
+                              className="p-1 rounded bg-brand-dark-4 hover:bg-brand-dark-5 text-white"
+                            >
+                              <ChevronRight size={13} />
+                            </button>
+                          )}
                         </div>
-                      )}
-                    </div>
-                  ))}
+
+                        {/* Posição da Foto */}
+                        <div className="absolute top-1 left-1 flex items-center gap-1">
+                          <span className={`text-[9px] font-black px-1.5 py-0.5 rounded shadow ${
+                            fotoPrincipal === url ? 'bg-amber-500 text-black' : 'bg-black/70 text-gray-300'
+                          }`}>
+                            #{idx + 1} {fotoPrincipal === url ? 'CAPA' : ''}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-[11px] text-gray-400">
+                    💡 Dica: Você pode adicionar várias fotos da arma (Lado A, Lado B, marcações, maleta e acessórios). No gerador de anúncios, você poderá escolher exibi-las em layout único, duplo, trio ou grade 4x!
+                  </p>
                 </div>
               )}
             </div>

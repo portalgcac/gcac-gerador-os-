@@ -3,7 +3,8 @@ import {
   X, Download, Copy, Check, Sparkles, Image as ImageIcon,
   Share2, Shield, Eye, Smartphone, LayoutGrid, AlertCircle, RefreshCw,
   Key, ExternalLink, Camera, QrCode, Upload, Trash2,
-  RotateCw, FlipHorizontal, SunMedium, Palette, Tag, Square
+  RotateCw, FlipHorizontal, SunMedium, Palette, Tag, Square,
+  ChevronLeft, ChevronRight, Star, Plus
 } from 'lucide-react';
 import { ArmaVenda } from '../../types';
 import { useAuth } from '../../context/AuthContext';
@@ -100,6 +101,9 @@ export function ModalGeradorAnuncio({ arma, isOpen, onClose }: ModalGeradorAnunc
   const [modalQrAberto, setModalQrAberto] = useState(false);
   const [salvandoFoto, setSalvandoFoto] = useState(false);
 
+  // Layout de Fotos no Anúncio: 1 Foto (Destaque), 2 Fotos (Dupla/Lado A e B), 3 Fotos (Trio), 4 Fotos (Grade 4x)
+  const [layoutFotos, setLayoutFotos] = useState<'1' | '2' | '3' | '4'>('1');
+
   // Status de cópia e downloads
   const [copiado, setCopiado] = useState(false);
   const [gerandoImagem, setGerandoImagem] = useState(false);
@@ -185,14 +189,14 @@ export function ModalGeradorAnuncio({ arma, isOpen, onClose }: ModalGeradorAnunc
       const imagemOtimizada = await otimizarFoto(fonte);
       if (!imagemOtimizada) return;
 
-      const novasFotos = [imagemOtimizada, ...fotosLocais];
+      const novasFotos = [...fotosLocais, imagemOtimizada];
       setFotosLocais(novasFotos);
-      setFotoSelecionadaIdx(0);
+      setFotoSelecionadaIdx(novasFotos.length - 1);
 
       // Persistir na arma no banco de dados
       await atualizarArmaVenda(arma.id, {
         fotos: novasFotos,
-        fotoPrincipal: imagemOtimizada
+        fotoPrincipal: arma.fotoPrincipal || novasFotos[0]
       });
     } catch (err) {
       console.error('Erro ao salvar foto na arma:', err);
@@ -201,12 +205,94 @@ export function ModalGeradorAnuncio({ arma, isOpen, onClose }: ModalGeradorAnunc
     }
   };
 
-  // Upload local de arquivo do computador
+  // Upload múltiplo de arquivos do computador
   const handleUploadComputador = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    await handleAdicionarFoto(file);
-    e.target.value = '';
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    try {
+      setSalvandoFoto(true);
+      const novasImagens: string[] = [];
+
+      for (const file of Array.from(files)) {
+        const imagemOtimizada = await otimizarFoto(file);
+        if (imagemOtimizada) {
+          novasImagens.push(imagemOtimizada);
+        }
+      }
+
+      if (novasImagens.length > 0) {
+        const novasFotos = [...fotosLocais, ...novasImagens];
+        setFotosLocais(novasFotos);
+        
+        // Se já anexou mais de uma foto e ainda estava em layout 1, sugere layout duplo
+        if (novasFotos.length >= 2 && layoutFotos === '1' && fotosLocais.length === 0) {
+          setLayoutFotos('2');
+        }
+
+        await atualizarArmaVenda(arma.id, {
+          fotos: novasFotos,
+          fotoPrincipal: arma.fotoPrincipal || novasFotos[0]
+        });
+      }
+    } catch (err) {
+      console.error('Erro ao anexar fotos:', err);
+    } finally {
+      setSalvandoFoto(false);
+      e.target.value = '';
+    }
+  };
+
+  // Remover foto da arma
+  const handleRemoverFoto = async (idxRemover: number) => {
+    if (fotosLocais.length <= 1) {
+      if (!confirm('Deseja realmente remover esta foto da arma?')) return;
+    }
+    const atualizadas = fotosLocais.filter((_, i) => i !== idxRemover);
+    setFotosLocais(atualizadas);
+    if (fotoSelecionadaIdx >= atualizadas.length) {
+      setFotoSelecionadaIdx(Math.max(0, atualizadas.length - 1));
+    }
+    if (Number(layoutFotos) > atualizadas.length && atualizadas.length > 0) {
+      setLayoutFotos(String(Math.min(4, Math.max(1, atualizadas.length))) as any);
+    }
+    await atualizarArmaVenda(arma.id, {
+      fotos: atualizadas,
+      fotoPrincipal: atualizadas[0] || ''
+    });
+  };
+
+  // Reordenar foto (mover para esquerda / direita)
+  const handleMoverFoto = async (idxOrigem: number, direcao: 'esquerda' | 'direita') => {
+    const idxDestino = direcao === 'esquerda' ? idxOrigem - 1 : idxOrigem + 1;
+    if (idxDestino < 0 || idxDestino >= fotosLocais.length) return;
+    const novaLista = [...fotosLocais];
+    const temp = novaLista[idxOrigem];
+    novaLista[idxOrigem] = novaLista[idxDestino];
+    novaLista[idxDestino] = temp;
+    setFotosLocais(novaLista);
+    if (fotoSelecionadaIdx === idxOrigem) {
+      setFotoSelecionadaIdx(idxDestino);
+    } else if (fotoSelecionadaIdx === idxDestino) {
+      setFotoSelecionadaIdx(idxOrigem);
+    }
+    await atualizarArmaVenda(arma.id, {
+      fotos: novaLista,
+      fotoPrincipal: novaLista[0] || ''
+    });
+  };
+
+  // Definir foto como Capa (Posição #1)
+  const handleDefinirComoCapa = async (idx: number) => {
+    if (idx === 0) return;
+    const foto = fotosLocais[idx];
+    const novaLista = [foto, ...fotosLocais.filter((_, i) => i !== idx)];
+    setFotosLocais(novaLista);
+    setFotoSelecionadaIdx(0);
+    await atualizarArmaVenda(arma.id, {
+      fotos: novaLista,
+      fotoPrincipal: foto
+    });
   };
 
   // Gerar texto padrão para WhatsApp
@@ -402,15 +488,31 @@ export function ModalGeradorAnuncio({ arma, isOpen, onClose }: ModalGeradorAnunc
 
     // Carregar Imagens
     const logoImg = new Image();
-    const armaImg = new Image();
     const logoSrc = usuario?.dadosEmpresa?.logoUrl || '/logo_gcac_vetor.png';
 
-    if (fotoAtual && (fotoAtual.startsWith('http://') || fotoAtual.startsWith('https://'))) {
-      armaImg.crossOrigin = 'anonymous';
-    }
     if (logoSrc && (logoSrc.startsWith('http://') || logoSrc.startsWith('https://'))) {
       logoImg.crossOrigin = 'anonymous';
     }
+
+    // Selecionar fotos para renderizar de acordo com o layout (1, 2, 3 ou 4 fotos)
+    const qtdFotosDesejadas = Number(layoutFotos);
+    const fotosParaAnuncio: string[] = [];
+    for (let i = 0; i < qtdFotosDesejadas; i++) {
+      if (fotosLocais[i]) {
+        fotosParaAnuncio.push(fotosLocais[i]);
+      } else if (fotoAtual) {
+        fotosParaAnuncio.push(fotoAtual);
+      }
+    }
+
+    const armaImgs: (HTMLImageElement | null)[] = fotosParaAnuncio.map(src => {
+      if (!src) return null;
+      const img = new Image();
+      if (src.startsWith('http://') || src.startsWith('https://')) {
+        img.crossOrigin = 'anonymous';
+      }
+      return img;
+    });
 
     const renderConteudo = () => {
       let topY = molduraY + 14;
@@ -498,151 +600,280 @@ export function ModalGeradorAnuncio({ arma, isOpen, onClose }: ModalGeradorAnunc
       const blocoMeioY = topY;
       const blocoMeioH = isQuadrado ? 370 : isStories ? 750 : 515;
 
-      // Lado Esquerdo: NOME DA ARMA E INFORMAÇÕES BÉLICAS
-      ctx.textAlign = 'left';
-
-      // Fabricante
-      const fabTexto = arma.fabricante.toUpperCase();
-      const fabTamanho = isQuadrado ? (fabTexto.length > 14 ? 22 : 26) : (fabTexto.length > 14 ? 26 : 32);
-      ctx.fillStyle = '#f8fafc';
-      ctx.font = `800 ${fabTamanho}px "Segoe UI", sans-serif`;
-      ctx.fillText(fabTexto, pad + 26, blocoMeioY + (isQuadrado ? 42 : 60));
-
-      // Modelo Grande com Gradiente Prata / Branco e Sombra
-      const modeloTexto = arma.modelo.toUpperCase();
-      const modeloTamanho = isQuadrado
-        ? (modeloTexto.length > 12 ? 36 : modeloTexto.length > 7 ? 46 : 56)
-        : (modeloTexto.length > 12 ? 46 : modeloTexto.length > 7 ? 58 : 72);
-      const modeloGrad = ctx.createLinearGradient(pad + 26, blocoMeioY + 50, pad + 26, blocoMeioY + 140);
-      modeloGrad.addColorStop(0, '#ffffff');
-      modeloGrad.addColorStop(1, '#93c5fd');
-
-      ctx.save();
-      ctx.fillStyle = modeloGrad;
-      ctx.font = `900 ${modeloTamanho}px "Segoe UI", sans-serif`;
-      ctx.shadowColor = 'rgba(0, 0, 0, 0.85)';
-      ctx.shadowOffsetY = 6;
-      ctx.shadowBlur = 16;
-      ctx.fillText(modeloTexto, pad + 24, blocoMeioY + (isQuadrado ? 96 : 130));
-      ctx.restore();
-
-      // Calibre em destaque Neon
-      ctx.fillStyle = tema.accent;
-      ctx.font = `bold ${isQuadrado ? 21 : 26}px "Segoe UI", sans-serif`;
-      ctx.fillText(`CALIBRE ${arma.calibre.toUpperCase()}`, pad + 26, blocoMeioY + (isQuadrado ? 142 : 185));
-
-      // Registro
-      if (arma.sigmaSinarm) {
-        ctx.fillStyle = '#e2e8f0';
-        ctx.font = `700 ${isQuadrado ? 16 : 19}px "Segoe UI", sans-serif`;
-        ctx.fillText(`REGISTRO: ${arma.sigmaSinarm}`, pad + 26, blocoMeioY + (isQuadrado ? 175 : 225));
-      }
-
-      // Selo de Procedência & Segurança Jurídica
-      const badgeSeloY = blocoMeioY + (isQuadrado ? 210 : 270);
-      ctx.fillStyle = 'rgba(6, 23, 51, 0.8)';
-      ctx.strokeStyle = tema.vitrineBorda;
-      ctx.lineWidth = 1.4;
-      ctx.beginPath();
-      ctx.roundRect(pad + 26, badgeSeloY, isQuadrado ? 220 : 260, isQuadrado ? 30 : 36, 8);
-      ctx.fill();
-      ctx.stroke();
-
-      ctx.fillStyle = tema.accent;
-      ctx.font = `bold ${isQuadrado ? 11 : 12}px "Segoe UI", sans-serif`;
-      ctx.fillText('🛡️  PROCEDÊNCIA VERIFICADA', pad + 38, badgeSeloY + (isQuadrado ? 20 : 23));
-
-      // Lado Direito: VITRINE DA ARMA EXPANDIDA COM MOLDURA GLASS E MÁXIMA VISIBILIDADE
       const boxFotoW = isQuadrado ? 600 : 635;
       const boxFotoH = blocoMeioH - 15;
       const boxFotoX = largura - pad - boxFotoW - 14;
       const boxFotoY = blocoMeioY + 5;
 
+      // Largura máxima de segurança para os textos à esquerda nunca sobreporem a imagem
+      const leftStartX = pad + 26;
+      const maxTextW = boxFotoX - leftStartX - 18;
+
+      // Lado Esquerdo: NOME DA ARMA E INFORMAÇÕES BÉLICAS COM ENCAIXE INTELIGENTE (Auto-Fit & Wrap)
+      ctx.textAlign = 'left';
+      let currentLeftY = blocoMeioY + (isQuadrado ? 26 : 38);
+
+      // 1. Tipo de Arma (se preenchido e não for 'OUTRO')
+      if (arma.tipo && arma.tipo.toUpperCase() !== 'OUTRO') {
+        ctx.fillStyle = tema.accent;
+        ctx.font = `bold ${isQuadrado ? 11 : 13}px "Segoe UI", sans-serif`;
+        ctx.fillText(arma.tipo.toUpperCase(), leftStartX, currentLeftY);
+        currentLeftY += isQuadrado ? 16 : 22;
+      }
+
+      // 2. Fabricante com auto-fit de largura
+      const fabTexto = (arma.fabricante || '').toUpperCase();
+      let fabFontSize = isQuadrado ? (fabTexto.length > 14 ? 19 : 23) : (fabTexto.length > 14 ? 24 : 30);
+      ctx.font = `800 ${fabFontSize}px "Segoe UI", sans-serif`;
+      while (ctx.measureText(fabTexto).width > maxTextW && fabFontSize > 13) {
+        fabFontSize -= 1;
+        ctx.font = `800 ${fabFontSize}px "Segoe UI", sans-serif`;
+      }
+      ctx.fillStyle = '#f8fafc';
+      ctx.fillText(fabTexto, leftStartX, currentLeftY);
+      currentLeftY += fabFontSize + (isQuadrado ? 6 : 10);
+
+      // 3. Modelo Grande com quebra em linhas (auto-wrap) e ajuste de fonte proporcional
+      const modeloTexto = (arma.modelo || '').toUpperCase();
+      const palavrasModelo = modeloTexto.split(/\s+/).filter(Boolean);
+      let modeloFontSize = isQuadrado ? 38 : 50;
+
+      const calcularLinhasModelo = (tamFonte: number) => {
+        ctx.font = `900 ${tamFonte}px "Segoe UI", sans-serif`;
+        const linhas: string[] = [];
+        let linhaAtual = '';
+        for (const palavra of palavrasModelo) {
+          const teste = linhaAtual ? `${linhaAtual} ${palavra}` : palavra;
+          if (ctx.measureText(teste).width <= maxTextW) {
+            linhaAtual = teste;
+          } else {
+            if (linhaAtual) linhas.push(linhaAtual);
+            linhaAtual = palavra;
+          }
+        }
+        if (linhaAtual) linhas.push(linhaAtual);
+        return linhas;
+      };
+
+      let linhasModelo = calcularLinhasModelo(modeloFontSize);
+      while (
+        modeloFontSize > 18 &&
+        (linhasModelo.length > (isQuadrado ? 2 : 3) || linhasModelo.some(l => {
+          ctx.font = `900 ${modeloFontSize}px "Segoe UI", sans-serif`;
+          return ctx.measureText(l).width > maxTextW;
+        }))
+      ) {
+        modeloFontSize -= 2;
+        linhasModelo = calcularLinhasModelo(modeloFontSize);
+      }
+
+      // Garantia para palavras individuais que excedam maxTextW
+      for (const linha of linhasModelo) {
+        ctx.font = `900 ${modeloFontSize}px "Segoe UI", sans-serif`;
+        while (ctx.measureText(linha).width > maxTextW && modeloFontSize > 14) {
+          modeloFontSize -= 1;
+          ctx.font = `900 ${modeloFontSize}px "Segoe UI", sans-serif`;
+        }
+      }
+
+      const modeloLineHeight = modeloFontSize * 1.1;
+      const modeloGrad = ctx.createLinearGradient(leftStartX, currentLeftY, leftStartX, currentLeftY + linhasModelo.length * modeloLineHeight);
+      modeloGrad.addColorStop(0, '#ffffff');
+      modeloGrad.addColorStop(1, '#93c5fd');
+
       ctx.save();
-      // Moldura da Vitrine com Fundo Glass e Bordas Táticas
-      ctx.fillStyle = tema.vitrineBg;
+      ctx.fillStyle = modeloGrad;
+      ctx.font = `900 ${modeloFontSize}px "Segoe UI", sans-serif`;
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.85)';
+      ctx.shadowOffsetY = 4;
+      ctx.shadowBlur = 12;
+
+      linhasModelo.forEach((linha) => {
+        currentLeftY += modeloLineHeight;
+        ctx.fillText(linha, leftStartX, currentLeftY);
+      });
+      ctx.restore();
+
+      currentLeftY += isQuadrado ? 14 : 20;
+
+      // 4. Calibre em destaque Neon com auto-fit
+      if (mostrarCalibre && arma.calibre) {
+        const calTexto = `CALIBRE ${arma.calibre.toUpperCase()}`;
+        let calFontSize = isQuadrado ? 17 : 22;
+        ctx.font = `bold ${calFontSize}px "Segoe UI", sans-serif`;
+        while (ctx.measureText(calTexto).width > maxTextW && calFontSize > 12) {
+          calFontSize -= 1;
+          ctx.font = `bold ${calFontSize}px "Segoe UI", sans-serif`;
+        }
+        ctx.fillStyle = tema.accent;
+        ctx.fillText(calTexto, leftStartX, currentLeftY);
+        currentLeftY += calFontSize + (isQuadrado ? 10 : 16);
+      }
+
+      // 5. Registro (SIGMA / SINARM / OUTRO) com auto-fit
+      if (arma.sigmaSinarm) {
+        const regTexto = `REGISTRO: ${arma.sigmaSinarm.toUpperCase()}`;
+        let regFontSize = isQuadrado ? 13 : 16;
+        ctx.font = `700 ${regFontSize}px "Segoe UI", sans-serif`;
+        while (ctx.measureText(regTexto).width > maxTextW && regFontSize > 10) {
+          regFontSize -= 1;
+          ctx.font = `700 ${regFontSize}px "Segoe UI", sans-serif`;
+        }
+        ctx.fillStyle = '#e2e8f0';
+        ctx.fillText(regTexto, leftStartX, currentLeftY);
+        currentLeftY += regFontSize + (isQuadrado ? 14 : 20);
+      }
+
+      // 6. Selo de Procedência & Segurança Jurídica
+      const badgeSeloW = Math.min(maxTextW, isQuadrado ? 215 : 255);
+      const badgeSeloH = isQuadrado ? 28 : 34;
+      ctx.fillStyle = 'rgba(6, 23, 51, 0.8)';
       ctx.strokeStyle = tema.vitrineBorda;
-      ctx.lineWidth = 2;
+      ctx.lineWidth = 1.4;
       ctx.beginPath();
-      ctx.roundRect(boxFotoX, boxFotoY, boxFotoW, boxFotoH, 18);
+      ctx.roundRect(leftStartX, currentLeftY, badgeSeloW, badgeSeloH, 8);
       ctx.fill();
       ctx.stroke();
 
-      // Glow suave de profundidade no centro da vitrine
-      const vitrineGlow = ctx.createRadialGradient(
-        boxFotoX + boxFotoW / 2, boxFotoY + boxFotoH / 2, 30,
-        boxFotoX + boxFotoW / 2, boxFotoY + boxFotoH / 2, boxFotoW * 0.55
-      );
-      vitrineGlow.addColorStop(0, tema.vitrineGlow);
-      vitrineGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
-      ctx.fillStyle = vitrineGlow;
-      ctx.beginPath();
-      ctx.roundRect(boxFotoX, boxFotoY, boxFotoW, boxFotoH, 18);
-      ctx.fill();
+      ctx.fillStyle = tema.accent;
+      ctx.font = `bold ${isQuadrado ? 10 : 11.5}px "Segoe UI", sans-serif`;
+      ctx.fillText('🛡️  PROCEDÊNCIA VERIFICADA', leftStartX + 12, currentLeftY + (badgeSeloH / 2) + 4);
 
-      const temFotoValida = armaImg.complete && armaImg.naturalWidth > 0 && !fotoAtual.includes('application/pdf');
-
-      if (temFotoValida) {
+      // Função para renderizar cada foto em sua área com enquadramento
+      const renderFotoNoBox = (
+        img: HTMLImageElement | null,
+        subX: number,
+        subY: number,
+        subW: number,
+        subH: number,
+        rotulo?: string,
+        usarControles: boolean = false
+      ) => {
+        ctx.save();
+        // Moldura interna Glass
+        ctx.fillStyle = 'rgba(4, 9, 20, 0.65)';
+        ctx.strokeStyle = tema.vitrineBorda;
+        ctx.lineWidth = 1.6;
         ctx.beginPath();
-        ctx.roundRect(boxFotoX + 4, boxFotoY + 4, boxFotoW - 8, boxFotoH - 8, 16);
-        ctx.clip();
-
-        if (filtroRealce) {
-          ctx.filter = 'brightness(1.1) contrast(1.16) saturate(1.1)';
-        }
-
-        const isRotated90 = rotacaoFoto === 90 || rotacaoFoto === 270;
-        const effectiveW = isRotated90 ? armaImg.naturalHeight : armaImg.naturalWidth;
-        const effectiveH = isRotated90 ? armaImg.naturalWidth : armaImg.naturalHeight;
-
-        let baseScale = modoFoto === 'preencher'
-          ? Math.max(boxFotoW / effectiveW, boxFotoH / effectiveH)
-          : Math.min((boxFotoW - 16) / effectiveW, (boxFotoH - 16) / effectiveH);
-
-        const finalScale = baseScale * (zoomFoto / 100);
-        const drawW = armaImg.naturalWidth * finalScale;
-        const drawH = armaImg.naturalHeight * finalScale;
-
-        const centerX = boxFotoX + boxFotoW / 2 + (posicaoXFoto / 100) * boxFotoW;
-        const centerY = boxFotoY + boxFotoH / 2 + (posicaoYFoto / 100) * boxFotoH;
-
-        ctx.translate(centerX, centerY);
-
-        if (rotacaoFoto !== 0) {
-          ctx.rotate((rotacaoFoto * Math.PI) / 180);
-        }
-
-        if (espelharFoto) {
-          ctx.scale(-1, 1);
-        }
-
-        ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
-        ctx.shadowBlur = 32;
-        ctx.shadowOffsetY = 16;
-
-        ctx.drawImage(armaImg, -drawW / 2, -drawH / 2, drawW, drawH);
-      } else {
-        const miraX = boxFotoX + boxFotoW / 2;
-        const miraY = boxFotoY + boxFotoH / 2 - 20;
-        ctx.strokeStyle = tema.accent;
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(miraX, miraY, 42, 0, Math.PI * 2);
-        ctx.moveTo(miraX - 56, miraY);
-        ctx.lineTo(miraX + 56, miraY);
-        ctx.moveTo(miraX, miraY - 56);
-        ctx.lineTo(miraX, miraY + 56);
+        ctx.roundRect(subX, subY, subW, subH, 14);
+        ctx.fill();
         ctx.stroke();
 
-        ctx.fillStyle = '#94a3b8';
-        ctx.font = 'bold 22px "Segoe UI", sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText('FOTO NÃO CADASTRADA', miraX, miraY + 76);
+        const temFoto = img && img.complete && img.naturalWidth > 0;
+        if (temFoto) {
+          ctx.beginPath();
+          ctx.roundRect(subX + 3, subY + 3, subW - 6, subH - 6, 12);
+          ctx.clip();
 
-        ctx.fillStyle = '#64748b';
-        ctx.font = '14px "Segoe UI", sans-serif';
-        ctx.fillText('Clique em "Anexar Foto" para adicionar agora', miraX, miraY + 102);
+          if (filtroRealce) {
+            ctx.filter = 'brightness(1.1) contrast(1.16) saturate(1.1)';
+          }
+
+          const rot = usarControles ? rotacaoFoto : 0;
+          const isRot90 = rot === 90 || rot === 270;
+          const effectiveW = isRot90 ? img.naturalHeight : img.naturalWidth;
+          const effectiveH = isRot90 ? img.naturalWidth : img.naturalHeight;
+
+          const baseScale = (usarControles && modoFoto === 'preencher')
+            ? Math.max(subW / effectiveW, subH / effectiveH)
+            : Math.min((subW - 14) / effectiveW, (subH - 14) / effectiveH);
+
+          const zoom = usarControles ? (zoomFoto / 100) : 1.0;
+          const finalScale = baseScale * zoom;
+          const drawW = img.naturalWidth * finalScale;
+          const drawH = img.naturalHeight * finalScale;
+
+          const posX = usarControles ? (posicaoXFoto / 100) * subW : 0;
+          const posY = usarControles ? (posicaoYFoto / 100) * subH : 0;
+          const centerX = subX + subW / 2 + posX;
+          const centerY = subY + subH / 2 + posY;
+
+          ctx.translate(centerX, centerY);
+
+          if (rot !== 0) {
+            ctx.rotate((rot * Math.PI) / 180);
+          }
+
+          if (usarControles && espelharFoto) {
+            ctx.scale(-1, 1);
+          }
+
+          ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
+          ctx.shadowBlur = 28;
+          ctx.shadowOffsetY = 12;
+
+          ctx.drawImage(img, -drawW / 2, -drawH / 2, drawW, drawH);
+        } else {
+          const miraX = subX + subW / 2;
+          const miraY = subY + subH / 2;
+          ctx.strokeStyle = tema.accent;
+          ctx.lineWidth = 1.4;
+          ctx.beginPath();
+          ctx.arc(miraX, miraY, 22, 0, Math.PI * 2);
+          ctx.moveTo(miraX - 30, miraY);
+          ctx.lineTo(miraX + 30, miraY);
+          ctx.moveTo(miraX - 30, miraY);
+          ctx.lineTo(miraX + 30, miraY);
+          ctx.stroke();
+
+          ctx.fillStyle = '#94a3b8';
+          ctx.font = 'bold 12px "Segoe UI", sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText('SEM FOTO NESTE ÂNGULO', miraX, miraY + 38);
+        }
+
+        ctx.restore();
+
+        // Rótulo discreto (ex: Lado A, Lado B)
+        if (rotulo && temFoto) {
+          ctx.save();
+          ctx.fillStyle = 'rgba(2, 6, 23, 0.8)';
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.roundRect(subX + 8, subY + 8, 86, 20, 6);
+          ctx.fill();
+          ctx.stroke();
+
+          ctx.fillStyle = tema.accent;
+          ctx.font = '900 10px "Segoe UI", sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText(rotulo, subX + 8 + 43, subY + 8 + 14);
+          ctx.restore();
+        }
+      };
+
+      const innerPad = 6;
+      const innerW = boxFotoW - innerPad * 2;
+      const innerH = boxFotoH - innerPad * 2;
+      const innerX = boxFotoX + innerPad;
+      const innerY = boxFotoY + innerPad;
+
+      if (layoutFotos === '1') {
+        renderFotoNoBox(armaImgs[0] || null, innerX, innerY, innerW, innerH, undefined, true);
+      } else if (layoutFotos === '2') {
+        const gap = 10;
+        const subH = Math.floor((innerH - gap) / 2);
+        renderFotoNoBox(armaImgs[0] || null, innerX, innerY, innerW, subH, '★ LADO A', true);
+        renderFotoNoBox(armaImgs[1] || armaImgs[0] || null, innerX, innerY + subH + gap, innerW, subH, '★ LADO B', false);
+      } else if (layoutFotos === '3') {
+        const gap = 8;
+        const topH = Math.floor(innerH * 0.58);
+        const botH = innerH - topH - gap;
+        const halfW = Math.floor((innerW - gap) / 2);
+        renderFotoNoBox(armaImgs[0] || null, innerX, innerY, innerW, topH, '★ PRINCIPAL', true);
+        renderFotoNoBox(armaImgs[1] || armaImgs[0] || null, innerX, innerY + topH + gap, halfW, botH, 'DETALHE 1', false);
+        renderFotoNoBox(armaImgs[2] || armaImgs[0] || null, innerX + halfW + gap, innerY + topH + gap, halfW, botH, 'DETALHE 2', false);
+      } else if (layoutFotos === '4') {
+        const gap = 8;
+        const halfW = Math.floor((innerW - gap) / 2);
+        const halfH = Math.floor((innerH - gap) / 2);
+        renderFotoNoBox(armaImgs[0] || null, innerX, innerY, halfW, halfH, 'FOTO 1', true);
+        renderFotoNoBox(armaImgs[1] || armaImgs[0] || null, innerX + halfW + gap, innerY, halfW, halfH, 'FOTO 2', false);
+        renderFotoNoBox(armaImgs[2] || armaImgs[0] || null, innerX, innerY + halfH + gap, halfW, halfH, 'FOTO 3', false);
+        renderFotoNoBox(armaImgs[3] || armaImgs[0] || null, innerX + halfW + gap, innerY + halfH + gap, halfW, halfH, 'FOTO 4', false);
       }
+
       ctx.restore();
 
       topY += blocoMeioH + (isQuadrado ? 10 : 14);
@@ -889,7 +1120,7 @@ export function ModalGeradorAnuncio({ arma, isOpen, onClose }: ModalGeradorAnunc
       renderConteudo();
     };
 
-    let totalParaCarregar = (mostrarLogo && logoSrc ? 1 : 0) + (fotoAtual ? 1 : 0);
+    let totalParaCarregar = (mostrarLogo && logoSrc ? 1 : 0) + armaImgs.filter(Boolean).length;
     let concluidas = 0;
 
     const onImagemFinalizada = () => {
@@ -901,11 +1132,19 @@ export function ModalGeradorAnuncio({ arma, isOpen, onClose }: ModalGeradorAnunc
 
     logoImg.onload = onImagemFinalizada;
     logoImg.onerror = onImagemFinalizada;
-    armaImg.onload = onImagemFinalizada;
-    armaImg.onerror = onImagemFinalizada;
+    armaImgs.forEach(img => {
+      if (img) {
+        img.onload = onImagemFinalizada;
+        img.onerror = onImagemFinalizada;
+      }
+    });
 
     if (mostrarLogo && logoSrc) logoImg.src = logoSrc;
-    if (fotoAtual) armaImg.src = fotoAtual;
+    armaImgs.forEach((img, idx) => {
+      if (img && fotosParaAnuncio[idx]) {
+        img.src = fotosParaAnuncio[idx];
+      }
+    });
 
     if (totalParaCarregar === 0) {
       dispararRender();
@@ -937,6 +1176,8 @@ export function ModalGeradorAnuncio({ arma, isOpen, onClose }: ModalGeradorAnunc
     posicaoYFoto,
     posicaoXFoto,
     fotoAtual,
+    fotosLocais,
+    layoutFotos,
     nomeLoja,
     telefoneLoja,
     cidadeLoja
@@ -1166,10 +1407,11 @@ Mantenha emojis de armas/tiro/fogo, bullet points claros e destaque a exigência
                   </button>
 
                   <label className="flex items-center gap-1 text-[11px] font-bold text-gray-200 bg-brand-dark-4 hover:bg-brand-dark-5 border border-brand-dark-5 px-2.5 py-1 rounded-lg cursor-pointer transition-colors">
-                    <Upload size={13} /> Anexar Foto
+                    <Upload size={13} /> Anexar Fotos
                     <input
                       type="file"
                       accept="image/*"
+                      multiple
                       onChange={handleUploadComputador}
                       className="hidden"
                     />
@@ -1197,24 +1439,106 @@ Mantenha emojis de armas/tiro/fogo, bullet points claros e destaque a exigência
                 />
               </div>
 
-              {/* Miniaturas de fotos da arma para escolher */}
-              {fotosLocais.length > 1 && (
-                <div className="flex items-center gap-2 mt-3 w-full overflow-x-auto pb-2">
-                  <span className="text-[11px] text-gray-400 font-medium shrink-0">Foto em Destaque:</span>
-                  {fotosLocais.map((f, i) => (
-                    <button
-                      key={i}
-                      type="button"
-                      onClick={() => setFotoSelecionadaIdx(i)}
-                      className={`relative w-12 h-12 rounded-lg overflow-hidden border-2 transition-all shrink-0 ${
-                        fotoSelecionadaIdx === i ? 'border-amber-400 scale-105' : 'border-brand-dark-5 opacity-60 hover:opacity-100'
-                      }`}
-                    >
-                      <img src={f} alt="" className="w-full h-full object-cover" />
-                    </button>
-                  ))}
+              {/* Gerenciador Completo de Fotos da Arma no Anúncio */}
+              <div className="w-full mt-3 p-3 bg-brand-dark-3/60 border border-brand-dark-5 rounded-xl space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-gray-300 flex items-center gap-1.5">
+                    <ImageIcon size={14} className="text-amber-400" />
+                    Galeria de Fotos ({fotosLocais.length})
+                  </span>
+                  <span className="text-[11px] text-gray-400">
+                    {layoutFotos === '1'
+                      ? 'Clique na estrela para definir a capa do anúncio'
+                      : `Primeiras ${layoutFotos} fotos aparecem na arte`}
+                  </span>
                 </div>
-              )}
+
+                {fotosLocais.length === 0 ? (
+                  <div className="text-center py-4 border border-dashed border-brand-dark-5 rounded-lg text-xs text-gray-400">
+                    Nenhuma foto anexada. Clique em "Anexar Fotos" ou "Foto Celular" acima!
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                    {fotosLocais.map((f, i) => {
+                      const noLayout = i < Number(layoutFotos);
+                      const ehCapa = i === 0;
+
+                      return (
+                        <div
+                          key={i}
+                          className={`relative rounded-xl overflow-hidden border-2 bg-black/40 group aspect-video transition-all ${
+                            fotoSelecionadaIdx === i
+                              ? 'ring-2 ring-amber-400'
+                              : ''
+                          } ${
+                            noLayout
+                              ? 'border-amber-400/80 shadow-md shadow-amber-500/10'
+                              : 'border-brand-dark-5 opacity-70 hover:opacity-100'
+                          }`}
+                        >
+                          <img src={f} alt="" className="w-full h-full object-cover" />
+
+                          {/* Badge de Posição / Status */}
+                          <div className="absolute top-1 left-1 flex items-center gap-1">
+                            <span className={`text-[9px] font-black px-1.5 py-0.5 rounded shadow ${
+                              ehCapa
+                                ? 'bg-amber-500 text-black'
+                                : noLayout
+                                ? 'bg-cyan-500 text-black'
+                                : 'bg-gray-800 text-gray-300'
+                            }`}>
+                              #{i + 1} {ehCapa ? 'CAPA' : noLayout ? 'NO ANÚNCIO' : ''}
+                            </span>
+                          </div>
+
+                          {/* Overlay com Ações */}
+                          <div className="absolute inset-0 bg-black/75 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1.5 p-1">
+                            {i > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => handleMoverFoto(i, 'esquerda')}
+                                title="Mover para esquerda"
+                                className="p-1 rounded bg-brand-dark-4 hover:bg-brand-dark-5 text-white"
+                              >
+                                <ChevronLeft size={13} />
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setFotoSelecionadaIdx(i);
+                                handleDefinirComoCapa(i);
+                              }}
+                              title="Tornar Foto Principal (Capa / Slot 1)"
+                              className="p-1 rounded bg-amber-500 hover:bg-amber-400 text-black"
+                            >
+                              <Star size={13} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoverFoto(i)}
+                              title="Excluir Foto"
+                              className="p-1 rounded bg-red-600 hover:bg-red-500 text-white"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                            {i < fotosLocais.length - 1 && (
+                              <button
+                                type="button"
+                                onClick={() => handleMoverFoto(i, 'direita')}
+                                title="Mover para direita"
+                                className="p-1 rounded bg-brand-dark-4 hover:bg-brand-dark-5 text-white"
+                              >
+                                <ChevronRight size={13} />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
 
               {/* Botão Principal de Download da Imagem */}
               <button
@@ -1228,6 +1552,78 @@ Mantenha emojis de armas/tiro/fogo, bullet points claros e destaque a exigência
 
             {/* Coluna Direita: Personalização e Texto WhatsApp com Gemini */}
             <div className="lg:col-span-5 flex flex-col gap-4">
+
+              {/* Bloco 0: Layout de Fotos no Anúncio */}
+              <div className="p-3.5 rounded-xl bg-brand-dark-3/60 border border-brand-dark-5 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-gray-300 uppercase tracking-wider flex items-center gap-1.5">
+                    <LayoutGrid size={14} className="text-amber-400" /> Fotos no Anúncio
+                  </span>
+                  <span className="text-[10px] text-amber-400 font-bold bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+                    {fotosLocais.length} foto(s) anexada(s)
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-4 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setLayoutFotos('1')}
+                    className={`py-2 px-1 rounded-lg text-center border font-bold text-xs transition-all ${
+                      layoutFotos === '1'
+                        ? 'bg-amber-500/25 text-amber-300 border-amber-400 shadow-xs scale-[1.02]'
+                        : 'bg-brand-dark-4 text-gray-400 border-brand-dark-5 hover:text-white'
+                    }`}
+                  >
+                    <div className="text-sm mb-0.5">🖼️ 1</div>
+                    <span className="text-[10px] block leading-tight">Única</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setLayoutFotos('2')}
+                    className={`py-2 px-1 rounded-lg text-center border font-bold text-xs transition-all ${
+                      layoutFotos === '2'
+                        ? 'bg-amber-500/25 text-amber-300 border-amber-400 shadow-xs scale-[1.02]'
+                        : 'bg-brand-dark-4 text-gray-400 border-brand-dark-5 hover:text-white'
+                    }`}
+                  >
+                    <div className="text-sm mb-0.5">👥 2</div>
+                    <span className="text-[10px] block leading-tight">Dupla</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setLayoutFotos('3')}
+                    className={`py-2 px-1 rounded-lg text-center border font-bold text-xs transition-all ${
+                      layoutFotos === '3'
+                        ? 'bg-amber-500/25 text-amber-300 border-amber-400 shadow-xs scale-[1.02]'
+                        : 'bg-brand-dark-4 text-gray-400 border-brand-dark-5 hover:text-white'
+                    }`}
+                  >
+                    <div className="text-sm mb-0.5">📐 3</div>
+                    <span className="text-[10px] block leading-tight">Trio</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setLayoutFotos('4')}
+                    className={`py-2 px-1 rounded-lg text-center border font-bold text-xs transition-all ${
+                      layoutFotos === '4'
+                        ? 'bg-amber-500/25 text-amber-300 border-amber-400 shadow-xs scale-[1.02]'
+                        : 'bg-brand-dark-4 text-gray-400 border-brand-dark-5 hover:text-white'
+                    }`}
+                  >
+                    <div className="text-sm mb-0.5">⊞ 4</div>
+                    <span className="text-[10px] block leading-tight">Grade 4x</span>
+                  </button>
+                </div>
+
+                {fotosLocais.length < Number(layoutFotos) && (
+                  <p className="text-[10px] text-amber-400/90 bg-amber-500/10 p-2 rounded-lg border border-amber-500/20">
+                    💡 Anexe mais ${Number(layoutFotos) - fotosLocais.length} foto(s) para preencher todos os ${layoutFotos} slots do anúncio!
+                  </p>
+                )}
+              </div>
 
               {/* Bloco 1: Tema Visual da Arte */}
               <div className="p-3.5 rounded-xl bg-brand-dark-3/60 border border-brand-dark-5 space-y-2">
