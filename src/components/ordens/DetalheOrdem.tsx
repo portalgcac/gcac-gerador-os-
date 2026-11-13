@@ -1643,7 +1643,7 @@ export function DetalheOrdem({ ordem }: DetalheOrdemProps) {
                           <option value="">Selecione uma arma...</option>
                           {armasCliente.map(a => (
                             <option key={a.id} value={a.id}>
-                              {a.fabricante} {a.modelo} ({a.calibre}) - SÉRIE: {a.numeroSerie}
+                              {a.tipo ? `[${a.tipo.toUpperCase()}] ` : ''}{a.fabricante} {a.modelo} ({a.calibre}) - SÉRIE: {a.numeroSerie}
                             </option>
                           ))}
                         </select>
@@ -1729,7 +1729,7 @@ export function DetalheOrdem({ ordem }: DetalheOrdemProps) {
                           <option value="">Selecione uma arma...</option>
                           {armasCliente.map(a => (
                             <option key={a.id} value={a.id}>
-                              {a.fabricante} {a.modelo} ({a.calibre}) - SÉRIE: {a.numeroSerie}
+                              {a.tipo ? `[${a.tipo.toUpperCase()}] ` : ''}{a.fabricante} {a.modelo} ({a.calibre}) - SÉRIE: {a.numeroSerie}
                             </option>
                           ))}
                         </select>

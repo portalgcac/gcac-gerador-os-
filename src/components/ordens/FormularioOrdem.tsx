@@ -1577,7 +1577,8 @@ export function FormularioOrdem({ ordemExistente }: FormularioOrdemProps) {
                             const val = e.target.value;
                             const arma = [...armasCliente, ...novasArmas].find(a => a.id === val || a.tempId === val);
                             if (arma) {
-                              atualizarArmaServico(serv.id, val, `${arma.fabricante} ${arma.modelo} (${arma.calibre})`);
+                              const tipoPrefixo = arma.tipo ? `[${arma.tipo.toUpperCase()}] ` : '';
+                              atualizarArmaServico(serv.id, val, `${tipoPrefixo}${arma.fabricante} ${arma.modelo} (${arma.calibre})`);
                             } else {
                               atualizarArmaServico(serv.id, '', '');
                             }
@@ -1585,10 +1586,14 @@ export function FormularioOrdem({ ordemExistente }: FormularioOrdemProps) {
                         >
                           <option value="">Selecione uma arma...</option>
                           {armasCliente.map(a => (
-                            <option key={a.id} value={a.id}>{a.fabricante} {a.modelo} - {a.calibre} (Série: {a.numeroSerie})</option>
+                            <option key={a.id} value={a.id}>
+                              {a.tipo ? `[${a.tipo.toUpperCase()}] ` : ''}{a.fabricante} {a.modelo} - {a.calibre} (Série: {a.numeroSerie})
+                            </option>
                           ))}
                           {novasArmas.map(a => (
-                            <option key={a.tempId} value={a.tempId}>*NOVA* {a.fabricante} {a.modelo} - {a.calibre} (Série: {a.numeroSerie})</option>
+                            <option key={a.tempId} value={a.tempId}>
+                              *NOVA* {a.tipo ? `[${a.tipo.toUpperCase()}] ` : ''}{a.fabricante} {a.modelo} - {a.calibre} (Série: {a.numeroSerie})
+                            </option>
                           ))}
                         </select>
                         <button
@@ -1599,6 +1604,30 @@ export function FormularioOrdem({ ordemExistente }: FormularioOrdemProps) {
                           + Cadastrar
                         </button>
                       </div>
+
+                      {/* Badge com Tipo e Dados Detalhados da Arma Selecionada */}
+                      {(() => {
+                        const armaSel = [...armasCliente, ...novasArmas].find(a => a.id === serv.armaId || a.tempId === serv.armaId);
+                        if (!armaSel) return null;
+                        return (
+                          <div className="flex items-center gap-2 mt-2 px-2.5 py-1 rounded-md bg-brand-dark-4 border border-brand-dark-5 text-[11px] text-gray-300 flex-wrap animate-fade-in">
+                            <span className="font-black text-amber-400 uppercase tracking-wider bg-amber-500/15 px-1.5 py-0.5 rounded border border-amber-500/30">
+                              {armaSel.tipo ? armaSel.tipo.toUpperCase() : 'ARMAMENTO'}
+                            </span>
+                            <span className="font-bold text-white">{armaSel.fabricante} {armaSel.modelo}</span>
+                            <span className="text-gray-500">•</span>
+                            <span className="text-cyan-400 font-bold">{armaSel.calibre}</span>
+                            <span className="text-gray-500">•</span>
+                            <span className="text-gray-400">Série: <strong className="text-gray-200">{armaSel.numeroSerie}</strong></span>
+                            {armaSel.acervo && (
+                              <>
+                                <span className="text-gray-500">•</span>
+                                <span className="text-emerald-400 font-bold">Acervo: {armaSel.acervo}</span>
+                              </>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </div>
 
                     {/* Automação de Transferência entre Acervos */}
@@ -2309,7 +2338,8 @@ export function FormularioOrdem({ ordemExistente }: FormularioOrdemProps) {
 
               if (servicoIndexParaArma !== null) {
                 const serv = form.servicos[servicoIndexParaArma];
-                atualizarArmaServico(serv.id, armaId, `${novaArmaObj.fabricante} ${novaArmaObj.modelo} (${novaArmaObj.calibre})`);
+                const tipoPrefixo = novaArmaObj.tipo ? `[${novaArmaObj.tipo.toUpperCase()}] ` : '';
+                atualizarArmaServico(serv.id, armaId, `${tipoPrefixo}${novaArmaObj.fabricante} ${novaArmaObj.modelo} (${novaArmaObj.calibre})`);
               }
 
               setModalArmaAberto(false);
