@@ -648,6 +648,32 @@ export interface FechamentoColaborador {
   atualizadoEm?: string;
 }
 
+export type StatusVale = 'pendente' | 'confirmado_eletronico' | 'assinado_manual' | 'recusado';
+
+export interface ValeColaborador {
+  id: string;
+  empresaId: string;
+  colaboradorId?: string;
+  colaboradorNome: string;
+  colaboradorCpf?: string;
+  usuarioEmail?: string;
+  valor: number;
+  dataAdiantamento: string; // YYYY-MM-DD
+  formaPagamento: 'PIX' | 'Dinheiro' | 'Transferência' | 'Outro';
+  motivo: string;
+  comprovanteGestorUrl?: string;
+  status: StatusVale;
+  confirmadoEm?: string; // ISO datetime
+  confirmadoPorEmail?: string;
+  hashAutenticacao?: string;
+  assinaturaBase64?: string;
+  reciboAssinadoUrl?: string;
+  observacoes?: string;
+  criadoPorNome?: string;
+  criadoEm: string;
+  atualizadoEm?: string;
+}
+
 // ─── Armas à Venda (Consignados / Vitrine) ──────────────────────────────────
 
 export type StatusArmaVenda =

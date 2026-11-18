@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Clock, BadgeDollarSign, ShieldCheck } from 'lucide-react';
+import { Clock, BadgeDollarSign, ShieldCheck, DollarSign } from 'lucide-react';
 import { startOfMonth, endOfMonth } from 'date-fns';
 import { useAuth } from '../../context/AuthContext';
 import { RelogioPontoColaborador } from './RelogioPontoColaborador';
 import { GestaoPontoPagamentos } from './GestaoPontoPagamentos';
+import { GestaoValesAdiantamentos } from './GestaoValesAdiantamentos';
 
 export function PaginaPontoColaboradores() {
   const { usuario } = useAuth();
@@ -17,8 +18,9 @@ export function PaginaPontoColaboradores() {
     Boolean(usuario?.permissoes?.includes('fin_gestao_colaboradores'));
 
   // Por padrão abre sempre no relógio de ponto ("meu_ponto") para permitir o registro imediato do ponto,
-  // abrindo em "gestao" apenas se for explicitamente solicitado via URL
-  const [aba, setAba] = useState<'meu_ponto' | 'gestao'>(() => {
+  // abrindo em "gestao" ou "vales" se for explicitamente solicitado via URL
+  const [aba, setAba] = useState<'meu_ponto' | 'gestao' | 'vales'>(() => {
+    if (abaUrl === 'meus_vales' || abaUrl === 'vales') return 'vales';
     if (abaUrl === 'gestao' && temAcessoGestao) return 'gestao';
     return 'meu_ponto';
   });
@@ -82,12 +84,49 @@ export function PaginaPontoColaboradores() {
                 <BadgeDollarSign size={14} />
                 Gestão & Pagamentos (Gestor)
               </button>
+              <button
+                type="button"
+                onClick={() => setAba('vales')}
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold uppercase flex items-center gap-1.5 transition-all ${
+                  aba === 'vales' ? 'bg-brand-blue text-white shadow' : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                <DollarSign size={14} />
+                Vales & Adiantamentos
+              </button>
             </div>
+          </div>
+        )}
+
+        {!temAcessoGestao && (
+          <div className="flex gap-1 p-1 bg-brand-dark-3 border border-brand-dark-5 rounded-xl">
+            <button
+              type="button"
+              onClick={() => setAba('meu_ponto')}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold uppercase flex items-center gap-1.5 transition-all ${
+                aba === 'meu_ponto' ? 'bg-brand-blue text-white shadow' : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              <Clock size={14} />
+              Bater Ponto
+            </button>
+            <button
+              type="button"
+              onClick={() => setAba('vales')}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold uppercase flex items-center gap-1.5 transition-all ${
+                aba === 'vales' ? 'bg-brand-blue text-white shadow' : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              <DollarSign size={14} />
+              Meus Vales & Recibos
+            </button>
           </div>
         )}
       </div>
 
-      {aba === 'meu_ponto' || !temAcessoGestao ? (
+      {aba === 'vales' ? (
+        <GestaoValesAdiantamentos modo={temAcessoGestao ? 'gestor' : 'colaborador'} />
+      ) : aba === 'meu_ponto' || !temAcessoGestao ? (
         <RelogioPontoColaborador />
       ) : (
         <GestaoPontoPagamentos dataInicio={dataInicio} dataFim={dataFim} />

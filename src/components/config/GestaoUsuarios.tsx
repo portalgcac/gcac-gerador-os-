@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { UserPlus, Shield, Mail, User, Trash2, Edit2, CheckCircle, XCircle, ChevronDown, ChevronUp, Lock, Building, ArrowLeft, Settings2, BadgeDollarSign, Calendar, CreditCard, Crosshair, ShieldAlert, Bell, Sparkles, X, Link2, MessageSquare, Target, BarChart3, Scale, Calculator } from 'lucide-react';
+import { UserPlus, Shield, Mail, User, Trash2, Edit2, CheckCircle, XCircle, ChevronDown, ChevronUp, Lock, Building, ArrowLeft, Settings2, BadgeDollarSign, Calendar, CreditCard, Crosshair, ShieldAlert, Bell, Sparkles, X, Link2, MessageSquare, Target, BarChart3, Scale, Calculator, DollarSign } from 'lucide-react';
 import { supabase } from '../../db/supabase';
 import { PainelClientesCAC } from '../vinculos/PainelClientesCAC';
 import { Notificacao, useNotificacao } from '../common/Notificacao';
 import { useAuth } from '../../context/AuthContext';
 import { DialogConfirmacao } from '../common/DialogConfirmacao';
 import { formatarData } from '../../utils/formatters';
+import { ModalEmitirVale } from '../financeiro/ModalEmitirVale';
 
 interface UsuarioAutorizado {
   id: string;
@@ -233,6 +234,7 @@ export function GestaoUsuarios({ abaInicial }: GestaoUsuariosProps = {}) {
   const [empresaEditando, setEmpresaEditando] = useState<any | null>(null);
   const [confirmandoDeleteEmpresa, setConfirmandoDeleteEmpresa] = useState<{ id: string; nome: string } | null>(null);
   const [confirmandoDeleteUsuario, setConfirmandoDeleteUsuario] = useState<{ id: string; nome: string; email?: string; empresa_id?: string } | null>(null);
+  const [valeColaboradorAlvo, setValeColaboradorAlvo] = useState<{ id?: string; nome: string; email?: string; cpf?: string } | null>(null);
 
   // Estados para Gestão de Faturamento & Mensalidades
   const [empresaFaturamentoSelecionada, setEmpresaFaturamentoSelecionada] = useState<any | null>(null);
@@ -4086,7 +4088,20 @@ Você pode adicionar comentários, observações ou explicações adicionais ant
                           </span>
                         </button>
                       </td>
-                      <td className="p-3 text-right">
+                      <td className="p-3 text-right space-x-1">
+                        <button
+                          type="button"
+                          onClick={() => setValeColaboradorAlvo({
+                            id: u.id,
+                            nome: u.nome,
+                            email: u.email,
+                            cpf: u.cpf || undefined
+                          })}
+                          className="p-1.5 text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 rounded-xl transition-all"
+                          title="Emitir Vale / Adiantamento para este colaborador"
+                        >
+                          <DollarSign size={15} />
+                        </button>
                         <button
                           type="button"
                           onClick={() => handleAbrirModal(u)}
@@ -5601,6 +5616,14 @@ Você pode adicionar comentários, observações ou explicações adicionais ant
           </div>
         </div>
       )}
+
+      {/* Modal Emitir Vale / Adiantamento */}
+      <ModalEmitirVale
+        isOpen={Boolean(valeColaboradorAlvo)}
+        onClose={() => setValeColaboradorAlvo(null)}
+        colaboradorPreSelecionado={valeColaboradorAlvo || undefined}
+        onSucesso={() => mostrar('sucesso', 'Vale emitido e notificação enviada com sucesso!')}
+      />
     </div>
   );
 }
