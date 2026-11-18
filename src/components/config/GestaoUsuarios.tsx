@@ -48,6 +48,7 @@ const RECURSOS_SISTEMA = [
   { key: 'fin_relatorio_equipe', label: 'Financeiro — Relatório de Produtividade da Equipe' },
   { key: 'fin_gestao_colaboradores', label: 'Financeiro / RH — Gestão de Ponto, Cargas Horárias e Pagamento de Colaboradores (NF)' },
   { key: 'fin_exportacao', label: 'Financeiro — Exportação de Relatórios Financeiros' },
+  { key: 'modulo_contabilidade', label: 'Contabilidade — Painel Contábil, DRE, Teto MEI/ME e Relatórios Fiscais do Contador' },
   { key: 'modulo_ordens', label: 'Módulo Ordens de Serviço — Emissão e Controle de Ordens de Serviço' },
   { key: 'modulo_orcamentos', label: 'Módulo Orçamentos — Emissão e Controle de Orçamentos' },
   { key: 'modulo_recibos', label: 'Módulo Recibos — Emissão de Recibos de Pagamento' },

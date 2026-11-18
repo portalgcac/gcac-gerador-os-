@@ -504,6 +504,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return usuario.role === 'admin' || userPerms.includes('fin_gestao_colaboradores');
     }
 
+    // Regra para Contabilidade (acesso restrito para admin ou quem tem a chave modulo_contabilidade)
+    if (recurso === 'modulo_contabilidade') {
+      return usuario.role === 'admin' || userPerms.includes('modulo_contabilidade');
+    }
+
     if (!recursosTenant.includes(recurso)) return false;
 
     // Se o usuário tem alguma das chaves de recursos do sistema em seu array de permissões,
@@ -512,6 +517,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       'dash_atencao_diaria', 'dash_alertas_vencimento', 'dash_lembretes', 'dash_resumo_os',
       'dash_margem_operacional', 'dash_resumo_operacional', 'dash_resumo_orcamentos', 'dash_ordens_recentes',
       'fin_fluxo_caixa', 'fin_relatorio_equipe', 'fin_gestao_colaboradores', 'fin_exportacao',
+      'modulo_contabilidade',
       'modulo_ordens', 'modulo_orcamentos', 'modulo_recibos', 'modulo_agendamentos', 'modulo_clientes',
       'modulo_clientes_cac', 'acervo_anexos', 'acervo_gerenciador',
       'config_alertas_vencimento', 'config_notificacoes_push', 'config_servicos', 'config_manual'

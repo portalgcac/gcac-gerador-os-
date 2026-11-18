@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
-  LayoutDashboard, FileText, Plus, Settings, LogOut, Cloud, CloudOff, Loader, X, Users, Receipt, Calendar, BarChart3, ListTodo, Bell, Shield, FileSpreadsheet, Building2, UserPlus, MessageSquare, BadgeDollarSign, Target, Scale, ArrowRightLeft, Menu, Clock, Crosshair
+  LayoutDashboard, FileText, Plus, Settings, LogOut, Cloud, CloudOff, Loader, X, Users, Receipt, Calendar, BarChart3, ListTodo, Bell, Shield, FileSpreadsheet, Building2, UserPlus, MessageSquare, BadgeDollarSign, Target, Scale, ArrowRightLeft, Menu, Clock, Crosshair, Calculator
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../db/supabase';
@@ -26,6 +26,7 @@ export const LINKS_MENU_BASE = [
   { to: '/recibos',       label: 'Recibos',               icon: Receipt,         slug: 'recibos' },
   { to: '/ponto',         label: 'Registro de Ponto',     icon: Clock,           slug: 'ponto' },
   { to: '/financeiro',    label: 'Financeiro',            icon: BarChart3,       slug: 'financeiro' },
+  { to: '/contabilidade', label: 'Contabilidade',         icon: Calculator,      slug: 'contabilidade' },
   { to: '/relatorios',    label: 'Relatórios',            icon: FileSpreadsheet, slug: 'relatorios' },
   { to: '/equipe',        label: 'Equipe do Escritório',  icon: Shield,          slug: 'equipe' },
   { to: '/configuracoes', label: 'Configurações',         icon: Settings,        slug: 'config' },
@@ -119,8 +120,14 @@ export const temAcessoLink = (link: typeof LINKS_MENU_BASE[0], usuario: any, tem
   const temPermissaoUser = usuario?.permissoes?.includes(link.slug) || 
                            (link.slug === 'declaracoes' && usuario?.permissoes?.includes('clientes')) ||
                            (link.slug === 'financeiro' && usuario?.permissoes?.includes('fin_gestao_colaboradores')) ||
+                           (link.slug === 'contabilidade' && usuario?.permissoes?.includes('modulo_contabilidade')) ||
                            usuario?.role === 'admin';
   if (!temPermissaoUser) return false;
+
+  // Verificar permissão no nível de empresa (tenant)
+  if (link.slug === 'contabilidade') {
+    return true;
+  }
 
   // Verificar permissão no nível de empresa (tenant)
   if (link.slug === 'relatorios') {

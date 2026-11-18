@@ -39,6 +39,7 @@ import { ListaAgendamentos } from './components/agendamentos/ListaAgendamentos';
 import { NotificacoesSistemaProvider } from './context/NotificacoesSistemaContext';
 import { FinanceiroProvider } from './context/FinanceiroContext';
 import { Financeiro } from './components/financeiro/Financeiro';
+import { Contabilidade } from './components/contabilidade/Contabilidade';
 import { PaginaPontoColaboradores } from './components/financeiro/PaginaPontoColaboradores';
 import { Relatorios } from './components/relatorios/Relatorios';
 import { RotinaDiaria } from './components/operacional/RotinaDiaria';
@@ -218,6 +219,8 @@ function RotaProtegida({ children, modulo }: { children: React.ReactNode, modulo
       temAcessoTenant = temAcessoRecurso('modulo_agendamentos');
     } else if (modulo === 'ponto') {
       temAcessoTenant = true;
+    } else if (modulo === 'contabilidade') {
+      temAcessoTenant = true;
     } else if (modulo === 'financeiro') {
       temAcessoTenant = temAcessoRecurso('fin_fluxo_caixa') || temAcessoRecurso('fin_relatorio_equipe') || temAcessoRecurso('fin_exportacao') || temAcessoRecurso('fin_gestao_colaboradores');
     } else if (modulo === 'painel') {
@@ -246,6 +249,11 @@ function RotaProtegida({ children, modulo }: { children: React.ReactNode, modulo
 
   // Colaborador com permissão específica de gestão de colaboradores pode acessar financeiro
   if (modulo === 'financeiro' && usuario.permissoes?.includes('fin_gestao_colaboradores')) {
+    return <>{children}</>;
+  }
+
+  // Colaborador ou contador com permissão específica de contabilidade
+  if (modulo === 'contabilidade' && (usuario.permissoes?.includes('modulo_contabilidade') || usuario.permissoes?.includes('contabilidade'))) {
     return <>{children}</>;
   }
 
@@ -341,6 +349,7 @@ export default function App() {
                               <Route path="agendamentos" element={<RotaProtegida modulo="agendamentos"><ListaAgendamentos /></RotaProtegida>} />
                               <Route path="ponto" element={<RotaProtegida modulo="ponto"><PaginaPontoColaboradores /></RotaProtegida>} />
                               <Route path="financeiro" element={<RotaProtegida modulo="financeiro"><Financeiro /></RotaProtegida>} />
+                              <Route path="contabilidade" element={<RotaProtegida modulo="contabilidade"><Contabilidade /></RotaProtegida>} />
                               <Route path="relatorios" element={<RotaProtegida modulo="relatorios"><Relatorios /></RotaProtegida>} />
                               <Route path="rotina" element={<RotaProtegida modulo="rotina"><RotinaDiaria /></RotaProtegida>} />
                               <Route path="agenda" element={<RotaProtegida modulo="agenda"><ListaLembretes /></RotaProtegida>} />
