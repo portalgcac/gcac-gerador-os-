@@ -54,7 +54,8 @@ export function GestaoValesAdiantamentos({
     setCarregando(true);
     try {
       const email = modo === 'colaborador' ? (colaboradorFiltroEmail || usuario.email) : undefined;
-      const dados = await listarVales(usuario.empresaId, email);
+      const nomeColab = modo === 'colaborador' ? usuario.nome : undefined;
+      const dados = await listarVales(usuario.empresaId, email, nomeColab);
       setVales(dados);
     } catch (err) {
       console.error('Erro ao listar vales:', err);

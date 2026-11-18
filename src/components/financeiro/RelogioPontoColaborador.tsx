@@ -16,10 +16,13 @@ import {
   ShieldCheck,
   User,
   Calendar,
-  ArrowRight
+  ArrowRight,
+  DollarSign
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { ColaboradorContrato, RegistroPontoColaborador, FechamentoColaborador } from '../../types';
+import { ColaboradorContrato, RegistroPontoColaborador, FechamentoColaborador, ValeColaborador } from '../../types';
+import { listarVales } from '../../services/valesColaboradoresService';
+import { ModalConfirmarVale } from './ModalConfirmarVale';
 import {
   listarContratosColaboradores,
   salvarContratoColaborador,
@@ -84,6 +87,24 @@ export function RelogioPontoColaborador({ onPontoRegistrado }: RelogioPontoColab
   // Upload de NF pelo colaborador
   const [enviandoNfId, setEnviandoNfId] = useState<string | null>(null);
   const [numeroNfInput, setNumeroNfInput] = useState<Record<string, string>>({});
+
+  // Vales pendentes de confirmação do colaborador
+  const [valesPendentes, setValesPendentes] = useState<ValeColaborador[]>([]);
+  const [valeParaConfirmar, setValeParaConfirmar] = useState<ValeColaborador | null>(null);
+
+  const carregarValesPendentes = async () => {
+    if (!empresaId) return;
+    try {
+      const lista = await listarVales(empresaId, usuario?.email, usuario?.nome);
+      setValesPendentes(lista.filter(v => v.status === 'pendente'));
+    } catch {
+      // ignore
+    }
+  };
+
+  useEffect(() => {
+    carregarValesPendentes();
+  }, [empresaId, usuario]);
 
   // Relógio em tempo real
   useEffect(() => {
@@ -454,6 +475,41 @@ export function RelogioPontoColaborador({ onPontoRegistrado }: RelogioPontoColab
           >
             Ir ao Painel agora (registrar depois)
             <ArrowRight size={14} />
+          </button>
+        </div>
+      )}
+
+      {/* Card de Destaque: Vales Pendentes de Confirmação do Colaborador */}
+      {valesPendentes.length > 0 && (
+        <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-950/60 via-brand-dark-3 to-brand-dark-2 border border-emerald-500/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xl animate-fade-in">
+          <div className="flex items-center gap-3.5">
+            <div className="p-3 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-xl shadow-inner">
+              <DollarSign size={24} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                  Aviso Financeiro
+                </span>
+                <span className="text-xs text-gray-400">
+                  {valesPendentes.length} {valesPendentes.length === 1 ? 'adiantamento pendente' : 'adiantamentos pendentes'}
+                </span>
+              </div>
+              <h3 className="text-sm font-black text-white mt-1">
+                Você recebeu um adiantamento/vale no valor de {formatarMoeda(valesPendentes[0].valor)}
+              </h3>
+              <p className="text-xs text-gray-300 mt-0.5">
+                Motivo: <strong className="text-white">{valesPendentes[0].motivo}</strong> • Clique no botão ao lado para conferir e assinar.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setValeParaConfirmar(valesPendentes[0])}
+            className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs uppercase tracking-wider transition-all shadow-lg shadow-emerald-900/40 flex items-center justify-center gap-2 shrink-0"
+          >
+            <ShieldCheck size={16} />
+            <span>Confirmar Recebimento Agora</span>
           </button>
         </div>
       )}
@@ -975,6 +1031,17 @@ export function RelogioPontoColaborador({ onPontoRegistrado }: RelogioPontoColab
           </table>
         </div>
       </div>
+
+      {/* Modal para Assinatura e Confirmação de Vale */}
+      <ModalConfirmarVale
+        vale={valeParaConfirmar}
+        isOpen={Boolean(valeParaConfirmar)}
+        onClose={() => setValeParaConfirmar(null)}
+        onConfirmado={() => {
+          setValeParaConfirmar(null);
+          carregarValesPendentes();
+        }}
+      />
     </div>
   );
 }

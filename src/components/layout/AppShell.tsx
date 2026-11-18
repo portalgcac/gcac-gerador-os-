@@ -1,5 +1,6 @@
 import React from 'react';
-import { Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Outlet, useLocation, useNavigate, Link } from 'react-router-dom';
+import { listarVales } from '../../services/valesColaboradoresService';
 import { verificarPontoEntradaPendenteHoje } from '../../services/pontoColaboradoresService';
 import { Sidebar, NavegacaoInferior } from './Sidebar';
 import { WorkspaceSwitcher } from './WorkspaceSwitcher';
@@ -31,6 +32,17 @@ export function AppShell() {
   const [painelDebugAberto, setPainelDebugAberto] = React.useState(false);
   const [drawerAberto, setDrawerAberto] = React.useState(false);
   const [dropdownNotifAberto, setDropdownNotifAberto] = React.useState(false);
+  const [valesPendentesColaborador, setValesPendentesColaborador] = React.useState(0);
+
+  // Monitora vales pendentes para o colaborador
+  React.useEffect(() => {
+    if (usuario?.empresaId) {
+      listarVales(usuario.empresaId, usuario.email, usuario.nome).then(lista => {
+        const pendentes = lista.filter(v => v.status === 'pendente').length;
+        setValesPendentesColaborador(pendentes);
+      }).catch(() => {});
+    }
+  }, [usuario, location.pathname]);
 
   
   // Redirecionamento automático no primeiro acesso do dia para Registro de Ponto
@@ -336,7 +348,8 @@ export function AppShell() {
               <WorkspaceSwitcher variant="compact" />
             )}
 
-            {isAdmin && (
+            {/* Sininho para todos */}
+            {true && (
               <div className="relative">
                 <button
                   type="button"
@@ -361,6 +374,22 @@ export function AppShell() {
             )}
           </div>
         </header>
+
+        {/* Banner Vales Pendentes de Confirmação para o Colaborador */}
+        {valesPendentesColaborador > 0 && (
+          <div className="bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 text-white px-4 py-2.5 flex items-center justify-between shadow-md animate-fade-in border-b border-emerald-500/30">
+            <div className="flex items-center gap-2.5 text-xs font-bold">
+              <span className="p-1 bg-white/20 rounded-lg">💰</span>
+              <span>Você possui {valesPendentesColaborador} adiantamento/vale aguardando sua confirmação de recebimento.</span>
+            </div>
+            <Link
+              to="/ponto?aba=meus_vales"
+              className="px-3 py-1 bg-white text-emerald-800 hover:bg-emerald-50 rounded-lg text-xs font-black uppercase transition-all shadow-sm shrink-0"
+            >
+              Conferir e Confirmar
+            </Link>
+          </div>
+        )}
 
         {/* Banner offline */}
         {!online && (

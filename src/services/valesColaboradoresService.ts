@@ -30,7 +30,11 @@ function mapValeFromDb(row: any): ValeColaborador {
   };
 }
 
-export async function listarVales(empresaId: string, colaboradorEmail?: string): Promise<ValeColaborador[]> {
+export async function listarVales(
+  empresaId: string, 
+  colaboradorEmail?: string,
+  colaboradorNome?: string
+): Promise<ValeColaborador[]> {
   const localRaw = localStorage.getItem(STORAGE_KEY_VALES(empresaId));
   let locais: ValeColaborador[] = [];
   try {
@@ -39,18 +43,29 @@ export async function listarVales(empresaId: string, colaboradorEmail?: string):
     locais = [];
   }
 
+  const bateFiltro = (v: ValeColaborador) => {
+    if (!colaboradorEmail && !colaboradorNome) return true;
+    if (colaboradorEmail && v.usuarioEmail && v.usuarioEmail.trim().toLowerCase() === colaboradorEmail.trim().toLowerCase()) {
+      return true;
+    }
+    if (colaboradorNome && v.colaboradorNome && v.colaboradorNome.trim().toLowerCase() === colaboradorNome.trim().toLowerCase()) {
+      return true;
+    }
+    if (colaboradorNome && v.colaboradorNome) {
+      const p1 = colaboradorNome.trim().toLowerCase().split(' ')[0];
+      const p2 = v.colaboradorNome.trim().toLowerCase().split(' ')[0];
+      if (p1 && p2 && p1.length >= 3 && p1 === p2) return true;
+    }
+    return false;
+  };
+
   try {
-    let query = supabase
+    const { data, error } = await supabase
       .from('vales_colaboradores')
       .select('*')
       .eq('empresa_id', empresaId)
       .order('data_adiantamento', { ascending: false });
 
-    if (colaboradorEmail) {
-      query = query.eq('usuario_email', colaboradorEmail.toLowerCase());
-    }
-
-    const { data, error } = await query;
     if (!error && data) {
       const remotos = data.map(mapValeFromDb);
       const mapa = new Map<string, ValeColaborador>();
@@ -60,17 +75,13 @@ export async function listarVales(empresaId: string, colaboradorEmail?: string):
         (a, b) => new Date(b.dataAdiantamento).getTime() - new Date(a.dataAdiantamento).getTime()
       );
       localStorage.setItem(STORAGE_KEY_VALES(empresaId), JSON.stringify(unificados));
-      return colaboradorEmail
-        ? unificados.filter(u => u.usuarioEmail?.toLowerCase() === colaboradorEmail.toLowerCase())
-        : unificados;
+      return (colaboradorEmail || colaboradorNome) ? unificados.filter(bateFiltro) : unificados;
     }
   } catch (err) {
     console.warn('Fallback para cache local de vales:', err);
   }
 
-  return colaboradorEmail
-    ? locais.filter(l => l.usuarioEmail?.toLowerCase() === colaboradorEmail.toLowerCase())
-    : locais;
+  return (colaboradorEmail || colaboradorNome) ? locais.filter(bateFiltro) : locais;
 }
 
 export async function criarVale(
