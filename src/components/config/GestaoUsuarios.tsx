@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { UserPlus, Shield, Mail, User, Trash2, Edit2, CheckCircle, XCircle, ChevronDown, ChevronUp, Lock, Building, ArrowLeft, Settings2, BadgeDollarSign, Calendar, CreditCard, Crosshair, ShieldAlert, Bell, Sparkles, X, Link2, MessageSquare, Target, BarChart3, Scale } from 'lucide-react';
+import { UserPlus, Shield, Mail, User, Trash2, Edit2, CheckCircle, XCircle, ChevronDown, ChevronUp, Lock, Building, ArrowLeft, Settings2, BadgeDollarSign, Calendar, CreditCard, Crosshair, ShieldAlert, Bell, Sparkles, X, Link2, MessageSquare, Target, BarChart3, Scale, Calculator } from 'lucide-react';
 import { supabase } from '../../db/supabase';
 import { PainelClientesCAC } from '../vinculos/PainelClientesCAC';
 import { Notificacao, useNotificacao } from '../common/Notificacao';
@@ -26,6 +26,7 @@ const MODULOS = [
   { slug: 'agenda', label: 'Agenda / Lembretes' },
   { slug: 'ponto', label: 'Ponto & NF (PJ)' },
   { slug: 'financeiro', label: 'Financeiro' },
+  { slug: 'contabilidade', label: 'Contabilidade' },
   { slug: 'orcamentos', label: 'Orçamentos' },
   { slug: 'ordens', label: 'Ordens de Serviço' },
   { slug: 'recibos', label: 'Recibos' },
@@ -2477,13 +2478,19 @@ Você pode adicionar comentários, observações ou explicações adicionais ant
                                 <p className="text-xs text-gray-400 font-mono mt-0.5">{u.email}</p>
                               </td>
                               <td className="p-3">
-                                <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full tracking-wider ${
-                                  u.role === 'admin' 
-                                    ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' 
-                                    : 'bg-brand-blue/10 text-brand-blue-light border border-brand-blue/20'
-                                }`}>
-                                  {u.role === 'admin' ? 'Admin' : 'Colaborador'}
-                                </span>
+                                {u.role === 'admin' ? (
+                                  <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full tracking-wider bg-purple-500/10 text-purple-400 border border-purple-500/20">
+                                    Admin
+                                  </span>
+                                ) : (u.permissoes?.includes('modulo_contabilidade') || u.permissoes?.includes('contabilidade')) ? (
+                                  <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1 w-fit">
+                                    <Calculator size={10} /> Contabilidade
+                                  </span>
+                                ) : (
+                                  <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full tracking-wider bg-brand-blue/10 text-brand-blue-light border border-brand-blue/20">
+                                    Colaborador
+                                  </span>
+                                )}
                               </td>
                               <td className="p-3 text-xs text-gray-300">
                                 {u.cpf ? <p className="font-mono">{u.cpf}</p> : <p className="text-gray-500 italic">Sem CPF</p>}
@@ -4050,13 +4057,19 @@ Você pode adicionar comentários, observações ou explicações adicionais ant
                         <p className="text-xs text-gray-400 font-mono mt-0.5">{u.email}</p>
                       </td>
                       <td className="p-3">
-                        <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full tracking-wider ${
-                          u.role === 'admin' 
-                            ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' 
-                            : 'bg-brand-blue/10 text-brand-blue-light border border-brand-blue/20'
-                        }`}>
-                          {u.role === 'admin' ? 'Admin' : 'Colaborador'}
-                        </span>
+                        {u.role === 'admin' ? (
+                          <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full tracking-wider bg-purple-500/10 text-purple-400 border border-purple-500/20">
+                            Admin
+                          </span>
+                        ) : (u.permissoes?.includes('modulo_contabilidade') || u.permissoes?.includes('contabilidade')) ? (
+                          <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1 w-fit">
+                            <Calculator size={10} /> Contabilidade
+                          </span>
+                        ) : (
+                          <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full tracking-wider bg-brand-blue/10 text-brand-blue-light border border-brand-blue/20">
+                            Colaborador
+                          </span>
+                        )}
                       </td>
                       <td className="p-3 text-xs text-gray-300">
                         {u.cpf ? <p className="font-mono">{u.cpf}</p> : <p className="text-gray-500 italic">Sem CPF</p>}
@@ -4172,34 +4185,73 @@ Você pode adicionar comentários, observações ou explicações adicionais ant
               )}
 
               <div className="space-y-2">
-                <label className="text-xs font-bold text-gray-500 uppercase">Nível de Acesso</label>
-                <div className="flex gap-4">
-                  <label className="flex-1 cursor-pointer group">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-gray-500 uppercase">Perfil / Nível de Acesso</label>
+                  <span className="text-[11px] text-gray-400 font-medium">Selecione o perfil base ou personalize os módulos abaixo</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {/* Perfil 1: Colaborador Operacional */}
+                  <label className="cursor-pointer group">
                     <input
                       type="radio"
                       className="hidden"
-                      checked={formData.role === 'colaborador'}
-                      onChange={() => setFormData({ ...formData, role: 'colaborador' })}
+                      checked={formData.role === 'colaborador' && !formData.permissoes.includes('modulo_contabilidade') && !formData.permissoes.includes('contabilidade')}
+                      onChange={() => {
+                        const novasPerms = Array.from(new Set([
+                          ...formData.permissoes.filter(p => p !== 'modulo_contabilidade' && p !== 'contabilidade'),
+                          'ordens'
+                        ]));
+                        setFormData({ ...formData, role: 'colaborador', permissoes: novasPerms });
+                      }}
                     />
-                    <div className={`p-3 rounded-xl border-2 transition-all flex flex-col items-center gap-1 ${
-                      formData.role === 'colaborador' ? 'border-brand-blue bg-brand-blue/5' : 'border-brand-dark-5 bg-brand-dark-4 hover:border-gray-700'
+                    <div className={`p-3 rounded-xl border-2 transition-all flex flex-col items-center gap-1 text-center ${
+                      formData.role === 'colaborador' && !formData.permissoes.includes('modulo_contabilidade') && !formData.permissoes.includes('contabilidade')
+                        ? 'border-brand-blue bg-brand-blue/10 shadow-sm'
+                        : 'border-brand-dark-5 bg-brand-dark-4 hover:border-gray-700'
                     }`}>
-                      <User size={18} className={formData.role === 'colaborador' ? 'text-brand-blue' : 'text-gray-600'} />
-                      <span className={`text-[10px] font-black uppercase ${formData.role === 'colaborador' ? 'text-white' : 'text-gray-500'}`}>Colaborador</span>
+                      <User size={18} className={formData.role === 'colaborador' && !formData.permissoes.includes('modulo_contabilidade') && !formData.permissoes.includes('contabilidade') ? 'text-brand-blue' : 'text-gray-500'} />
+                      <span className={`text-[10px] font-black uppercase ${formData.role === 'colaborador' && !formData.permissoes.includes('modulo_contabilidade') && !formData.permissoes.includes('contabilidade') ? 'text-white' : 'text-gray-400'}`}>Colaborador</span>
+                      <span className="text-[9px] text-gray-500">Operação diária</span>
                     </div>
                   </label>
-                  <label className="flex-1 cursor-pointer group">
+
+                  {/* Perfil 2: Contabilidade / Contador */}
+                  <label className="cursor-pointer group">
+                    <input
+                      type="radio"
+                      className="hidden"
+                      checked={formData.role === 'colaborador' && (formData.permissoes.includes('modulo_contabilidade') || formData.permissoes.includes('contabilidade'))}
+                      onChange={() => {
+                        const baseContador = ['contabilidade', 'modulo_contabilidade', 'financeiro', 'fin_exportacao', 'recibos', 'relatorios'];
+                        const unificadas = Array.from(new Set([...formData.permissoes, ...baseContador]));
+                        setFormData({ ...formData, role: 'colaborador', permissoes: unificadas });
+                      }}
+                    />
+                    <div className={`p-3 rounded-xl border-2 transition-all flex flex-col items-center gap-1 text-center ${
+                      formData.role === 'colaborador' && (formData.permissoes.includes('modulo_contabilidade') || formData.permissoes.includes('contabilidade'))
+                        ? 'border-emerald-500 bg-emerald-500/10 shadow-sm'
+                        : 'border-brand-dark-5 bg-brand-dark-4 hover:border-gray-700'
+                    }`}>
+                      <Calculator size={18} className={formData.role === 'colaborador' && (formData.permissoes.includes('modulo_contabilidade') || formData.permissoes.includes('contabilidade')) ? 'text-emerald-400' : 'text-gray-500'} />
+                      <span className={`text-[10px] font-black uppercase ${formData.role === 'colaborador' && (formData.permissoes.includes('modulo_contabilidade') || formData.permissoes.includes('contabilidade')) ? 'text-emerald-300' : 'text-gray-400'}`}>Contabilidade</span>
+                      <span className="text-[9px] text-gray-500">Acesso contábil/fiscal</span>
+                    </div>
+                  </label>
+
+                  {/* Perfil 3: Administrador */}
+                  <label className="cursor-pointer group">
                     <input
                       type="radio"
                       className="hidden"
                       checked={formData.role === 'admin'}
                       onChange={() => setFormData({ ...formData, role: 'admin' })}
                     />
-                    <div className={`p-3 rounded-xl border-2 transition-all flex flex-col items-center gap-1 ${
-                      formData.role === 'admin' ? 'border-purple-500 bg-purple-500/5' : 'border-brand-dark-5 bg-brand-dark-4 hover:border-gray-700'
+                    <div className={`p-3 rounded-xl border-2 transition-all flex flex-col items-center gap-1 text-center ${
+                      formData.role === 'admin' ? 'border-purple-500 bg-purple-500/10 shadow-sm' : 'border-brand-dark-5 bg-brand-dark-4 hover:border-gray-700'
                     }`}>
-                      <Shield size={18} className={formData.role === 'admin' ? 'text-purple-400' : 'text-gray-600'} />
-                      <span className={`text-[10px] font-black uppercase ${formData.role === 'admin' ? 'text-white' : 'text-gray-500'}`}>Administrador</span>
+                      <Shield size={18} className={formData.role === 'admin' ? 'text-purple-400' : 'text-gray-500'} />
+                      <span className={`text-[10px] font-black uppercase ${formData.role === 'admin' ? 'text-white' : 'text-gray-400'}`}>Administrador</span>
+                      <span className="text-[9px] text-gray-500">Acesso irrestrito</span>
                     </div>
                   </label>
                 </div>
