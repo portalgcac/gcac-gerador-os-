@@ -43,22 +43,34 @@ export async function listarVales(
     locais = [];
   }
 
+  const mapa = new Map<string, ValeColaborador>();
+  locais.forEach(l => mapa.set(l.id, l));
+
   const bateFiltro = (v: ValeColaborador) => {
     if (!colaboradorEmail && !colaboradorNome) return true;
-    if (colaboradorEmail && v.usuarioEmail && v.usuarioEmail.trim().toLowerCase() === colaboradorEmail.trim().toLowerCase()) {
+
+    // Filtro por E-mail
+    const emailBuscado = colaboradorEmail?.trim().toLowerCase();
+    const emailVale = v.usuarioEmail?.trim().toLowerCase();
+    if (emailBuscado && emailVale && emailBuscado === emailVale) {
       return true;
     }
-    if (colaboradorNome && v.colaboradorNome && v.colaboradorNome.trim().toLowerCase() === colaboradorNome.trim().toLowerCase()) {
-      return true;
+
+    // Filtro por Nome (insensível a maiúsculas e abreviações)
+    const nomeBuscado = colaboradorNome?.trim().toLowerCase() || '';
+    const nomeVale = v.colaboradorNome?.trim().toLowerCase() || '';
+    if (nomeBuscado && nomeVale) {
+      if (nomeBuscado === nomeVale) return true;
+      if (nomeBuscado.includes(nomeVale) || nomeVale.includes(nomeBuscado)) return true;
+      const partesBuscado = nomeBuscado.split(/\s+/).filter(p => p.length >= 3);
+      const partesVale = nomeVale.split(/\s+/).filter(p => p.length >= 3);
+      if (partesBuscado.some(p => partesVale.includes(p))) return true;
     }
-    if (colaboradorNome && v.colaboradorNome) {
-      const p1 = colaboradorNome.trim().toLowerCase().split(' ')[0];
-      const p2 = v.colaboradorNome.trim().toLowerCase().split(' ')[0];
-      if (p1 && p2 && p1.length >= 3 && p1 === p2) return true;
-    }
+
     return false;
   };
 
+  // 1. Tenta carregar do Supabase (tabela vales_colaboradores)
   try {
     const { data, error } = await supabase
       .from('vales_colaboradores')
@@ -68,20 +80,59 @@ export async function listarVales(
 
     if (!error && data) {
       const remotos = data.map(mapValeFromDb);
-      const mapa = new Map<string, ValeColaborador>();
-      locais.forEach(l => mapa.set(l.id, l));
       remotos.forEach(r => mapa.set(r.id, r));
-      const unificados = Array.from(mapa.values()).sort(
-        (a, b) => new Date(b.dataAdiantamento).getTime() - new Date(a.dataAdiantamento).getTime()
-      );
-      localStorage.setItem(STORAGE_KEY_VALES(empresaId), JSON.stringify(unificados));
-      return (colaboradorEmail || colaboradorNome) ? unificados.filter(bateFiltro) : unificados;
     }
   } catch (err) {
     console.warn('Fallback para cache local de vales:', err);
   }
 
-  return (colaboradorEmail || colaboradorNome) ? locais.filter(bateFiltro) : locais;
+  // 2. Fallback Inteligente via notificacoes_sistema (garante sincronização mesmo antes da migration SQL)
+  try {
+    const { data: notifs } = await supabase
+      .from('notificacoes_sistema')
+      .select('id, titulo, mensagem, criado_em')
+      .eq('empresa_id', empresaId)
+      .order('criado_em', { ascending: false })
+      .limit(100);
+
+    if (notifs) {
+      notifs.forEach(n => {
+        // Validação de Vales Confirmados
+        const matchConf = n.mensagem?.match(/<!--VALE_CONFIRMADO:(.*?)-->/);
+        if (matchConf && matchConf[1]) {
+          try {
+            const vConf = JSON.parse(decodeURIComponent(matchConf[1])) as ValeColaborador;
+            if (vConf && vConf.id) {
+              mapa.set(vConf.id, vConf);
+            }
+          } catch {}
+        }
+
+        // Validação de Novos Vales Emitidos
+        const matchData = n.mensagem?.match(/<!--VALE_DATA:(.*?)-->/);
+        if (matchData && matchData[1]) {
+          try {
+            const vNovo = JSON.parse(decodeURIComponent(matchData[1])) as ValeColaborador;
+            if (vNovo && vNovo.id) {
+              const existente = mapa.get(vNovo.id);
+              if (!existente || existente.status === 'pendente') {
+                mapa.set(vNovo.id, { ...vNovo, ...(existente?.status !== 'pendente' ? existente : {}) });
+              }
+            }
+          } catch {}
+        }
+      });
+    }
+  } catch (errNotif) {
+    console.warn('Fallback vales via notificacoes_sistema:', errNotif);
+  }
+
+  const unificados = Array.from(mapa.values()).sort(
+    (a, b) => new Date(b.dataAdiantamento || b.criadoEm).getTime() - new Date(a.dataAdiantamento || a.criadoEm).getTime()
+  );
+
+  localStorage.setItem(STORAGE_KEY_VALES(empresaId), JSON.stringify(unificados));
+  return (colaboradorEmail || colaboradorNome) ? unificados.filter(bateFiltro) : unificados;
 }
 
 export async function criarVale(
@@ -146,18 +197,24 @@ export async function criarVale(
     console.warn('Erro ao salvar vale no Supabase (mantido local):', err);
   }
 
-  // 3. Dispara Notificação no Sistema para a Equipe / Colaborador
+  // 3. Dispara Notificação no Sistema para a Equipe / Colaborador com Payload Embutido
   try {
     const valorFmt = novoVale.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    const payloadCodificado = encodeURIComponent(JSON.stringify(novoVale));
     await supabase.from('notificacoes_sistema').insert([{
       titulo: 'Novo Adiantamento / Vale Emitido',
-      mensagem: `Foi emitido um adiantamento no valor de ${valorFmt} para ${novoVale.colaboradorNome}. Acesse para confirmar o recebimento.`,
+      mensagem: `Foi emitido um adiantamento no valor de ${valorFmt} para ${novoVale.colaboradorNome}. Acesse para conferir e assinar. <!--VALE_DATA:${payloadCodificado}-->`,
       tipo: 'info',
       link: '/ponto?aba=meus_vales',
       empresa_id: empresaId
     }]);
-  } catch {
-    // ignore
+  } catch (errNotif) {
+    console.warn('Erro ao disparar notificacao_sistema do vale:', errNotif);
+  }
+
+  // Notifica componentes na mesma aba/janela
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('gcac-vale-atualizado', { detail: novoVale }));
   }
 
   return novoVale;
@@ -215,6 +272,26 @@ export async function confirmarValeEletronico(
     console.warn('Erro ao atualizar vale no Supabase:', err);
   }
 
+  // 3. Notifica o Gestor de que o Colaborador confirmou o vale
+  if (valeAtualizado) {
+    try {
+      const v = valeAtualizado as ValeColaborador;
+      const valorFmt = v.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+      const payloadConf = encodeURIComponent(JSON.stringify(v));
+      await supabase.from('notificacoes_sistema').insert([{
+        titulo: 'Adiantamento Confirmado pelo Colaborador',
+        mensagem: `O colaborador ${dados.usuarioNome} confirmou eletronicamente e assinou o vale de ${valorFmt}. <!--VALE_CONFIRMADO:${payloadConf}-->`,
+        tipo: 'sucesso',
+        link: '/ponto?aba=vales',
+        empresa_id: empresaId
+      }]);
+    } catch {}
+  }
+
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('gcac-vale-atualizado', { detail: valeAtualizado }));
+  }
+
   return valeAtualizado;
 }
 
@@ -259,6 +336,10 @@ export async function anexarReciboManual(
     console.warn('Erro ao atualizar comprovante manual no Supabase:', err);
   }
 
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('gcac-vale-atualizado', { detail: valeAtualizado }));
+  }
+
   return valeAtualizado;
 }
 
@@ -273,5 +354,9 @@ export async function excluirVale(empresaId: string, valeId: string): Promise<vo
     await supabase.from('vales_colaboradores').delete().eq('id', valeId);
   } catch (err) {
     console.warn('Erro ao deletar vale no Supabase:', err);
+  }
+
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('gcac-vale-atualizado', { detail: valeId }));
   }
 }

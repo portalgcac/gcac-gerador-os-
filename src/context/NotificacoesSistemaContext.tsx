@@ -59,8 +59,11 @@ export function NotificacoesSistemaProvider({ children }: { children: React.Reac
         .on(
           'postgres_changes',
           { event: '*', schema: 'public', table: 'notificacoes_sistema' },
-          () => {
+          (payload) => {
             carregarNotificacoes();
+            if (typeof window !== 'undefined') {
+              window.dispatchEvent(new CustomEvent('gcac-nova-notificacao', { detail: payload }));
+            }
           }
         )
         .subscribe();

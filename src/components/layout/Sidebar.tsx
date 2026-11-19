@@ -333,13 +333,16 @@ export function Sidebar({ onClose, isMobile }: SidebarProps = {}) {
           </div>
         </div>
         
-        {isAdmin && !isMobile && (
+        {/* Central de Notificações para Administradores e Colaboradores */}
+        {!isMobile && (
           <div className="absolute top-4 right-4">
             <button 
+              type="button"
               onClick={() => setDropdownAberto(!dropdownAberto)}
               className={`p-2 rounded-xl transition-all h-10 w-10 flex items-center justify-center relative ${
                 dropdownAberto ? 'bg-brand-blue/20 text-brand-blue-light' : 'bg-brand-dark-3 text-gray-500 hover:text-white'
               }`}
+              title="Notificações do Sistema"
             >
               <Bell size={20} />
               {naoLidas > 0 && (

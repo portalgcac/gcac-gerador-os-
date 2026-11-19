@@ -1,9 +1,9 @@
-import React from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FileText, Clock, CheckCircle, Plus, ChevronRight, Loader, Receipt, XCircle, AlertCircle } from 'lucide-react';
+import { FileText, Clock, CheckCircle, Plus, ChevronRight, Loader, Receipt, XCircle, AlertCircle, DollarSign, FileCheck2 } from 'lucide-react';
 import { useOrdens } from '../../context/OrdensContext';
 import { useOrcamentos } from '../../context/OrcamentosContext';
-import { StatusExecucaoServico, STATUS_EXECUCAO_SERVICO } from '../../types';
+import { StatusExecucaoServico, STATUS_EXECUCAO_SERVICO, ValeColaborador } from '../../types';
 import { isSameMonth, parseISO } from 'date-fns';
 import {
   formatarMoeda,
@@ -20,6 +20,8 @@ import { BriefingDiario } from './BriefingDiario';
 import { WidgetLembretes } from './WidgetLembretes';
 import { WidgetVencimentos } from './WidgetVencimentos';
 import { WidgetAlertasRegulatorios } from './WidgetAlertasRegulatorios';
+import { listarVales } from '../../services/valesColaboradoresService';
+import { ModalConfirmarVale } from '../financeiro/ModalConfirmarVale';
 
 export function Dashboard() {
   const navigate = useNavigate();
@@ -28,6 +30,35 @@ export function Dashboard() {
   const { despesas } = useFinanceiro();
   const { usuario, temAcessoRecurso } = useAuth();
   const online = useStatusConexao();
+
+  // Monitora vales pendentes para o colaborador no Dashboard
+  const [valesPendentes, setValesPendentes] = useState<ValeColaborador[]>([]);
+  const [valeParaConfirmar, setValeParaConfirmar] = useState<ValeColaborador | null>(null);
+
+  const carregarValesPendentes = useCallback(async () => {
+    if (!usuario?.empresaId) return;
+    try {
+      const lista = await listarVales(usuario.empresaId, usuario.email, usuario.nome);
+      setValesPendentes(lista.filter(v => v.status === 'pendente'));
+    } catch {
+      // ignore
+    }
+  }, [usuario]);
+
+  useEffect(() => {
+    carregarValesPendentes();
+
+    const interval = setInterval(carregarValesPendentes, 15000);
+    const handleAtualizar = () => carregarValesPendentes();
+    window.addEventListener('gcac-nova-notificacao', handleAtualizar);
+    window.addEventListener('gcac-vale-atualizado', handleAtualizar);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('gcac-nova-notificacao', handleAtualizar);
+      window.removeEventListener('gcac-vale-atualizado', handleAtualizar);
+    };
+  }, [carregarValesPendentes]);
 
   const dataAtual = new Date();
 
@@ -153,6 +184,45 @@ export function Dashboard() {
           )}
         </div>
       </div>
+
+      {/* ── Alerta em Destaque: Adiantamento / Vale Pendente para o Colaborador ── */}
+      {valesPendentes.length > 0 && (
+        <div className="bg-gradient-to-r from-emerald-950/80 via-brand-dark-2 to-emerald-900/40 border-2 border-emerald-500/50 rounded-2xl p-4 sm:p-5 shadow-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 animate-fade-in">
+          <div className="flex items-start gap-4">
+            <div className="p-3 bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 rounded-2xl shadow-inner shrink-0 mt-0.5">
+              <DollarSign size={28} className="animate-pulse" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-500/25 text-emerald-300 border border-emerald-500/40">
+                  Aviso Financeiro • Confirmação Obrigatória
+                </span>
+                <span className="text-xs text-emerald-400 font-bold">
+                  {valesPendentes.length} {valesPendentes.length === 1 ? 'adiantamento aguardando sua assinatura' : 'adiantamentos aguardando sua assinatura'}
+                </span>
+              </div>
+              <h3 className="text-base sm:text-lg font-black text-white mt-1">
+                Você recebeu um adiantamento/vale no valor de {formatarMoeda(valesPendentes[0].valor)}
+              </h3>
+              <p className="text-xs text-gray-300 mt-1 leading-relaxed">
+                Motivo: <strong className="text-white">{valesPendentes[0].motivo}</strong> • Data do repasse: {formatarData(valesPendentes[0].dataAdiantamento)}
+                <br />
+                O gestor emitiu este adiantamento e aguarda sua conferência e assinatura eletrônica.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 w-full md:w-auto shrink-0">
+            <button
+              type="button"
+              onClick={() => setValeParaConfirmar(valesPendentes[0])}
+              className="w-full md:w-auto px-5 py-3 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-brand-dark font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow-lg shadow-emerald-500/30 flex items-center justify-center gap-2"
+            >
+              <FileCheck2 size={18} />
+              Conferir e Assinar
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ── Widget de Atenção (Rotina Diária) ── */}
       {temAcessoRecurso('dash_atencao_diaria') && possuiAlertas && (
@@ -444,6 +514,19 @@ export function Dashboard() {
       >
         <Plus size={24} />
       </button>
+
+      {/* ── Modal de Confirmação do Vale pelo Colaborador ── */}
+      {valeParaConfirmar && (
+        <ModalConfirmarVale
+          vale={valeParaConfirmar}
+          isOpen={Boolean(valeParaConfirmar)}
+          onClose={() => setValeParaConfirmar(null)}
+          onConfirmado={() => {
+            setValeParaConfirmar(null);
+            carregarValesPendentes();
+          }}
+        />
+      )}
     </div>
   );
 }

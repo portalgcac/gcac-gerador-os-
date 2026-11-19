@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, DollarSign, Calendar, CreditCard, FileText, Upload, Check, AlertCircle, User } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { criarVale } from '../../services/valesColaboradoresService';
@@ -6,6 +6,7 @@ import { fileToBase64 } from '../../utils/fileUtils';
 import { format } from 'date-fns';
 import { formatarMoeda } from '../../utils/formatters';
 import { gerarReciboValePdf } from '../../utils/reciboValePdf';
+import { supabase } from '../../db/supabase';
 
 interface ModalEmitirValeProps {
   isOpen: boolean;
@@ -33,10 +34,49 @@ export function ModalEmitirVale({
   listaColaboradores = []
 }: ModalEmitirValeProps) {
   const { usuario } = useAuth();
+  const [colaboradoresInternos, setColaboradoresInternos] = useState(listaColaboradores);
 
   const [colaboradorSelecionado, setColaboradorSelecionado] = useState(() => {
     return colaboradorPreSelecionado || (listaColaboradores.length > 0 ? listaColaboradores[0] : null);
   });
+
+  useEffect(() => {
+    if (colaboradorPreSelecionado) {
+      setColaboradorSelecionado(colaboradorPreSelecionado);
+      return;
+    }
+    if (listaColaboradores.length > 0) {
+      setColaboradoresInternos(listaColaboradores);
+      setColaboradorSelecionado(prev => prev || listaColaboradores[0]);
+      return;
+    }
+    if (!usuario?.empresaId) return;
+
+    const carregarColabs = async () => {
+      try {
+        const { data } = await supabase
+          .from('usuarios_autorizados')
+          .select('id, nome, cpf, email')
+          .eq('empresa_id', usuario.empresaId)
+          .eq('ativo', true)
+          .order('nome');
+
+        if (data && data.length > 0) {
+          const formatados = data.map(d => ({
+            id: d.id,
+            nome: d.nome,
+            cpf: d.cpf || undefined,
+            email: d.email
+          }));
+          setColaboradoresInternos(formatados);
+          setColaboradorSelecionado(prev => prev || formatados[0]);
+        }
+      } catch (err) {
+        console.warn('Erro ao carregar colaboradores no modal:', err);
+      }
+    };
+    carregarColabs();
+  }, [usuario?.empresaId, colaboradorPreSelecionado, listaColaboradores]);
 
   const [valor, setValor] = useState('');
   const [dataAdiantamento, setDataAdiantamento] = useState(format(new Date(), 'yyyy-MM-dd'));
@@ -160,13 +200,13 @@ export function ModalEmitirVale({
               <select
                 value={colaboradorSelecionado?.email || ''}
                 onChange={e => {
-                  const achou = listaColaboradores.find(c => c.email === e.target.value);
+                  const achou = colaboradoresInternos.find(c => c.email === e.target.value);
                   setColaboradorSelecionado(achou || null);
                 }}
                 className="input w-full bg-gray-900 border-gray-800 text-white rounded-xl"
               >
                 <option value="">Selecione um colaborador da equipe...</option>
-                {listaColaboradores.map((colab, idx) => (
+                {colaboradoresInternos.map((colab, idx) => (
                   <option key={colab.email || colab.id || idx} value={colab.email || ''}>
                     {colab.nome} {colab.cpf ? `(${colab.cpf})` : ''}
                   </option>

@@ -1,5 +1,6 @@
 import React, { useRef, useEffect } from 'react';
-import { Bell, Check, Trash2, Clock, Info, CheckCircle, AlertTriangle } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Bell, Check, Trash2, Clock, Info, CheckCircle, AlertTriangle, ExternalLink } from 'lucide-react';
 import { useNotificacoesSistema } from '../../context/NotificacoesSistemaContext';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -10,6 +11,7 @@ interface NotificacoesDropdownProps {
 }
 
 export function NotificacoesDropdown({ aberto, onClose }: NotificacoesDropdownProps) {
+  const navigate = useNavigate();
   const { notificacoes, naoLidas, marcarComoLida, marcarTodasComoLidas } = useNotificacoesSistema();
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -56,34 +58,46 @@ export function NotificacoesDropdown({ aberto, onClose }: NotificacoesDropdownPr
             <p className="text-xs text-gray-500">Nenhuma notificação por enquanto.</p>
           </div>
         ) : (
-          notificacoes.map(n => (
-            <div 
-              key={n.id}
-              onClick={() => !n.lida && marcarComoLida(n.id)}
-              className={`p-4 border-b border-brand-dark-5 last:border-0 hover:bg-white/5 cursor-pointer transition-colors relative ${!n.lida ? 'bg-brand-blue/5' : ''}`}
-            >
-              {!n.lida && <div className="absolute right-4 top-4 w-2 h-2 bg-brand-blue rounded-full" />}
-              
-              <div className="flex gap-3">
-                <div className={`p-2 rounded-lg h-fit ${
-                  n.tipo === 'sucesso' ? 'bg-green-500/10 text-green-400' :
-                  n.tipo === 'alerta' ? 'bg-yellow-500/10 text-yellow-400' : 'bg-brand-blue/10 text-brand-blue-light'
-                }`}>
-                  {n.tipo === 'sucesso' ? <CheckCircle size={16} /> :
-                   n.tipo === 'alerta' ? <AlertTriangle size={16} /> : <Info size={16} />}
-                </div>
+          notificacoes.map(n => {
+            const mensagemLimpa = n.mensagem?.replace(/<!--.*?-->/g, '').trim();
+            return (
+              <div 
+                key={n.id}
+                onClick={() => {
+                  if (!n.lida) marcarComoLida(n.id);
+                  if (n.link) {
+                    navigate(n.link);
+                    onClose();
+                  }
+                }}
+                className={`p-4 border-b border-brand-dark-5 last:border-0 hover:bg-white/5 cursor-pointer transition-colors relative ${!n.lida ? 'bg-brand-blue/5' : ''}`}
+              >
+                {!n.lida && <div className="absolute right-4 top-4 w-2 h-2 bg-brand-blue rounded-full" />}
                 
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-bold text-white mb-0.5">{n.titulo}</p>
-                  <p className="text-[11px] text-gray-400 leading-relaxed mb-2">{n.mensagem}</p>
-                  <div className="flex items-center gap-1 text-[9px] text-gray-500 uppercase font-bold">
-                    <Clock size={10} />
-                    {formatDistanceToNow(new Date(n.criadoEm), { addSuffix: true, locale: ptBR })}
+                <div className="flex gap-3">
+                  <div className={`p-2 rounded-lg h-fit ${
+                    n.tipo === 'sucesso' ? 'bg-green-500/10 text-green-400' :
+                    n.tipo === 'alerta' ? 'bg-yellow-500/10 text-yellow-400' : 'bg-brand-blue/10 text-brand-blue-light'
+                  }`}>
+                    {n.tipo === 'sucesso' ? <CheckCircle size={16} /> :
+                     n.tipo === 'alerta' ? <AlertTriangle size={16} /> : <Info size={16} />}
+                  </div>
+                  
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2 mb-0.5">
+                      <p className="text-xs font-bold text-white">{n.titulo}</p>
+                      {n.link && <ExternalLink size={12} className="text-gray-500 shrink-0" />}
+                    </div>
+                    <p className="text-[11px] text-gray-400 leading-relaxed mb-2">{mensagemLimpa}</p>
+                    <div className="flex items-center gap-1 text-[9px] text-gray-500 uppercase font-bold">
+                      <Clock size={10} />
+                      {formatDistanceToNow(new Date(n.criadoEm), { addSuffix: true, locale: ptBR })}
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
 

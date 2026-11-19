@@ -34,15 +34,32 @@ export function AppShell() {
   const [dropdownNotifAberto, setDropdownNotifAberto] = React.useState(false);
   const [valesPendentesColaborador, setValesPendentesColaborador] = React.useState(0);
 
-  // Monitora vales pendentes para o colaborador
-  React.useEffect(() => {
-    if (usuario?.empresaId) {
-      listarVales(usuario.empresaId, usuario.email, usuario.nome).then(lista => {
-        const pendentes = lista.filter(v => v.status === 'pendente').length;
-        setValesPendentesColaborador(pendentes);
-      }).catch(() => {});
+  // Monitora vales pendentes para o colaborador com atualização contínua e eventos Realtime
+  const checarValesPendentes = React.useCallback(async () => {
+    if (!usuario?.empresaId) return;
+    try {
+      const lista = await listarVales(usuario.empresaId, usuario.email, usuario.nome);
+      const pendentes = lista.filter(v => v.status === 'pendente').length;
+      setValesPendentesColaborador(pendentes);
+    } catch {
+      // ignore
     }
-  }, [usuario, location.pathname]);
+  }, [usuario]);
+
+  React.useEffect(() => {
+    checarValesPendentes();
+
+    const interval = setInterval(checarValesPendentes, 15000);
+    const handleAtualizar = () => checarValesPendentes();
+    window.addEventListener('gcac-nova-notificacao', handleAtualizar);
+    window.addEventListener('gcac-vale-atualizado', handleAtualizar);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('gcac-nova-notificacao', handleAtualizar);
+      window.removeEventListener('gcac-vale-atualizado', handleAtualizar);
+    };
+  }, [checarValesPendentes, location.pathname]);
 
   
   // Redirecionamento automático no primeiro acesso do dia para Registro de Ponto

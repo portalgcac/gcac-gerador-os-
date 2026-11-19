@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { 
   DollarSign, 
   CheckCircle2, 
@@ -22,6 +22,7 @@ import { gerarReciboValePdf } from '../../utils/reciboValePdf';
 import { useAuth } from '../../context/AuthContext';
 import { ModalEmitirVale } from './ModalEmitirVale';
 import { ModalConfirmarVale } from './ModalConfirmarVale';
+import { supabase } from '../../db/supabase';
 
 interface GestaoValesAdiantamentosProps {
   modo?: 'gestor' | 'colaborador';
@@ -44,12 +45,13 @@ export function GestaoValesAdiantamentos({
   const [carregando, setCarregando] = useState(true);
   const [filtroStatus, setFiltroStatus] = useState<'todos' | 'pendente' | 'confirmado'>('todos');
   const [busca, setBusca] = useState('');
+  const [colaboradoresDisponiveis, setColaboradoresDisponiveis] = useState(listaColaboradores);
 
   // Modais
   const [modalNovoAberto, setModalNovoAberto] = useState(false);
   const [valeParaConfirmar, setValeParaConfirmar] = useState<ValeColaborador | null>(null);
 
-  const carregarDados = async () => {
+  const carregarDados = useCallback(async () => {
     if (!usuario?.empresaId) return;
     setCarregando(true);
     try {
@@ -62,11 +64,52 @@ export function GestaoValesAdiantamentos({
     } finally {
       setCarregando(false);
     }
-  };
+  }, [usuario?.empresaId, usuario?.email, usuario?.nome, modo, colaboradorFiltroEmail]);
+
+  // Carrega lista de colaboradores se não informada
+  useEffect(() => {
+    if (listaColaboradores.length > 0) {
+      setColaboradoresDisponiveis(listaColaboradores);
+      return;
+    }
+    if (!usuario?.empresaId) return;
+
+    const carregarColabs = async () => {
+      try {
+        const { data } = await supabase
+          .from('usuarios_autorizados')
+          .select('id, nome, cpf, email')
+          .eq('empresa_id', usuario.empresaId)
+          .eq('ativo', true)
+          .order('nome');
+
+        if (data && data.length > 0) {
+          setColaboradoresDisponiveis(data.map(d => ({
+            id: d.id,
+            nome: d.nome,
+            cpf: d.cpf || undefined,
+            email: d.email
+          })));
+        }
+      } catch (err) {
+        console.warn('Erro ao carregar colaboradores para vales:', err);
+      }
+    };
+    carregarColabs();
+  }, [usuario?.empresaId, listaColaboradores]);
 
   useEffect(() => {
     carregarDados();
-  }, [usuario?.empresaId, modo, colaboradorFiltroEmail]);
+
+    const handleAtualizar = () => carregarDados();
+    window.addEventListener('gcac-nova-notificacao', handleAtualizar);
+    window.addEventListener('gcac-vale-atualizado', handleAtualizar);
+
+    return () => {
+      window.removeEventListener('gcac-nova-notificacao', handleAtualizar);
+      window.removeEventListener('gcac-vale-atualizado', handleAtualizar);
+    };
+  }, [carregarDados]);
 
   const valesFiltrados = useMemo(() => {
     return vales.filter(v => {
@@ -323,7 +366,7 @@ export function GestaoValesAdiantamentos({
         isOpen={modalNovoAberto}
         onClose={() => setModalNovoAberto(false)}
         onSucesso={carregarDados}
-        listaColaboradores={listaColaboradores}
+        listaColaboradores={colaboradoresDisponiveis}
       />
 
       {/* Modal Confirmar Vale (Colaborador) */}

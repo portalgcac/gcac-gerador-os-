@@ -34,8 +34,20 @@ CREATE INDEX IF NOT EXISTS idx_vales_data ON public.vales_colaboradores(data_adi
 -- Habilitar RLS simples
 ALTER TABLE public.vales_colaboradores ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Acesso aos vales da empresa" 
+DROP POLICY IF EXISTS "vales_colaboradores_all_policy" ON public.vales_colaboradores;
+CREATE POLICY "vales_colaboradores_all_policy" 
 ON public.vales_colaboradores
-FOR ALL 
+FOR ALL TO authenticated
 USING (true)
 WITH CHECK (true);
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables 
+    WHERE pubname = 'supabase_realtime' 
+    AND tablename = 'vales_colaboradores'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.vales_colaboradores;
+  END IF;
+END $$;
