@@ -11,6 +11,7 @@ export const CATALOGO_BASE_ARMAS: ItemCatalogoArma[] = [
   // ==========================================
   // TAURUS
   { tipo: 'PISTOLA', fabricante: 'TAURUS', modelo: 'G2C', calibrePadrao: '9mm LUGER' },
+  { tipo: 'PISTOLA', fabricante: 'TAURUS', modelo: 'G2C .38 TPC', calibrePadrao: '.38 TPC' },
   { tipo: 'PISTOLA', fabricante: 'TAURUS', modelo: 'G3', calibrePadrao: '9mm LUGER' },
   { tipo: 'PISTOLA', fabricante: 'TAURUS', modelo: 'G3C', calibrePadrao: '9mm LUGER' },
   { tipo: 'PISTOLA', fabricante: 'TAURUS', modelo: 'G3 TORO', calibrePadrao: '9mm LUGER' },
@@ -18,8 +19,10 @@ export const CATALOGO_BASE_ARMAS: ItemCatalogoArma[] = [
   { tipo: 'PISTOLA', fabricante: 'TAURUS', modelo: 'GX4', calibrePadrao: '9mm LUGER' },
   { tipo: 'PISTOLA', fabricante: 'TAURUS', modelo: 'GX4 TORO', calibrePadrao: '9mm LUGER' },
   { tipo: 'PISTOLA', fabricante: 'TAURUS', modelo: 'GX4 CARRY', calibrePadrao: '9mm LUGER' },
+  { tipo: 'PISTOLA', fabricante: 'TAURUS', modelo: 'GX4 CARRY .38 TPC', calibrePadrao: '.38 TPC' },
   { tipo: 'PISTOLA', fabricante: 'TAURUS', modelo: 'GX4 CARRY TORO', calibrePadrao: '9mm LUGER' },
   { tipo: 'PISTOLA', fabricante: 'TAURUS', modelo: 'TS9', calibrePadrao: '9mm LUGER' },
+  { tipo: 'PISTOLA', fabricante: 'TAURUS', modelo: 'TS9 .38 TPC', calibrePadrao: '.38 TPC' },
   { tipo: 'PISTOLA', fabricante: 'TAURUS', modelo: 'TH9', calibrePadrao: '9mm LUGER' },
   { tipo: 'PISTOLA', fabricante: 'TAURUS', modelo: 'TH9C', calibrePadrao: '9mm LUGER' },
   { tipo: 'PISTOLA', fabricante: 'TAURUS', modelo: 'TH380', calibrePadrao: '.380 ACP' },
@@ -299,6 +302,7 @@ export const CALIBRES_COMPATIVEIS_POR_TIPO: Record<string, string[]> = {
   'PISTOLA': [
     '9mm LUGER',
     '.380 ACP',
+    '.38 TPC',
     '.40 S&W',
     '.45 ACP',
     '.22 LR',
@@ -332,6 +336,7 @@ export const CALIBRES_COMPATIVEIS_POR_TIPO: Record<string, string[]> = {
     '.30-06 SPRG',
     '.357 MAG',
     '.38 SPL',
+    '.38 TPC',
     '.44 MAG',
     '.44-40 WIN',
     '9mm LUGER',
@@ -380,7 +385,7 @@ export function obterCalibresCompativeis(
   const baseCalibres = tipoNorm && CALIBRES_COMPATIVEIS_POR_TIPO[tipoNorm] 
     ? [...CALIBRES_COMPATIVEIS_POR_TIPO[tipoNorm]]
     : [
-        '9mm LUGER', '.380 ACP', '.40 S&W', '.45 ACP', '.22 LR', 
+        '9mm LUGER', '.380 ACP', '.38 TPC', '.40 S&W', '.45 ACP', '.22 LR', 
         '.38 SPL', '.357 MAG', '.44 MAG', '.223 REM / 5.56 NATO', 
         '.308 WIN / 7.62 NATO', '12 GA', '20 GA', '28 GA', '36 GA'
       ];
@@ -397,9 +402,7 @@ export function obterCalibresCompativeis(
   if (calibresExtras && calibresExtras.length > 0) {
     calibresExtras.forEach(c => {
       if (c) {
-        if (!tipoNorm || baseCalibres.includes(c)) {
-          lista.add(c);
-        }
+        lista.add(c);
       }
     });
   }

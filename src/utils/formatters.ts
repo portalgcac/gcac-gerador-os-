@@ -353,6 +353,10 @@ export function normalizarCalibre(calibre: string | undefined | null): string {
   if (c.includes('357 MAG') || c.includes('357MAG') || c.includes('357 MAGNUM') || c.includes('357')) {
     return '.357 MAG';
   }
+  // .38 TPC (deve ser verificado antes de .38 SPL para evitar conflito com '38 ')
+  if (c.includes('38 TPC') || c.includes('38TPC') || c.includes('38-TPC') || c.includes('TPC')) {
+    return '.38 TPC';
+  }
   // .38 SPL
   if (c.includes('38 SPL') || c.includes('38SPL') || c.includes('38 SPECIAL') || c.includes('38SPECIAL') || c.includes('38 ')) {
     return '.38 SPL';

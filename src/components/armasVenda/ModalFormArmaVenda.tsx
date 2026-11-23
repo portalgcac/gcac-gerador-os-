@@ -875,6 +875,7 @@ export function ModalFormArmaVenda({
                   <datalist id="calibres-sugestoes">
                     <option value="9mm LUGER" />
                     <option value=".380 ACP" />
+                    <option value=".38 TPC" />
                     <option value=".40 S&W" />
                     <option value=".45 ACP" />
                     <option value=".38 SPL" />

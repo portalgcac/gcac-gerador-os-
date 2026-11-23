@@ -11,7 +11,7 @@ import { useAuth } from './AuthContext';
 // Padrões de Armas para Importação / Inicialização
 export const CALIBRES_BASE = [
   '.22 LR', '.22 WMR', '.223 REM / 5.56 NATO', '.30-06 SPRG', '.308 WIN / 7.62 NATO', 
-  '.357 MAG', '.38 SPL', '.380 ACP', '9mm LUGER', '.40 S&W', '.44 MAG', 
+  '.357 MAG', '.38 SPL', '.38 TPC', '.380 ACP', '9mm LUGER', '.40 S&W', '.44 MAG', 
   '.45 ACP', '.454 CASULL', '12 GA', '20 GA', '28 GA', '36 GA'
 ];
 export const FABRICANTES_BASE = [
@@ -279,6 +279,21 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
     return Array.from(tipos).filter(Boolean).sort();
   }, [catalogoArmas]);
 
+  const calibresTotais = React.useMemo(() => {
+    const opcoes = opcoesArmas.filter(o => o.tipo === 'calibre').map(o => normalizarCalibre(o.nome));
+    return Array.from(new Set([...calibresRegistrados, ...opcoes])).filter(Boolean).sort();
+  }, [calibresRegistrados, opcoesArmas]);
+
+  const modelosTotais = React.useMemo(() => {
+    const opcoes = opcoesArmas.filter(o => o.tipo === 'modelo').map(o => normalizarModelo(o.nome));
+    return Array.from(new Set([...modelosRegistrados, ...opcoes])).filter(Boolean).sort();
+  }, [modelosRegistrados, opcoesArmas]);
+
+  const fabricantesTotais = React.useMemo(() => {
+    const opcoes = opcoesArmas.filter(o => o.tipo === 'fabricante').map(o => normalizarFabricante(o.nome));
+    return Array.from(new Set([...fabricantesRegistrados, ...opcoes])).filter(Boolean).sort();
+  }, [fabricantesRegistrados, opcoesArmas]);
+
   const obterFabricantesPorTipo = useCallback((tipo?: string): string[] => {
     const fabricantes = new Set<string>();
     const tipoNorm = normalizarTipoArma(tipo);
@@ -290,13 +305,11 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
-    if (fabricantes.size === 0) {
-      FABRICANTES_BASE.forEach(f => fabricantes.add(normalizarFabricante(f)));
-      fabricantesRegistrados.forEach(f => fabricantes.add(normalizarFabricante(f)));
-    }
+    FABRICANTES_BASE.forEach(f => fabricantes.add(normalizarFabricante(f)));
+    fabricantesTotais.forEach(f => fabricantes.add(normalizarFabricante(f)));
 
     return Array.from(fabricantes).filter(Boolean).sort();
-  }, [catalogoArmas, fabricantesRegistrados]);
+  }, [catalogoArmas, fabricantesTotais]);
 
   const obterModelosPorTipoEFabricante = useCallback((tipo?: string, fabricante?: string): string[] => {
     const modelos = new Set<string>();
@@ -315,11 +328,13 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
     });
 
     if (modelos.size === 0 && !fabNorm && !tipoNorm) {
-      modelosRegistrados.forEach(m => modelos.add(m));
+      modelosTotais.forEach(m => modelos.add(m));
+    } else {
+      modelosTotais.forEach(m => modelos.add(m));
     }
 
     return Array.from(modelos).filter(Boolean).sort();
-  }, [catalogoArmas, modelosRegistrados]);
+  }, [catalogoArmas, modelosTotais]);
 
   const obterCalibreSugerido = useCallback((tipo?: string, fabricante?: string, modelo?: string): string | undefined => {
     if (!modelo) return undefined;
@@ -342,8 +357,8 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
   }, [catalogoArmas]);
 
   const obterCalibresCompativeisContext = useCallback((tipo?: string, modelo?: string): string[] => {
-    return obterCalibresCompativeis(tipo, modelo, catalogoArmas, calibresRegistrados);
-  }, [catalogoArmas, calibresRegistrados]);
+    return obterCalibresCompativeis(tipo, modelo, catalogoArmas, calibresTotais);
+  }, [catalogoArmas, calibresTotais]);
 
   const obterDadosPorModeloContext = useCallback((modelo: string) => {
     return obterDadosPorModelo(modelo, catalogoArmas);
@@ -544,7 +559,13 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
 
   const criarOpcaoArma = async (tipo: 'modelo' | 'calibre' | 'fabricante' | 'clube', nome: string) => {
     if (!usuario?.empresaId) throw new Error('Usuário não autenticado');
-    const nomeFormatado = nome.trim().toUpperCase();
+    const nomeFormatado = tipo === 'calibre' 
+      ? normalizarCalibre(nome) 
+      : tipo === 'modelo' 
+        ? normalizarModelo(nome) 
+        : tipo === 'fabricante' 
+          ? normalizarFabricante(nome) 
+          : nome.trim().toUpperCase();
     if (!nomeFormatado) throw new Error('Nome inválido');
 
     // Evitar duplicidade local antes de tentar salvar
@@ -569,7 +590,13 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
     const item = opcoesArmas.find(o => o.id === id);
     if (!item) throw new Error('Item não encontrado');
 
-    const nomeFormatado = novoNome.trim().toUpperCase();
+    const nomeFormatado = item.tipo === 'calibre' 
+      ? normalizarCalibre(novoNome) 
+      : item.tipo === 'modelo' 
+        ? normalizarModelo(novoNome) 
+        : item.tipo === 'fabricante' 
+          ? normalizarFabricante(novoNome) 
+          : novoNome.trim().toUpperCase();
     if (!nomeFormatado) throw new Error('Nome inválido');
 
     const duplicado = opcoesArmas.some(o => o.id !== id && o.tipo === item.tipo && o.nome.toUpperCase() === nomeFormatado.toUpperCase());
@@ -1750,9 +1777,9 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
       buscarCliente,
       buscarClientePorNomeExato,
       clubesRegistrados,
-      modelosRegistrados,
-      calibresRegistrados,
-      fabricantesRegistrados,
+      modelosRegistrados: modelosTotais,
+      calibresRegistrados: calibresTotais,
+      fabricantesRegistrados: fabricantesTotais,
       catalogoArmas,
       obterTiposDeArma,
       obterFabricantesPorTipo,

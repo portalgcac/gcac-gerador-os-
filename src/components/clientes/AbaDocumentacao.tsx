@@ -1565,7 +1565,8 @@ export function ModalArma({ armaParaEditar, acervoPadrao, onFechar, onSalvar }: 
                   className="input uppercase font-bold text-xs"
                   placeholder="Digite o modelo (ex: METE MC9)"
                   value={form.modelo}
-                  onChange={e => setForm({ ...form, modelo: normalizarModelo(e.target.value) })}
+                  onChange={e => setForm({ ...form, modelo: e.target.value.toUpperCase() })}
+                  onBlur={e => setForm({ ...form, modelo: normalizarModelo(e.target.value) })}
                   autoFocus
                 />
               ) : (
@@ -1620,9 +1621,10 @@ export function ModalArma({ armaParaEditar, acervoPadrao, onFechar, onSalvar }: 
                 <input 
                   type="text" 
                   className="input uppercase font-bold text-xs"
-                  placeholder="Ex: 9mm LUGER, .380 ACP..."
+                  placeholder="Ex: 9mm LUGER, .380 ACP, .38 TPC..."
                   value={form.calibre}
-                  onChange={e => setForm({ ...form, calibre: normalizarCalibre(e.target.value) })}
+                  onChange={e => setForm({ ...form, calibre: e.target.value.toUpperCase() })}
+                  onBlur={e => setForm({ ...form, calibre: normalizarCalibre(e.target.value) })}
                   autoFocus
                 />
               ) : (
