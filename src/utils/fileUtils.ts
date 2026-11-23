@@ -75,43 +75,74 @@ export function compressImage(
   quality = 0.85
 ): Promise<string> {
   return new Promise((resolve, reject) => {
+    // Se for SVG, não redimensiona por canvas para não perder vetorização
+    if (file.type === 'image/svg+xml') {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = (err) => reject(err);
+      reader.readAsDataURL(file);
+      return;
+    }
+
     const reader = new FileReader();
-    reader.readAsDataURL(file);
     reader.onload = (event) => {
+      const dataUrl = event.target?.result as string;
+      if (!dataUrl) {
+        reject(new Error('Falha ao ler dados da imagem.'));
+        return;
+      }
+
       const img = new Image();
-      img.src = event.target?.result as string;
       img.onload = () => {
-        const canvas = document.createElement('canvas');
-        let width = img.width;
-        let height = img.height;
+        try {
+          const canvas = document.createElement('canvas');
+          let width = img.width || maxWidth;
+          let height = img.height || maxHeight;
 
-        if (width > height) {
-          if (width > maxWidth) {
-            height = Math.round((height * maxWidth) / width);
-            width = maxWidth;
+          if (width > height) {
+            if (width > maxWidth) {
+              height = Math.round((height * maxWidth) / width);
+              width = maxWidth;
+            }
+          } else {
+            if (height > maxHeight) {
+              width = Math.round((width * maxHeight) / height);
+              height = maxHeight;
+            }
           }
-        } else {
-          if (height > maxHeight) {
-            width = Math.round((width * maxHeight) / height);
-            height = maxHeight;
+
+          canvas.width = Math.max(1, width);
+          canvas.height = Math.max(1, height);
+
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            // Se canvas não estiver disponível, resolve com o dataUrl original
+            resolve(dataUrl);
+            return;
           }
+
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          const outputFormat = file.type === 'image/jpeg' ? 'image/jpeg' : 'image/png';
+          resolve(canvas.toDataURL(outputFormat, quality));
+        } catch (canvasErr) {
+          console.warn('[compressImage] Fallback para dataUrl original:', canvasErr);
+          resolve(dataUrl);
         }
-
-        canvas.width = width;
-        canvas.height = height;
-
-        const ctx = canvas.getContext('2d');
-        if (!ctx) {
-          reject(new Error('Canvas context no available'));
-          return;
-        }
-
-        ctx.drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL('image/png', quality));
       };
-      img.onerror = (err) => reject(err);
+
+      img.onerror = () => {
+        // Fallback para dataUrl se a imagem não puder ser renderizada no elemento Image
+        console.warn('[compressImage] img.onerror disparado, usando dataUrl original.');
+        resolve(dataUrl);
+      };
+
+      // Define src após configurar os listeners de onload e onerror
+      img.src = dataUrl;
     };
+
     reader.onerror = (err) => reject(err);
+    // Inicia a leitura do arquivo após registrar os callbacks
+    reader.readAsDataURL(file);
   });
 }
 

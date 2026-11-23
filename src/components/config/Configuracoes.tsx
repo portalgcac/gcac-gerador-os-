@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
@@ -22,7 +22,7 @@ import { ModalCategoria } from './ModalCategoria';
 import { GestaoUsuarios } from './GestaoUsuarios';
 import { GerenciadorOrdemMenu } from './GerenciadorOrdemMenu';
 import { formatarMoeda, formatarData } from '../../utils/formatters';
-import { compressImage, uploadBase64File } from '../../utils/fileUtils';
+import { compressImage, fileToBase64, uploadBase64File } from '../../utils/fileUtils';
 import { ServicoConfig, CategoriaServico } from '../../types';
 import { CONTEUDO_MANUAL } from '../../services/manualService';
 import { baixarManualPdf } from '../../services/geradorPdfManual';
@@ -297,9 +297,11 @@ export function Configuracoes() {
     mensagemAlertaCraf: usuario?.dadosEmpresa?.mensagemAlertaCraf || ''
   });
   const [salvandoEmpresa, setSalvandoEmpresa] = useState(false);
+  const [processandoLogo, setProcessandoLogo] = useState(false);
+  const fileInputLogoRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (usuario?.dadosEmpresa) {
+    if (usuario?.dadosEmpresa && !empresaExpandido) {
       setFormEmpresa({
         razaoSocial: usuario.dadosEmpresa.razaoSocialFantasia || '',
         cnpj: usuario.dadosEmpresa.cnpj || '',
@@ -311,10 +313,13 @@ export function Configuracoes() {
         mensagemAlertaCraf: usuario.dadosEmpresa.mensagemAlertaCraf || ''
       });
     }
-  }, [usuario?.dadosEmpresa]);
+  }, [usuario?.dadosEmpresa, empresaExpandido]);
 
   const handleSalvarEmpresa = async () => {
-    if (!usuario?.empresaId) return;
+    if (!usuario?.empresaId) {
+      mostrar('erro', 'ID da empresa não localizado. Recarregue a página.');
+      return;
+    }
     setSalvandoEmpresa(true);
     try {
       const { error } = await supabase
@@ -333,7 +338,7 @@ export function Configuracoes() {
 
       if (error) throw error;
 
-      mostrar('sucesso', 'Dados da empresa e clube parceiro atualizados com sucesso!');
+      mostrar('sucesso', 'Dados da empresa e logotipo atualizados com sucesso!');
       await refreshUsuario();
       setEmpresaExpandido(false);
     } catch (e: any) {
@@ -1360,8 +1365,12 @@ export function Configuracoes() {
                           <img src={formEmpresa.logoUrl} alt="Logo" className="w-full h-full object-contain p-1" />
                           <button
                             type="button"
-                            onClick={() => setFormEmpresa({ ...formEmpresa, logoUrl: '' })}
+                            onClick={() => {
+                              setFormEmpresa(prev => ({ ...prev, logoUrl: '' }));
+                              mostrar('info', 'Logotipo removido da pré-visualização. Clique em "Salvar Alterações" para confirmar.');
+                            }}
                             className="absolute inset-0 bg-red-600/80 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white text-[10px] font-bold"
+                            title="Remover Logotipo"
                           >
                             Remover
                           </button>
@@ -1373,28 +1382,60 @@ export function Configuracoes() {
                         </div>
                       )}
                     </div>
-                    <div className="flex-1 space-y-1.5 w-full">
-                      <label className="btn-secondary py-2 px-3 cursor-pointer inline-flex items-center gap-2 text-xs w-full sm:w-auto justify-center bg-brand-dark-4 hover:bg-brand-dark-5 border border-brand-dark-5 text-white rounded">
-                        <Upload size={14} />
-                        Escolher Logotipo
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={async (e) => {
-                            const file = e.target.files?.[0];
-                            if (file) {
-                              try {
-                                const compressedBase64 = await compressImage(file, 350, 350, 0.85);
-                                setFormEmpresa({ ...formEmpresa, logoUrl: compressedBase64 });
-                              } catch (err) {
-                                console.error('Erro ao processar imagem:', err);
-                                mostrar('erro', 'Falha ao processar imagem.');
-                              }
+                    <div className="flex-1 space-y-2 w-full">
+                      <input
+                        ref={fileInputLogoRef}
+                        type="file"
+                        accept="image/png,image/jpeg,image/jpg,image/webp,image/svg+xml,image/*"
+                        className="hidden"
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          setProcessandoLogo(true);
+                          try {
+                            const compressedBase64 = await compressImage(file, 350, 350, 0.85);
+                            setFormEmpresa(prev => ({ ...prev, logoUrl: compressedBase64 }));
+                            mostrar('sucesso', 'Logotipo carregado na pré-visualização! Clique em "Salvar Alterações" para salvar.');
+                          } catch (err: any) {
+                            console.error('Erro ao comprimir imagem, tentando base64 direto:', err);
+                            try {
+                              const rawBase64 = await fileToBase64(file);
+                              setFormEmpresa(prev => ({ ...prev, logoUrl: rawBase64 }));
+                              mostrar('sucesso', 'Logotipo carregado na pré-visualização! Clique em "Salvar Alterações" para salvar.');
+                            } catch (fallbackErr) {
+                              console.error('Falha ao processar arquivo:', fallbackErr);
+                              mostrar('erro', 'Falha ao processar imagem selecionada.');
                             }
-                          }}
-                        />
-                      </label>
+                          } finally {
+                            setProcessandoLogo(false);
+                            if (e.target) e.target.value = '';
+                          }
+                        }}
+                      />
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => fileInputLogoRef.current?.click()}
+                          disabled={processandoLogo}
+                          className="btn-secondary py-2 px-3 cursor-pointer inline-flex items-center gap-2 text-xs w-full sm:w-auto justify-center bg-brand-dark-4 hover:bg-brand-dark-5 border border-brand-dark-5 text-white rounded disabled:opacity-50"
+                        >
+                          {processandoLogo ? <Loader2 size={14} className="animate-spin text-brand-blue" /> : <Upload size={14} />}
+                          {processandoLogo ? 'Processando imagem...' : 'Escolher Logotipo'}
+                        </button>
+                        {formEmpresa.logoUrl && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setFormEmpresa(prev => ({ ...prev, logoUrl: '' }));
+                              mostrar('info', 'Logotipo removido. Clique em "Salvar Alterações" para confirmar.');
+                            }}
+                            className="py-2 px-3 inline-flex items-center gap-1.5 text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10 border border-red-500/20 rounded transition-colors"
+                          >
+                            <Trash2 size={13} />
+                            Remover Logotipo
+                          </button>
+                        )}
+                      </div>
                       <p className="text-[10px] text-gray-500 leading-normal">
                         PNG, JPG ou WEBP. Dimensão máxima recomendada de 350x350px. Imagens grandes serão redimensionadas e comprimidas localmente de forma automática.
                       </p>
