@@ -849,75 +849,102 @@ export function AbaDocumentacao({ cliente, armaIdInicial, cacEmpresaId, podeEdit
           <EmptyState msg="Nenhuma autorização de manejo cadastrada." />
         ) : (
           <div className="space-y-3">
-            {manejos.map(m => (
-              <div key={m.id} className="card bg-brand-dark-3/50 border-brand-dark-5 p-0 overflow-hidden group">
-                <div className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div className="flex items-start sm:items-center gap-3 min-w-0">
-                    <div className="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center text-green-500 shrink-0">
-                      <FileText size={20} />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <p className="text-sm font-bold text-white truncate">
-                          {m.nomeFazenda} • {m.cidade}
-                        </p>
-                        {m.status === 'Inerte' && (
-                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-gray-500/10 text-gray-400 font-black uppercase tracking-tighter shrink-0">
-                            Inerte
+            {manejos.map(m => {
+              const fazendaTexto = m.nomeFazenda?.trim();
+              const cidadeTexto = m.cidade?.trim();
+              const tituloCompleto = fazendaTexto && cidadeTexto
+                ? `${fazendaTexto} • ${cidadeTexto}`
+                : fazendaTexto || cidadeTexto || 'Autorização de Manejo';
+
+              return (
+                <div key={m.id} className="card bg-brand-dark-3/50 border-brand-dark-5 p-0 overflow-hidden group hover:border-green-500/30 transition-all duration-200">
+                  <div className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-start gap-3 min-w-0 flex-1">
+                      <div className="w-10 h-10 rounded-xl bg-green-500/10 border border-green-500/20 flex items-center justify-center text-green-500 shrink-0 mt-0.5">
+                        <FileText size={20} />
+                      </div>
+                      <div className="min-w-0 flex-1 space-y-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="text-sm font-bold text-white tracking-wide break-words">
+                            {tituloCompleto}
+                          </p>
+                          {m.status === 'Inerte' && (
+                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-gray-500/10 text-gray-400 font-black uppercase tracking-tighter shrink-0">
+                              Inerte
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Proprietário Completo */}
+                        <div className="flex items-baseline gap-1.5 flex-wrap">
+                          <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider shrink-0">
+                            Proprietário:
                           </span>
+                          <span className="text-xs text-emerald-400 font-semibold tracking-normal break-words">
+                            {m.nomeProprietario?.trim() || 'Não informado'}
+                          </span>
+                        </div>
+
+                        {/* Número do CAR */}
+                        {m.numeroCar && (
+                          <div className="flex items-start gap-1.5 text-[10px] text-gray-400 font-mono">
+                            <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider font-sans shrink-0">
+                              CAR:
+                            </span>
+                            <span className="text-gray-400 font-mono break-all select-all">
+                              {m.numeroCar}
+                            </span>
+                          </div>
                         )}
                       </div>
-                      <p className="text-[10px] text-gray-500 uppercase font-bold tracking-widest truncate mt-0.5">
-                        CAR: {m.numeroCar} • {m.nomeProprietario}
-                      </p>
                     </div>
-                  </div>
-                  
-                  <div className="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t border-brand-dark-5/30 sm:border-0">
-                    <div className="text-left sm:text-right flex flex-row sm:flex-col items-center sm:items-end gap-1.5 sm:gap-0 shrink-0">
-                      <p className="text-[9px] text-gray-500 font-bold uppercase sm:mb-1">Validade:</p>
-                      <BadgeVencimento data={m.vencimento} tipo="MANEJO" status={m.status} emRenovacao={m.manejoEmRenovacao} />
-                    </div>
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      {m.arquivoUrl && (
-                        <button 
-                          onClick={() => visualizarDocumentoBase64(m.arquivoUrl!, `Manejo-${m.nomeFazenda}`)} 
-                          className="p-2 rounded-lg bg-brand-dark-2 text-brand-blue hover:text-brand-blue-light transition-colors"
-                          title="Visualizar Autorização"
-                        >
-                          <FileText size={16} />
-                        </button>
-                      )}
-                      {podeEditar && (
-                        <>
+                    
+                    <div className="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t border-brand-dark-5/30 sm:border-0 shrink-0">
+                      <div className="text-left sm:text-right flex flex-row sm:flex-col items-center sm:items-end gap-1.5 sm:gap-0 shrink-0">
+                        <p className="text-[9px] text-gray-500 font-bold uppercase sm:mb-1">Validade:</p>
+                        <BadgeVencimento data={m.vencimento} tipo="MANEJO" status={m.status} emRenovacao={m.manejoEmRenovacao} />
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {m.arquivoUrl && (
                           <button 
-                            onClick={() => {
-                              setManejoParaEditar(m);
-                              setModalManejo(true);
-                            }} 
-                            className="p-2 rounded-lg bg-brand-dark-2 text-gray-400 hover:text-brand-blue transition-colors"
-                            title="Editar Manejo"
+                            onClick={() => visualizarDocumentoBase64(m.arquivoUrl!, `Manejo-${m.nomeFazenda || 'documento'}`)} 
+                            className="p-2 rounded-lg bg-brand-dark-2 text-brand-blue hover:text-brand-blue-light transition-colors"
+                            title="Visualizar Autorização"
                           >
-                            <Pencil size={16} />
+                            <FileText size={16} />
                           </button>
-                          <button 
-                            onClick={() => {
-                              if(confirm('Excluir esta autorização?')) {
-                                deletarManejo(m.id).then(carregarDados);
-                              }
-                            }} 
-                            className="p-2 rounded-lg bg-brand-dark-2 text-gray-400 hover:text-red-400 transition-colors"
-                            title="Excluir Manejo"
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        </>
-                      )}
+                        )}
+                        {podeEditar && (
+                          <>
+                            <button 
+                              onClick={() => {
+                                setManejoParaEditar(m);
+                                setModalManejo(true);
+                              }} 
+                              className="p-2 rounded-lg bg-brand-dark-2 text-gray-400 hover:text-brand-blue transition-colors"
+                              title="Editar Manejo"
+                            >
+                              <Pencil size={16} />
+                            </button>
+                            <button 
+                              onClick={() => {
+                                if(confirm('Excluir esta autorização?')) {
+                                  deletarManejo(m.id).then(carregarDados);
+                                }
+                              }} 
+                              className="p-2 rounded-lg bg-brand-dark-2 text-gray-400 hover:text-red-400 transition-colors"
+                              title="Excluir Manejo"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </section>
