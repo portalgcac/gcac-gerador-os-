@@ -31,8 +31,12 @@ import {
   ehServicoTransferenciaAcervo,
   isServicoProgramadoLiberado,
   extrairDataYMD,
-  formatarParaISO
+  formatarParaISO,
+  normalizarFabricante,
+  normalizarModelo,
+  normalizarCalibre
 } from '../../utils/formatters';
+import { normalizarTipoArma } from '../../data/catalogoArmas';
 import { ModalEscolhaWhatsApp } from '../common/ModalEscolhaWhatsApp';
 import { Modal } from '../common/Modal';
 import { visualizarDocumentoBase64, fileToBase64, uploadBase64File } from '../../utils/fileUtils';
@@ -49,7 +53,11 @@ export function DetalheOrdem({ ordem }: DetalheOrdemProps) {
     atualizarGruServico, registrarPagamento, removerPagamento,
     sincronizarComPerfil, sincronizarOrdem
   } = useOrdens();
-  const { clientes, buscarCreditos, adicionarCredito, salvarGt, buscarArmas, salvarArma } = useClientes();
+  const { 
+    clientes, buscarCreditos, adicionarCredito, salvarGt, buscarArmas, salvarArma,
+    obterTiposDeArma, obterFabricantesPorTipo, obterModelosPorTipoEFabricante,
+    obterCalibresCompativeis, obterCalibreSugerido, obterDadosPorModelo
+  } = useClientes();
   const { estaAutenticado, usuario } = useAuth();
   const podeExcluir = usuario?.role === 'admin' || usuario?.permissoes?.includes('excluir_registros');
   const { estado: notif, mostrar, fechar } = useNotificacao();
@@ -81,6 +89,56 @@ export function DetalheOrdem({ ordem }: DetalheOrdemProps) {
   const [armasCliente, setArmasCliente] = useState<Arma[]>([]);
   const [armaSelecionadaId, setArmaSelecionadaId] = useState<string>('');
   const [modalArmaAberto, setModalArmaAberto] = useState(false);
+
+  // Estados específicos para Armamento no CRAF (Nova Arma vs Existente)
+  const [modoArmaCraf, setModoArmaCraf] = useState<'nova' | 'existente'>('nova');
+  const [novaArmaTipo, setNovaArmaTipo] = useState('PISTOLA');
+  const [novaArmaFabricante, setNovaArmaFabricante] = useState('');
+  const [novaArmaModelo, setNovaArmaModelo] = useState('');
+  const [novaArmaCalibre, setNovaArmaCalibre] = useState('');
+  const [novaArmaSerie, setNovaArmaSerie] = useState('');
+  const [novaArmaSigma, setNovaArmaSigma] = useState('');
+  const [novaArmaAcervo, setNovaArmaAcervo] = useState<'Tiro Desportivo' | 'Caça' | 'Coleção'>('Tiro Desportivo');
+
+  // Listas de opções inteligentes para a nova arma
+  const tiposArmaLista = obterTiposDeArma ? obterTiposDeArma() : ['PISTOLA', 'REVOLVER', 'CARABINA / FUZIL', 'ESPINGARDA', 'RIFLE'];
+  const fabricantesArmaLista = obterFabricantesPorTipo ? obterFabricantesPorTipo(novaArmaTipo) : [];
+  const modelosArmaLista = obterModelosPorTipoEFabricante ? obterModelosPorTipoEFabricante(novaArmaTipo, novaArmaFabricante) : [];
+  const calibresArmaLista = obterCalibresCompativeis ? obterCalibresCompativeis(novaArmaTipo, novaArmaModelo) : [];
+
+  const handleNovaArmaTipoChange = (tipo: string) => {
+    const tipoNorm = normalizarTipoArma(tipo);
+    setNovaArmaTipo(tipoNorm);
+    const novosModelos = obterModelosPorTipoEFabricante ? obterModelosPorTipoEFabricante(tipoNorm, novaArmaFabricante) : [];
+    if (!novosModelos.includes(novaArmaModelo)) {
+      setNovaArmaModelo('');
+      setNovaArmaCalibre('');
+    }
+  };
+
+  const handleNovaArmaFabricanteChange = (fab: string) => {
+    const fabNorm = normalizarFabricante(fab);
+    setNovaArmaFabricante(fabNorm);
+    const novosModelos = obterModelosPorTipoEFabricante ? obterModelosPorTipoEFabricante(novaArmaTipo, fabNorm) : [];
+    if (!novosModelos.includes(novaArmaModelo)) {
+      setNovaArmaModelo('');
+      setNovaArmaCalibre('');
+    }
+  };
+
+  const handleNovaArmaModeloChange = (mod: string) => {
+    const modNorm = normalizarModelo(mod);
+    setNovaArmaModelo(modNorm);
+    const dados = obterDadosPorModelo ? obterDadosPorModelo(modNorm) : null;
+    if (dados) {
+      if (dados.tipo && !novaArmaTipo) setNovaArmaTipo(dados.tipo);
+      if (dados.fabricante && !novaArmaFabricante) setNovaArmaFabricante(dados.fabricante);
+      if (dados.calibrePadrao) setNovaArmaCalibre(dados.calibrePadrao);
+    } else if (obterCalibreSugerido) {
+      const calSug = obterCalibreSugerido(novaArmaTipo, novaArmaFabricante, modNorm);
+      if (calSug) setNovaArmaCalibre(calSug);
+    }
+  };
 
   React.useEffect(() => {
     setValorDescontoInput(String(ordem.desconto || 0));
@@ -187,9 +245,13 @@ export function DetalheOrdem({ ordem }: DetalheOrdemProps) {
   React.useEffect(() => {
     if (modalConclusaoAberto && servicoConclusao) {
       const serv = ordem.servicos.find(s => s.id === servicoConclusao.id);
-      setArmaSelecionadaId(serv?.armaId || '');
+      if (!servicoConclusao.exigeCraf || modoArmaCraf === 'existente') {
+        if (serv?.armaId) {
+          setArmaSelecionadaId(serv.armaId);
+        }
+      }
     }
-  }, [modalConclusaoAberto, servicoConclusao, ordem.servicos]);
+  }, [modalConclusaoAberto, servicoConclusao, ordem.servicos, modoArmaCraf]);
 
   const servicos = ordem.servicos || [];
   const totalServicos = servicos.length;
@@ -364,6 +426,10 @@ export function DetalheOrdem({ ordem }: DetalheOrdemProps) {
         else defaultTipo = 'Outro';
       }
 
+      const nomeUpper = (serv?.nome || '').toUpperCase();
+      const isRenovacaoCraf = nomeUpper.includes('RENOVACAO') || nomeUpper.includes('RENOVAÇÃO') || nomeUpper.includes('2ª VIA') || nomeUpper.includes('SEGUNDA VIA');
+      const modoInicialCraf: 'nova' | 'existente' = (isRenovacaoCraf && armasCliente.length > 0) ? 'existente' : 'nova';
+
       setServicoConclusao({
         id: servicoId,
         nome: serv?.nome || '',
@@ -372,11 +438,29 @@ export function DetalheOrdem({ ordem }: DetalheOrdemProps) {
         isTransfAcervo
       });
       setConclusaoArquivo(null);
-      setSalvarNoPerfilCac(isTransfAcervo ? true : false);
+      setSalvarNoPerfilCac(isCraf || isTransfAcervo ? true : false);
+      setModoArmaCraf(modoInicialCraf);
       setVencimentoGt('');
       setVencimentoCraf('');
       setDestinoGt('');
       setTipoGt(defaultTipo);
+
+      // Resetar dados para cadastro de nova arma
+      setNovaArmaTipo('PISTOLA');
+      setNovaArmaFabricante('');
+      setNovaArmaModelo('');
+      setNovaArmaCalibre('');
+      setNovaArmaSerie('');
+      setNovaArmaSigma('');
+      setNovaArmaAcervo('Tiro Desportivo');
+
+      // Se for renovação ou guia, preserva arma vinculada; se for nova solicitação de CRAF, inicia sem arma antiga selecionada
+      if (isRenovacaoCraf || isGuia || isTransfAcervo) {
+        setArmaSelecionadaId(serv?.armaId || '');
+      } else {
+        setArmaSelecionadaId('');
+      }
+
       setModalConclusaoAberto(true);
       setStatusAberto(null);
       return;
@@ -452,8 +536,26 @@ export function DetalheOrdem({ ordem }: DetalheOrdemProps) {
             if (parsed.vencimento) {
               setVencimentoCraf(parsed.vencimento);
             }
+            if (parsed.numeroSerie) {
+              setNovaArmaSerie(parsed.numeroSerie);
+            }
+            if (parsed.numeroSigma) {
+              setNovaArmaSigma(parsed.numeroSigma);
+            }
+            if (parsed.calibre) {
+              setNovaArmaCalibre(normalizarCalibre(parsed.calibre));
+            }
+            if (parsed.tipo) {
+              setNovaArmaTipo(normalizarTipoArma(parsed.tipo));
+            }
+            if (parsed.fabricante) {
+              setNovaArmaFabricante(normalizarFabricante(parsed.fabricante));
+            }
+            if (parsed.modelo) {
+              setNovaArmaModelo(normalizarModelo(parsed.modelo));
+            }
             setSalvarNoPerfilCac(true);
-            mostrar('sucesso', 'Data de vencimento extraída com sucesso do PDF do CRAF!');
+            mostrar('sucesso', 'Dados do CRAF e validade extraídos com sucesso do PDF!');
           }
         } catch (parseErr) {
           console.warn('Erro ao ler PDF de CRAF:', parseErr);
@@ -483,11 +585,60 @@ export function DetalheOrdem({ ordem }: DetalheOrdemProps) {
       
       let targetArmaId = armaSelecionadaId || serv?.armaId;
       let targetArmaModelo = serv?.armaModelo;
-      
-      if (targetArmaId) {
+
+      // Tratamento especial para conclusão de CRAF
+      if (servicoConclusao.exigeCraf && salvarNoPerfilCac && clienteDaOS) {
+        if (modoArmaCraf === 'nova') {
+          if (!novaArmaFabricante.trim() || !novaArmaModelo.trim() || !novaArmaCalibre.trim() || !novaArmaSerie.trim()) {
+            mostrar('erro', 'Por favor, preencha os dados obrigatórios da nova arma: Fabricante, Modelo, Calibre e Nº de Série.');
+            setSalvandoConclusao(false);
+            return;
+          }
+
+          const { v4: uuidv4 } = await import('uuid');
+          const novaArmaId = uuidv4();
+          const novaArmaObj = {
+            id: novaArmaId,
+            clienteId: clienteDaOS.id,
+            tipo: normalizarTipoArma(novaArmaTipo),
+            fabricante: normalizarFabricante(novaArmaFabricante),
+            modelo: normalizarModelo(novaArmaModelo),
+            calibre: normalizarCalibre(novaArmaCalibre),
+            numeroSerie: novaArmaSerie.trim().toUpperCase(),
+            numeroSigma: novaArmaSigma ? novaArmaSigma.trim().toUpperCase() : undefined,
+            acervo: novaArmaAcervo,
+            vencimentoCraf: vencimentoCraf || undefined,
+            crafUrl: finalFileUrl || undefined,
+            crafEmRenovacao: false
+          };
+
+          await salvarArma(novaArmaObj, clienteDaOS.empresaId);
+          targetArmaId = novaArmaId;
+          const tipoPrefixo = novaArmaObj.tipo ? `[${novaArmaObj.tipo.toUpperCase()}] ` : '';
+          targetArmaModelo = `${tipoPrefixo}${novaArmaObj.fabricante} ${novaArmaObj.modelo} (${novaArmaObj.calibre})`;
+
+          const listaAtualizada = await buscarArmas(clienteDaOS.id, clienteDaOS.empresaId);
+          setArmasCliente(listaAtualizada);
+        } else {
+          // Atualizar CRAF de arma já cadastrada
+          if (targetArmaId) {
+            const arma = armasCliente.find(a => a.id === targetArmaId);
+            if (arma) {
+              await salvarArma({
+                ...arma,
+                vencimentoCraf: vencimentoCraf || undefined,
+                crafUrl: finalFileUrl || arma.crafUrl || undefined
+              }, clienteDaOS.empresaId);
+              const tipoPrefixo = arma.tipo ? `[${arma.tipo.toUpperCase()}] ` : '';
+              targetArmaModelo = `${tipoPrefixo}${arma.fabricante} ${arma.modelo} (${arma.calibre})`;
+            }
+          }
+        }
+      } else if (targetArmaId) {
         const arma = armasCliente.find(a => a.id === targetArmaId);
         if (arma) {
-          targetArmaModelo = `${arma.fabricante} ${arma.modelo} (${arma.calibre})`;
+          const tipoPrefixo = arma.tipo ? `[${arma.tipo.toUpperCase()}] ` : '';
+          targetArmaModelo = `${tipoPrefixo}${arma.fabricante} ${arma.modelo} (${arma.calibre})`;
         }
       }
 
@@ -509,17 +660,6 @@ export function DetalheOrdem({ ordem }: DetalheOrdemProps) {
           destino: destinoGt.toUpperCase(),
           arquivoUrl: finalFileUrl || undefined
         });
-      }
-
-      if (servicoConclusao.exigeCraf && salvarNoPerfilCac && targetArmaId && clienteDaOS) {
-        const arma = armasCliente.find(a => a.id === targetArmaId);
-        if (arma) {
-          await salvarArma({
-            ...arma,
-            vencimentoCraf: vencimentoCraf || undefined,
-            crafUrl: finalFileUrl || arma.crafUrl || undefined
-          }, clienteDaOS.empresaId);
-        }
       }
 
       // Automação de Transferência entre Acervos: atualiza acervo da arma no perfil do cliente automaticamente
@@ -1576,7 +1716,7 @@ export function DetalheOrdem({ ordem }: DetalheOrdemProps) {
             setServicoConclusao(null);
           }}
           titulo={`Concluir Serviço: ${servicoConclusao.nome}`}
-          tamanho="md"
+          tamanho={servicoConclusao.exigeCraf ? 'lg' : 'md'}
         >
           <div className="space-y-4">
             <div>
@@ -1632,7 +1772,7 @@ export function DetalheOrdem({ ordem }: DetalheOrdemProps) {
                       <label className="label text-[10px] font-bold uppercase tracking-wider text-gray-400">Armamento da Guia</label>
                       <div className="flex gap-2">
                         <select
-                          className="flex-1 bg-brand-dark-4 border border-brand-dark-5 focus:border-brand-blue/50 rounded-lg px-3 py-2 text-xs text-gray-200 outline-none transition-colors"
+                          className="flex-1 min-w-0 bg-brand-dark-4 border border-brand-dark-5 focus:border-brand-blue/50 rounded-lg px-3 py-2 text-xs text-gray-200 outline-none transition-colors"
                           value={armaSelecionadaId}
                           onChange={e => setArmaSelecionadaId(e.target.value)}
                           required={salvarNoPerfilCac}
@@ -1647,7 +1787,7 @@ export function DetalheOrdem({ ordem }: DetalheOrdemProps) {
                         <button
                           type="button"
                           onClick={() => setModalArmaAberto(true)}
-                          className="px-3 py-2 bg-brand-blue/20 hover:bg-brand-blue/30 text-brand-blue-light border border-brand-blue/30 rounded-lg text-xs font-bold transition-all whitespace-nowrap"
+                          className="shrink-0 px-3 py-2 bg-brand-blue/20 hover:bg-brand-blue/30 text-brand-blue-light border border-brand-blue/30 rounded-lg text-xs font-bold transition-all whitespace-nowrap"
                         >
                           + Cadastrar
                         </button>
@@ -1708,48 +1848,220 @@ export function DetalheOrdem({ ordem }: DetalheOrdemProps) {
                   />
                   <div>
                     <span className="font-bold text-white text-xs">Registrar/Atualizar CRAF no perfil do cliente</span>
-                    <p className="text-[10px] text-gray-500">Isso salvará esta arma e seu documento CRAF diretamente no perfil do cliente.</p>
+                    <p className="text-[10px] text-gray-500">Salva esta arma e seu documento CRAF diretamente no perfil do cliente.</p>
                   </div>
                 </label>
 
                 {salvarNoPerfilCac && (
                   <div className="space-y-3 pt-2 border-t border-brand-dark-5/50 animate-scale-up">
-                    <div>
-                      <label className="label text-[10px] font-bold uppercase tracking-wider text-gray-400">Armamento do CRAF</label>
-                      <div className="flex gap-2">
-                        <select
-                          className="flex-1 bg-brand-dark-4 border border-brand-dark-5 focus:border-brand-blue/50 rounded-lg px-3 py-2 text-xs text-gray-200 outline-none transition-colors"
-                          value={armaSelecionadaId}
-                          onChange={e => setArmaSelecionadaId(e.target.value)}
-                          required={salvarNoPerfilCac}
-                        >
-                          <option value="">Selecione uma arma...</option>
-                          {armasCliente.map(a => (
-                            <option key={a.id} value={a.id}>
-                              {a.tipo ? `[${a.tipo.toUpperCase()}] ` : ''}{a.fabricante} {a.modelo} ({a.calibre}) - SÉRIE: {a.numeroSerie}
-                            </option>
-                          ))}
-                        </select>
-                        <button
-                          type="button"
-                          onClick={() => setModalArmaAberto(true)}
-                          className="px-3 py-2 bg-brand-blue/20 hover:bg-brand-blue/30 text-brand-blue-light border border-brand-blue/30 rounded-lg text-xs font-bold transition-all whitespace-nowrap"
-                        >
-                          + Cadastrar
-                        </button>
-                      </div>
+                    {/* Seletor de Modo: Nova Arma ou Arma Existente */}
+                    <div className="flex gap-2 p-1 bg-brand-dark-4 rounded-lg border border-brand-dark-5">
+                      <button
+                        type="button"
+                        onClick={() => setModoArmaCraf('nova')}
+                        className={`flex-1 py-1.5 px-3 rounded-md text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                          modoArmaCraf === 'nova'
+                            ? 'bg-brand-blue text-white shadow-sm'
+                            : 'text-gray-400 hover:text-gray-200'
+                        }`}
+                      >
+                        ➕ Cadastrar Nova Arma
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setModoArmaCraf('existente')}
+                        className={`flex-1 py-1.5 px-3 rounded-md text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                          modoArmaCraf === 'existente'
+                            ? 'bg-brand-blue text-white shadow-sm'
+                            : 'text-gray-400 hover:text-gray-200'
+                        }`}
+                      >
+                        🔄 Atualizar Arma Já Cadastrada
+                      </button>
                     </div>
 
-                    <div>
-                      <label className="label text-[10px] font-bold uppercase tracking-wider text-gray-400">Data de Vencimento do CRAF</label>
-                      <input
-                        type="date"
-                        className="input text-xs"
-                        value={vencimentoCraf}
-                        onChange={e => setVencimentoCraf(e.target.value)}
-                        required={salvarNoPerfilCac}
-                      />
-                    </div>
+                    {modoArmaCraf === 'nova' ? (
+                      /* Formulário Direto de Cadastro de Nova Arma */
+                      <div className="space-y-3 bg-brand-dark-4/70 p-3.5 rounded-xl border border-brand-dark-5">
+                        <div className="flex items-center justify-between pb-1 border-b border-brand-dark-5/40">
+                          <span className="text-[10px] font-black uppercase tracking-wider text-brand-blue-light flex items-center gap-1.5">
+                            ⚔️ Dados da Nova Arma (Será inserida no perfil do cliente)
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setModalArmaAberto(true)}
+                            className="text-[10px] font-bold text-gray-400 hover:text-brand-blue-light underline"
+                            title="Abrir modal com foto e recursos avançados"
+                          >
+                            Abrir cadastro detalhado
+                          </button>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div>
+                            <label className="label text-[10px] font-bold uppercase tracking-wider text-gray-400">Tipo de Arma *</label>
+                            <select
+                              className="w-full bg-brand-dark-3 border border-brand-dark-5 focus:border-brand-blue/50 rounded-lg px-2.5 py-2 text-xs text-gray-200 outline-none"
+                              value={novaArmaTipo}
+                              onChange={e => handleNovaArmaTipoChange(e.target.value)}
+                              required={salvarNoPerfilCac && modoArmaCraf === 'nova'}
+                            >
+                              {tiposArmaLista.map(t => (
+                                <option key={t} value={t}>{t}</option>
+                              ))}
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="label text-[10px] font-bold uppercase tracking-wider text-gray-400">Acervo</label>
+                            <select
+                              className="w-full bg-brand-dark-3 border border-brand-dark-5 focus:border-brand-blue/50 rounded-lg px-2.5 py-2 text-xs text-gray-200 outline-none"
+                              value={novaArmaAcervo}
+                              onChange={e => setNovaArmaAcervo(e.target.value as any)}
+                            >
+                              <option value="Tiro Desportivo">Tiro Desportivo</option>
+                              <option value="Caça">Caça</option>
+                              <option value="Coleção">Coleção</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div>
+                            <label className="label text-[10px] font-bold uppercase tracking-wider text-gray-400">Fabricante *</label>
+                            <input
+                              type="text"
+                              list="datalist-fabricantes-craf"
+                              className="input text-xs uppercase"
+                              placeholder="Ex: TAURUS, GLOCK, ROSSI..."
+                              value={novaArmaFabricante}
+                              onChange={e => handleNovaArmaFabricanteChange(e.target.value)}
+                              required={salvarNoPerfilCac && modoArmaCraf === 'nova'}
+                            />
+                            <datalist id="datalist-fabricantes-craf">
+                              {fabricantesArmaLista.map(f => (
+                                <option key={f} value={f} />
+                              ))}
+                            </datalist>
+                          </div>
+
+                          <div>
+                            <label className="label text-[10px] font-bold uppercase tracking-wider text-gray-400">Modelo *</label>
+                            <input
+                              type="text"
+                              list="datalist-modelos-craf"
+                              className="input text-xs uppercase"
+                              placeholder="Ex: G2C, TS9, PUMA..."
+                              value={novaArmaModelo}
+                              onChange={e => handleNovaArmaModeloChange(e.target.value)}
+                              required={salvarNoPerfilCac && modoArmaCraf === 'nova'}
+                            />
+                            <datalist id="datalist-modelos-craf">
+                              {modelosArmaLista.map(m => (
+                                <option key={m} value={m} />
+                              ))}
+                            </datalist>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div>
+                            <label className="label text-[10px] font-bold uppercase tracking-wider text-gray-400">Calibre *</label>
+                            <input
+                              type="text"
+                              list="datalist-calibres-craf"
+                              className="input text-xs uppercase"
+                              placeholder="Ex: 9mm, .357 MAG, .380..."
+                              value={novaArmaCalibre}
+                              onChange={e => setNovaArmaCalibre(normalizarCalibre(e.target.value))}
+                              required={salvarNoPerfilCac && modoArmaCraf === 'nova'}
+                            />
+                            <datalist id="datalist-calibres-craf">
+                              {calibresArmaLista.map(c => (
+                                <option key={c} value={c} />
+                              ))}
+                            </datalist>
+                          </div>
+
+                          <div>
+                            <label className="label text-[10px] font-bold uppercase tracking-wider text-gray-400">Número de Série *</label>
+                            <input
+                              type="text"
+                              className="input text-xs uppercase"
+                              placeholder="Ex: ABC123456"
+                              value={novaArmaSerie}
+                              onChange={e => setNovaArmaSerie(e.target.value.toUpperCase())}
+                              required={salvarNoPerfilCac && modoArmaCraf === 'nova'}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div>
+                            <label className="label text-[10px] font-bold uppercase tracking-wider text-gray-400">Nº SIGMA / SINARM (Registro CRAF)</label>
+                            <input
+                              type="text"
+                              className="input text-xs uppercase"
+                              placeholder="Ex: 12345678"
+                              value={novaArmaSigma}
+                              onChange={e => setNovaArmaSigma(e.target.value.toUpperCase())}
+                            />
+                          </div>
+
+                          <div>
+                            <label className="label text-[10px] font-bold uppercase tracking-wider text-gray-400">Data de Vencimento do CRAF</label>
+                            <input
+                              type="date"
+                              className="input text-xs"
+                              value={vencimentoCraf}
+                              onChange={e => setVencimentoCraf(e.target.value)}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      /* Modo Arma Existente (Renovação / Atualização) */
+                      <div className="space-y-3 bg-brand-dark-4/70 p-3.5 rounded-xl border border-brand-dark-5">
+                        <div>
+                          <label className="label text-[10px] font-bold uppercase tracking-wider text-gray-400">Armamento do CRAF *</label>
+                          <div className="flex gap-2">
+                            <select
+                              className="flex-1 min-w-0 bg-brand-dark-4 border border-brand-dark-5 focus:border-brand-blue/50 rounded-lg px-3 py-2 text-xs text-gray-200 outline-none transition-colors"
+                              value={armaSelecionadaId}
+                              onChange={e => setArmaSelecionadaId(e.target.value)}
+                              required={salvarNoPerfilCac && modoArmaCraf === 'existente'}
+                            >
+                              <option value="">Selecione uma arma...</option>
+                              {armasCliente.map(a => (
+                                <option key={a.id} value={a.id}>
+                                  {a.tipo ? `[${a.tipo.toUpperCase()}] ` : ''}{a.fabricante} {a.modelo} ({a.calibre}) - SÉRIE: {a.numeroSerie}
+                                </option>
+                              ))}
+                            </select>
+                            <button
+                              type="button"
+                              onClick={() => setModalArmaAberto(true)}
+                              className="shrink-0 px-3 py-2 bg-brand-blue/20 hover:bg-brand-blue/30 text-brand-blue-light border border-brand-blue/30 rounded-lg text-xs font-bold transition-all whitespace-nowrap"
+                            >
+                              + Cadastrar
+                            </button>
+                          </div>
+                          {armasCliente.length === 0 && (
+                            <p className="text-[10px] text-amber-400 mt-1">Este cliente ainda não possui armas cadastradas. Alterne para a opção "Cadastrar Nova Arma" acima.</p>
+                          )}
+                        </div>
+
+                        <div>
+                          <label className="label text-[10px] font-bold uppercase tracking-wider text-gray-400">Nova Data de Vencimento do CRAF</label>
+                          <input
+                            type="date"
+                            className="input text-xs"
+                            value={vencimentoCraf}
+                            onChange={e => setVencimentoCraf(e.target.value)}
+                          />
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -1773,7 +2085,11 @@ export function DetalheOrdem({ ordem }: DetalheOrdemProps) {
                   salvandoConclusao ||
                   (salvarNoPerfilCac && (
                     (servicoConclusao.exigeGt && (!vencimentoGt || !destinoGt || !armaSelecionadaId)) ||
-                    (servicoConclusao.exigeCraf && (!vencimentoCraf || !armaSelecionadaId))
+                    (servicoConclusao.exigeCraf && (
+                      modoArmaCraf === 'nova'
+                        ? (!novaArmaFabricante.trim() || !novaArmaModelo.trim() || !novaArmaCalibre.trim() || !novaArmaSerie.trim())
+                        : (!armaSelecionadaId)
+                    ))
                   ))
                 }
                 className="btn-primary flex-1 py-2.5 rounded-lg text-xs font-bold uppercase flex items-center justify-center gap-2"

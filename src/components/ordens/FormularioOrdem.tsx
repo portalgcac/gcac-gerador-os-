@@ -1571,7 +1571,7 @@ export function FormularioOrdem({ ordemExistente }: FormularioOrdemProps) {
                       </label>
                       <div className="flex gap-2">
                         <select
-                          className="flex-1 bg-brand-dark-4 border border-brand-dark-5 focus:border-brand-blue/50 rounded-lg px-3 py-2 text-xs text-gray-200 outline-none transition-colors"
+                          className="flex-1 min-w-0 bg-brand-dark-4 border border-brand-dark-5 focus:border-brand-blue/50 rounded-lg px-3 py-2 text-xs text-gray-200 outline-none transition-colors"
                           value={serv.armaId || ''}
                           onChange={e => {
                             const val = e.target.value;
@@ -1599,7 +1599,7 @@ export function FormularioOrdem({ ordemExistente }: FormularioOrdemProps) {
                         <button
                           type="button"
                           onClick={() => abrirModalCadastroArma(index)}
-                          className="px-3 py-2 bg-brand-blue/20 hover:bg-brand-blue/30 text-brand-blue-light border border-brand-blue/30 rounded-lg text-xs font-bold transition-all whitespace-nowrap"
+                          className="shrink-0 px-3 py-2 bg-brand-blue/20 hover:bg-brand-blue/30 text-brand-blue-light border border-brand-blue/30 rounded-lg text-xs font-bold transition-all whitespace-nowrap"
                         >
                           + Cadastrar
                         </button>

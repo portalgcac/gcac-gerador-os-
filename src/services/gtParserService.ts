@@ -88,6 +88,12 @@ export async function parseGtPdf(file: File): Promise<GtData> {
 export interface CrafData {
   vencimento?: string;
   rawText?: string;
+  tipo?: string;
+  fabricante?: string;
+  modelo?: string;
+  calibre?: string;
+  numeroSerie?: string;
+  numeroSigma?: string;
 }
 
 export async function parseCrafPdf(file: File): Promise<CrafData> {
@@ -123,6 +129,47 @@ export async function parseCrafPdf(file: File): Promise<CrafData> {
       const [d, m, y] = dates[dates.length - 1].split('/');
       data.vencimento = `${y}-${m}-${d}`;
     }
+  }
+
+  // Nº de Série
+  const serieMatch = text.match(/(?:N[ºO\.]?\s*(?:DE\s*)?S[EÉ]RIE|SERIE)[\s:]+([A-Z0-9\.\-]+)/);
+  if (serieMatch && serieMatch[1] && !serieMatch[1].includes('VALID') && !serieMatch[1].includes('DATA')) {
+    data.numeroSerie = serieMatch[1].trim();
+  }
+
+  // Nº SIGMA ou SINARM
+  const sigmaMatch = text.match(/(?:N[ºO\.]?\s*)?(?:SIGMA|SINARM|CRAF)[\s:]+([0-9\.\-]+)/);
+  if (sigmaMatch && sigmaMatch[1]) {
+    data.numeroSigma = sigmaMatch[1].trim();
+  }
+
+  // Calibre
+  const calMatch = text.match(/CALIBRE[\s:]+([0-9\.\/]+(?:\s*[A-Z]+)?)/);
+  if (calMatch && calMatch[1]) {
+    data.calibre = calMatch[1].trim();
+  }
+
+  // Tipo / Espécie
+  const tipoMatch = text.match(/(?:ESP[EÉ]CIE|TIPO)[\s:]+([A-Z\/\s]+?)(?:\s{2,}|\n|MARCA|FABRICANTE|CALIBRE)/);
+  if (tipoMatch && tipoMatch[1]) {
+    const t = tipoMatch[1].trim();
+    if (t.includes('PISTOLA')) data.tipo = 'PISTOLA';
+    else if (t.includes('REVOLVER')) data.tipo = 'REVOLVER';
+    else if (t.includes('CARABINA') || t.includes('FUZIL')) data.tipo = 'CARABINA / FUZIL';
+    else if (t.includes('ESPINGARDA')) data.tipo = 'ESPINGARDA';
+    else if (t.includes('RIFLE')) data.tipo = 'RIFLE';
+  }
+
+  // Fabricante / Marca
+  const fabMatch = text.match(/(?:FABRICANTE|MARCA)[\s:]+([A-Z0-9\s]+?)(?:\s{2,}|\n|MODELO|CALIBRE)/);
+  if (fabMatch && fabMatch[1]) {
+    data.fabricante = fabMatch[1].trim();
+  }
+
+  // Modelo
+  const modMatch = text.match(/MODELO[\s:]+([A-Z0-9\s\.\-]+?)(?:\s{2,}|\n|CALIBRE|N[ºO])/);
+  if (modMatch && modMatch[1]) {
+    data.modelo = modMatch[1].trim();
   }
 
   return data;
