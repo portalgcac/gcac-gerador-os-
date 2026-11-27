@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { 
   FileText, Plus, Trash2, Edit3, Download, Copy, Check, AlertCircle, Sparkles, User, RefreshCw,
-  Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight, AlignJustify, Minus, Table 
+  Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight, AlignJustify, Minus, Table,
+  ArrowLeft, Upload, Image as ImageIcon, Eye, MapPin, X 
 } from 'lucide-react';
 import { useClientes } from '../../context/ClientesContext';
 import { Cliente, ModeloDeclaracao } from '../../types';
@@ -42,15 +43,43 @@ function inserirHtmlNoCursor(html: string) {
 
 interface ToolbarProps {
   editorRef: React.RefObject<HTMLDivElement | null>;
+  onInserirImagem?: (base64: string, nomeArquivo?: string) => void;
 }
 
-function Toolbar({ editorRef }: ToolbarProps) {
+function Toolbar({ editorRef, onInserirImagem }: ToolbarProps) {
   const [mostrarMenuTabela, setMostrarMenuTabela] = useState(false);
   const [estaNaTabela, setEstaNaTabela] = useState(false);
   const [hoveredR, setHoveredR] = useState(0);
   const [hoveredC, setHoveredC] = useState(0);
   const [manualLinhas, setManualLinhas] = useState('3');
   const [manualColunas, setManualColunas] = useState('3');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleEscolherImagem = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const base64 = event.target?.result as string;
+      if (editorRef.current) {
+        editorRef.current.focus();
+      }
+      inserirHtmlNoCursor(`
+        <div style="text-align: center; margin: 15px 0;">
+          <img src="${base64}" alt="Foto / Print" style="max-width: 95%; max-height: 480px; object-fit: contain; border: 1px solid #d1d5db; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);" />
+        </div>
+      `);
+      if (editorRef.current) {
+        const inputEvent = new Event('input', { bubbles: true });
+        editorRef.current.dispatchEvent(inputEvent);
+      }
+      if (onInserirImagem) {
+        onInserirImagem(base64, file.name);
+      }
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
 
   // Close dropdown on click outside
   useEffect(() => {
@@ -556,11 +585,33 @@ function Toolbar({ editorRef }: ToolbarProps) {
           </div>
         )}
       </div>
+
+      <div className="h-4 w-px bg-brand-dark-5 mx-1" />
+
+      {/* Botão de Inserir Imagem / Foto */}
+      <button
+        type="button"
+        onClick={() => fileInputRef.current?.click()}
+        onMouseDown={(e) => e.preventDefault()}
+        className="p-1.5 hover:bg-brand-dark-5 text-gray-400 hover:text-white rounded-lg transition-all flex items-center gap-1"
+        title="Inserir Foto / Print / Comprovante no Editor"
+      >
+        <ImageIcon size={14} className="text-brand-blue" />
+        <span className="text-[11px] font-semibold hidden sm:inline">Foto / Print</span>
+      </button>
+      <input
+        type="file"
+        ref={fileInputRef}
+        accept="image/*"
+        className="hidden"
+        onChange={handleEscolherImagem}
+      />
     </div>
   );
 }
 
 export function GerenciadorDeclaracoes() {
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { clientes, buscarModelosDeclaracao, salvarModeloDeclaracao, deletarModeloDeclaracao, atualizarCliente } = useClientes();
   
@@ -575,6 +626,15 @@ export function GerenciadorDeclaracoes() {
   const [copiado, setCopiado] = useState(false);
   const [gerandoPdf, setGerandoPdf] = useState(false);
   const [tituloManual, setTituloManual] = useState('');
+
+  // Anexo de Comprovante de Endereço (Foto/Print)
+  const [comprovanteEndereco, setComprovanteEndereco] = useState<{
+    arquivoNome: string;
+    base64: string;
+    tipo: string;
+  } | null>(null);
+  const [anexarComprovanteNoPdf, setAnexarComprovanteNoPdf] = useState(true);
+  const [mostrarModalImagem, setMostrarModalImagem] = useState(false);
 
   // Estado de Edição de Modelo
   const [modeloEditando, setModeloEditando] = useState<Partial<ModeloDeclaracao> | null>(null);
@@ -675,6 +735,112 @@ export function GerenciadorDeclaracoes() {
       text.includes('{{clube_')
     );
   }, [modeloSelecionado]);
+
+  const isDeclaracaoEndereco = useMemo(() => {
+    const t = (tituloManual || modeloSelecionado?.titulo || '').toUpperCase();
+    return t.includes('ENDEREÇO') || t.includes('ENDERECO') || t.includes('RESIDÊNCIA') || t.includes('RESIDENCIA');
+  }, [tituloManual, modeloSelecionado]);
+
+  const handleVoltar = () => {
+    const cid = (clienteSelecionadoId && clienteSelecionadoId !== 'avulso')
+      ? clienteSelecionadoId
+      : searchParams.get('clienteId');
+    if (cid && cid !== 'avulso') {
+      navigate(`/clientes/${cid}`);
+    } else {
+      navigate(-1);
+    }
+  };
+
+  const handleSelecionarArquivoComprovante = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const base64 = event.target?.result as string;
+      setComprovanteEndereco({
+        arquivoNome: file.name,
+        base64,
+        tipo: file.type || 'image/png'
+      });
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
+  const handleDropComprovante = (e: React.DragEvent<HTMLElement>) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      alert('Por favor, selecione um arquivo de imagem (PNG, JPG, JPEG).');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const base64 = event.target?.result as string;
+      setComprovanteEndereco({
+        arquivoNome: file.name,
+        base64,
+        tipo: file.type || 'image/png'
+      });
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleInserirComprovanteNoTexto = () => {
+    if (!comprovanteEndereco) return;
+    if (editorRefGerar.current) {
+      editorRefGerar.current.focus();
+      inserirHtmlNoCursor(`
+        <div style="text-align: center; margin: 15px 0;">
+          <img src="${comprovanteEndereco.base64}" alt="Comprovante de Endereço" style="max-width: 95%; max-height: 480px; object-fit: contain; border: 1px solid #d1d5db; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);" />
+        </div>
+      `);
+      handleEditorGerarInput();
+    }
+  };
+
+  const handleEditorGerarPaste = (e: React.ClipboardEvent<HTMLDivElement>) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.indexOf('image') !== -1) {
+        e.preventDefault();
+        const file = items[i].getAsFile();
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            const base64 = event.target?.result as string;
+            inserirHtmlNoCursor(`
+              <div style="text-align: center; margin: 15px 0;">
+                <img src="${base64}" alt="Print / Foto" style="max-width: 95%; max-height: 480px; object-fit: contain; border: 1px solid #d1d5db; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);" />
+              </div>
+            `);
+            handleEditorGerarInput();
+            setComprovanteEndereco({
+              arquivoNome: `print_comprovante_${Date.now()}.png`,
+              base64,
+              tipo: file.type || 'image/png'
+            });
+          };
+          reader.readAsDataURL(file);
+        }
+        return;
+      }
+    }
+  };
+
+  const handleImagemInseridaPeloToolbar = (base64: string, nomeArquivo?: string) => {
+    handleEditorGerarInput();
+    if (!comprovanteEndereco) {
+      setComprovanteEndereco({
+        arquivoNome: nomeArquivo || `imagem_${Date.now()}.png`,
+        base64,
+        tipo: 'image/png'
+      });
+    }
+  };
 
   // Carregar Modelos do DB
   const carregarModelos = async () => {
@@ -925,7 +1091,15 @@ Por ser expressão da verdade, firmo o presente compromisso.`;
         tituloManual, 
         textoEditado, 
         clienteSelecionado.nome,
-        clienteSelecionado.cpf
+        clienteSelecionado.cpf,
+        anexarComprovanteNoPdf && comprovanteEndereco ? {
+          imagemBase64: comprovanteEndereco.base64,
+          tipo: 'comprovante_endereco',
+          titulo: 'COMPROVANTE DE ENDEREÇO'
+        } : undefined,
+        {
+          enderecoCliente: dadosCliente.endereco || clienteSelecionado.endereco
+        }
       );
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -1025,11 +1199,24 @@ Por ser expressão da verdade, firmo o presente compromisso.`;
     <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-            <FileText className="text-brand-blue" /> Gerador de Declarações
-          </h1>
-          <p className="text-sm text-gray-400">Gere e emita declarações e termos oficiais com dados automatizados do acervo.</p>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={handleVoltar}
+            className="p-2.5 bg-brand-dark-3 border border-brand-dark-5 hover:border-brand-blue/50 hover:bg-brand-dark-4 rounded-xl text-gray-300 hover:text-white transition-all flex items-center gap-2 group shadow-sm"
+            title={clienteSelecionado && clienteSelecionadoId !== 'avulso' ? `Voltar para o perfil de ${clienteSelecionado.nome}` : 'Voltar'}
+          >
+            <ArrowLeft size={18} className="text-gray-400 group-hover:text-brand-blue group-hover:-translate-x-0.5 transition-all" />
+            <span className="text-xs font-bold hidden sm:inline">
+              {clienteSelecionado && clienteSelecionadoId !== 'avulso' ? 'Voltar ao Perfil' : 'Voltar'}
+            </span>
+          </button>
+          <div>
+            <h1 className="text-2xl font-bold text-white flex items-center gap-2">
+              <FileText className="text-brand-blue" /> Gerador de Declarações
+            </h1>
+            <p className="text-sm text-gray-400">Gere e emita declarações e termos oficiais com dados automatizados do acervo.</p>
+          </div>
         </div>
       </div>
 
@@ -1345,6 +1532,129 @@ Por ser expressão da verdade, firmo o presente compromisso.`;
                 </div>
               </div>
             )}
+
+            {/* Seção de Anexar ou Inserir Comprovante de Endereço */}
+            {clienteSelecionado && (
+              <div className={`p-3.5 rounded-xl border transition-all ${
+                isDeclaracaoEndereco 
+                  ? 'bg-brand-blue/5 border-brand-blue/40 shadow-sm shadow-brand-blue/10' 
+                  : 'bg-brand-dark-4 border-brand-dark-5'
+              }`}>
+                <div className="flex items-center justify-between border-b border-brand-dark-5/80 pb-2 mb-3">
+                  <div className="flex items-center gap-1.5">
+                    <MapPin size={14} className={isDeclaracaoEndereco ? 'text-brand-blue' : 'text-gray-400'} />
+                    <span className="text-[11px] font-black uppercase tracking-wider text-white">
+                      Comprovante de Endereço
+                    </span>
+                  </div>
+                  {isDeclaracaoEndereco ? (
+                    <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-brand-blue/20 text-brand-blue border border-brand-blue/30">
+                      Exigido Anexar
+                    </span>
+                  ) : (
+                    <span className="text-[9px] font-semibold text-gray-500">
+                      Opcional
+                    </span>
+                  )}
+                </div>
+
+                {!comprovanteEndereco ? (
+                  <div>
+                    <label 
+                      onDragOver={e => e.preventDefault()}
+                      onDrop={handleDropComprovante}
+                      className="border-2 border-dashed border-brand-dark-5 hover:border-brand-blue/50 rounded-xl p-4 flex flex-col items-center justify-center text-center cursor-pointer transition-all bg-brand-dark-3/50 hover:bg-brand-dark-3 group"
+                    >
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        className="hidden" 
+                        onChange={handleSelecionarArquivoComprovante}
+                      />
+                      <div className="p-2.5 rounded-full bg-brand-dark-4 text-gray-400 group-hover:text-brand-blue group-hover:bg-brand-blue/10 transition-all mb-2">
+                        <Upload size={18} />
+                      </div>
+                      <p className="text-xs font-bold text-gray-300 group-hover:text-white">
+                        Anexar Foto ou Print
+                      </p>
+                      <p className="text-[10px] text-gray-500 mt-1">
+                        Clique, arraste ou cole com <kbd className="px-1 py-0.5 bg-brand-dark-5 rounded text-gray-300 text-[9px] font-mono">Ctrl+V</kbd>
+                      </p>
+                      <p className="text-[9px] text-gray-600 mt-0.5">
+                        PNG, JPG ou JPEG (Conta de Luz, Água, etc.)
+                      </p>
+                    </label>
+                  </div>
+                ) : (
+                  <div className="space-y-2.5">
+                    <div className="relative rounded-lg overflow-hidden border border-brand-dark-5 bg-brand-dark-5/30 p-2 flex items-center gap-3">
+                      <div 
+                        onClick={() => setMostrarModalImagem(true)}
+                        className="w-16 h-16 rounded border border-brand-dark-5 overflow-hidden bg-black/40 flex-shrink-0 cursor-pointer relative group"
+                        title="Clique para ampliar"
+                      >
+                        <img 
+                          src={comprovanteEndereco.base64} 
+                          alt="Comprovante de Endereço" 
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                        />
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                          <Eye size={14} className="text-white" />
+                        </div>
+                      </div>
+                      
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-bold text-white truncate" title={comprovanteEndereco.arquivoNome}>
+                          {comprovanteEndereco.arquivoNome}
+                        </p>
+                        <p className="text-[10px] text-brand-green font-medium flex items-center gap-1 mt-0.5">
+                          <Check size={11} /> Foto carregada
+                        </p>
+                        <div className="flex items-center gap-2 mt-1.5">
+                          <button
+                            type="button"
+                            onClick={() => setMostrarModalImagem(true)}
+                            className="text-[10px] text-brand-blue hover:underline flex items-center gap-0.5"
+                          >
+                            <Eye size={10} /> Ver ampliado
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setComprovanteEndereco(null)}
+                            className="text-[10px] text-red-400 hover:text-red-300 flex items-center gap-0.5"
+                          >
+                            <Trash2 size={10} /> Remover
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Botão para inserir no corpo do texto */}
+                    <button
+                      type="button"
+                      onClick={handleInserirComprovanteNoTexto}
+                      className="w-full py-1.5 px-2 bg-brand-dark-3 hover:bg-brand-dark-4 border border-brand-dark-5 hover:border-brand-blue/30 rounded-lg text-[11px] font-bold text-gray-300 hover:text-white transition-all flex items-center justify-center gap-1.5"
+                    >
+                      <ImageIcon size={13} className="text-brand-blue" />
+                      Inserir foto no corpo do texto
+                    </button>
+
+                    {/* Checkbox para anexar no PDF */}
+                    <label className="flex items-start gap-2 pt-1 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={anexarComprovanteNoPdf}
+                        onChange={e => setAnexarComprovanteNoPdf(e.target.checked)}
+                        className="rounded border-brand-dark-5 text-brand-blue focus:ring-brand-blue mt-0.5"
+                      />
+                      <span className="text-[11px] text-gray-300 leading-tight">
+                        Anexar como página oficial no PDF <span className="text-brand-blue font-semibold">(Exigido p/ SisGCorp/Sinarm)</span>
+                      </span>
+                    </label>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Editor e Preview de Texto */}
@@ -1386,12 +1696,13 @@ Por ser expressão da verdade, firmo o presente compromisso.`;
                 <div>
                   <label className="label">Corpo do Texto (Edite livremente antes de gerar o PDF)</label>
                   <div className="rounded-xl border border-brand-dark-5 overflow-hidden">
-                    <Toolbar editorRef={editorRefGerar} />
+                    <Toolbar editorRef={editorRefGerar} onInserirImagem={handleImagemInseridaPeloToolbar} />
                     <div
                       ref={editorRefGerar}
                       contentEditable
                       suppressContentEditableWarning
                       onInput={handleEditorGerarInput}
+                      onPaste={handleEditorGerarPaste}
                       className="input min-h-[450px] h-[450px] overflow-y-auto font-sans text-sm py-3 px-4 leading-relaxed focus:outline-none focus:ring-0 rounded-b-xl border-t-0 bg-brand-dark-3/30"
                     />
                   </div>
@@ -1565,6 +1876,48 @@ Por ser expressão da verdade, firmo o presente compromisso.`;
                 </p>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Visualização Ampliada da Foto / Print */}
+      {mostrarModalImagem && comprovanteEndereco && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="relative max-w-4xl max-h-[90vh] bg-brand-dark-3 border border-brand-dark-5 rounded-2xl overflow-hidden flex flex-col shadow-2xl">
+            <div className="flex items-center justify-between p-3.5 border-b border-brand-dark-5 bg-brand-dark-4">
+              <div className="flex items-center gap-2">
+                <MapPin size={16} className="text-brand-blue" />
+                <span className="text-sm font-bold text-white truncate max-w-md">
+                  {comprovanteEndereco.arquivoNome}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setMostrarModalImagem(false)}
+                className="p-1.5 hover:bg-brand-dark-5 rounded-lg text-gray-400 hover:text-white transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="p-4 overflow-auto max-h-[75vh] flex items-center justify-center bg-brand-dark-2">
+              <img
+                src={comprovanteEndereco.base64}
+                alt="Comprovante de Endereço"
+                className="max-w-full max-h-[70vh] object-contain rounded-lg border border-brand-dark-5 shadow-lg"
+              />
+            </div>
+            <div className="p-3 border-t border-brand-dark-5 bg-brand-dark-4 flex items-center justify-between">
+              <span className="text-xs text-gray-400">
+                Esta foto/print será incluída no PDF oficial gerado.
+              </span>
+              <button
+                type="button"
+                onClick={() => setMostrarModalImagem(false)}
+                className="btn-primary py-1.5 px-4 text-xs"
+              >
+                Fechar
+              </button>
+            </div>
           </div>
         </div>
       )}

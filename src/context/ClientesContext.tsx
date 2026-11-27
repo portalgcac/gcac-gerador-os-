@@ -1492,6 +1492,11 @@ export function ClientesProvider({ children }: { children: React.ReactNode }) {
           titulo: 'DECLARAÇÃO DE ENDEREÇO DE 5 ANOS',
           texto: 'Eu, {{nome}}, portador(a) do RG nº {{rg}} e do CPF nº {{cpf}}, nascido(a) na data de {{data_nascimento}}, declaro para os devidos fins de comprovação que resido no endereço {{endereco}}.\n\nDeclaro também, sob as penas da lei, que nos últimos 5 (cinco) anos residi nos endereços supracitados e declarei idoneidade de residência para fins de registro e aquisição de produtos controlados.\n\nEstando ciente de que a falsidade da presente declaração implica em sanções penais previstas no Art. 299 do Código Penal Brasileiro.',
           empresa_id: usuario.empresaId
+        },
+        {
+          titulo: 'DECLARAÇÃO DE RESIDÊNCIA E COMPROVAÇÃO DE ENDEREÇO',
+          texto: 'Eu, {{nome}}, nascido(a) em {{data_nascimento}}, filho(a) de {{nome_pai}} e {{nome_mae}}, portador(a) do RG nº {{rg}} e inscrito(a) no CPF sob o nº {{cpf}}, DECLARO sob as penas da lei, em especial o Art. 299 do Código Penal, para fins de instrução e deferimento de processo perante os órgãos de fiscalização (Exército Brasileiro / Polícia Federal), que resido e sou domiciliado(a) no endereço:\n\n{{endereco}}\n\nDeclaro ainda que as informações aqui prestadas são a mais lídima expressão da verdade, anexando a este documento a cópia/foto do respectivo comprovante de residência atualizado para fins de auditoria e conferência.\n\nPor ser verdade, firmo a presente declaração.',
+          empresa_id: usuario.empresaId
         }
       ];
 

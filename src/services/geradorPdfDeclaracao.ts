@@ -63,11 +63,19 @@ async function obterLogoOficialBase64(): Promise<string> {
   return '';
 }
 
+export interface AnexoDeclaracao {
+  imagemBase64: string;
+  tipo?: string;
+  titulo?: string;
+}
+
 export async function gerarPdfDeclaracaoBlob(
   titulo: string, 
   textoHtml: string, 
   nomeCliente: string,
-  cpfCliente?: string
+  cpfCliente?: string,
+  anexo?: AnexoDeclaracao,
+  dadosExtras?: { enderecoCliente?: string }
 ): Promise<Blob> {
   let cidadeEmpresa = 'Jataí';
   let estadoEmpresa = 'GO';
@@ -211,6 +219,106 @@ export async function gerarPdfDeclaracaoBlob(
         doc.addPage();
         doc.addImage(imgData, 'JPEG', 0, position, pageWidthMm, totalHeightMm, undefined, 'FAST');
         heightLeft -= pageHeightMm;
+      }
+    }
+
+    // Se houver anexo (ex: foto/print do comprovante de endereço), adiciona página oficial de anexo
+    if (anexo && anexo.imagemBase64) {
+      const anexoContainer = document.createElement('div');
+      anexoContainer.className = 'pdf-render-anexo-container';
+      anexoContainer.style.position = 'fixed';
+      anexoContainer.style.left = '0';
+      anexoContainer.style.top = '0';
+      anexoContainer.style.width = '794px'; // 210mm a 96 DPI
+      anexoContainer.style.minHeight = '1120px'; // A4 (297mm)
+      anexoContainer.style.padding = '40px 60px 40px 60px';
+      anexoContainer.style.boxSizing = 'border-box';
+      anexoContainer.style.backgroundColor = '#FFFFFF';
+      anexoContainer.style.color = '#000000';
+      anexoContainer.style.fontFamily = 'Arial, Helvetica, sans-serif';
+      anexoContainer.style.zIndex = '-99999';
+      anexoContainer.style.pointerEvents = 'none';
+      anexoContainer.style.display = 'flex';
+      anexoContainer.style.flexDirection = 'column';
+      anexoContainer.style.justifyContent = 'space-between';
+
+      anexoContainer.innerHTML = `
+        <div>
+          <!-- Topo com Logo e Título do Anexo -->
+          <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #000000; padding-bottom: 12px; margin-bottom: 20px;">
+            <div style="display: flex; align-items: center; gap: 14px;">
+              ${logoBase64 ? `<img src="${logoBase64}" alt="Logo GCAC" style="width: 60px; height: 60px; object-fit: contain;" />` : ''}
+              <div>
+                <div style="font-size: 16px; font-weight: bold; text-transform: uppercase; color: #000000; letter-spacing: 0.5px;">
+                  ANEXO — ${anexo.titulo || 'COMPROVANTE DE ENDEREÇO'}
+                </div>
+                <div style="font-size: 11px; color: #555555; margin-top: 3px;">
+                  Documento comprobatório oficial anexado à declaração
+                </div>
+              </div>
+            </div>
+            <div style="text-align: right; font-size: 11px; color: #555555;">
+              <div style="font-weight: bold; color: #000000;">Portal G CAC</div>
+              <div>${dataExtenso}</div>
+            </div>
+          </div>
+
+          <!-- Caixa de Identificação do Titular e Endereço -->
+          <div style="background-color: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; padding: 12px 16px; margin-bottom: 20px; font-size: 12px; line-height: 1.5;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+              <span><strong>Requerente / Titular:</strong> ${nomeCliente.toUpperCase()}</span>
+              ${cpfFormatado ? `<span><strong>CPF:</strong> ${cpfFormatado}</span>` : ''}
+            </div>
+            ${dadosExtras?.enderecoCliente ? `<div><strong>Endereço Declarado:</strong> ${dadosExtras.enderecoCliente.toUpperCase()}</div>` : ''}
+          </div>
+
+          <!-- Imagem do Comprovante de Endereço -->
+          <div style="display: flex; justify-content: center; align-items: center; min-height: 700px; max-height: 780px; background-color: #ffffff; border: 1px solid #cbd5e1; border-radius: 6px; padding: 12px; box-sizing: border-box;">
+            <img 
+              src="${anexo.imagemBase64}" 
+              alt="Comprovante de Endereço Anexo" 
+              style="max-width: 100%; max-height: 750px; object-fit: contain; display: block;" 
+            />
+          </div>
+        </div>
+
+        <!-- Rodapé -->
+        <div style="text-align: center; font-size: 10px; color: #666666; border-top: 1px solid #e2e8f0; padding-top: 10px; margin-top: 10px;">
+          Documento comprobatório autenticado e anexado pelo despachante/requerente para fins de comprovação legal perante os órgãos públicos de fiscalização (SisGCorp / Sinarm).
+        </div>
+      `;
+
+      document.body.appendChild(anexoContainer);
+
+      try {
+        const anexoImgs = Array.from(anexoContainer.querySelectorAll('img'));
+        await Promise.all(
+          anexoImgs.map(img => {
+            if (img.complete && img.naturalWidth > 0) return Promise.resolve();
+            return new Promise<void>(res => {
+              img.onload = () => res();
+              img.onerror = () => res();
+            });
+          })
+        );
+        await new Promise(r => setTimeout(r, 60));
+
+        const anexoCanvas = await html2canvas(anexoContainer, {
+          scale: 2,
+          useCORS: true,
+          allowTaint: true,
+          logging: false,
+          backgroundColor: '#FFFFFF',
+          windowWidth: 794
+        });
+
+        const anexoImgData = anexoCanvas.toDataURL('image/jpeg', 0.98);
+        doc.addPage();
+        doc.addImage(anexoImgData, 'JPEG', 0, 0, pageWidthMm, pageHeightMm, undefined, 'FAST');
+      } finally {
+        if (document.body.contains(anexoContainer)) {
+          document.body.removeChild(anexoContainer);
+        }
       }
     }
 
