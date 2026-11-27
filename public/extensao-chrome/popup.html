@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Portal G CAC - Certidões</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+    body {
+      width: 380px;
+      background-color: #0f172a;
+      color: #f8fafc;
+      padding: 16px;
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid #1e293b;
+      padding-bottom: 12px;
+      margin-bottom: 14px;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .brand-icon {
+      width: 28px;
+      height: 28px;
+      background: linear-gradient(135deg, #10b981, #059669);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 900;
+      font-size: 14px;
+      color: #fff;
+    }
+    .brand-title {
+      font-size: 14px;
+      font-weight: 800;
+      color: #fff;
+      letter-spacing: -0.2px;
+    }
+    .brand-sub {
+      font-size: 10px;
+      color: #10b981;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .status-badge {
+      font-size: 10px;
+      font-weight: 700;
+      padding: 4px 8px;
+      border-radius: 999px;
+      background-color: rgba(16, 185, 129, 0.15);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+    .status-badge.empty {
+      background-color: rgba(239, 68, 68, 0.15);
+      color: #f87171;
+      border-color: rgba(239, 68, 68, 0.3);
+    }
+    .client-card {
+      background-color: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 12px;
+      margin-bottom: 14px;
+    }
+    .client-name {
+      font-size: 13px;
+      font-weight: 800;
+      color: #fff;
+      margin-bottom: 6px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .client-meta {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      font-size: 11px;
+      color: #94a3b8;
+    }
+    .client-meta span b {
+      color: #cbd5e1;
+    }
+    .btn-fill {
+      width: 100%;
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      color: white;
+      border: none;
+      padding: 12px;
+      border-radius: 10px;
+      font-size: 12px;
+      font-weight: 800;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      box-shadow: 0 4px 14px 0 rgba(16, 185, 129, 0.39);
+      transition: all 0.2s ease;
+      margin-bottom: 14px;
+    }
+    .btn-fill:hover {
+      opacity: 0.95;
+      transform: translateY(-1px);
+    }
+    .section-title {
+      font-size: 11px;
+      font-weight: 800;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+    }
+    .copy-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      margin-bottom: 14px;
+    }
+    .btn-copy-chip {
+      background-color: #1e293b;
+      border: 1px solid #334155;
+      color: #e2e8f0;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 6px 10px;
+      border-radius: 8px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      transition: background 0.15s;
+    }
+    .btn-copy-chip:hover {
+      background-color: #334155;
+    }
+    .empty-state {
+      text-align: center;
+      padding: 24px 12px;
+      background-color: #1e293b;
+      border: 1px dashed #334155;
+      border-radius: 12px;
+      margin-bottom: 14px;
+    }
+    .empty-state p {
+      font-size: 12px;
+      color: #94a3b8;
+      line-height: 1.5;
+    }
+    .footer {
+      text-align: center;
+      font-size: 10px;
+      color: #475569;
+      border-top: 1px solid #1e293b;
+      padding-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="brand">
+      <div class="brand-icon">⚡</div>
+      <div>
+        <div class="brand-title">Portal G CAC</div>
+        <div class="brand-sub">Auto Certidões</div>
+      </div>
+    </div>
+    <div id="statusBadge" class="status-badge">Sincronizado</div>
+  </div>
+
+  <div id="clientContent">
+    <div class="client-card">
+      <div id="clientName" class="client-name">Carregando dados...</div>
+      <div class="client-meta">
+        <div>CPF: <b id="clientCpf">-</b></div>
+        <div>RG: <b id="clientRg">-</b></div>
+        <div>Nascimento: <b id="clientNasc">-</b></div>
+        <div>UF: <b id="clientUf">-</b></div>
+      </div>
+    </div>
+
+    <button id="btnPreencher" class="btn-fill">
+      <span>⚡ Preencher Tela Atual</span>
+    </button>
+
+    <div class="section-title">Copiar Dado Rápido</div>
+    <div class="copy-grid">
+      <button class="btn-copy-chip" data-field="nome">Nome <span>📋</span></button>
+      <button class="btn-copy-chip" data-field="cpf">CPF <span>📋</span></button>
+      <button class="btn-copy-chip" data-field="rg">RG <span>📋</span></button>
+      <button class="btn-copy-chip" data-field="dataNascimento">Nascimento <span>📋</span></button>
+      <button class="btn-copy-chip" data-field="nomeMae">Nome da Mãe <span>📋</span></button>
+      <button class="btn-copy-chip" data-field="nomePai">Nome do Pai <span>📋</span></button>
+      <button class="btn-copy-chip" data-field="endereco">Endereço <span>📋</span></button>
+      <button class="btn-copy-chip" data-field="cep">CEP <span>📋</span></button>
+    </div>
+  </div>
+
+  <div id="emptyContent" class="empty-state" style="display: none;">
+    <div style="font-size: 28px; margin-bottom: 8px;">👤</div>
+    <p><b>Nenhum cliente ativo sincronizado.</b></p>
+    <p style="margin-top: 6px;">Abra o perfil de um cliente no <b>Portal G CAC</b> e acesse a aba <b>Certidões Criminais</b> para ativar.</p>
+  </div>
+
+  <div class="footer">
+    Portal G CAC © 2026 • Despachante Bélico
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

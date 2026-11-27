@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "Portal G CAC - Emissor Rápido de Certidões",
+  "version": "1.0.0",
+  "description": "Preenchimento automático inteligente de certidões criminais e negativas em tribunais e portais oficiais com dados do cliente.",
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": "icons/icon48.png",
+    "default_title": "Portal G CAC - Certidões"
+  },
+  "permissions": [
+    "storage",
+    "activeTab"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

@@ -5,12 +5,13 @@ import {
   User, Mail, Phone, MapPin, Shield, Copy, Check, 
   FileText, Receipt, Clock, Calendar, Plus, 
   ArrowLeft, ChevronRight, ExternalLink, MessageCircle, Trash2, Pencil, AlertTriangle,
-  Loader2, X
+  Loader2, X, ShieldCheck
 } from 'lucide-react';
 import { ModalEscolhaWhatsApp } from '../common/ModalEscolhaWhatsApp';
 import { FormularioCliente } from './FormularioCliente';
 import { AbaDocumentacao } from './AbaDocumentacao';
 import { AbaCreditos } from './AbaCreditos';
+import { CentralCertidoesCliente } from './CentralCertidoesCliente';
 import { Cliente } from '../../types';
 import { formatarCPF, formatarTelefone, formatarMoeda, formatarData, formatarNumeroOS, isOrdemConcluida, obterResumoExecucao, iconeStatusExecucao } from '../../utils/formatters';
 import { calcularAlerta } from '../../utils/vencimentos';
@@ -211,6 +212,7 @@ export function DetalheCliente({ cliente }: DetalheClienteProps) {
     { id: 'recibos', label: 'Recibos', slug: 'recibos', count: recibosCliente.length, badgeText: undefined as string | undefined },
     { id: 'agendamentos', label: 'Agendamentos de Laudos', slug: 'agendamentos', count: agendamentosCliente.length, badgeText: undefined as string | undefined },
     { id: 'documentos', label: 'Acervo & Docs', slug: null, count: alertasCount, badgeText: undefined as string | undefined },
+    { id: 'certidoes', label: 'Certidões Criminais', slug: 'clientes', count: 0, badgeText: 'Auto' },
     { id: 'creditos', label: 'Haver', slug: null, count: 0, badgeText: saldoHaverCliente > 0 ? formatarMoeda(saldoHaverCliente) : undefined },
   ].filter(tab => {
     if (usuario?.tipoConta === 'cac_individual') {
@@ -219,7 +221,7 @@ export function DetalheCliente({ cliente }: DetalheClienteProps) {
     return !tab.slug || temPermissao(tab.slug);
   });
 
-  const [abaAtiva, setAbaAtiva] = useState<'ordens' | 'orcamentos' | 'recibos' | 'agendamentos' | 'documentos' | 'creditos'>(() => {
+  const [abaAtiva, setAbaAtiva] = useState<'ordens' | 'orcamentos' | 'recibos' | 'agendamentos' | 'documentos' | 'creditos' | 'certidoes'>(() => {
     const defaultAba = (location.state as any)?.aba;
     if (defaultAba && tabsDisponiveis.some(t => t.id === defaultAba)) {
       return defaultAba;
@@ -786,6 +788,13 @@ export function DetalheCliente({ cliente }: DetalheClienteProps) {
       onClick: () => navigate(`/declaracoes?clienteId=${cliente.id}`),
       slug: 'clientes'
     },
+    { 
+      label: 'Emitir Certidões', 
+      icon: <ShieldCheck size={20} />, 
+      color: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20',
+      onClick: () => setAbaAtiva('certidoes'),
+      slug: 'clientes'
+    },
   ].filter(acao => {
     if (usuario?.tipoConta === 'cac_individual') {
       return false;
@@ -1260,6 +1269,11 @@ export function DetalheCliente({ cliente }: DetalheClienteProps) {
                   cacEmpresaId={cacEmpresaId}
                   podeEditarVinculo={podeEditarVinculo}
                 />
+              )}
+              {abaAtiva === 'certidoes' && (
+                <div className="pt-2">
+                  <CentralCertidoesCliente cliente={cliente} />
+                </div>
               )}
               {abaAtiva === 'creditos' && (
                 <div className="pt-2">
