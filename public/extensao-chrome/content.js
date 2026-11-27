@@ -2,6 +2,11 @@
 (function () {
   'use strict';
 
+  function normalizar(str) {
+    if (!str) return '';
+    return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+  }
+
   // 1. Detecta se está no Portal G CAC
   const isGcacPortal = window.location.hostname.includes('localhost') || 
                        window.location.hostname.includes('vercel.app') ||
@@ -9,7 +14,7 @@
                        document.title.toLowerCase().includes('portal g cac');
 
   if (isGcacPortal) {
-    document.documentElement.setAttribute('data-gcac-ext', '1.1.0');
+    document.documentElement.setAttribute('data-gcac-ext', '1.1.1');
 
     function sincronizarCliente(cliente) {
       if (!cliente || !cliente.nome) return;
@@ -29,12 +34,10 @@
       }
     });
 
-    // Escuta evento customizado do DOM
     window.addEventListener('gcac_set_cliente', (event) => {
       if (event.detail) sincronizarCliente(event.detail);
     });
 
-    // Polling sutil para sincronizar do localStorage
     setInterval(() => {
       try {
         const raw = localStorage.getItem('gcac_cliente_certidao_ativa');
@@ -62,7 +65,6 @@
       if (cliente && cliente.nome) {
         criarBotaoFlutuante(cliente);
       } else {
-        // Se ainda não estiver no storage, tenta consultar as outras abas abertas via background
         chrome.runtime.sendMessage({ action: 'buscar_cliente_abas' }, (resp) => {
           if (resp && resp.cliente) {
             criarBotaoFlutuante(resp.cliente);
@@ -74,7 +76,6 @@
 
   iniciarNaPaginaExterna();
 
-  // Escuta comandos vindos do popup da extensão
   chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === 'preencher') {
       const cliente = request.cliente;
@@ -87,7 +88,6 @@
     }
   });
 
-  // Cria botão flutuante discreto no canto inferior direito
   function criarBotaoFlutuante(cliente) {
     if (document.getElementById('gcac-floating-btn')) return;
 
@@ -152,7 +152,6 @@
     document.body.appendChild(container);
   }
 
-  // Preenchimento de campos com suporte especial para TSE (Angular) e demais tribunais
   function preencherFormularioGeral(cliente) {
     if (!cliente) return 0;
     let preenchidos = 0;
@@ -162,9 +161,12 @@
     const rgFull = cliente.rg || '';
     const rgNumero = rgFull.replace(/[^\dXx]/g, '');
 
-    let dataNascFormatada = '';
+    const nomeMae = cliente.nomeMae || cliente.nome_mae || '';
+    const nomePai = cliente.nomePai || cliente.nome_pai || '';
+
+    let dataNascFormatada = cliente.dataNascimentoBr || '';
     let dataNascIso = '';
-    if (cliente.dataNascimento) {
+    if (!dataNascFormatada && cliente.dataNascimento) {
       if (cliente.dataNascimento.includes('-')) {
         const parts = cliente.dataNascimento.split('-');
         if (parts.length === 3) {
@@ -181,7 +183,7 @@
     }
 
     // ─────────────────────────────────────────────────────────────
-    // CASO ESPECÍFICO 1: TSE (Justiça Eleitoral - Angular Reactive Forms)
+    // CASO ESPECÍFICO 1: TSE (Angular Reactive Forms com Seletores Exatos)
     // ─────────────────────────────────────────────────────────────
     const tseNome = document.querySelector('input[formcontrolname="nomeEleitor"]');
     if (tseNome) {
@@ -192,7 +194,6 @@
 
     const tseCpf = document.querySelector('input[formcontrolname="TituloCPF"]');
     if (tseCpf) {
-      // TSE aceita tanto CPF formatado quanto unformatted
       atribuirValorNativo(tseCpf, cpfLimpo);
       destacarCampo(tseCpf);
       preenchidos++;
@@ -208,11 +209,11 @@
     const tseSelectFiliacao = document.querySelector('select[formcontrolname="tipoFiliacao"]');
     if (tseSelectFiliacao) {
       let tipo = 'UMA_MAE_UM_PAI';
-      if (cliente.nomeMae && cliente.nomePai) {
+      if (nomeMae && nomePai) {
         tipo = 'UMA_MAE_UM_PAI';
-      } else if (cliente.nomeMae && !cliente.nomePai) {
+      } else if (nomeMae && !nomePai) {
         tipo = 'UMA_MAE';
-      } else if (!cliente.nomeMae && cliente.nomePai) {
+      } else if (!nomeMae && nomePai) {
         tipo = 'UM_PAI';
       } else {
         tipo = 'NAO_HA_REGISTRO';
@@ -220,140 +221,160 @@
       atribuirValorSelect(tseSelectFiliacao, tipo);
       destacarCampo(tseSelectFiliacao);
       preenchidos++;
+    }
 
-      // Aguarda o Angular renderizar os inputs dinâmicos
-      setTimeout(() => {
-        const tseMae = document.querySelector('input[formcontrolname="nomeMae"]') || document.getElementById('nomeMae');
-        if (tseMae && cliente.nomeMae) {
-          atribuirValorNativo(tseMae, cliente.nomeMae);
-          destacarCampo(tseMae);
-        }
-        const tsePai = document.querySelector('input[formcontrolname="nomePai"]') || document.getElementById('nomePai');
-        if (tsePai && cliente.nomePai) {
-          atribuirValorNativo(tsePai, cliente.nomePai);
-          destacarCampo(tsePai);
-        }
-      }, 100);
+    // Preenche campos de Mãe e Pai do TSE
+    const tseMae = document.querySelector('input[formcontrolname="nomeMae"]') || document.getElementById('nomeMae');
+    if (tseMae) {
+      atribuirValorNativo(tseMae, nomeMae);
+      destacarCampo(tseMae);
+      preenchidos++;
+    }
+
+    const tsePai = document.querySelector('input[formcontrolname="nomePai"]') || document.getElementById('nomePai');
+    if (tsePai) {
+      atribuirValorNativo(tsePai, nomePai);
+      destacarCampo(tsePai);
+      preenchidos++;
     }
 
     // ─────────────────────────────────────────────────────────────
     // CASO GERAL: DEMAIS TRIBUNAIS (TRF, TJ, STM, PF, POLÍCIA CIVIL)
+    // ORDEM ESTRITA: MÃE E PAI PRIMEIRO, NOME DO CLIENTE POR ÚLTIMO
     // ─────────────────────────────────────────────────────────────
-    const mapCampos = [
-      {
-        alvos: ['cpf', 'num_cpf', 'nr_cpf', 'numcpf', 'documentocpf', 'nu_cpf', 'cpf_solicitante', 'titulocpf'],
-        textosLabel: ['cpf', 'cadastro de pessoa', 'título eleitoral ou cpf'],
-        valores: [cpfFormatado, cpfLimpo]
-      },
-      {
-        alvos: ['nome', 'nome_completo', 'nomerequerente', 'requerente', 'nome_pessoa', 'interessado', 'no_pessoa', 'nm_pessoa', 'nomeeleitor'],
-        textosLabel: ['nome', 'nome completo', 'requerente', 'interessado', 'nome do eleitor'],
-        valores: [cliente.nome]
-      },
-      {
-        alvos: ['rg', 'num_rg', 'nr_rg', 'identidade', 'doc_identidade', 'numero_rg'],
-        textosLabel: ['rg', 'identidade', 'documento de identidade'],
-        valores: [rgNumero, rgFull]
-      },
-      {
-        alvos: ['orgao', 'orgao_emissor', 'orgao_expedidor', 'emissor_rg', 'ds_orgao_emissor'],
-        textosLabel: ['órgão', 'orgao expedidor', 'emissor'],
-        valores: [cliente.orgaoEmissor || 'SSP']
-      },
-      {
-        alvos: ['data_nasc', 'nascimento', 'dtnascimento', 'dt_nasc', 'data_nascimento', 'dt_nascimento'],
-        textosLabel: ['nascimento', 'data de nascimento', 'dt. nascimento', 'dia/mês/ano'],
-        valores: [dataNascFormatada, dataNascIso]
-      },
-      {
-        alvos: ['mae', 'nome_mae', 'nomemae', 'filiacao_mae', 'filiacao_materna', 'no_mae'],
-        textosLabel: ['mãe', 'nome da mãe', 'filiação materna'],
-        valores: [cliente.nomeMae || '']
-      },
-      {
-        alvos: ['pai', 'nome_pai', 'nomepai', 'filiacao_pai', 'filiacao_paterna', 'no_pai'],
-        textosLabel: ['pai', 'nome do pai', 'filiação paterna'],
-        valores: [cliente.nomePai || '']
-      },
-      {
-        alvos: ['cep', 'nu_cep', 'nr_cep', 'codigo_postal'],
-        textosLabel: ['cep', 'código postal'],
-        valores: [(cliente.cep || '').replace(/\D/g, ''), cliente.cep || '']
-      },
-      {
-        alvos: ['endereco', 'logradouro', 'rua', 'ds_logradouro', 'ds_endereco'],
-        textosLabel: ['endereço', 'endereco', 'logradouro', 'rua'],
-        valores: [cliente.endereco || '']
-      },
-      {
-        alvos: ['bairro', 'no_bairro', 'ds_bairro'],
-        textosLabel: ['bairro'],
-        valores: [cliente.bairro || '']
-      },
-      {
-        alvos: ['municipio', 'cidade', 'no_municipio', 'no_cidade'],
-        textosLabel: ['município', 'municipio', 'cidade'],
-        valores: [cliente.cidade || '']
-      },
-      {
-        alvos: ['uf', 'estado', 'sg_uf', 'uf_naturalidade'],
-        textosLabel: ['uf', 'estado'],
-        valores: [cliente.estado || 'GO']
-      },
-      {
-        alvos: ['email', 'ds_email', 'correio_eletronico'],
-        textosLabel: ['e-mail', 'email'],
-        valores: [cliente.email || '']
-      },
-      {
-        alvos: ['telefone', 'celular', 'contato', 'fone', 'nu_telefone'],
-        textosLabel: ['telefone', 'celular', 'fone', 'whatsapp'],
-        valores: [cliente.contato || '']
-      }
-    ];
-
     const todosInputs = Array.from(document.querySelectorAll('input:not([type="hidden"]):not([type="submit"]):not([type="button"]):not([type="checkbox"]):not([type="radio"]), select, textarea'));
 
     todosInputs.forEach((input) => {
       if (input.offsetParent === null || input.disabled || input.readOnly) return;
-      if (input.value && input.value.trim().length > 0) return; // Não sobrescreve se já tiver valor
+      if (input.value && input.value.trim().length > 0) return;
 
-      const id = (input.id || '').toLowerCase();
-      const name = (input.name || '').toLowerCase();
-      const placeholder = (input.getAttribute('placeholder') || '').toLowerCase();
-      const ariaLabel = (input.getAttribute('aria-label') || '').toLowerCase();
-      const formControlName = (input.getAttribute('formcontrolname') || '').toLowerCase();
+      const id = normalizar(input.id);
+      const name = normalizar(input.name);
+      const placeholder = normalizar(input.getAttribute('placeholder'));
+      const ariaLabel = normalizar(input.getAttribute('aria-label'));
+      const formControlName = normalizar(input.getAttribute('formcontrolname'));
 
       let labelText = '';
       if (input.id) {
         const label = document.querySelector(`label[for="${input.id}"]`);
-        if (label) labelText = (label.textContent || '').toLowerCase();
+        if (label) labelText = normalizar(label.textContent);
       }
       if (!labelText && input.closest('label')) {
-        labelText = (input.closest('label').textContent || '').toLowerCase();
+        labelText = normalizar(input.closest('label').textContent);
       }
       if (!labelText && input.parentElement) {
-        labelText = (input.parentElement.textContent || '').toLowerCase();
+        labelText = normalizar(input.parentElement.textContent);
       }
 
-      for (const item of mapCampos) {
-        const matchIdentificador = item.alvos.some(alvo => 
-          id.includes(alvo) || 
-          name.includes(alvo) || 
-          placeholder.includes(alvo) || 
-          ariaLabel.includes(alvo) ||
-          formControlName.includes(alvo)
-        );
-        const matchLabel = item.textosLabel.some(termo => labelText.includes(termo));
+      const fullText = `${id} ${name} ${placeholder} ${ariaLabel} ${formControlName} ${labelText}`;
 
-        if (matchIdentificador || matchLabel) {
-          const valorParaInserir = item.valores.find(v => !!v);
-          if (valorParaInserir) {
-            atribuirValorNativo(input, valorParaInserir);
-            destacarCampo(input);
-            preenchidos++;
-            break;
-          }
+      // 1. MÃE / FILIAÇÃO MATERNA (PRIORIDADE MÁXIMA)
+      if (fullText.includes('mae') || fullText.includes('materna')) {
+        if (nomeMae) {
+          atribuirValorNativo(input, nomeMae);
+          destacarCampo(input);
+          preenchidos++;
+        }
+        return;
+      }
+
+      // 2. PAI / FILIAÇÃO PATERNA (PRIORIDADE MÁXIMA)
+      if (fullText.includes('pai') || fullText.includes('paterna')) {
+        if (nomePai) {
+          atribuirValorNativo(input, nomePai);
+          destacarCampo(input);
+          preenchidos++;
+        }
+        return;
+      }
+
+      // 3. DATA DE NASCIMENTO
+      if (fullText.includes('nasc') || fullText.includes('aniversario') || fullText.includes('dtnascimento')) {
+        if (input.type === 'date') {
+          atribuirValorNativo(input, dataNascIso || dataNascFormatada);
+        } else {
+          atribuirValorNativo(input, dataNascFormatada);
+        }
+        destacarCampo(input);
+        preenchidos++;
+        return;
+      }
+
+      // 4. CPF
+      if (fullText.includes('cpf') || fullText.includes('cadastro de pessoa') || fullText.includes('titulocpf')) {
+        const valCpf = (input.maxLength === 11 || input.getAttribute('mask') === '00000000000') ? cpfLimpo : cpfFormatado;
+        atribuirValorNativo(input, valCpf);
+        destacarCampo(input);
+        preenchidos++;
+        return;
+      }
+
+      // 5. RG
+      if (fullText.includes('rg') || fullText.includes('identidade')) {
+        if (!fullText.includes('orgao') && !fullText.includes('emissor') && !fullText.includes('expedidor')) {
+          atribuirValorNativo(input, rgNumero || rgFull);
+          destacarCampo(input);
+          preenchidos++;
+          return;
+        }
+      }
+
+      // 6. ÓRGÃO EXPEDIDOR
+      if (fullText.includes('orgao') || fullText.includes('emissor') || fullText.includes('expedidor')) {
+        atribuirValorNativo(input, cliente.orgaoEmissor || 'SSP');
+        destacarCampo(input);
+        preenchidos++;
+        return;
+      }
+
+      // 7. CEP
+      if (fullText.includes('cep') || fullText.includes('postal')) {
+        atribuirValorNativo(input, (cliente.cep || '').replace(/\D/g, ''));
+        destacarCampo(input);
+        preenchidos++;
+        return;
+      }
+
+      // 8. ENDEREÇO / LOGRADOURO
+      if (fullText.includes('endereco') || fullText.includes('logradouro') || fullText.includes('rua')) {
+        atribuirValorNativo(input, cliente.endereco || '');
+        destacarCampo(input);
+        preenchidos++;
+        return;
+      }
+
+      // 9. BAIRRO
+      if (fullText.includes('bairro')) {
+        atribuirValorNativo(input, cliente.bairro || '');
+        destacarCampo(input);
+        preenchidos++;
+        return;
+      }
+
+      // 10. MUNICÍPIO / CIDADE
+      if (fullText.includes('municipio') || fullText.includes('cidade')) {
+        atribuirValorNativo(input, cliente.cidade || '');
+        destacarCampo(input);
+        preenchidos++;
+        return;
+      }
+
+      // 11. UF / ESTADO
+      if (fullText.includes('uf') || (fullText.includes('estado') && !fullText.includes('civil'))) {
+        atribuirValorNativo(input, cliente.estado || cliente.uf || 'GO');
+        destacarCampo(input);
+        preenchidos++;
+        return;
+      }
+
+      // 12. NOME DO CLIENTE / ELEITOR / REQUERENTE
+      // REGRA DE OURO: SÓ PREENCHE SE NÃO FOR MÃE, NÃO FOR PAI E NÃO FOR FILIAÇÃO
+      if (fullText.includes('nome') || fullText.includes('requerente') || fullText.includes('interessado') || fullText.includes('eleitor')) {
+        if (!fullText.includes('mae') && !fullText.includes('pai') && !fullText.includes('filiacao')) {
+          atribuirValorNativo(input, cliente.nome);
+          destacarCampo(input);
+          preenchidos++;
+          return;
         }
       }
     });
@@ -361,9 +382,8 @@
     return preenchidos;
   }
 
-  // Define valor com disparos de eventos para Angular, React, Vue e JS Puro
   function atribuirValorNativo(elemento, valor) {
-    if (!elemento) return;
+    if (!elemento || !valor) return;
     elemento.focus();
 
     if (elemento.tagName === 'SELECT') {
@@ -371,7 +391,6 @@
       return;
     }
 
-    // Setter nativo para furar wrappers de framework reativo
     const prototype = elemento instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
     const descriptor = Object.getOwnPropertyDescriptor(prototype, 'value');
     if (descriptor && descriptor.set) {
@@ -380,7 +399,6 @@
       elemento.value = valor;
     }
 
-    // Dispara cadeia completa de eventos nativos
     elemento.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
     elemento.dispatchEvent(new Event('change', { bubbles: true, cancelable: true }));
     elemento.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true }));
@@ -389,12 +407,12 @@
   }
 
   function atribuirValorSelect(elemento, valor) {
-    const valorNorm = valor.trim().toLowerCase();
+    const valorNorm = normalizar(valor);
     let encontrou = false;
 
     for (let i = 0; i < elemento.options.length; i++) {
       const opt = elemento.options[i];
-      if (opt.value.toLowerCase() === valorNorm || opt.text.toLowerCase().includes(valorNorm)) {
+      if (normalizar(opt.value) === valorNorm || normalizar(opt.text).includes(valorNorm)) {
         elemento.selectedIndex = i;
         encontrou = true;
         break;

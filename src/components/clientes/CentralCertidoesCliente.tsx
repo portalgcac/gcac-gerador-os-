@@ -195,8 +195,8 @@ export function CentralCertidoesCliente({ cliente }: CentralCertidoesClienteProp
       rg: cliente.rg || '',
       dataNascimento: cliente.dataNascimento || '',
       dataNascimentoBr: cliente.dataNascimento ? cliente.dataNascimento.split('-').reverse().join('/') : '',
-      nomeMae: (cliente.nomeMae || '').toUpperCase().trim(),
-      nomePai: (cliente.nomePai || '').toUpperCase().trim(),
+      nomeMae: (cliente.nomeMae || (cliente as any).nome_mae || '').toUpperCase().trim(),
+      nomePai: (cliente.nomePai || (cliente as any).nome_pai || '').toUpperCase().trim(),
       endereco: cliente.endereco || '',
       uf: ufSelecionada,
       timestamp: Date.now()

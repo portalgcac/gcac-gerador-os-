@@ -103,8 +103,15 @@ document.addEventListener('DOMContentLoaded', () => {
         target: { tabId },
         func: (cli) => {
           let preenchidos = 0;
+          function norm(str) {
+            if (!str) return '';
+            return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+          }
+
           const cpfLimpo = (cli.cpf || '').replace(/\D/g, '');
           const cpfFormatado = cpfLimpo.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+          const nomeMae = cli.nomeMae || cli.nome_mae || '';
+          const nomePai = cli.nomePai || cli.nome_pai || '';
           
           let dataNascBr = cli.dataNascimentoBr || '';
           if (!dataNascBr && cli.dataNascimento) {
@@ -130,7 +137,7 @@ document.addEventListener('DOMContentLoaded', () => {
             preenchidos++;
           }
 
-          // TSE Específico
+          // 1. TSE Específico (Angular Reactive Forms)
           const tseNome = document.querySelector('input[formcontrolname="nomeEleitor"]');
           if (tseNome) setVal(tseNome, cli.nome);
 
@@ -142,28 +149,55 @@ document.addEventListener('DOMContentLoaded', () => {
 
           const tseFiliacao = document.querySelector('select[formcontrolname="tipoFiliacao"]');
           if (tseFiliacao) {
-            tseFiliacao.value = (cli.nomeMae && cli.nomePai) ? 'UMA_MAE_UM_PAI' : (cli.nomeMae ? 'UMA_MAE' : 'UM_PAI');
+            tseFiliacao.value = (nomeMae && nomePai) ? 'UMA_MAE_UM_PAI' : (nomeMae ? 'UMA_MAE' : 'UM_PAI');
             tseFiliacao.dispatchEvent(new Event('change', { bubbles: true }));
             preenchidos++;
-            setTimeout(() => {
-              const mae = document.querySelector('input[formcontrolname="nomeMae"]') || document.getElementById('nomeMae');
-              if (mae) setVal(mae, cli.nomeMae);
-              const pai = document.querySelector('input[formcontrolname="nomePai"]') || document.getElementById('nomePai');
-              if (pai) setVal(pai, cli.nomePai);
-            }, 100);
           }
 
-          // Busca geral em inputs comuns
-          const inputs = Array.from(document.querySelectorAll('input:not([type="hidden"]), textarea'));
+          const tseMae = document.querySelector('input[formcontrolname="nomeMae"]') || document.getElementById('nomeMae');
+          if (tseMae && nomeMae) setVal(tseMae, nomeMae);
+
+          const tsePai = document.querySelector('input[formcontrolname="nomePai"]') || document.getElementById('nomePai');
+          if (tsePai && nomePai) setVal(tsePai, nomePai);
+
+          // 2. Busca geral com prioridade estrita
+          const inputs = Array.from(document.querySelectorAll('input:not([type="hidden"]):not([type="submit"]):not([type="button"]):not([type="checkbox"]):not([type="radio"]), textarea'));
           inputs.forEach(inp => {
             if (inp.value) return;
-            const text = ((inp.id || '') + ' ' + (inp.name || '') + ' ' + (inp.placeholder || '') + ' ' + (inp.getAttribute('aria-label') || '')).toLowerCase();
-            if (text.includes('nome') && !text.includes('mae') && !text.includes('pai')) setVal(inp, cli.nome);
-            else if (text.includes('cpf') || text.includes('documento')) setVal(inp, cpfFormatado);
-            else if (text.includes('nasc')) setVal(inp, dataNascBr);
-            else if (text.includes('mae')) setVal(inp, cli.nomeMae);
-            else if (text.includes('pai')) setVal(inp, cli.nomePai);
-            else if (text.includes('rg') || text.includes('identidade')) setVal(inp, cli.rg);
+            const text = norm((inp.id || '') + ' ' + (inp.name || '') + ' ' + (inp.placeholder || '') + ' ' + (inp.getAttribute('aria-label') || '') + ' ' + (inp.getAttribute('formcontrolname') || ''));
+            
+            // Mãe primeiro
+            if (text.includes('mae') || text.includes('materna')) {
+              if (nomeMae) setVal(inp, nomeMae);
+              return;
+            }
+            // Pai segundo
+            if (text.includes('pai') || text.includes('paterna')) {
+              if (nomePai) setVal(inp, nomePai);
+              return;
+            }
+            // Nascimento
+            if (text.includes('nasc')) {
+              setVal(inp, dataNascBr);
+              return;
+            }
+            // CPF
+            if (text.includes('cpf') || text.includes('titulocpf')) {
+              setVal(inp, cpfFormatado);
+              return;
+            }
+            // RG
+            if (text.includes('rg') || text.includes('identidade')) {
+              setVal(inp, cli.rg);
+              return;
+            }
+            // Nome do Requerente/Cliente (por último, nunca se for mãe ou pai)
+            if (text.includes('nome') || text.includes('eleitor') || text.includes('requerente')) {
+              if (!text.includes('mae') && !text.includes('pai') && !text.includes('filiacao')) {
+                setVal(inp, cli.nome);
+                return;
+              }
+            }
           });
 
           return preenchidos;
