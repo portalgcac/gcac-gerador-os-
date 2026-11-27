@@ -101,6 +101,19 @@ export async function gerarPdfDeclaracaoBlob(
   // Formatar CPF para a assinatura
   const cpfFormatado = cpfCliente ? formatarCPF(cpfCliente) : '';
 
+  // Verificar se há imagem (print/foto) inserida no corpo da declaração
+  const contemImagem = textoHtml.toLowerCase().includes('<img');
+
+  // Ajustes de layout para garantir que declarações com foto caibam em 1 página com a assinatura
+  const containerPadding = contemImagem ? '35px 65px 30px 65px' : '50px 75px 60px 75px';
+  const logoWidth = contemImagem ? '125px' : '175px';
+  const logoHeight = contemImagem ? '125px' : '175px';
+  const logoMarginBottom = contemImagem ? '14px' : '25px';
+  const tituloMarginBottom = contemImagem ? '16px' : '28px';
+  const dataMarginTop = contemImagem ? '16px' : '30px';
+  const dataMarginBottom = contemImagem ? '14px' : '25px';
+  const assinaturaMarginTop = contemImagem ? '22px' : '35px';
+
   // Criar container DOM com layout A4 oficial para captura de alta resolução
   const container = document.createElement('div');
   container.className = 'pdf-render-declaracao-container';
@@ -109,13 +122,13 @@ export async function gerarPdfDeclaracaoBlob(
   container.style.top = '0';
   container.style.width = '794px'; // 210mm a 96 DPI
   container.style.minHeight = '1120px'; // Proporção exata da página A4 (297mm)
-  container.style.padding = '50px 75px 60px 75px';
+  container.style.padding = containerPadding;
   container.style.boxSizing = 'border-box';
   container.style.backgroundColor = '#FFFFFF';
   container.style.color = '#000000';
   container.style.fontFamily = 'Arial, Helvetica, sans-serif';
-  container.style.fontSize = '14px';
-  container.style.lineHeight = '1.6';
+  container.style.fontSize = contemImagem ? '13px' : '14px';
+  container.style.lineHeight = contemImagem ? '1.5' : '1.6';
   container.style.zIndex = '-99999';
   container.style.pointerEvents = 'none';
   container.style.opacity = '1';
@@ -136,29 +149,29 @@ export async function gerarPdfDeclaracaoBlob(
     <!-- Top Content -->
     <div style="flex: 1; display: flex; flex-direction: column;">
       <!-- Logo Oficial Centralizada no Topo (conforme layout oficial de declarações GCAC) -->
-      <div style="display: flex; justify-content: center; align-items: center; margin-top: 5px; margin-bottom: 25px;">
-        ${logoBase64 ? `<img src="${logoBase64}" alt="Logo GCAC Despachante Bélico" style="width: 175px; height: 175px; object-fit: contain;" />` : ''}
+      <div style="display: flex; justify-content: center; align-items: center; margin-top: 5px; margin-bottom: ${logoMarginBottom};">
+        ${logoBase64 ? `<img src="${logoBase64}" alt="Logo GCAC Despachante Bélico" style="width: ${logoWidth}; height: ${logoHeight}; object-fit: contain;" />` : ''}
       </div>
 
       <!-- Título da Declaração Centralizado em Negrito -->
-      <div style="text-align: center; font-size: 16px; font-weight: bold; margin-bottom: 28px; text-transform: uppercase; color: #000000; font-family: Arial, Helvetica, sans-serif; letter-spacing: 0.5px;">
+      <div style="text-align: center; font-size: ${contemImagem ? '15px' : '16px'}; font-weight: bold; margin-bottom: ${tituloMarginBottom}; text-transform: uppercase; color: #000000; font-family: Arial, Helvetica, sans-serif; letter-spacing: 0.5px;">
         ${titulo}
       </div>
 
       <!-- Corpo da Declaração Justificado -->
-      <div style="text-align: justify; font-size: 13.5px; color: #000000; font-family: Arial, Helvetica, sans-serif; line-height: 1.65; word-wrap: break-word;">
+      <div style="text-align: justify; font-size: ${contemImagem ? '13px' : '13.5px'}; color: #000000; font-family: Arial, Helvetica, sans-serif; line-height: ${contemImagem ? '1.55' : '1.65'}; word-wrap: break-word;">
         ${textoHtml}
       </div>
 
       <!-- Fechamento e Data Alinhados à Direita -->
-      <div style="text-align: right; font-size: 13px; color: #000000; margin-top: 30px; margin-bottom: 25px; font-family: Arial, Helvetica, sans-serif; line-height: 1.5;">
+      <div style="text-align: right; font-size: 12.5px; color: #000000; margin-top: ${dataMarginTop}; margin-bottom: ${dataMarginBottom}; font-family: Arial, Helvetica, sans-serif; line-height: 1.4;">
         ${!jaTemFechamento ? 'Por ser verdade, firmo o presente documento.<br>' : ''}
         ${dataExtenso}
       </div>
     </div>
 
     <!-- Linha de Assinatura Centralizada com Nome e CPF -->
-    <div style="display: flex; flex-direction: column; align-items: center; margin-top: 35px; padding-bottom: 10px;">
+    <div style="display: flex; flex-direction: column; align-items: center; margin-top: ${assinaturaMarginTop}; padding-bottom: 10px;">
       <div style="width: 340px; border-top: 1px solid #000000; margin-bottom: 6px;"></div>
       <span style="font-size: 13px; font-weight: bold; text-transform: uppercase; color: #000000; font-family: Arial, Helvetica, sans-serif;">${nomeCliente}</span>
       ${cpfFormatado ? `<span style="font-size: 12px; color: #222222; font-family: Arial, Helvetica, sans-serif; margin-top: 2px;">${cpfFormatado}</span>` : ''}
@@ -203,11 +216,18 @@ export async function gerarPdfDeclaracaoBlob(
 
     const imgData = canvas.toDataURL('image/jpeg', 0.98);
 
-    // Se o conteúdo cabe em 1 página (com tolerância de 3mm)
-    if (totalHeightMm <= pageHeightMm + 3) {
-      doc.addImage(imgData, 'JPEG', 0, 0, pageWidthMm, Math.min(totalHeightMm, pageHeightMm), undefined, 'FAST');
+    // Tolerância inteligente para caber em 1 página
+    // Evita cortar apenas a linha de assinatura para a página 2 quando há foto/print
+    const TOLERANCIA_UMA_PAGINA_MM = contemImagem ? 35 : 10;
+    if (totalHeightMm <= pageHeightMm + TOLERANCIA_UMA_PAGINA_MM) {
+      // Se excedeu por poucos milímetros, ajusta a escala suavemente para encaixar perfeitamente em 1 página
+      const fatorEscala = totalHeightMm > pageHeightMm ? (pageHeightMm / totalHeightMm) : 1;
+      const larguraRender = pageWidthMm * fatorEscala;
+      const alturaRender = totalHeightMm * fatorEscala;
+      const posX = (pageWidthMm - larguraRender) / 2;
+      doc.addImage(imgData, 'JPEG', posX, 0, larguraRender, alturaRender, undefined, 'FAST');
     } else {
-      // Caso exceda 1 página, aplica paginação fluida
+      // Caso exceda significativamente 1 página, aplica paginação fluida
       let heightLeft = totalHeightMm;
       let position = 0;
 

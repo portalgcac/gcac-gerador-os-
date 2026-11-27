@@ -3,7 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { 
   FileText, Plus, Trash2, Edit3, Download, Copy, Check, AlertCircle, Sparkles, User, RefreshCw,
   Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight, AlignJustify, Minus, Table,
-  ArrowLeft, Upload, Image as ImageIcon, Eye, MapPin, X 
+  ArrowLeft, Upload, Image as ImageIcon, Eye, MapPin, X, Sliders 
 } from 'lucide-react';
 import { useClientes } from '../../context/ClientesContext';
 import { Cliente, ModeloDeclaracao } from '../../types';
@@ -44,9 +44,10 @@ function inserirHtmlNoCursor(html: string) {
 interface ToolbarProps {
   editorRef: React.RefObject<HTMLDivElement | null>;
   onInserirImagem?: (base64: string, nomeArquivo?: string) => void;
+  tamanhoImagemPct?: number;
 }
 
-function Toolbar({ editorRef, onInserirImagem }: ToolbarProps) {
+function Toolbar({ editorRef, onInserirImagem, tamanhoImagemPct = 45 }: ToolbarProps) {
   const [mostrarMenuTabela, setMostrarMenuTabela] = useState(false);
   const [estaNaTabela, setEstaNaTabela] = useState(false);
   const [hoveredR, setHoveredR] = useState(0);
@@ -64,9 +65,10 @@ function Toolbar({ editorRef, onInserirImagem }: ToolbarProps) {
       if (editorRef.current) {
         editorRef.current.focus();
       }
+      const maxH = Math.round((tamanhoImagemPct / 100) * 480);
       inserirHtmlNoCursor(`
-        <div style="text-align: center; margin: 15px 0;">
-          <img src="${base64}" alt="Foto / Print" style="max-width: 95%; max-height: 480px; object-fit: contain; border: 1px solid #d1d5db; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);" />
+        <div style="text-align: center; margin: 12px 0;">
+          <img src="${base64}" alt="Foto / Print" style="max-width: ${tamanhoImagemPct}%; max-height: ${maxH}px; object-fit: contain; border: 1px solid #d1d5db; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); cursor: pointer;" />
         </div>
       `);
       if (editorRef.current) {
@@ -635,6 +637,8 @@ export function GerenciadorDeclaracoes() {
   } | null>(null);
   const [anexarComprovanteNoPdf, setAnexarComprovanteNoPdf] = useState(true);
   const [mostrarModalImagem, setMostrarModalImagem] = useState(false);
+  // Tamanho Manual da Imagem no Corpo do Texto (% de 15 a 100)
+  const [tamanhoImagemTexto, setTamanhoImagemTexto] = useState<number>(45);
 
   // Estado de Edição de Modelo
   const [modeloEditando, setModeloEditando] = useState<Partial<ModeloDeclaracao> | null>(null);
@@ -788,13 +792,33 @@ export function GerenciadorDeclaracoes() {
     reader.readAsDataURL(file);
   };
 
+  const aplicarTamanhoImagemNoTexto = (novoTamanho: number) => {
+    setTamanhoImagemTexto(novoTamanho);
+    if (editorRefGerar.current) {
+      const imgs = editorRefGerar.current.querySelectorAll('img');
+      const maxH = Math.round((novoTamanho / 100) * 480);
+      imgs.forEach(img => {
+        img.style.maxWidth = `${novoTamanho}%`;
+        img.style.maxHeight = `${maxH}px`;
+        img.style.width = 'auto';
+        img.style.height = 'auto';
+      });
+      handleEditorGerarInput();
+    }
+  };
+
+  const temImagemNoEditor = useMemo(() => {
+    return textoEditado.toLowerCase().includes('<img');
+  }, [textoEditado]);
+
   const handleInserirComprovanteNoTexto = () => {
     if (!comprovanteEndereco) return;
     if (editorRefGerar.current) {
       editorRefGerar.current.focus();
+      const maxH = Math.round((tamanhoImagemTexto / 100) * 480);
       inserirHtmlNoCursor(`
-        <div style="text-align: center; margin: 15px 0;">
-          <img src="${comprovanteEndereco.base64}" alt="Comprovante de Endereço" style="max-width: 95%; max-height: 480px; object-fit: contain; border: 1px solid #d1d5db; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);" />
+        <div style="text-align: center; margin: 12px 0;">
+          <img src="${comprovanteEndereco.base64}" alt="Comprovante de Endereço" style="max-width: ${tamanhoImagemTexto}%; max-height: ${maxH}px; object-fit: contain; border: 1px solid #d1d5db; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); cursor: pointer;" />
         </div>
       `);
       handleEditorGerarInput();
@@ -812,9 +836,10 @@ export function GerenciadorDeclaracoes() {
           const reader = new FileReader();
           reader.onload = (event) => {
             const base64 = event.target?.result as string;
+            const maxH = Math.round((tamanhoImagemTexto / 100) * 480);
             inserirHtmlNoCursor(`
-              <div style="text-align: center; margin: 15px 0;">
-                <img src="${base64}" alt="Print / Foto" style="max-width: 95%; max-height: 480px; object-fit: contain; border: 1px solid #d1d5db; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);" />
+              <div style="text-align: center; margin: 12px 0;">
+                <img src="${base64}" alt="Print / Foto" style="max-width: ${tamanhoImagemTexto}%; max-height: ${maxH}px; object-fit: contain; border: 1px solid #d1d5db; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); cursor: pointer;" />
               </div>
             `);
             handleEditorGerarInput();
@@ -1639,6 +1664,57 @@ Por ser expressão da verdade, firmo o presente compromisso.`;
                       Inserir foto no corpo do texto
                     </button>
 
+                    {/* Controle Manual de Tamanho da Foto no Documento */}
+                    <div className="p-2.5 bg-brand-dark-3/60 border border-brand-dark-5 rounded-lg space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold text-gray-300 uppercase flex items-center gap-1">
+                          <Sliders size={12} className="text-brand-blue" />
+                          Tamanho no Texto: <span className="text-white font-mono">{tamanhoImagemTexto}%</span>
+                        </span>
+                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
+                          tamanhoImagemTexto <= 50 
+                            ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
+                            : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                        }`}>
+                          {tamanhoImagemTexto <= 50 ? '✓ Cabe em 1 pág' : '⚠️ Pode gerar 2ª pág'}
+                        </span>
+                      </div>
+
+                      <input
+                        type="range"
+                        min="15"
+                        max="100"
+                        step="5"
+                        value={tamanhoImagemTexto}
+                        onChange={e => aplicarTamanhoImagemNoTexto(Number(e.target.value))}
+                        className="w-full accent-brand-blue cursor-pointer h-1.5 bg-brand-dark-5 rounded-lg"
+                        title="Arraste para ajustar o tamanho da foto no texto"
+                      />
+
+                      <div className="flex gap-1">
+                        {[
+                          { label: '30%', val: 30 },
+                          { label: '45% Ideal', val: 45 },
+                          { label: '60%', val: 60 },
+                          { label: '80%', val: 80 },
+                          { label: '100%', val: 100 },
+                        ].map(p => (
+                          <button
+                            key={p.val}
+                            type="button"
+                            onClick={() => aplicarTamanhoImagemNoTexto(p.val)}
+                            className={`flex-1 py-1 text-[10px] font-bold rounded transition-all ${
+                              tamanhoImagemTexto === p.val 
+                                ? 'bg-brand-blue text-white shadow-sm' 
+                                : 'bg-brand-dark-4 hover:bg-brand-dark-5 text-gray-400 hover:text-white'
+                            }`}
+                          >
+                            {p.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
                     {/* Checkbox para anexar no PDF */}
                     <label className="flex items-start gap-2 pt-1 cursor-pointer select-none">
                       <input
@@ -1696,7 +1772,72 @@ Por ser expressão da verdade, firmo o presente compromisso.`;
                 <div>
                   <label className="label">Corpo do Texto (Edite livremente antes de gerar o PDF)</label>
                   <div className="rounded-xl border border-brand-dark-5 overflow-hidden">
-                    <Toolbar editorRef={editorRefGerar} onInserirImagem={handleImagemInseridaPeloToolbar} />
+                    <Toolbar editorRef={editorRefGerar} onInserirImagem={handleImagemInseridaPeloToolbar} tamanhoImagemPct={tamanhoImagemTexto} />
+
+                    {/* Barra de Ajuste de Tamanho da Imagem quando há foto no texto */}
+                    {temImagemNoEditor && (
+                      <div className="bg-brand-dark-4 border-y border-brand-dark-5 px-3 py-2 flex flex-wrap items-center justify-between gap-2.5">
+                        <div className="flex items-center gap-2">
+                          <Sliders size={14} className="text-brand-blue" />
+                          <span className="text-xs font-bold text-white">
+                            Ajustar Tamanho da Foto/Print:
+                          </span>
+                          <span className="text-xs font-mono font-bold text-brand-blue bg-brand-blue/15 px-2 py-0.5 rounded border border-brand-blue/20">
+                            {tamanhoImagemTexto}%
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-2 flex-1 min-w-[170px] max-w-xs">
+                          <span className="text-[10px] text-gray-400 font-medium">15%</span>
+                          <input
+                            type="range"
+                            min="15"
+                            max="100"
+                            step="5"
+                            value={tamanhoImagemTexto}
+                            onChange={e => aplicarTamanhoImagemNoTexto(Number(e.target.value))}
+                            className="flex-1 accent-brand-blue cursor-pointer h-1.5 bg-brand-dark-5 rounded-lg"
+                            title="Arraste para redimensionar a imagem no texto"
+                          />
+                          <span className="text-[10px] text-gray-400 font-medium">100%</span>
+                        </div>
+
+                        <div className="flex items-center gap-1">
+                          {[
+                            { label: '30%', val: 30 },
+                            { label: '45% Ideal', val: 45 },
+                            { label: '60%', val: 60 },
+                            { label: '80%', val: 80 }
+                          ].map(p => (
+                            <button
+                              key={p.val}
+                              type="button"
+                              onClick={() => aplicarTamanhoImagemNoTexto(p.val)}
+                              className={`px-2 py-1 text-[10px] font-bold rounded transition-all ${
+                                tamanhoImagemTexto === p.val 
+                                  ? 'bg-brand-blue text-white shadow-sm' 
+                                  : 'bg-brand-dark-3 hover:bg-brand-dark-5 text-gray-400 hover:text-white'
+                              }`}
+                            >
+                              {p.label}
+                            </button>
+                          ))}
+                        </div>
+
+                        <div className="text-[10px] flex items-center gap-1">
+                          {tamanhoImagemTexto <= 50 ? (
+                            <span className="text-emerald-400 font-semibold flex items-center gap-1 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                              <Check size={12} /> Cabe em 1 página com assinatura
+                            </span>
+                          ) : (
+                            <span className="text-amber-400 font-semibold bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+                              ⚠️ Reduza para ≤ 50% para não cortar a assinatura
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
                     <div
                       ref={editorRefGerar}
                       contentEditable
