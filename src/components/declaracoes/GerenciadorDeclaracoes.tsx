@@ -3,11 +3,12 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { 
   FileText, Plus, Trash2, Edit3, Download, Copy, Check, AlertCircle, Sparkles, User, RefreshCw,
   Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight, AlignJustify, Minus, Table,
-  ArrowLeft, Upload, Image as ImageIcon, Eye, MapPin, X, Sliders 
+  ArrowLeft, Upload, Image as ImageIcon, Eye, MapPin, X, Sliders, QrCode 
 } from 'lucide-react';
 import { useClientes } from '../../context/ClientesContext';
 import { Cliente, ModeloDeclaracao } from '../../types';
 import { gerarPdfDeclaracaoBlob } from '../../services/geradorPdfDeclaracao';
+import { ModalUploadCelular } from '../common/ModalUploadCelular';
 
 function formatarDataBr(dataStr?: string): string {
   if (!dataStr) return '';
@@ -45,9 +46,10 @@ interface ToolbarProps {
   editorRef: React.RefObject<HTMLDivElement | null>;
   onInserirImagem?: (base64: string, nomeArquivo?: string) => void;
   tamanhoImagemPct?: number;
+  onAbrirQrCodeCelular?: () => void;
 }
 
-function Toolbar({ editorRef, onInserirImagem, tamanhoImagemPct = 45 }: ToolbarProps) {
+function Toolbar({ editorRef, onInserirImagem, tamanhoImagemPct = 45, onAbrirQrCodeCelular }: ToolbarProps) {
   const [mostrarMenuTabela, setMostrarMenuTabela] = useState(false);
   const [estaNaTabela, setEstaNaTabela] = useState(false);
   const [hoveredR, setHoveredR] = useState(0);
@@ -596,11 +598,26 @@ function Toolbar({ editorRef, onInserirImagem, tamanhoImagemPct = 45 }: ToolbarP
         onClick={() => fileInputRef.current?.click()}
         onMouseDown={(e) => e.preventDefault()}
         className="p-1.5 hover:bg-brand-dark-5 text-gray-400 hover:text-white rounded-lg transition-all flex items-center gap-1"
-        title="Inserir Foto / Print / Comprovante no Editor"
+        title="Inserir Foto / Print do Computador"
       >
         <ImageIcon size={14} className="text-brand-blue" />
         <span className="text-[11px] font-semibold hidden sm:inline">Foto / Print</span>
       </button>
+
+      {/* Botão de Tirar Foto com o Celular via QR Code */}
+      {onAbrirQrCodeCelular && (
+        <button
+          type="button"
+          onClick={onAbrirQrCodeCelular}
+          onMouseDown={(e) => e.preventDefault()}
+          className="p-1.5 hover:bg-brand-dark-5 text-amber-400 hover:text-amber-300 rounded-lg transition-all flex items-center gap-1"
+          title="Tirar Foto pelo Celular via QR Code e inserir direto aqui"
+        >
+          <QrCode size={14} />
+          <span className="text-[11px] font-semibold hidden md:inline">Foto Celular (QR)</span>
+        </button>
+      )}
+
       <input
         type="file"
         ref={fileInputRef}
@@ -639,6 +656,10 @@ export function GerenciadorDeclaracoes() {
   const [mostrarModalImagem, setMostrarModalImagem] = useState(false);
   // Tamanho Manual da Imagem no Corpo do Texto (% de 15 a 100)
   const [tamanhoImagemTexto, setTamanhoImagemTexto] = useState<number>(45);
+
+  // Modal de Upload pelo Celular (QR Code)
+  const [modalUploadCelularAberto, setModalUploadCelularAberto] = useState(false);
+  const [qrCodeOrigem, setQrCodeOrigem] = useState<'painel' | 'editor'>('painel');
 
   // Estado de Edição de Modelo
   const [modeloEditando, setModeloEditando] = useState<Partial<ModeloDeclaracao> | null>(null);
@@ -810,6 +831,33 @@ export function GerenciadorDeclaracoes() {
   const temImagemNoEditor = useMemo(() => {
     return textoEditado.toLowerCase().includes('<img');
   }, [textoEditado]);
+
+  const abrirModalCelular = (origem: 'painel' | 'editor') => {
+    setQrCodeOrigem(origem);
+    setModalUploadCelularAberto(true);
+  };
+
+  const handleUploadCelularSucesso = (base64Data: string) => {
+    const nome = `foto_comprovante_celular_${Date.now()}.jpg`;
+    setComprovanteEndereco({
+      arquivoNome: nome,
+      base64: base64Data,
+      tipo: 'image/jpeg'
+    });
+
+    if (qrCodeOrigem === 'editor' && editorRefGerar.current) {
+      editorRefGerar.current.focus();
+      const maxH = Math.round((tamanhoImagemTexto / 100) * 480);
+      inserirHtmlNoCursor(`
+        <div style="text-align: center; margin: 12px 0;">
+          <img src="${base64Data}" alt="Comprovante de Endereço" style="max-width: ${tamanhoImagemTexto}%; max-height: ${maxH}px; object-fit: contain; border: 1px solid #d1d5db; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); cursor: pointer;" />
+        </div>
+      `);
+      handleEditorGerarInput();
+    }
+
+    setModalUploadCelularAberto(false);
+  };
 
   const handleInserirComprovanteNoTexto = () => {
     if (!comprovanteEndereco) return;
@@ -1584,11 +1632,27 @@ Por ser expressão da verdade, firmo o presente compromisso.`;
                 </div>
 
                 {!comprovanteEndereco ? (
-                  <div>
+                  <div className="space-y-2.5">
+                    {/* Botão de QR Code Celular */}
+                    <button
+                      type="button"
+                      onClick={() => abrirModalCelular('painel')}
+                      className="w-full py-2.5 px-3 bg-gradient-to-r from-amber-500/20 via-brand-blue/20 to-amber-500/20 hover:from-amber-500/30 hover:to-brand-blue/30 text-amber-300 hover:text-white border border-amber-500/40 hover:border-amber-400 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-sm group"
+                    >
+                      <QrCode size={16} className="text-amber-400 group-hover:scale-110 transition-transform" />
+                      <span>Tirar Foto com o Celular (QR Code)</span>
+                    </button>
+
+                    <div className="flex items-center gap-2">
+                      <div className="h-px bg-brand-dark-5 flex-1" />
+                      <span className="text-[9px] text-gray-500 uppercase font-bold tracking-wider">ou anexar do pc</span>
+                      <div className="h-px bg-brand-dark-5 flex-1" />
+                    </div>
+
                     <label 
                       onDragOver={e => e.preventDefault()}
                       onDrop={handleDropComprovante}
-                      className="border-2 border-dashed border-brand-dark-5 hover:border-brand-blue/50 rounded-xl p-4 flex flex-col items-center justify-center text-center cursor-pointer transition-all bg-brand-dark-3/50 hover:bg-brand-dark-3 group"
+                      className="border-2 border-dashed border-brand-dark-5 hover:border-brand-blue/50 rounded-xl p-3 flex flex-col items-center justify-center text-center cursor-pointer transition-all bg-brand-dark-3/50 hover:bg-brand-dark-3 group"
                     >
                       <input 
                         type="file" 
@@ -1596,13 +1660,13 @@ Por ser expressão da verdade, firmo o presente compromisso.`;
                         className="hidden" 
                         onChange={handleSelecionarArquivoComprovante}
                       />
-                      <div className="p-2.5 rounded-full bg-brand-dark-4 text-gray-400 group-hover:text-brand-blue group-hover:bg-brand-blue/10 transition-all mb-2">
-                        <Upload size={18} />
+                      <div className="p-2 rounded-full bg-brand-dark-4 text-gray-400 group-hover:text-brand-blue group-hover:bg-brand-blue/10 transition-all mb-1.5">
+                        <Upload size={16} />
                       </div>
                       <p className="text-xs font-bold text-gray-300 group-hover:text-white">
                         Anexar Foto ou Print
                       </p>
-                      <p className="text-[10px] text-gray-500 mt-1">
+                      <p className="text-[10px] text-gray-500 mt-0.5">
                         Clique, arraste ou cole com <kbd className="px-1 py-0.5 bg-brand-dark-5 rounded text-gray-300 text-[9px] font-mono">Ctrl+V</kbd>
                       </p>
                       <p className="text-[9px] text-gray-600 mt-0.5">
@@ -1642,6 +1706,14 @@ Por ser expressão da verdade, firmo o presente compromisso.`;
                             className="text-[10px] text-brand-blue hover:underline flex items-center gap-0.5"
                           >
                             <Eye size={10} /> Ver ampliado
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => abrirModalCelular('painel')}
+                            className="text-[10px] text-amber-400 hover:underline flex items-center gap-0.5"
+                            title="Tirar outra foto pelo celular"
+                          >
+                            <QrCode size={10} /> Foto Celular
                           </button>
                           <button
                             type="button"
@@ -1772,7 +1844,12 @@ Por ser expressão da verdade, firmo o presente compromisso.`;
                 <div>
                   <label className="label">Corpo do Texto (Edite livremente antes de gerar o PDF)</label>
                   <div className="rounded-xl border border-brand-dark-5 overflow-hidden">
-                    <Toolbar editorRef={editorRefGerar} onInserirImagem={handleImagemInseridaPeloToolbar} tamanhoImagemPct={tamanhoImagemTexto} />
+                    <Toolbar 
+                      editorRef={editorRefGerar} 
+                      onInserirImagem={handleImagemInseridaPeloToolbar} 
+                      tamanhoImagemPct={tamanhoImagemTexto}
+                      onAbrirQrCodeCelular={() => abrirModalCelular('editor')}
+                    />
 
                     {/* Barra de Ajuste de Tamanho da Imagem quando há foto no texto */}
                     {temImagemNoEditor && (
@@ -2061,6 +2138,16 @@ Por ser expressão da verdade, firmo o presente compromisso.`;
             </div>
           </div>
         </div>
+      )}
+
+      {/* Modal QR Code Upload pelo Celular */}
+      {modalUploadCelularAberto && (
+        <ModalUploadCelular
+          isOpen={modalUploadCelularAberto}
+          onClose={() => setModalUploadCelularAberto(false)}
+          onUploadSuccess={handleUploadCelularSucesso}
+          titulo="Tirar Foto do Comprovante de Endereço"
+        />
       )}
     </div>
   );
