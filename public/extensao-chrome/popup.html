@@ -151,7 +151,7 @@
     }
     .empty-state {
       text-align: center;
-      padding: 24px 12px;
+      padding: 20px 12px;
       background-color: #1e293b;
       border: 1px dashed #334155;
       border-radius: 12px;
@@ -161,6 +161,20 @@
       font-size: 12px;
       color: #94a3b8;
       line-height: 1.5;
+    }
+    .btn-sync {
+      background-color: #3b82f6;
+      color: white;
+      border: none;
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+      margin-top: 10px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
     }
     .footer {
       text-align: center;
@@ -213,8 +227,11 @@
 
   <div id="emptyContent" class="empty-state" style="display: none;">
     <div style="font-size: 28px; margin-bottom: 8px;">👤</div>
-    <p><b>Nenhum cliente ativo sincronizado.</b></p>
-    <p style="margin-top: 6px;">Abra o perfil de um cliente no <b>Portal G CAC</b> e acesse a aba <b>Certidões Criminais</b> para ativar.</p>
+    <p><b>Aba do cliente não detectada.</b></p>
+    <p style="margin-top: 6px;">Abra a ficha do cliente no <b>Portal G CAC</b> e clique no botão abaixo para puxar os dados automaticamente:</p>
+    <button id="btnBuscarAbas" class="btn-sync">
+      <span>🔄 Puxar Dados do Portal G CAC</span>
+    </button>
   </div>
 
   <div class="footer">

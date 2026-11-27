@@ -1,51 +1,89 @@
-// Portal G CAC - Content Script para Preenchimento Automático de Certidões
+// Portal G CAC - Content Script Inteligente para Preenchimento de Certidões
 (function () {
   'use strict';
 
-  // 1. Detecta e sincroniza com o Portal G CAC
+  // 1. Detecta se está no Portal G CAC
   const isGcacPortal = window.location.hostname.includes('localhost') || 
                        window.location.hostname.includes('vercel.app') ||
+                       window.location.hostname.includes('gcac') ||
                        document.title.toLowerCase().includes('portal g cac');
 
   if (isGcacPortal) {
-    document.documentElement.setAttribute('data-gcac-ext', '1.0.0');
-    
-    // Anuncia que a extensão está instalada para a aplicação web
-    window.postMessage({ type: 'GCAC_EXTENSION_INSTALLED', version: '1.0.0' }, '*');
+    document.documentElement.setAttribute('data-gcac-ext', '1.1.0');
 
-    // Escuta atualizações enviadas pelo Portal G CAC
+    function sincronizarCliente(cliente) {
+      if (!cliente || !cliente.nome) return;
+      chrome.storage.local.set({ gcac_cliente: cliente }, () => {
+        mostrarToast(`✓ Sincronizado com Portal G CAC: ${cliente.nome}`, '#10b981');
+      });
+      chrome.runtime.sendMessage({ action: 'salvar_cliente', cliente });
+    }
+
+    // Escuta eventos via postMessage
     window.addEventListener('message', (event) => {
-      if (event.data && event.data.type === 'GCAC_SET_CLIENTE' && event.data.cliente) {
-        chrome.storage.local.set({ gcac_cliente: event.data.cliente }, () => {
-          mostrarToast(`✓ Extensão sincronizada com: ${event.data.cliente.nome}`, '#10b981');
-        });
+      if (!event.data) return;
+      if (event.data.type === 'PORTAL_GCAC_CLIENTE_ATIVO' && (event.data.payload || event.data.cliente)) {
+        sincronizarCliente(event.data.payload || event.data.cliente);
+      } else if (event.data.type === 'GCAC_SET_CLIENTE' && event.data.cliente) {
+        sincronizarCliente(event.data.cliente);
       }
     });
 
-    // Sincroniza dados salvos no localStorage do portal
-    try {
-      const localData = localStorage.getItem('gcac_cliente_certidao_ativa');
-      if (localData) {
-        const cliente = JSON.parse(localData);
-        chrome.storage.local.set({ gcac_cliente: cliente });
-      }
-    } catch (e) {}
+    // Escuta evento customizado do DOM
+    window.addEventListener('gcac_set_cliente', (event) => {
+      if (event.detail) sincronizarCliente(event.detail);
+    });
+
+    // Polling sutil para sincronizar do localStorage
+    setInterval(() => {
+      try {
+        const raw = localStorage.getItem('gcac_cliente_certidao_ativa');
+        if (raw) {
+          const cli = JSON.parse(raw);
+          if (cli && cli.nome) {
+            chrome.storage.local.get(['gcac_cliente'], (res) => {
+              if (!res.gcac_cliente || res.gcac_cliente.id !== cli.id || res.gcac_cliente.timestamp !== cli.timestamp) {
+                sincronizarCliente(cli);
+              }
+            });
+          }
+        }
+      } catch (e) {}
+    }, 1500);
+
     return;
   }
 
-  // 2. Em portais externos (Tribunais, Portais Oficiais)
-  chrome.storage.local.get(['gcac_cliente'], (result) => {
-    const cliente = result.gcac_cliente;
-    if (!cliente || !cliente.nome) return;
+  // 2. Em portais externos de Tribunais e Órgãos Oficiais
+  function iniciarNaPaginaExterna() {
+    chrome.storage.local.get(['gcac_cliente'], (result) => {
+      let cliente = result.gcac_cliente;
 
-    criarBotaoFlutuante(cliente);
-  });
+      if (cliente && cliente.nome) {
+        criarBotaoFlutuante(cliente);
+      } else {
+        // Se ainda não estiver no storage, tenta consultar as outras abas abertas via background
+        chrome.runtime.sendMessage({ action: 'buscar_cliente_abas' }, (resp) => {
+          if (resp && resp.cliente) {
+            criarBotaoFlutuante(resp.cliente);
+          }
+        });
+      }
+    });
+  }
+
+  iniciarNaPaginaExterna();
 
   // Escuta comandos vindos do popup da extensão
   chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === 'preencher') {
-      const total = preencherFormulario(request.cliente);
-      sendResponse({ sucesso: true, camposPreenchidos: total });
+      const cliente = request.cliente;
+      if (cliente) {
+        const total = preencherFormularioGeral(cliente);
+        sendResponse({ sucesso: true, camposPreenchidos: total });
+      } else {
+        sendResponse({ sucesso: false, erro: 'Sem cliente ativo' });
+      }
     }
   });
 
@@ -102,11 +140,11 @@
     });
 
     btn.addEventListener('click', () => {
-      const total = preencherFormulario(cliente);
+      const total = preencherFormularioGeral(cliente);
       if (total > 0) {
         mostrarToast(`✓ ${total} campos preenchidos com sucesso! Resolva o CAPTCHA e emita a certidão.`, '#10b981');
       } else {
-        mostrarToast('Nenhum campo compatível identificado nesta tela. Verifique se o formulário está visível.', '#f59e0b');
+        mostrarToast('Verifique se o formulário do órgão está aberto na tela.', '#f59e0b');
       }
     });
 
@@ -114,18 +152,16 @@
     document.body.appendChild(container);
   }
 
-  // Lógica inteligente de preenchimento de campos
-  function preencherFormulario(cliente) {
+  // Preenchimento de campos com suporte especial para TSE (Angular) e demais tribunais
+  function preencherFormularioGeral(cliente) {
     if (!cliente) return 0;
+    let preenchidos = 0;
 
     const cpfLimpo = (cliente.cpf || '').replace(/\D/g, '');
     const cpfFormatado = cpfLimpo.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
-    
-    // Tratamento de RG
     const rgFull = cliente.rg || '';
     const rgNumero = rgFull.replace(/[^\dXx]/g, '');
 
-    // Tratamento de Data
     let dataNascFormatada = '';
     let dataNascIso = '';
     if (cliente.dataNascimento) {
@@ -144,15 +180,74 @@
       }
     }
 
+    // ─────────────────────────────────────────────────────────────
+    // CASO ESPECÍFICO 1: TSE (Justiça Eleitoral - Angular Reactive Forms)
+    // ─────────────────────────────────────────────────────────────
+    const tseNome = document.querySelector('input[formcontrolname="nomeEleitor"]');
+    if (tseNome) {
+      atribuirValorNativo(tseNome, cliente.nome);
+      destacarCampo(tseNome);
+      preenchidos++;
+    }
+
+    const tseCpf = document.querySelector('input[formcontrolname="TituloCPF"]');
+    if (tseCpf) {
+      // TSE aceita tanto CPF formatado quanto unformatted
+      atribuirValorNativo(tseCpf, cpfLimpo);
+      destacarCampo(tseCpf);
+      preenchidos++;
+    }
+
+    const tseNasc = document.querySelector('input[formcontrolname="dataNascimento"]') || document.getElementById('dataNascimento');
+    if (tseNasc) {
+      atribuirValorNativo(tseNasc, dataNascFormatada);
+      destacarCampo(tseNasc);
+      preenchidos++;
+    }
+
+    const tseSelectFiliacao = document.querySelector('select[formcontrolname="tipoFiliacao"]');
+    if (tseSelectFiliacao) {
+      let tipo = 'UMA_MAE_UM_PAI';
+      if (cliente.nomeMae && cliente.nomePai) {
+        tipo = 'UMA_MAE_UM_PAI';
+      } else if (cliente.nomeMae && !cliente.nomePai) {
+        tipo = 'UMA_MAE';
+      } else if (!cliente.nomeMae && cliente.nomePai) {
+        tipo = 'UM_PAI';
+      } else {
+        tipo = 'NAO_HA_REGISTRO';
+      }
+      atribuirValorSelect(tseSelectFiliacao, tipo);
+      destacarCampo(tseSelectFiliacao);
+      preenchidos++;
+
+      // Aguarda o Angular renderizar os inputs dinâmicos
+      setTimeout(() => {
+        const tseMae = document.querySelector('input[formcontrolname="nomeMae"]') || document.getElementById('nomeMae');
+        if (tseMae && cliente.nomeMae) {
+          atribuirValorNativo(tseMae, cliente.nomeMae);
+          destacarCampo(tseMae);
+        }
+        const tsePai = document.querySelector('input[formcontrolname="nomePai"]') || document.getElementById('nomePai');
+        if (tsePai && cliente.nomePai) {
+          atribuirValorNativo(tsePai, cliente.nomePai);
+          destacarCampo(tsePai);
+        }
+      }, 100);
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // CASO GERAL: DEMAIS TRIBUNAIS (TRF, TJ, STM, PF, POLÍCIA CIVIL)
+    // ─────────────────────────────────────────────────────────────
     const mapCampos = [
       {
-        alvos: ['cpf', 'num_cpf', 'nr_cpf', 'numcpf', 'documentocpf', 'nu_cpf', 'cpf_solicitante'],
-        textosLabel: ['cpf', 'cadastro de pessoa'],
+        alvos: ['cpf', 'num_cpf', 'nr_cpf', 'numcpf', 'documentocpf', 'nu_cpf', 'cpf_solicitante', 'titulocpf'],
+        textosLabel: ['cpf', 'cadastro de pessoa', 'título eleitoral ou cpf'],
         valores: [cpfFormatado, cpfLimpo]
       },
       {
-        alvos: ['nome', 'nome_completo', 'nomerequerente', 'requerente', 'nome_pessoa', 'interessado', 'no_pessoa', 'nm_pessoa'],
-        textosLabel: ['nome', 'nome completo', 'requerente', 'interessado'],
+        alvos: ['nome', 'nome_completo', 'nomerequerente', 'requerente', 'nome_pessoa', 'interessado', 'no_pessoa', 'nm_pessoa', 'nomeeleitor'],
+        textosLabel: ['nome', 'nome completo', 'requerente', 'interessado', 'nome do eleitor'],
         valores: [cliente.nome]
       },
       {
@@ -167,7 +262,7 @@
       },
       {
         alvos: ['data_nasc', 'nascimento', 'dtnascimento', 'dt_nasc', 'data_nascimento', 'dt_nascimento'],
-        textosLabel: ['nascimento', 'data de nascimento', 'dt. nascimento'],
+        textosLabel: ['nascimento', 'data de nascimento', 'dt. nascimento', 'dia/mês/ano'],
         valores: [dataNascFormatada, dataNascIso]
       },
       {
@@ -217,19 +312,18 @@
       }
     ];
 
-    let preenchidos = 0;
-    const inputs = Array.from(document.querySelectorAll('input:not([type="hidden"]):not([type="submit"]):not([type="button"]):not([type="checkbox"]):not([type="radio"]), select, textarea'));
+    const todosInputs = Array.from(document.querySelectorAll('input:not([type="hidden"]):not([type="submit"]):not([type="button"]):not([type="checkbox"]):not([type="radio"]), select, textarea'));
 
-    inputs.forEach((input) => {
-      // Ignora campos invisíveis ou já preenchidos
+    todosInputs.forEach((input) => {
       if (input.offsetParent === null || input.disabled || input.readOnly) return;
+      if (input.value && input.value.trim().length > 0) return; // Não sobrescreve se já tiver valor
 
       const id = (input.id || '').toLowerCase();
       const name = (input.name || '').toLowerCase();
       const placeholder = (input.getAttribute('placeholder') || '').toLowerCase();
       const ariaLabel = (input.getAttribute('aria-label') || '').toLowerCase();
+      const formControlName = (input.getAttribute('formcontrolname') || '').toLowerCase();
 
-      // Busca texto de label correspondente
       let labelText = '';
       if (input.id) {
         const label = document.querySelector(`label[for="${input.id}"]`);
@@ -238,15 +332,24 @@
       if (!labelText && input.closest('label')) {
         labelText = (input.closest('label').textContent || '').toLowerCase();
       }
+      if (!labelText && input.parentElement) {
+        labelText = (input.parentElement.textContent || '').toLowerCase();
+      }
 
       for (const item of mapCampos) {
-        const matchIdentificador = item.alvos.some(alvo => id.includes(alvo) || name.includes(alvo) || placeholder.includes(alvo) || ariaLabel.includes(alvo));
+        const matchIdentificador = item.alvos.some(alvo => 
+          id.includes(alvo) || 
+          name.includes(alvo) || 
+          placeholder.includes(alvo) || 
+          ariaLabel.includes(alvo) ||
+          formControlName.includes(alvo)
+        );
         const matchLabel = item.textosLabel.some(termo => labelText.includes(termo));
 
         if (matchIdentificador || matchLabel) {
           const valorParaInserir = item.valores.find(v => !!v);
           if (valorParaInserir) {
-            atribuirValor(input, valorParaInserir);
+            atribuirValorNativo(input, valorParaInserir);
             destacarCampo(input);
             preenchidos++;
             break;
@@ -258,32 +361,48 @@
     return preenchidos;
   }
 
-  // Atribui valor simulando digitação real e eventos nativos do navegador
-  function atribuirValor(elemento, valor) {
+  // Define valor com disparos de eventos para Angular, React, Vue e JS Puro
+  function atribuirValorNativo(elemento, valor) {
+    if (!elemento) return;
     elemento.focus();
-    
-    // Tratamento especial para tag SELECT
-    if (elemento.tagName === 'SELECT') {
-      const valorNorm = valor.trim().toLowerCase();
-      for (let i = 0; i < elemento.options.length; i++) {
-        const opt = elemento.options[i];
-        if (opt.text.toLowerCase().includes(valorNorm) || opt.value.toLowerCase().includes(valorNorm)) {
-          elemento.selectedIndex = i;
-          break;
-        }
-      }
-    } else {
-      // Usa property descriptor para disparar listeners de frameworks reativos
-      const nativeSetter = Object.getOwnPropertyDescriptor(
-        elemento instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype,
-        'value'
-      )?.set;
 
-      if (nativeSetter) {
-        nativeSetter.call(elemento, valor);
-      } else {
-        elemento.value = valor;
+    if (elemento.tagName === 'SELECT') {
+      atribuirValorSelect(elemento, valor);
+      return;
+    }
+
+    // Setter nativo para furar wrappers de framework reativo
+    const prototype = elemento instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+    const descriptor = Object.getOwnPropertyDescriptor(prototype, 'value');
+    if (descriptor && descriptor.set) {
+      descriptor.set.call(elemento, valor);
+    } else {
+      elemento.value = valor;
+    }
+
+    // Dispara cadeia completa de eventos nativos
+    elemento.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
+    elemento.dispatchEvent(new Event('change', { bubbles: true, cancelable: true }));
+    elemento.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true }));
+    elemento.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true }));
+    elemento.dispatchEvent(new Event('blur', { bubbles: true, cancelable: true }));
+  }
+
+  function atribuirValorSelect(elemento, valor) {
+    const valorNorm = valor.trim().toLowerCase();
+    let encontrou = false;
+
+    for (let i = 0; i < elemento.options.length; i++) {
+      const opt = elemento.options[i];
+      if (opt.value.toLowerCase() === valorNorm || opt.text.toLowerCase().includes(valorNorm)) {
+        elemento.selectedIndex = i;
+        encontrou = true;
+        break;
       }
+    }
+
+    if (!encontrou) {
+      elemento.value = valor;
     }
 
     elemento.dispatchEvent(new Event('input', { bubbles: true }));
@@ -291,21 +410,19 @@
     elemento.dispatchEvent(new Event('blur', { bubbles: true }));
   }
 
-  // Efeito visual sutil de sucesso no campo preenchido
   function destacarCampo(elemento) {
     const originalBorder = elemento.style.borderColor;
     const originalBoxShadow = elemento.style.boxShadow;
 
     elemento.style.borderColor = '#10b981';
-    elemento.style.boxShadow = '0 0 0 2px rgba(16, 185, 129, 0.25)';
+    elemento.style.boxShadow = '0 0 0 3px rgba(16, 185, 129, 0.35)';
 
     setTimeout(() => {
       elemento.style.borderColor = originalBorder;
       elemento.style.boxShadow = originalBoxShadow;
-    }, 2500);
+    }, 3000);
   }
 
-  // Mostra notificação flutuante temporária
   function mostrarToast(mensagem, cor) {
     const antigo = document.getElementById('gcac-toast-msg');
     if (antigo) antigo.remove();
@@ -325,7 +442,7 @@
       font-size: 13px;
       font-weight: 600;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4);
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
       z-index: 2147483647;
       max-width: 380px;
       line-height: 1.4;

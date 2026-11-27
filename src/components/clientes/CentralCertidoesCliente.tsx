@@ -204,7 +204,10 @@ export function CentralCertidoesCliente({ cliente }: CentralCertidoesClienteProp
 
     try {
       localStorage.setItem('gcac_cliente_certidao_ativa', JSON.stringify(dadosCliente));
-      window.postMessage({ type: 'PORTAL_GCAC_CLIENTE_ATIVO', payload: dadosCliente }, '*');
+      sessionStorage.setItem('gcac_cliente_certidao_ativa', JSON.stringify(dadosCliente));
+      window.postMessage({ type: 'PORTAL_GCAC_CLIENTE_ATIVO', payload: dadosCliente, cliente: dadosCliente }, '*');
+      window.postMessage({ type: 'GCAC_SET_CLIENTE', cliente: dadosCliente, payload: dadosCliente }, '*');
+      window.dispatchEvent(new CustomEvent('gcac_set_cliente', { detail: dadosCliente }));
     } catch (e) {
       console.warn(e);
     }
