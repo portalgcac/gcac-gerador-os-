@@ -58,17 +58,33 @@ const CERTIDOES_CATALOGO: CertidaoConfig[] = [
     obterUrl: (uf: string) => {
       const u = uf.toUpperCase().trim();
       switch (u) {
-        case 'GO': return 'https://www.tjgo.jus.br/index.php/certidao-negativa';
+        case 'AC': return 'https://esaj.tjac.jus.br/sco/abrirCadastro.do';
+        case 'AL': return 'https://www.tjal.jus.br/servicos/certidoes';
+        case 'AP': return 'https://www.tjap.jus.br/portal/servicos/certidao-negativa.html';
+        case 'AM': return 'https://consultasaj.tjam.jus.br/sco/abrirCadastro.do';
+        case 'BA': return 'https://www.tjba.jus.br/portal/certidao-judicial/';
+        case 'CE': return 'https://sirece.tjce.jus.br/sirece-web/';
         case 'DF': return 'https://cnc.tjdft.jus.br/';
-        case 'SP': return 'https://esaj.tjsp.jus.br/sco/abrirCadastro.do';
-        case 'MG': return 'https://rupe.tjmg.jus.br/rupe/justica/publico/certidoes/guiaAcompanhamentoCertidao.rupe';
-        case 'RJ': return 'https://www.tjrj.jus.br/servicos/certidoes';
+        case 'ES': return 'https://sistemas.tjes.jus.br/certidaonegativa/';
+        case 'GO': return 'https://www.tjgo.jus.br/index.php/certidao-negativa';
+        case 'MA': return 'https://jurisconsult.tjma.jus.br/#/certidao-solicitacao';
         case 'MT': return 'https://cidadao.tjmt.jus.br/certidaonegativa/';
         case 'MS': return 'https://esaj.tjms.jus.br/sco/abrirCadastro.do';
+        case 'MG': return 'https://rupe.tjmg.jus.br/rupe/justica/publico/certidoes/guiaAcompanhamentoCertidao.rupe';
+        case 'PA': return 'https://www.tjpa.jus.br/PortalExterno/servicos/certidoes.xhtml';
+        case 'PB': return 'https://app.tjpb.jus.br/certidao/paginas/solicitarCertidao.jsf';
         case 'PR': return 'https://www.tjpr.jus.br/certidoes';
-        case 'SC': return 'https://certeproc1g.tjsc.jus.br/';
+        case 'PE': return 'https://www.tjpe.jus.br/antecedentes-criminais/';
+        case 'PI': return 'https://www.tjpi.jus.br/certidoes/';
+        case 'RJ': return 'https://www.tjrj.jus.br/servicos/certidoes';
+        case 'RN': return 'https://certidoes.tjrn.jus.br/';
         case 'RS': return 'https://www.tjrs.jus.br/novo/processos-e-servicos/servicos-processuais/emissao-de-certidoes/';
-        case 'BA': return 'https://www.tjba.jus.br/portal/certidao-judicial/';
+        case 'RO': return 'https://certidao.tjro.jus.br/';
+        case 'RR': return 'https://www.tjrr.jus.br/index.php/certidoes';
+        case 'SC': return 'https://certeproc1g.tjsc.jus.br/';
+        case 'SP': return 'https://esaj.tjsp.jus.br/sco/abrirCadastro.do';
+        case 'SE': return 'https://www.tjse.jus.br/portal/consultas/certidoes';
+        case 'TO': return 'https://certidoes.tjto.jus.br/';
         default: return 'https://www.tjgo.jus.br/index.php/certidao-negativa';
       }
     }
@@ -81,7 +97,7 @@ const CERTIDOES_CATALOGO: CertidaoConfig[] = [
     descricao: 'Certidão Negativa de Ações Criminais junto ao Superior Tribunal Militar.',
     obrigatóriaPara: 'Exigido p/ Aquisição, Concessão de CR e Renovação',
     validadeDias: 90,
-    obterUrl: () => 'https://www.stm.jus.br/servicos-stm/certidao-negativa/emitir-certidao-negativa'
+    obterUrl: () => 'https://www.stm.jus.br/servicos-ao-cidadao/atendimentoaocidadao/certidao-negativa'
   },
   {
     id: 'tse_quitacao',
@@ -91,7 +107,7 @@ const CERTIDOES_CATALOGO: CertidaoConfig[] = [
     descricao: 'Comprova a regularidade do cidadão perante a Justiça Eleitoral brasileira.',
     obrigatóriaPara: 'Exigência legal para processos junto ao Exército e Polícia Federal',
     validadeDias: 90,
-    obterUrl: () => 'https://www.tse.jus.br/servicos-eleitorais/certidoes/certidao-de-quitacao-eleitoral'
+    obterUrl: () => 'https://www.tse.jus.br/servicos-eleitorais/autoatendimento-eleitoral#/certidoes-eleitor/certidao-quitacao-eleitoral'
   },
   {
     id: 'tse_crimes',
@@ -101,7 +117,7 @@ const CERTIDOES_CATALOGO: CertidaoConfig[] = [
     descricao: 'Certidão negativa de condenações por ilícitos ou crimes eleitorais.',
     obrigatóriaPara: 'Exigência de idoneidade em processos SisGCorp e Sinarm',
     validadeDias: 90,
-    obterUrl: () => 'https://www.tse.jus.br/servicos-eleitorais/certidoes/certidao-de-crimes-eleitorais'
+    obterUrl: () => 'https://www.tse.jus.br/servicos-eleitorais/autoatendimento-eleitoral#/certidoes-eleitor/certidao-crimes-eleitorais'
   },
   {
     id: 'dpf',
@@ -124,11 +140,16 @@ const CERTIDOES_CATALOGO: CertidaoConfig[] = [
     obterUrl: (uf: string) => {
       const u = uf.toUpperCase().trim();
       switch (u) {
-        case 'GO': return 'https://sistemas.ssp.go.gov.br/atendimento/antecedentes-criminais';
-        case 'SP': return 'https://www.institutodeidentificacao.sp.gov.br/';
+        case 'GO': return 'https://www.go.gov.br/servicos-digitais/dgpc/obter-atestado-de-antecedentes-criminais/app-obter-antecedente-criminal;brasileiro=S';
         case 'DF': return 'https://www.pcdf.df.gov.br/servicos/antecedentes-criminais';
         case 'MG': return 'https://www.policiacivil.mg.gov.br/site/servico/antecedente-criminal';
-        default: return 'https://sistemas.ssp.go.gov.br/atendimento/antecedentes-criminais';
+        case 'SP': return 'https://www.institutodeidentificacao.sp.gov.br/';
+        case 'RJ': return 'https://atestado.detran.rj.gov.br/';
+        case 'PR': return 'https://www.policiacivil.pr.gov.br/Servicos/Seguranca-Publica/Solicitar-Atestado-de-Antecedentes-Criminais-8V5g4zvr';
+        case 'SC': return 'https://sistemas.pc.sc.gov.br/atestado/';
+        case 'RS': return 'https://www.pc.rs.gov.br/emitir-certidao-de-antecedentes-policiais';
+        case 'BA': return 'https://www.ba.gov.br/servico/103/emitir-atestado-de-antecedentes-criminais';
+        default: return 'https://www.go.gov.br/servicos-digitais/dgpc/obter-atestado-de-antecedentes-criminais/app-obter-antecedente-criminal;brasileiro=S';
       }
     }
   }
@@ -193,11 +214,16 @@ export function CentralCertidoesCliente({ cliente }: CentralCertidoesClienteProp
       cpf: (cliente.cpf || '').replace(/\D/g, ''),
       cpfFormatado: cliente.cpf || '',
       rg: cliente.rg || '',
+      orgaoEmissor: (cliente as any).orgaoEmissor || (cliente as any).orgao_emissor || 'SSP',
+      email: cliente.email || '',
       dataNascimento: cliente.dataNascimento || '',
       dataNascimentoBr: cliente.dataNascimento ? cliente.dataNascimento.split('-').reverse().join('/') : '',
       nomeMae: (cliente.nomeMae || (cliente as any).nome_mae || '').toUpperCase().trim(),
       nomePai: (cliente.nomePai || (cliente as any).nome_pai || '').toUpperCase().trim(),
       endereco: cliente.endereco || '',
+      cidade: (cliente as any).cidade || '',
+      bairro: (cliente as any).bairro || '',
+      cep: (cliente as any).cep || '',
       uf: ufSelecionada,
       timestamp: Date.now()
     };
@@ -229,6 +255,7 @@ RG: ${cliente.rg || ''}
 Data de Nascimento: ${cliente.dataNascimento ? cliente.dataNascimento.split('-').reverse().join('/') : ''}
 Nome da Mãe: ${cliente.nomeMae || ''}
 Nome do Pai: ${cliente.nomePai || ''}
+E-mail: ${cliente.email || ''}
 Endereço: ${cliente.endereco || ''}
 Estado (UF): ${ufSelecionada}`;
     copiarTexto(texto, 'todos');
@@ -285,7 +312,7 @@ Estado (UF): ${ufSelecionada}`;
 
   const handleDownloadExtensao = () => {
     const link = document.createElement('a');
-    link.href = '/extensao-chrome/extensao-gcac.zip';
+    link.href = '/extensao-gcac.zip';
     link.download = 'extensao-portal-gcac.zip';
     link.click();
   };

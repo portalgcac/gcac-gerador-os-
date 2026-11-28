@@ -1,4 +1,4 @@
-// Portal G CAC - Content Script Inteligente para Preenchimento de Certidões
+// Portal G CAC - Content Script Inteligente para Preenchimento de Certidões v1.2.0
 (function () {
   'use strict';
 
@@ -14,10 +14,11 @@
                        document.title.toLowerCase().includes('portal g cac');
 
   if (isGcacPortal) {
-    document.documentElement.setAttribute('data-gcac-ext', '1.1.1');
+    document.documentElement.setAttribute('data-gcac-ext', '1.2.0');
 
     function sincronizarCliente(cliente) {
       if (!cliente || !cliente.nome) return;
+      cliente.timestamp = cliente.timestamp || Date.now();
       chrome.storage.local.set({ gcac_cliente: cliente }, () => {
         mostrarToast(`✓ Sincronizado com Portal G CAC: ${cliente.nome}`, '#10b981');
       });
@@ -57,21 +58,105 @@
     return;
   }
 
-  // 2. Em portais externos de Tribunais e Órgãos Oficiais
+  // 2. Verifica se a página atual pertence a um portal oficial de certidão ou tribunal
+  function ehSiteDeCertidaoOuOrgao() {
+    const host = window.location.hostname.toLowerCase();
+    const href = window.location.href.toLowerCase();
+    const title = (document.title || '').toLowerCase();
+
+    return host.includes('jus.br') ||
+           host.includes('gov.br') ||
+           host.includes('dpf.gov.br') ||
+           host.includes('policiacivil') ||
+           host.includes('ssp.') ||
+           host.includes('pcdf.df.gov.br') ||
+           host.includes('detran.rj.gov.br') ||
+           host.includes('institutodeidentificacao') ||
+           href.includes('antecedente') ||
+           href.includes('certidao') ||
+           href.includes('ceneg') ||
+           href.includes('sco/abrircadastro') ||
+           title.includes('certid') ||
+           title.includes('antecedente') ||
+           title.includes('acesso.gov.br');
+  }
+
+  // 3. Em portais externos
   function iniciarNaPaginaExterna() {
     chrome.storage.local.get(['gcac_cliente'], (result) => {
       let cliente = result.gcac_cliente;
 
       if (cliente && cliente.nome) {
-        criarBotaoFlutuante(cliente);
+        processarPaginaExterna(cliente);
       } else {
         chrome.runtime.sendMessage({ action: 'buscar_cliente_abas' }, (resp) => {
           if (resp && resp.cliente) {
-            criarBotaoFlutuante(resp.cliente);
+            processarPaginaExterna(resp.cliente);
           }
         });
       }
     });
+  }
+
+  function processarPaginaExterna(cliente) {
+    const relevante = ehSiteDeCertidaoOuOrgao();
+
+    // Se NÃO for site de certidão/órgão oficial, NÃO polui a tela com o botão flutuante
+    // (Apenas responde se o usuário clicar no popup da extensão)
+    if (!relevante) return;
+
+    // Cria o botão flutuante com opção de fechar/minimizar
+    criarBotaoFlutuante(cliente);
+
+    // Executa o PREENCHIMENTO AUTOMÁTICO de imediato!
+    tentarAutoPreenchimento(cliente);
+  }
+
+  function tentarAutoPreenchimento(cliente) {
+    // 1º disparo imediato / rápido
+    setTimeout(() => {
+      const preenchidos = preencherFormularioGeral(cliente);
+      if (preenchidos > 0) {
+        mostrarToast(`✓ Preenchimento automático: ${preenchidos} campos preenchidos com dados de ${cliente.nome}!`, '#10b981');
+      }
+    }, 600);
+
+    // 2º disparo para formulários Angular / React que demoram a carregar
+    setTimeout(() => {
+      preencherFormularioGeral(cliente);
+    }, 1800);
+
+    // Observa mudanças dinâmicas no DOM (ex.: modal de autenticação do TSE ou carregamento tardio do TRF)
+    observarMutacoesDOM(cliente);
+  }
+
+  let observerAtivo = null;
+  function observarMutacoesDOM(cliente) {
+    if (observerAtivo) return;
+    try {
+      observerAtivo = new MutationObserver((mutations) => {
+        let precisaTentar = false;
+        for (const m of mutations) {
+          if (m.addedNodes && m.addedNodes.length > 0) {
+            precisaTentar = true;
+            break;
+          }
+        }
+        if (precisaTentar) {
+          preencherFormularioGeral(cliente);
+        }
+      });
+
+      observerAtivo.observe(document.body, { childList: true, subtree: true });
+
+      // Desconecta o observer após 25 segundos para não consumir CPU desnecessariamente
+      setTimeout(() => {
+        if (observerAtivo) {
+          observerAtivo.disconnect();
+          observerAtivo = null;
+        }
+      }, 25000);
+    } catch (e) {}
   }
 
   iniciarNaPaginaExterna();
@@ -101,8 +186,21 @@
       display: flex;
       flex-direction: column;
       align-items: flex-end;
-      gap: 8px;
+      gap: 6px;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    `;
+
+    const widget = document.createElement('div');
+    widget.style.cssText = `
+      display: flex;
+      align-items: center;
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      color: #ffffff;
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      border-radius: 12px;
+      box-shadow: 0 10px 25px -5px rgba(16, 185, 129, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.2);
+      overflow: hidden;
+      transition: all 0.2s ease;
     `;
 
     const btn = document.createElement('button');
@@ -111,44 +209,65 @@
       <div style="display:flex; align-items:center; gap:8px;">
         <span style="font-size:18px;">⚡</span>
         <div style="text-align:left;">
-          <div style="font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:0.5px;">Preencher com Portal G CAC</div>
-          <div style="font-size:12px; font-weight:600; opacity:0.9; max-width:220px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+          <div style="font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:0.5px;">Portal G CAC • Preenchimento</div>
+          <div style="font-size:12px; font-weight:700; opacity:0.95; max-width:210px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
             ${cliente.nome}
           </div>
         </div>
       </div>
     `;
     btn.style.cssText = `
-      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      background: transparent;
       color: #ffffff;
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      border-radius: 12px;
-      padding: 10px 16px;
+      border: none;
+      padding: 10px 14px;
       cursor: pointer;
-      box-shadow: 0 10px 25px -5px rgba(16, 185, 129, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
-      transition: all 0.2s ease;
       outline: none;
+      font-family: inherit;
     `;
-
-    btn.addEventListener('mouseenter', () => {
-      btn.style.transform = 'translateY(-2px)';
-      btn.style.boxShadow = '0 14px 28px -4px rgba(16, 185, 129, 0.6)';
-    });
-    btn.addEventListener('mouseleave', () => {
-      btn.style.transform = 'translateY(0)';
-      btn.style.boxShadow = '0 10px 25px -5px rgba(16, 185, 129, 0.5)';
-    });
 
     btn.addEventListener('click', () => {
       const total = preencherFormularioGeral(cliente);
       if (total > 0) {
-        mostrarToast(`✓ ${total} campos preenchidos com sucesso! Resolva o CAPTCHA e emita a certidão.`, '#10b981');
+        mostrarToast(`✓ ${total} campos preenchidos com sucesso! Resolva o CAPTCHA para emitir.`, '#10b981');
       } else {
-        mostrarToast('Verifique se o formulário do órgão está aberto na tela.', '#f59e0b');
+        mostrarToast('Formulário verificado. Campos preenchidos ou não localizados na tela.', '#f59e0b');
       }
     });
 
-    container.appendChild(btn);
+    // Botão de fechar (✕) para permitir ao usuário dispensar o botão
+    const btnFechar = document.createElement('button');
+    btnFechar.type = 'button';
+    btnFechar.innerHTML = '✕';
+    btnFechar.title = 'Fechar este botão';
+    btnFechar.style.cssText = `
+      background: rgba(0, 0, 0, 0.15);
+      color: rgba(255, 255, 255, 0.8);
+      border: none;
+      border-left: 1px solid rgba(255, 255, 255, 0.2);
+      padding: 14px 10px;
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: bold;
+      transition: background 0.2s ease;
+      outline: none;
+    `;
+    btnFechar.addEventListener('mouseenter', () => {
+      btnFechar.style.background = 'rgba(239, 68, 68, 0.8)';
+      btnFechar.style.color = '#fff';
+    });
+    btnFechar.addEventListener('mouseleave', () => {
+      btnFechar.style.background = 'rgba(0, 0, 0, 0.15)';
+      btnFechar.style.color = 'rgba(255, 255, 255, 0.8)';
+    });
+    btnFechar.addEventListener('click', (e) => {
+      e.stopPropagation();
+      container.remove();
+    });
+
+    widget.appendChild(btn);
+    widget.appendChild(btnFechar);
+    container.appendChild(widget);
     document.body.appendChild(container);
   }
 
@@ -163,44 +282,83 @@
 
     const nomeMae = cliente.nomeMae || cliente.nome_mae || '';
     const nomePai = cliente.nomePai || cliente.nome_pai || '';
+    const emailCli = cliente.email || '';
 
     let dataNascFormatada = cliente.dataNascimentoBr || '';
     let dataNascIso = '';
+    let diaNasc = '', mesNasc = '', anoNasc = '';
+
     if (!dataNascFormatada && cliente.dataNascimento) {
       if (cliente.dataNascimento.includes('-')) {
         const parts = cliente.dataNascimento.split('-');
         if (parts.length === 3) {
-          dataNascFormatada = `${parts[2]}/${parts[1]}/${parts[0]}`;
+          diaNasc = parts[2];
+          mesNasc = parts[1];
+          anoNasc = parts[0];
+          dataNascFormatada = `${diaNasc}/${mesNasc}/${anoNasc}`;
           dataNascIso = `${parts[0]}-${parts[1]}-${parts[2]}`;
         }
       } else if (cliente.dataNascimento.includes('/')) {
         dataNascFormatada = cliente.dataNascimento;
         const parts = cliente.dataNascimento.split('/');
         if (parts.length === 3) {
+          diaNasc = parts[0];
+          mesNasc = parts[1];
+          anoNasc = parts[2];
           dataNascIso = `${parts[2]}-${parts[1]}-${parts[0]}`;
+        }
+      }
+    } else if (dataNascFormatada) {
+      const parts = dataNascFormatada.split('/');
+      if (parts.length === 3) {
+        diaNasc = parts[0];
+        mesNasc = parts[1];
+        anoNasc = parts[2];
+        dataNascIso = `${parts[2]}-${parts[1]}-${parts[0]}`;
+      }
+    }
+
+    const host = window.location.hostname.toLowerCase();
+    const href = window.location.href.toLowerCase();
+
+    // ─────────────────────────────────────────────────────────────
+    // CASO 0: GOV.BR LOGIN (sso.acesso.gov.br / DPF Antecedentes)
+    // ─────────────────────────────────────────────────────────────
+    if (host.includes('acesso.gov.br') || href.includes('acesso.gov.br')) {
+      const govCpf = document.getElementById('accountId') || 
+                     document.querySelector('input[name="accountId"]') ||
+                     document.querySelector('input[placeholder*="CPF" i]');
+      if (govCpf && (!govCpf.value || govCpf.value.replace(/\D/g, '') !== cpfLimpo)) {
+        atribuirValorNativo(govCpf, cpfLimpo);
+        destacarCampo(govCpf);
+        preenchidos++;
+
+        const btnContinuar = document.getElementById('enter-account-id') || document.querySelector('.button-continuar');
+        if (btnContinuar) {
+          btnContinuar.style.boxShadow = '0 0 0 4px rgba(16, 185, 129, 0.4)';
         }
       }
     }
 
     // ─────────────────────────────────────────────────────────────
-    // CASO ESPECÍFICO 1: TSE (Angular Reactive Forms com Seletores Exatos)
+    // CASO 1: TSE (Angular Reactive Forms - Quitação e Crimes)
     // ─────────────────────────────────────────────────────────────
     const tseNome = document.querySelector('input[formcontrolname="nomeEleitor"]');
-    if (tseNome) {
+    if (tseNome && !tseNome.value) {
       atribuirValorNativo(tseNome, cliente.nome);
       destacarCampo(tseNome);
       preenchidos++;
     }
 
     const tseCpf = document.querySelector('input[formcontrolname="TituloCPF"]');
-    if (tseCpf) {
+    if (tseCpf && !tseCpf.value) {
       atribuirValorNativo(tseCpf, cpfLimpo);
       destacarCampo(tseCpf);
       preenchidos++;
     }
 
     const tseNasc = document.querySelector('input[formcontrolname="dataNascimento"]') || document.getElementById('dataNascimento');
-    if (tseNasc) {
+    if (tseNasc && !tseNasc.value) {
       atribuirValorNativo(tseNasc, dataNascFormatada);
       destacarCampo(tseNasc);
       preenchidos++;
@@ -223,19 +381,208 @@
       preenchidos++;
     }
 
-    // Preenche campos de Mãe e Pai do TSE
     const tseMae = document.querySelector('input[formcontrolname="nomeMae"]') || document.getElementById('nomeMae');
-    if (tseMae) {
+    if (tseMae && !tseMae.value && nomeMae) {
       atribuirValorNativo(tseMae, nomeMae);
       destacarCampo(tseMae);
       preenchidos++;
     }
 
     const tsePai = document.querySelector('input[formcontrolname="nomePai"]') || document.getElementById('nomePai');
-    if (tsePai) {
+    if (tsePai && !tsePai.value && nomePai) {
       atribuirValorNativo(tsePai, nomePai);
       destacarCampo(tsePai);
       preenchidos++;
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // CASO 2: STM (Superior Tribunal Militar & Iframe www2.stm.jus.br)
+    // ─────────────────────────────────────────────────────────────
+    if (host.includes('stm.jus.br') || href.includes('stm.jus.br') || href.includes('ceneg')) {
+      const stmNome = document.querySelector('input[name="txt_nome"]');
+      if (stmNome && !stmNome.value) {
+        atribuirValorNativo(stmNome, cliente.nome);
+        destacarCampo(stmNome);
+        preenchidos++;
+      }
+
+      const stmCpf1 = document.querySelector('input[name="txt_cpf1"]');
+      const stmCpf2 = document.querySelector('input[name="txt_cpf2"]');
+      const stmCpf3 = document.querySelector('input[name="txt_cpf3"]');
+      const stmDv = document.querySelector('input[name="txt_dv"]');
+      if (stmCpf1 && stmCpf2 && stmCpf3 && stmDv && !stmCpf1.value && cpfLimpo.length >= 11) {
+        atribuirValorNativo(stmCpf1, cpfLimpo.slice(0, 3));
+        atribuirValorNativo(stmCpf2, cpfLimpo.slice(3, 6));
+        atribuirValorNativo(stmCpf3, cpfLimpo.slice(6, 9));
+        atribuirValorNativo(stmDv, cpfLimpo.slice(9, 11));
+        destacarCampo(stmCpf1);
+        destacarCampo(stmDv);
+        preenchidos++;
+      }
+
+      const stmDia = document.querySelector('input[name="txt_dia"]');
+      const stmMes = document.querySelector('input[name="txt_mes"]');
+      const stmAno = document.querySelector('input[name="txt_ano"]');
+      if (stmDia && stmMes && stmAno && !stmDia.value && diaNasc && mesNasc && anoNasc) {
+        atribuirValorNativo(stmDia, diaNasc);
+        atribuirValorNativo(stmMes, mesNasc);
+        atribuirValorNativo(stmAno, anoNasc);
+        destacarCampo(stmDia);
+        destacarCampo(stmAno);
+        preenchidos++;
+      }
+
+      const stmMae = document.querySelector('input[name="txt_nome_mae"]');
+      if (stmMae && !stmMae.value && nomeMae) {
+        atribuirValorNativo(stmMae, nomeMae);
+        destacarCampo(stmMae);
+        preenchidos++;
+      }
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // CASO 3: TJSP / e-SAJ (TJSP, TJMS, TJAC, TJAM - Softplan e-SAJ)
+    // ─────────────────────────────────────────────────────────────
+    if (host.includes('esaj') || href.includes('sco/abrircadastro')) {
+      const cdModelo = document.getElementById('cdModelo') || document.querySelector('[name="entity.cdModelo"]');
+      if (cdModelo && !cdModelo.value) {
+        atribuirValorSelect(cdModelo, '6'); // 6 = Certidão de Distribuição Criminal
+        destacarCampo(cdModelo);
+      }
+
+      const radioMasc = document.getElementById('flGeneroM');
+      if (radioMasc && !radioMasc.checked) {
+        radioMasc.checked = true;
+        radioMasc.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+
+      const sajNome = document.getElementById('nmCadastroF') || document.querySelector('[name="entity.nmPesquisa"]');
+      if (sajNome && !sajNome.value) {
+        atribuirValorNativo(sajNome, cliente.nome);
+        destacarCampo(sajNome);
+        preenchidos++;
+      }
+
+      const sajCpf = document.getElementById('identity.nuCpfFormatado') || document.querySelector('[name="entity.nuCpfFormatado"]');
+      if (sajCpf && !sajCpf.value) {
+        atribuirValorNativo(sajCpf, cpfFormatado);
+        destacarCampo(sajCpf);
+        preenchidos++;
+      }
+
+      const sajRg = document.getElementById('identity.nuRgFormatado') || document.querySelector('[name="entity.nuRgFormatado"]');
+      if (sajRg && !sajRg.value && rgFull) {
+        atribuirValorNativo(sajRg, rgNumero || rgFull);
+        destacarCampo(sajRg);
+        preenchidos++;
+      }
+
+      const sajMae = document.getElementById('nmMaeCadastro') || document.querySelector('[name="entity.nmMae"]');
+      if (sajMae && !sajMae.value && nomeMae) {
+        atribuirValorNativo(sajMae, nomeMae);
+        destacarCampo(sajMae);
+        preenchidos++;
+      }
+
+      const sajPai = document.getElementById('nmPaiCadastro') || document.querySelector('[name="entity.nmPai"]');
+      if (sajPai && !sajPai.value && nomePai) {
+        atribuirValorNativo(sajPai, nomePai);
+        destacarCampo(sajPai);
+        preenchidos++;
+      }
+
+      const sajNasc = document.getElementById('dataNascimento') || document.querySelector('[name="entity.dtNascimento"]');
+      if (sajNasc && !sajNasc.value && dataNascFormatada) {
+        atribuirValorNativo(sajNasc, dataNascFormatada);
+        destacarCampo(sajNasc);
+        preenchidos++;
+      }
+
+      const sajEmail = document.getElementById('identity.solicitante.deEmail') || document.querySelector('[name="entity.solicitante.deEmail"]');
+      if (sajEmail && !sajEmail.value && emailCli) {
+        atribuirValorNativo(sajEmail, emailCli);
+        destacarCampo(sajEmail);
+        preenchidos++;
+      }
+
+      const sajCheck = document.getElementById('confirmacaoInformacoes');
+      if (sajCheck && !sajCheck.checked) {
+        sajCheck.checked = true;
+        sajCheck.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // CASO 4: TRF1 (Angular Material MDC - sistemas.trf1.jus.br)
+    // ─────────────────────────────────────────────────────────────
+    if (host.includes('trf1.jus.br') || href.includes('trf1.jus.br')) {
+      const trfCpf = document.querySelector('input[formcontrolname="cpf"]');
+      if (trfCpf && !trfCpf.value) {
+        atribuirValorNativo(trfCpf, cpfLimpo);
+        destacarCampo(trfCpf);
+        preenchidos++;
+      }
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // CASO 5: SSP-GO / PCGO (Expresso Design System no go.gov.br)
+    // ─────────────────────────────────────────────────────────────
+    if (host.includes('go.gov.br') || href.includes('obter-atestado-de-antecedentes-criminais')) {
+      const expNome = document.querySelector('[formcontrolname="nome"] input');
+      if (expNome && !expNome.value) {
+        atribuirValorNativo(expNome, cliente.nome);
+        destacarCampo(expNome);
+        preenchidos++;
+      }
+
+      const expNasc = document.querySelector('[formcontrolname="dataNascimento"] input');
+      if (expNasc && !expNasc.value && dataNascFormatada) {
+        atribuirValorNativo(expNasc, dataNascFormatada);
+        destacarCampo(expNasc);
+        preenchidos++;
+      }
+
+      const expCpf = document.querySelector('[formcontrolname="cpf"] input');
+      if (expCpf && !expCpf.value) {
+        atribuirValorNativo(expCpf, cpfLimpo);
+        destacarCampo(expCpf);
+        preenchidos++;
+      }
+
+      const expRg = document.querySelector('[formcontrolname="rgCivil"] input');
+      if (expRg && !expRg.value && rgNumero) {
+        atribuirValorNativo(expRg, rgNumero);
+        destacarCampo(expRg);
+        preenchidos++;
+      }
+
+      const expOrgao = document.querySelector('[formcontrolname="orgaoRgCivil"] input');
+      if (expOrgao && !expOrgao.value) {
+        atribuirValorNativo(expOrgao, cliente.orgaoEmissor || 'SSP');
+        destacarCampo(expOrgao);
+        preenchidos++;
+      }
+
+      const expMae = document.querySelector('[formcontrolname="nomeMae"] input');
+      if (expMae && !expMae.value && nomeMae) {
+        atribuirValorNativo(expMae, nomeMae);
+        destacarCampo(expMae);
+        preenchidos++;
+      }
+
+      const expPai = document.querySelector('[formcontrolname="nomePai"] input');
+      if (expPai && !expPai.value && nomePai) {
+        atribuirValorNativo(expPai, nomePai);
+        destacarCampo(expPai);
+        preenchidos++;
+      }
+
+      const expEmail = document.querySelector('[formcontrolname="email"] input');
+      if (expEmail && !expEmail.value && emailCli) {
+        atribuirValorNativo(expEmail, emailCli);
+        destacarCampo(expEmail);
+        preenchidos++;
+      }
     }
 
     // ─────────────────────────────────────────────────────────────
@@ -301,7 +648,7 @@
       }
 
       // 4. CPF
-      if (fullText.includes('cpf') || fullText.includes('cadastro de pessoa') || fullText.includes('titulocpf')) {
+      if (fullText.includes('cpf') || fullText.includes('cadastro de pessoa') || fullText.includes('titulocpf') || fullText.includes('accountid')) {
         const valCpf = (input.maxLength === 11 || input.getAttribute('mask') === '00000000000') ? cpfLimpo : cpfFormatado;
         atribuirValorNativo(input, valCpf);
         destacarCampo(input);
@@ -327,7 +674,17 @@
         return;
       }
 
-      // 7. CEP
+      // 7. E-MAIL
+      if (fullText.includes('email') || fullText.includes('correio eletronico')) {
+        if (emailCli) {
+          atribuirValorNativo(input, emailCli);
+          destacarCampo(input);
+          preenchidos++;
+          return;
+        }
+      }
+
+      // 8. CEP
       if (fullText.includes('cep') || fullText.includes('postal')) {
         atribuirValorNativo(input, (cliente.cep || '').replace(/\D/g, ''));
         destacarCampo(input);
@@ -335,7 +692,7 @@
         return;
       }
 
-      // 8. ENDEREÇO / LOGRADOURO
+      // 9. ENDEREÇO / LOGRADOURO
       if (fullText.includes('endereco') || fullText.includes('logradouro') || fullText.includes('rua')) {
         atribuirValorNativo(input, cliente.endereco || '');
         destacarCampo(input);
@@ -343,7 +700,7 @@
         return;
       }
 
-      // 9. BAIRRO
+      // 10. BAIRRO
       if (fullText.includes('bairro')) {
         atribuirValorNativo(input, cliente.bairro || '');
         destacarCampo(input);
@@ -351,7 +708,7 @@
         return;
       }
 
-      // 10. MUNICÍPIO / CIDADE
+      // 11. MUNICÍPIO / CIDADE
       if (fullText.includes('municipio') || fullText.includes('cidade')) {
         atribuirValorNativo(input, cliente.cidade || '');
         destacarCampo(input);
@@ -359,7 +716,7 @@
         return;
       }
 
-      // 11. UF / ESTADO
+      // 12. UF / ESTADO
       if (fullText.includes('uf') || (fullText.includes('estado') && !fullText.includes('civil'))) {
         atribuirValorNativo(input, cliente.estado || cliente.uf || 'GO');
         destacarCampo(input);
@@ -367,7 +724,7 @@
         return;
       }
 
-      // 12. NOME DO CLIENTE / ELEITOR / REQUERENTE
+      // 13. NOME DO CLIENTE / ELEITOR / REQUERENTE
       // REGRA DE OURO: SÓ PREENCHE SE NÃO FOR MÃE, NÃO FOR PAI E NÃO FOR FILIAÇÃO
       if (fullText.includes('nome') || fullText.includes('requerente') || fullText.includes('interessado') || fullText.includes('eleitor')) {
         if (!fullText.includes('mae') && !fullText.includes('pai') && !fullText.includes('filiacao')) {
@@ -383,27 +740,37 @@
   }
 
   function atribuirValorNativo(elemento, valor) {
-    if (!elemento || !valor) return;
-    elemento.focus();
+    if (!elemento || valor === undefined || valor === null) return;
+    try {
+      elemento.focus();
 
-    if (elemento.tagName === 'SELECT') {
-      atribuirValorSelect(elemento, valor);
-      return;
+      if (elemento.tagName === 'SELECT') {
+        atribuirValorSelect(elemento, valor);
+        return;
+      }
+
+      const prototype = elemento instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+      const descriptor = Object.getOwnPropertyDescriptor(prototype, 'value');
+      if (descriptor && descriptor.set) {
+        descriptor.set.call(elemento, valor);
+      } else {
+        elemento.value = valor;
+      }
+
+      // Dispara eventos com InputEvent para compatibilidade máxima com bibliotecas de máscara e Angular/React
+      try {
+        elemento.dispatchEvent(new InputEvent('input', { bubbles: true, cancelable: true, inputType: 'insertText', data: valor }));
+      } catch (err) {
+        elemento.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
+      }
+
+      elemento.dispatchEvent(new Event('change', { bubbles: true, cancelable: true }));
+      elemento.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true }));
+      elemento.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true }));
+      elemento.dispatchEvent(new Event('blur', { bubbles: true, cancelable: true }));
+    } catch (e) {
+      console.warn('Erro ao atribuir valor:', e);
     }
-
-    const prototype = elemento instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
-    const descriptor = Object.getOwnPropertyDescriptor(prototype, 'value');
-    if (descriptor && descriptor.set) {
-      descriptor.set.call(elemento, valor);
-    } else {
-      elemento.value = valor;
-    }
-
-    elemento.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
-    elemento.dispatchEvent(new Event('change', { bubbles: true, cancelable: true }));
-    elemento.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true }));
-    elemento.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true }));
-    elemento.dispatchEvent(new Event('blur', { bubbles: true, cancelable: true }));
   }
 
   function atribuirValorSelect(elemento, valor) {
@@ -438,7 +805,7 @@
     setTimeout(() => {
       elemento.style.borderColor = originalBorder;
       elemento.style.boxShadow = originalBoxShadow;
-    }, 3000);
+    }, 4000);
   }
 
   function mostrarToast(mensagem, cor) {
@@ -462,7 +829,7 @@
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
       z-index: 2147483647;
-      max-width: 380px;
+      max-width: 400px;
       line-height: 1.4;
       animation: gcacFadeIn 0.3s ease;
     `;
@@ -472,6 +839,6 @@
       toast.style.opacity = '0';
       toast.style.transition = 'opacity 0.3s ease';
       setTimeout(() => toast.remove(), 300);
-    }, 4500);
+    }, 5000);
   }
 })();
